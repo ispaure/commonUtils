@@ -1,0 +1,434 @@
+"""
+PySide Utils for creating GUI (needs a few outside packages, I know they are in Maya but IDK for the others).
+"""
+import sys
+import platform
+if sys.platform != 'win32' and platform.processor() == 'arm':
+
+    # Alternative worked before fuck up
+    from PySide6.QtCore import *
+    from PySide6.QtGui import *
+    from PySide6.QtWidgets import *
+
+    # from PySide2.QtCore import *
+    # from PySide2.QtGui import *
+    # from PySide2.QtWidgets import *
+
+    # # Alternative trying April 2024
+    # from PyQt6.QtCore import *
+    # from PyQt6.QtGui import *
+    # from PyQt6.QtWidgets import *
+else:
+    from PySide2.QtCore import *
+    from PySide2.QtGui import *
+    from PySide2.QtWidgets import *
+
+
+show_verbose = True
+
+
+# QMessageBox
+class MessageBox(QMessageBox):
+    def __init__(self):
+        super(MessageBox, self).__init__()
+
+
+def create_msg_box_base(title, message, icon='default', width=300, height=400,
+                        b_01_str=None, b_01_fn=None,
+                        b_02_str=None, b_02_fn=None,
+                        b_03_str=None, b_03_fn=None):
+    """
+    Creates message box of various types
+    :param title: Title in the header of the message box
+    :type title: str
+    :param message: Message within the message box
+    :type message: str
+    :param icon: Icon in the message box to display (dependent of severity of message)
+    :type icon: str, from a few predefined options (see API doc.)
+    :param width: Width of the window
+    :type width: int
+    :param height: Height of the window
+    :type height: int
+    :param b_01_str: Text to display on first button
+    :type b_01_str: str
+    :param b_01_fn: Function to execute on first button press
+    :type b_01_fn: func
+    :param b_02_str: Text to display on second button
+    :type b_02_str: str
+    :param b_02_fn: Function to execute on second button press
+    :type b_02_fn: func
+    :param b_03_str: Text to display on third button
+    :type b_03_str: str
+    :param b_03_fn: Function to execute on third button press
+    :type b_03_fn: func
+    """
+
+    def button_pressed(info):
+        # Execute button pressed function.
+        def exec_fn_if_not_none(b_fn):
+            # If function isn't None, execute
+            if b_fn is not None:
+                b_fn()
+
+        # Find out which button was pressed and run its fn (if not set to None)
+        if info.text() == b_01_str:
+            exec_fn_if_not_none(b_01_fn)
+        if info.text() == b_02_str:
+            exec_fn_if_not_none(b_02_fn)
+        if info.text() == b_03_str:
+            exec_fn_if_not_none(b_03_fn)
+
+    # Create message box
+    msg_box = MessageBox()
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.setMinimumWidth(width)
+    msg_box.setMinimumHeight(height)
+
+    # Set Icon
+    if icon.lower() == 'critical':
+        msg_box.setIcon(msg_box.Critical)
+    elif icon.lower() == 'warning':
+        msg_box.setIcon(msg_box.Warning)
+    elif icon.lower() == 'information':
+        msg_box.setIcon(msg_box.Information)
+    elif icon.lower() == 'question':
+        msg_box.setIcon(msg_box.Question)
+
+    # Connect button to functions
+    msg_box.buttonClicked.connect(button_pressed)
+
+    # Return created message box
+    return msg_box
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# PRESETS
+
+"""This section below includes presets which are based on the create_msg_box_base function."""
+
+
+def display_msg_box_ok_cancel(title, message, fn_ok=None, fn_cancel=None, icon='information', width=300, height=400):
+    """
+    Displays a message box with OK and Cancel buttons.
+    """
+    msg_box = create_msg_box_base(title, message, icon, width, height, 'OK', fn_ok, 'Cancel', fn_cancel)
+    msg_box.setStandardButtons(msg_box.Ok | msg_box.Cancel)
+    msg_box.exec_()
+    return True
+
+
+def display_msg_box_ok(title, message, icon='warning', width=300, height=400):
+    """
+    Displays a message box with OK button.
+    """
+    msg_box = create_msg_box_base(title, message, icon, width, height, 'OK')
+    msg_box.setStandardButtons(msg_box.Ok)
+    msg_box.exec_()
+    return True
+
+
+def display_msg_box_ignore_abort(title, message, fn_ignore=None, fn_abort=None, icon='warning', width=300, height=400):
+    """
+    Displays a message box with Ignore and Abort buttons.
+    """
+    msg_box = create_msg_box_base(title, message, icon, width, height, 'Ignore', fn_ignore, 'Abort', fn_abort)
+    msg_box.setStandardButtons(msg_box.Ignore | msg_box.Abort)
+    msg_box.exec_()
+    return True
+
+
+def display_msg_box_yes_no(title, message, fn_yes=None, fn_no=None, icon='question', width=300, height=400):
+    """
+    Displays a message box with Yes and No buttons.
+    """
+    msg_box = create_msg_box_base(title, message, icon, width, height, '&Yes', fn_yes, '&No', fn_no)
+    msg_box.setStandardButtons(msg_box.Yes | msg_box.No)
+    msg_box.exec_()
+    return True
+
+
+def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=300, height=400):
+    """
+    Displays a message box with Ok and Help buttons.
+    """
+    msg_box = create_msg_box_base(title, message, icon, width, height, 'Ok', None, 'Help', fn_help)
+    msg_box.setStandardButtons(msg_box.Ok | msg_box.Help)
+    msg_box.exec_()
+    return True
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# LABELS & BUTTONS & SCROLL AREA & GRID & PANEL
+# To add to custom UI Windows
+
+
+def get_scale_multiplier():
+    return 1
+
+
+class UiRect:
+    def __init__(self, point_x, point_y, size_x, size_y):
+        """
+        :param point_x: Offset from origin (horizontal)
+        :type point_x: Int
+        :param point_y: Offset from origin (vertical)
+        :type point_y: Int
+        :param size_x: Size (horizontal)
+        :type size_x: Int
+        :param size_y: Size (vertical)
+        :type size_y: Int
+        """
+        self.QRect = self.create_scaled_qrect(point_x, point_y, size_x, size_y)
+
+    def create_scaled_qrect(self, point_x, point_y, size_x, size_y):
+        """
+        This function is used to create a PySide2.QtCore.QRect object that will scale properly in all scenarios
+        :rtype: PySide2.QtCore.QRect
+        """
+
+        def point_x_scaled():
+            return point_x * get_scale_multiplier()
+
+        def point_y_scaled():
+            return point_y * get_scale_multiplier()
+
+        def size_x_scaled():
+            return size_x * get_scale_multiplier()
+
+        def size_y_scaled():
+            return size_y * get_scale_multiplier()
+
+        return QRect(point_x_scaled(), point_y_scaled(), size_x_scaled(), size_y_scaled())
+
+
+class UiSize:
+    def __init__(self, size_x, size_y):
+        """
+        :param size_x: Size (horizontal)
+        :type size_x: Int
+        :param size_y: Size (vertical)
+        :type size_y: Int
+        """
+        self.QSize = self.create_scaled_qsize(size_x, size_y)
+
+    def create_scaled_qsize(self, size_x, size_y):
+        """
+        This function is used to create a PySide2.QtCore.QSize object that will scale properly in all scenarios
+        :rtype: PySide2.QtCore.QSize
+        """
+
+        def size_x_scaled():
+            return size_x * get_scale_multiplier()
+
+        def size_y_scaled():
+            return size_y * get_scale_multiplier()
+
+        return QSize(size_x_scaled(), size_y_scaled())
+
+
+def create_label(text, ui_rect_cls, target, align_center=False, box_frame=False):
+    """
+    Create a label (piece of non-interactive text) that can be used within a UI.
+    :param text: Text to display on label
+    :type text: str
+    :param ui_rect_cls: UiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the label in
+    :type target: PySide2.QtWidgets.QObject
+    :param align_center: Whether to align the text in centre of the bounds of the UiRect Object. Default is False
+    :type align_center: bool
+    :param box_frame: Whether to use a box frame or not for the label. Default is False
+    :type box_frame: bool
+    :rtype: PySide2.QtWidgets.QLabel
+    """
+    label = QLabel(target)
+    label.setGeometry(ui_rect_cls.QRect)
+    label.setObjectName('label')
+    label.setText(text)
+
+    # Set Font and Size
+    if sys.platform == 'win32':
+        font_size = 10
+    else:
+        font_size = 13
+    label.setFont(QFont('Arial', font_size))
+
+    if align_center:
+        label.setAlignment(Qt.AlignCenter)
+    if box_frame:
+        label.setFrameShape(QFrame.Box)
+    return label
+
+
+def create_button(text, ui_rect_cls, target, exec_fn=None, arg_dict=None, tooltip=None):
+    """
+    Create a button that can trigger a function (with arguments) when clicked
+    :param text: Text to display on button
+    :type text: str
+    :param ui_rect_cls: UiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the button in
+    :type target: PySide2.QtWidgets.QObject
+    :param exec_fn: Function to execute when button is pressed
+    :type exec_fn: Func
+    :param arg_dict: Dictionary of arguments to pass on to the function when executing it
+    :type arg_dict: dict
+    :param tooltip: Tooltip to display on hover of the button
+    :type tooltip: str
+    :rtype: PySide2.QtWidgets.QPushButton
+    """
+    def clicked():
+        if exec_fn is not None:
+            if arg_dict is not None:
+                exec_fn(arg_dict)
+            else:
+                exec_fn()
+    push_button = QPushButton(target)
+    push_button.setGeometry(ui_rect_cls.QRect)
+    push_button.setObjectName('button')
+    push_button.setText(text)
+    push_button.clicked.connect(clicked)
+    if tooltip is not None:
+        push_button.setToolTip(tooltip)
+
+    # Set Font and Size
+    if sys.platform == 'win32':
+        font_size = 10
+    else:
+        font_size = 13
+    push_button.setFont(QFont('Arial', font_size))
+
+    return push_button
+
+
+def create_panel(ui_rect_cls, target):
+    """
+    Creates a panel which can hold multiple objects to be displayed
+    :param ui_rect_cls: UiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the panel in
+    :type target: PySide2.QtWidgets.QObject
+    :rtype: PySide2.QtWidgets.QFrame
+    """
+    line = QFrame(target)
+    line.setGeometry(ui_rect_cls.QRect)
+    line.setObjectName('panel')
+    line.setFrameShape(QFrame.Panel)
+    line.setFrameShadow(QFrame.Plain)
+    return line
+
+
+def create_textedit(text, ui_rect_cls, target, pw_field=False):
+    """
+    Create a text box which can be filled by user.
+    :param text: Text that is there by default in the field (set to '' for nothing)
+    :type text: str
+    :param ui_rect_cls: UiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the textedit in
+    :type target: PySide2.QtWidgets.QObject
+    :param pw_field: If is a password field or not (put *** instead of text)
+    :type pw_field: bool
+    :rtype: PySide2.QtWidgets.QTextEdit
+    """
+    textedit = QLineEdit(target)
+    textedit.setGeometry(ui_rect_cls.QRect)
+    textedit.setObjectName('textedit')
+    textedit.setText(text)
+
+    # Set Font and Size
+    if sys.platform == 'win32':
+        font_size = 10
+    else:
+        font_size = 13
+    textedit.setFont(QFont('Arial', font_size))
+
+    # Set PW field
+    if pw_field:
+        textedit.setEchoMode(QLineEdit.Password)
+
+    return textedit
+
+
+def create_checkbox(ui_rect_cls, target, default_state=False):
+    """
+    Create a checkbox which can be ticked or not by user.
+    :param ui_rect_cls: UiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the checkbox in
+    :type target: PySide2.QtWidgets.QObject
+    :rtype: PySide2.QtWidgets.QCheckBox
+    :param default_state: Default state for the checkbox. Default is unchecked.
+    :type default_state: bool
+    :rtype: PySide2.QtWidgets.QCheckBox
+    """
+    checkbox = QCheckBox(target)
+    checkbox.setGeometry(ui_rect_cls.QRect)
+    checkbox.setObjectName('checkbox')
+    if default_state:
+        checkbox.setChecked(default_state)
+
+    return checkbox
+
+
+def create_scroll_area(ui_rect_cls, ui_size_min, target):
+    """
+    Creates a scroll area (scroll bar appears only if not everything can be seen).
+    :param ui_rect_cls: UiRect Object (Physical location and size of the scroll area on screen)
+    :type ui_rect_cls: UiRect
+    :param ui_size_min: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
+    :type ui_size_min: UiSize
+    :param target: Target UI Element to draw the scroll area in
+    :type target: PySide2.QtWidgets.QObject
+    :rtype: PySide2.QtWidgets.QWidget
+    """
+    scroll_area = QScrollArea(target)
+    scroll_area.setGeometry(ui_rect_cls.QRect)
+    scroll_area.setWidgetResizable(True)
+    scroll_area.setObjectName('scroll_area')
+    scroll_area_widget_contents = QWidget()
+    scroll_area_widget_contents.setGeometry(ui_rect_cls.QRect)
+    scroll_area_widget_contents.setMinimumSize(ui_size_min.QSize)
+    scroll_area_widget_contents.setObjectName('scroll_area_widget')
+    scroll_area.setWidget(scroll_area_widget_contents)
+    return scroll_area_widget_contents
+
+
+def create_grid(ui_rect_cls, target):
+    """
+    Create a grid that can later be filled.
+    :param ui_rect_cls: uiRect Object
+    :type ui_rect_cls: UiRect
+    :param target: Target UI Element to draw the grid in
+    :type target: PySide2.QtWidgets.QObject
+    :rtype PySide2.QtWidgets.QGridLayout
+    """
+    grid_layout_widget = QWidget(target)
+    grid_layout_widget.setGeometry(ui_rect_cls.QRect)
+    grid_layout_widget.setObjectName('grid_layout_widget')
+    grid_layout = QGridLayout(grid_layout_widget)
+    grid_layout.setContentsMargins(0, 0, 0, 0)
+    grid_layout.setObjectName('grid_layout')
+    return grid_layout
+
+
+def create_scroll_area_grid(ui_rect_cls, ui_size_cls_content, target):
+    """
+    Creates a scrollable area which contains a grid that can be filled later on.
+    :param ui_rect_cls: UiRect Object (Physical location and size of the scroll area on screen)
+    :type ui_rect_cls: UiRect
+    :param ui_size_cls_content: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
+    :type ui_size_cls_content: UiSize
+    :param target: Target UI Element to draw the scroll area in
+    :type target: PySide2.QtWidgets.QObject
+    :return: PySide2.QtWidgets.QGridLayout
+    """
+    # Create scroll area widget contents
+    scroll_area_widget_contents = create_scroll_area(ui_rect_cls, ui_size_cls_content, target)
+    # Make size for grid
+    grid_ui_rect_cls = UiRect(0, 0, 0, 0)
+    grid_ui_rect_cls.QRect = QRect(0, 0, ui_size_cls_content.QSize.width(), ui_size_cls_content.QSize.height())
+    # Create grid layout
+    grid_layout = create_grid(grid_ui_rect_cls, scroll_area_widget_contents)
+    return scroll_area_widget_contents, grid_layout
