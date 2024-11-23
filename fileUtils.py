@@ -266,3 +266,7 @@ def make_dir(directory):
     """
     if not os.path.exists(directory):
         Path(directory).mkdir(parents=True, exist_ok=True)
+
+
+def get_current_working_dir() -> Path:
+    return Path(os.getcwd())
