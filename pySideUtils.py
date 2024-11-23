@@ -1,6 +1,7 @@
 import sys
 import os
 import platform
+from commonUtils import logUtils
 
 # if sys.platform != 'win32' and platform.processor() == 'arm':
 from PySide6.QtCore import *
@@ -48,10 +49,10 @@ class Button:
 
     def clicked(self):
         if self.args is None:
-            print('exec fn')
+            logUtils.log_msg('Executing Button Function')
             self.fn()
         else:
-            print('exec fn with arg')
+            logUtils.log_msg('Executing Button Function (with Arguments)')
             self.fn(self.args)
 
 
@@ -85,25 +86,38 @@ class Window:
         self.name = name
         self.width = 720
         self.height = 500
-        self.dialog_cls = None
+        self.dlg = None
         self.create_ui()
 
     def create_ui(self):
         dialog_cls = QDialog()
-        self.dialog_cls = dialog_cls
+        self.dlg = dialog_cls
         self.setup_ui()
 
     def setup_ui(self):
-        self.dialog_cls.setObjectName(self.name)
-        self.dialog_cls.resize(self.width, self.height)
+        self.dlg.setObjectName(self.name)
+        self.dlg.resize(self.width, self.height)
 
     def re_translate_ui(self):
         _translate = QCoreApplication.translate
-        self.dialog_cls.resize(self.width, self.height)
-        self.dialog_cls.setWindowTitle(_translate(self.name, self.name))
+        self.dlg.resize(self.width, self.height)
+        self.dlg.setWindowTitle(_translate(self.name, self.name))
 
     def display_ui(self):
         print('display ui')
         self.re_translate_ui()
-        QMetaObject.connectSlotsByName(self.dialog_cls)
-        self.dialog_cls.exec_()
+        QMetaObject.connectSlotsByName(self.dlg)
+        self.dlg.exec_()
+
+
+class ButtonOpenWindow:
+    def __init__(self, text: str, target: QWidget, rect: QRect, window):
+        self.push_button = QPushButton(target)
+        self.push_button.setGeometry(rect)
+        self.push_button.setText(text)
+        set_font(self.push_button)
+        self.window = window
+        self.push_button.clicked.connect(self.clicked)
+
+    def clicked(self):
+        self.window().display_ui()
