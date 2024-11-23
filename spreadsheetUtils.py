@@ -64,8 +64,10 @@ class Spreadsheet:
         with open(str(path), 'w') as out:
             out.write(csv_output_str)
 
-    def import_file(self, path: Path):
+    def import_file(self, path: Union[str, Path]):
         logUtils.log_msg(f'Importing spreadsheet from {path}')
+        if isinstance(path, str):
+            path = Path(path)
 
         if path.exists():
             with open(path, 'r') as input:
