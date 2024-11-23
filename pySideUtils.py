@@ -108,7 +108,6 @@ class Window:
         self.dlg.setWindowTitle(_translate(self.name, self.name))
 
     def display_ui(self):
-        print('display ui')
         self.re_translate_ui()
         QMetaObject.connectSlotsByName(self.dlg)
         self.dlg.exec_()
