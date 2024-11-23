@@ -38,7 +38,11 @@ class Palette:
 
 
 class Button:
-    def __init__(self, text: str, target: QWidget, rect: QRect, fn=None, args=None):
+    def __init__(self, text: str,
+                 target: QWidget,
+                 rect: QRect,
+                 fn=None,
+                 args=None):
         self.push_button = QPushButton(target)
         self.push_button.setGeometry(rect)
         self.push_button.setText(text)
