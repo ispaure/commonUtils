@@ -31,6 +31,9 @@ class Row:
         else:
             return self.__cell_lst[idx]
 
+    def get_cells(self):
+        return self.__cell_lst
+
     def get_csv_line(self):
         cell_str_lst = []
         for cell in self.__cell_lst:

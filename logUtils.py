@@ -7,6 +7,13 @@ def log_msg(msg: str):
         print(msg)
 
 
-def log_exit_msg(msg: str):
+def exit_msg(msg: str):
     print(msg)
     sys.exit()
+
+
+def join(lst):
+    value_lst = []
+    for value in lst:
+        value_lst.append(str(value))
+    return ", ".join(value_lst)

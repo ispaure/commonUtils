@@ -84,6 +84,9 @@ class LineEdit:
     def txt(self):
         return self.line_edit.text()
 
+    def set_txt(self, txt):
+        self.line_edit.setText(str(txt))
+
 
 class Window:
     def __init__(self, name: str):
