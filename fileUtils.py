@@ -269,4 +269,8 @@ def make_dir(directory):
 
 
 def get_current_working_dir() -> Path:
-    return Path(os.getcwd())
+    cwd = Path(os.getcwd())
+    if cwd.parent == 'Python':
+        return cwd
+    else:
+        return Path(cwd, 'Python')
