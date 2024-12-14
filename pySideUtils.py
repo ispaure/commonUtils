@@ -17,6 +17,10 @@ def set_font(q_thing):
     q_thing.setFont(QFont('Arial', font_size))
 
 
+def get_scale_multiplier():
+    return 1
+
+
 class Palette:
     def __init__(self):
         self.palette = QPalette()
@@ -37,29 +41,22 @@ class Palette:
         self.palette.setColor(QPalette.HighlightedText, Qt.black)
 
 
-class Button:
-    def __init__(self, text: str, target: QWidget, rect: QRect, fn=None, args=None):
-        self.push_button = None
-        self.__init_push_button(text, target, rect, fn, args)
+def create_button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
+    def clicked():
+        if args is None:
+            logUtils.log_msg('Executing Button Function')
+            fn()
+        else:
+            logUtils.log_msg('Executing Button Function (with Arguments)')
+            fn(args)
 
-    def __init_push_button(self, text: str, target: QWidget, rect: QRect, fn=None, args=None):
-
-        def clicked(self):
-            if args is None:
-                logUtils.log_msg('Executing Button Function')
-                fn()
-            else:
-                logUtils.log_msg('Executing Button Function (with Arguments)')
-                fn(args)
-
-        push_button = QPushButton(target)
-        push_button.setObjectName(text)
-        push_button.setGeometry(rect)
-        push_button.setText(text)
-        set_font(push_button)
-        push_button.clicked.connect(clicked)
-
-        self.push_button = push_button
+    push_button = QPushButton(target)
+    push_button.setObjectName(text)
+    push_button.setGeometry(rect)
+    push_button.setText(text)
+    set_font(push_button)
+    push_button.clicked.connect(clicked)
+    return push_button
 
 
 class Label:
@@ -129,3 +126,88 @@ class ButtonOpenWindow:
 
     def clicked(self):
         self.window().display_ui()
+
+
+def create_scroll_area(target, rect, rect_content):
+    """
+    Creates a scroll area (scroll bar appears only if not everything can be seen).
+    :param target: Target UI Element to draw the scroll area in
+    :type target: PySide2.QtWidgets.QObject
+    :param rect: UiRect Object (Physical location and size of the scroll area on screen)
+    :type rect: UiRect
+    :param rect_content: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
+    :type rect_content: UiSize
+    :rtype: PySide2.QtWidgets.QWidget
+    """
+    scroll_area = QScrollArea(target)
+    scroll_area.setGeometry(rect)
+    scroll_area.setWidgetResizable(True)
+    scroll_area.setObjectName('scroll_area')
+    scroll_area_widget_contents = QWidget()
+    scroll_area_widget_contents.setGeometry(rect)
+    scroll_area_widget_contents.setMinimumSize(rect_content)
+    scroll_area_widget_contents.setObjectName('scroll_area_widget')
+    scroll_area.setWidget(scroll_area_widget_contents)
+    return scroll_area_widget_contents
+
+
+def create_grid(target, rect: QRect):
+    """
+    Create a grid that can later be filled.
+    :param target: Target UI Element to draw the grid in
+    :type target: PySide2.QtWidgets.QObject
+    :param rect: QRect Object
+    :type rect: QRect
+    :rtype PySide2.QtWidgets.QGridLayout
+    """
+    grid_layout_widget = QWidget(target)
+    grid_layout_widget.setGeometry(rect)
+    grid_layout_widget.setObjectName('grid_layout_widget')
+    grid_layout = QGridLayout(grid_layout_widget)
+    grid_layout.setContentsMargins(0, 0, 0, 0)
+    grid_layout.setObjectName('grid_layout')
+    return grid_layout
+
+
+def create_scroll_area_grid(target, rect, rect_content):
+    """
+    Creates a scrollable area which contains a grid that can be filled later on.
+    :param rect: UiRect Object (Physical location and size of the scroll area on screen)
+    :type rect: UiRect
+    :param rect_content: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
+    :type rect_content: UiSize
+    :param target: Target UI Element to draw the scroll area in
+    :type target: PySide2.QtWidgets.QObject
+    :return: PySide2.QtWidgets.QGridLayout
+    """
+    # Create scroll area widget contents
+    scroll_area_widget_contents = create_scroll_area(target, rect, rect_content)
+    # Make size for grid
+    grid_ui_rect_cls = QRect(0, 0, 0, 0)
+    grid_ui_rect_cls = QRect(0, 0, rect_content.width(), rect_content.height())
+    # Create grid layout
+    grid_layout = create_grid(scroll_area_widget_contents, grid_ui_rect_cls)
+    return scroll_area_widget_contents, grid_layout
+
+
+def create_size(size_x, size_y):
+    """
+    This function is used to create a PySide2.QtCore.QSize object that will scale properly in all scenarios
+    :rtype: PySide2.QtCore.QSize
+    """
+    def size_x_scaled():
+        return size_x * get_scale_multiplier()
+
+    def size_y_scaled():
+        return size_y * get_scale_multiplier()
+
+    return QSize(size_x_scaled(), size_y_scaled())
+
+
+def create_frame(target: QDialog, rect: QRect):
+    frame = QFrame(target)
+    frame.setGeometry(rect)
+    frame.setObjectName('panel')
+    frame.setFrameShape(QFrame.Panel)
+    frame.setFrameShadow(QFrame.Plain)
+    return frame
