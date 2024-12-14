@@ -210,3 +210,24 @@ def create_frame(target: QDialog, rect: QRect):
     frame.setFrameShape(QFrame.Panel)
     frame.setFrameShadow(QFrame.Plain)
     return frame
+
+
+def create_checkbox(target: QWidget, rect: QRect, default_state: bool = False):
+    """
+    Create a checkbox which can be ticked or not by user.
+    :param rect: UiRect Object
+    :type rect: UiRect
+    :param target: Target UI Element to draw the checkbox in
+    :type target: PySide2.QtWidgets.QObject
+    :rtype: PySide2.QtWidgets.QCheckBox
+    :param default_state: Default state for the checkbox. Default is unchecked.
+    :type default_state: bool
+    :rtype: PySide2.QtWidgets.QCheckBox
+    """
+    checkbox = QCheckBox(target)
+    checkbox.setGeometry(rect)
+    checkbox.setObjectName('checkbox')
+    if default_state:
+        checkbox.setChecked(default_state)
+
+    return checkbox

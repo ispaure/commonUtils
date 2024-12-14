@@ -351,27 +351,6 @@ def create_textedit(text, ui_rect_cls, target, pw_field=False):
     return textedit
 
 
-def create_checkbox(ui_rect_cls, target, default_state=False):
-    """
-    Create a checkbox which can be ticked or not by user.
-    :param ui_rect_cls: UiRect Object
-    :type ui_rect_cls: UiRect
-    :param target: Target UI Element to draw the checkbox in
-    :type target: PySide2.QtWidgets.QObject
-    :rtype: PySide2.QtWidgets.QCheckBox
-    :param default_state: Default state for the checkbox. Default is unchecked.
-    :type default_state: bool
-    :rtype: PySide2.QtWidgets.QCheckBox
-    """
-    checkbox = QCheckBox(target)
-    checkbox.setGeometry(ui_rect_cls.QRect)
-    checkbox.setObjectName('checkbox')
-    if default_state:
-        checkbox.setChecked(default_state)
-
-    return checkbox
-
-
 def create_scroll_area(ui_rect_cls, ui_size_min, target):
     """
     Creates a scroll area (scroll bar appears only if not everything can be seen).
