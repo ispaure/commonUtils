@@ -38,26 +38,28 @@ class Palette:
 
 
 class Button:
-    def __init__(self, text: str,
-                 target: QWidget,
-                 rect: QRect,
-                 fn=None,
-                 args=None):
-        self.push_button = QPushButton(target)
-        self.push_button.setGeometry(rect)
-        self.push_button.setText(text)
-        set_font(self.push_button)
-        self.fn = fn
-        self.args = args
-        self.push_button.clicked.connect(self.clicked)
+    def __init__(self, text: str, target: QWidget, rect: QRect, fn=None, args=None):
+        self.push_button = None
+        self.__init_push_button(text, target, rect, fn, args)
 
-    def clicked(self):
-        if self.args is None:
-            logUtils.log_msg('Executing Button Function')
-            self.fn()
-        else:
-            logUtils.log_msg('Executing Button Function (with Arguments)')
-            self.fn(self.args)
+    def __init_push_button(self, text: str, target: QWidget, rect: QRect, fn=None, args=None):
+
+        def clicked(self):
+            if args is None:
+                logUtils.log_msg('Executing Button Function')
+                fn()
+            else:
+                logUtils.log_msg('Executing Button Function (with Arguments)')
+                fn(args)
+
+        push_button = QPushButton(target)
+        push_button.setObjectName(text)
+        push_button.setGeometry(rect)
+        push_button.setText(text)
+        set_font(push_button)
+        push_button.clicked.connect(clicked)
+
+        self.push_button = push_button
 
 
 class Label:
