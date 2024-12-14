@@ -41,7 +41,7 @@ class Palette:
         self.palette.setColor(QPalette.HighlightedText, Qt.black)
 
 
-def create_button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
+def button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
     def clicked():
         if args is None:
             logUtils.log_msg('Executing Button Function')
@@ -115,17 +115,16 @@ class Window:
         self.dlg.exec_()
 
 
-class ButtonOpenWindow:
-    def __init__(self, text: str, target: QWidget, rect: QRect, window):
-        self.push_button = QPushButton(target)
-        self.push_button.setGeometry(rect)
-        self.push_button.setText(text)
-        set_font(self.push_button)
-        self.window = window
-        self.push_button.clicked.connect(self.clicked)
-
+def button_open_win(text: str, target: QWidget, rect: QRect, window):
     def clicked(self):
-        self.window().display_ui()
+        window().display_ui()
+
+    push_button = QPushButton(target)
+    push_button.setGeometry(rect)
+    push_button.setText(text)
+    set_font(push_button)
+    push_button.clicked.connect(clicked)
+    return push_button
 
 
 def create_scroll_area(target, rect, rect_content):
