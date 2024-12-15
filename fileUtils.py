@@ -274,3 +274,18 @@ def get_current_working_dir() -> Path:
         return cwd
     else:
         return Path(cwd, 'Python')
+
+
+def get_user_home_dir() -> Path:
+    """
+    Get the current user's home directory
+    """
+    return Path.home()
+
+
+def get_user_lib_dir() -> Path:
+    return Path(get_user_home_dir(), 'Library')
+
+
+def get_user_application_support() -> Path:
+    return Path(get_user_lib_dir(), 'Application Support')
