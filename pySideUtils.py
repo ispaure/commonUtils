@@ -292,13 +292,13 @@ def create_msg_box_base(title, message, icon='default', width=300, height=400,
 
     # Set Icon
     if icon.lower() == 'critical':
-        msg_box.setIcon(msg_box.Critical)
+        msg_box.setIcon(msg_box.Icon.Critical)
     elif icon.lower() == 'warning':
-        msg_box.setIcon(msg_box.Warning)
+        msg_box.setIcon(msg_box.Icon.Warning)
     elif icon.lower() == 'information':
-        msg_box.setIcon(msg_box.Information)
+        msg_box.setIcon(msg_box.Icon.Information)
     elif icon.lower() == 'question':
-        msg_box.setIcon(msg_box.Question)
+        msg_box.setIcon(msg_box.Icon.Question)
 
     # Connect button to functions
     msg_box.buttonClicked.connect(button_pressed)
@@ -318,7 +318,7 @@ def display_msg_box_ok_cancel(title, message, fn_ok=None, fn_cancel=None, icon='
     Displays a message box with OK and Cancel buttons.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'OK', fn_ok, 'Cancel', fn_cancel)
-    msg_box.setStandardButtons(msg_box.Ok | msg_box.Cancel)
+    msg_box.setStandardButtons(msg_box.StandardButton.Ok | msg_box.StandardButton.Cancel)
     msg_box.exec_()
     return True
 
@@ -328,7 +328,7 @@ def display_msg_box_ok(title, message, icon='warning', width=300, height=400):
     Displays a message box with OK button.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'OK')
-    msg_box.setStandardButtons(msg_box.Ok)
+    msg_box.setStandardButtons(msg_box.StandardButton.Ok)
     msg_box.exec_()
     return True
 
