@@ -3,6 +3,7 @@ import subprocess
 import time
 from commonUtils.debugUtils import print_debug_msg as print_debug_msg
 import sys
+from typing import *
 from pathlib import Path
 import os
 import commonUtils.fileUtils as fileUtils
