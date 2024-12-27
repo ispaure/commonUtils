@@ -2,6 +2,7 @@ import sys
 import os
 import platform
 from commonUtils import logUtils
+from commonUtils import debugUtils
 
 # if sys.platform != 'win32' and platform.processor() == 'arm':
 from PySide6.QtCore import *
@@ -9,9 +10,15 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 
 
+rog_ally = False
+
+
 def set_font(q_thing):
     if sys.platform == 'win32':
-        font_size = 10
+        if not rog_ally:
+            font_size = 10
+        else:
+            font_size = 16
     else:
         font_size = 13
     q_thing.setFont(QFont('Arial', font_size))
@@ -88,21 +95,33 @@ class LineEdit:
 
 
 class Window:
-    def __init__(self, name: str):
+    def __init__(self, name: str, main_window=False, maximized=False):
         self.name = name
         self.width = 720
         self.height = 500
         self.dlg = None
-        self.create_ui()
-
-    def create_ui(self):
-        dialog_cls = QDialog()
-        self.dlg = dialog_cls
+        self.maximized = maximized
+        # self.layout = None
+        self.create_ui(main_window)
         self.setup_ui()
+
+    def create_ui(self, main_window):
+        if not main_window:
+            dialog_cls = QDialog()
+        else:
+            dialog_cls = QMainWindow()
+        self.dlg = dialog_cls
 
     def setup_ui(self):
         self.dlg.setObjectName(self.name)
         self.dlg.resize(self.width, self.height)
+
+        # if isinstance(self.dlg, QMainWindow):
+        #     # Add layout to manage positioning (optional for base Window)
+        #     central_widget = QWidget()
+        #     self.layout = QVBoxLayout(central_widget)
+        #     self.layout.addWidget(QLabel("Hello, world!", alignment=Qt.AlignCenter))
+        #     self.dlg.setCentralWidget(central_widget)
 
     def re_translate_ui(self):
         _translate = QCoreApplication.translate
@@ -112,7 +131,18 @@ class Window:
     def display_ui(self):
         self.re_translate_ui()
         QMetaObject.connectSlotsByName(self.dlg)
-        self.dlg.exec_()
+
+        # Do right thing, depending on type
+        if isinstance(self.dlg, QDialog):
+            # For QDialog, use exec_()
+            self.dlg.exec_()
+        elif isinstance(self.dlg, QMainWindow):
+            # For QMainWindow, use show() and ensure app.exec() is called
+            self.dlg.show()
+            if self.maximized:
+                self.dlg.showMaximized()
+        else:
+            debugUtils.exit_msg('Wrong type for Window.dlg')
 
 
 def button_open_win(text: str, target: QWidget, rect: QRect, window):
