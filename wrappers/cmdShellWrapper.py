@@ -22,7 +22,7 @@ def delete_script_file(file_path):
     return True
 
 
-def exec_cmd(command, wait_for_output=True, in_new_window=Union[None, str, Path]):
+def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path] = None):
     """
     Execute command from CMD shell (Windows) or the terminal (MacOS & Linux)
     :param command: Command to execute
