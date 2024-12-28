@@ -177,6 +177,17 @@ def create_scroll_area(target, rect, rect_content):
     scroll_area_widget_contents.setMinimumSize(rect_content)
     scroll_area_widget_contents.setObjectName('scroll_area_widget')
     scroll_area.setWidget(scroll_area_widget_contents)
+
+    if rog_ally:
+        scroll_area.setStyleSheet("""
+            QScrollBar:vertical {
+                width: 30px; /* Set the desired width here */
+            }
+            QScrollBar:horizontal {
+                height: 30px; /* Set the desired height here */
+            }
+        """)
+
     return scroll_area_widget_contents
 
 
