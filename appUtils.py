@@ -27,10 +27,10 @@ class DiskApp(App):
             print('Resolving Path with CurrentWorkingDirectory...')
             print(f'Path to resolve: {self.disk_path}')
             if str(cwd).endswith('Python'):
-                ally_tools_root = str(Path(Path(cwd).parent, 'Software'))
+                ally_tools_software_dir = str(Path(Path(cwd).parent, 'Software'))
             else:
-                ally_tools_root = str(Path(cwd, 'Software'))
-            resolved_path = self.disk_path.replace('%SOFTWARE%', ally_tools_root)
+                ally_tools_software_dir = str(Path(cwd, 'Software'))
+            resolved_path = self.disk_path.replace('%SOFTWARE%', ally_tools_software_dir)
             print(f'Resolved path: {resolved_path}')
             return resolved_path
         if self.disk_path.startswith('?'):
@@ -54,6 +54,15 @@ class DiskApp(App):
             display_msg_box_ok('App Launcher', msg)
         elif resolved_path.endswith('.ps1'):  # If powershell, run as powershell
             powerShellWrapper.exec_powershell(resolved_path)
+        elif resolved_path.endswith('.cmd') or resolved_path.endswith('.bat'):  # If CMD, run in new window
+            cwd = fileUtils.get_current_working_dir()
+            if str(cwd).endswith('Python'):
+                ally_tools_temp_dir = str(Path(Path(cwd).parent, 'temp'))
+            else:
+                ally_tools_temp_dir = str(Path(cwd, 'temp'))
+            temp_file_path = str(Path(ally_tools_temp_dir, 'exec.bat'))
+            print(f'executing custom temp file path script: {temp_file_path}')
+            cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False, in_new_window=temp_file_path)
         else:
             cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False)
 
