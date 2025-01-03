@@ -63,8 +63,8 @@ class DiskApp(App):
             cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False, in_new_window=temp_file_path)
         else:
             print('Regular Launch')
-            subprocess.run([resolved_path], check=True, shell=True)
-            # cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False)
+            # subprocess.run([resolved_path], check=True, shell=True)
+            cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False)
 
 
 class StoreApp(App):
