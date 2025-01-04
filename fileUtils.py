@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import subprocess
 from shutil import copyfile
+from typing import *
 
 
 class File:
@@ -60,14 +61,14 @@ def get_file_path_list(dir_name, recursive=True, filter_extension=None):
     return all_files
 
 
-def read_file(file_path):
+def read_file(file_path: Union[str, Path]):
     """
     Returns each line of a text file as part of a list.
     :param file_path: File path to read
     :type file_path: str
     :rtype: lst
     """
-    f = open(file_path, 'r')
+    f = open(file_path, 'r', encoding='utf-8-sig')
     return f.read().splitlines()
 
 
@@ -270,10 +271,11 @@ def make_dir(directory):
 
 def get_current_working_dir() -> Path:
     cwd = Path(os.getcwd())
-    if cwd.name == 'Python':
-        return cwd
+    cwd_resolved = Path.resolve(cwd)
+    if cwd_resolved.name == 'Python':
+        return cwd_resolved
     else:
-        return Path(cwd, 'Python')
+        return Path(cwd_resolved, 'Python')
 
 
 def get_user_home_dir() -> Path:
