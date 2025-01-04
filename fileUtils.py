@@ -171,12 +171,12 @@ def open_dir_path(dir_path):
               '\nAttempted path: ' + dir_path)
 
 
-def write_file(file_path, write_str):
+def write_file(file_path, write_str: Union[str, List[str]]):
     """
     Creates a file (if not created yet) and writes to it
     :param file_path: Path to write to
     :type file_path: str
-    :param write_str: String to write
+    :param write_str: String to write (or List of strings)
     :type write_str: str
     """
     # Get folder in which the file is
@@ -187,7 +187,10 @@ def write_file(file_path, write_str):
 
     # Write to the file
     f = open(file_path, 'w+')
-    f.write(write_str)
+    if isinstance(write_str, str):
+        f.write(write_str)
+    elif isinstance(write_str, List):
+        f.writelines(write_str)
     f.close()
 
     # If macOS, ensure can be run
@@ -291,3 +294,7 @@ def get_user_lib_dir() -> Path:
 
 def get_user_application_support() -> Path:
     return Path(get_user_lib_dir(), 'Application Support')
+
+
+def get_user_appdata_roaming() -> Path:
+    return Path(os.environ.get('APPDATA'))
