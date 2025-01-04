@@ -48,10 +48,10 @@ class DiskApp(App):
     def launch(self):
         resolved_path = self.__get_resolved_path()
         if resolved_path is None:
-            msg = f'{self.name} is not currently installed on this ROG Ally. Install first and try again!'
+            msg = f'{self.name} is not currently installed. Install first and try again!'
             display_msg_box_ok('App Launcher', msg)
         elif not os.path.isfile(resolved_path):
-            msg = f'{self.name} is not currently installed on this ROG Ally. Install first and try again!'
+            msg = f'{self.name} is not currently installed. Install first and try again!'
             display_msg_box_ok('App Launcher', msg)
         elif resolved_path.endswith('.ps1'):  # If powershell, run as powershell
             powerShellWrapper.exec_powershell(resolved_path)
