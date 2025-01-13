@@ -143,7 +143,57 @@ def create_symbolic_link(source_dir, destination_dir):
     """
     Creates a symbolic link from the source dir to the destination dir
     """
+    # if sys.platform == 'win32':
+    #     subprocess.check_call(['cmd', '/c', 'mklink', '/J', str(source_dir), str(destination_dir)])
+    # else:
     os.symlink(source_dir, destination_dir)
+
+
+def update_symbolic_link(source: Path, destination: Path, allow_dir_deletion=False):
+    """
+    Creates a symbolic link (allowing directory deletion if a directory exists at source when specified only)
+    If a link already exists, see if it points to the right folder, else updates it.
+    """
+    tool_name = f'Update Symbolic Link'
+    print(f'{tool_name}: "{source}", Destination: "{destination}"')
+
+    # Delete folder if it's there and not a symlink
+    if os.path.isdir(destination) and not os.path.islink(destination):
+        if allow_dir_deletion:
+            delete_dir(destination)
+        else:
+            msg = f'{tool_name}: Directory already exists at source location: "{source}". Aborting!\n' \
+                  f'Note: To bypass, set allow_dir_deletion flag to True.'
+            print(msg)
+            return
+
+    if not os.path.exists(source):
+        msg = f'{tool_name}: Source "{source}" for symbolic link does not exist, Aborting!'
+        print(msg)
+        return
+
+    # If it's a symbolic link, see if path matches expected
+    if os.path.islink(destination):
+        destination_link_path = os.path.realpath(destination)
+        if str(Path(destination_link_path)) != str(source):
+            msg = f'Symbolic Link Destination Path does not correspond to desired location! \n' \
+                  f'Current destination path: "{destination_link_path}"\n' \
+                  f'Expected destination path: "{source}"\n' \
+                  f'Updating Symbolic Link...'
+            print(msg)
+            # Delete existing link
+            delete_symbolic_link(destination)
+            # Make a link to the folder
+            create_symbolic_link(source, destination)
+        else:
+            msg = f'Symbolic Link Already Up to Date'
+            print(msg)
+    else:
+        # Create new symbolic link
+        msg = f'Creating symbolic link from "{source}" to {destination}...'
+        print(msg)
+        # Make a link to the folder
+        create_symbolic_link(source, destination)
 
 
 def get_split_character():

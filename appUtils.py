@@ -23,17 +23,6 @@ class DiskApp(App):
         """
         Get disk path properly (if there's a question mark as first char, don't know which drive it's in)
         """
-        if self.disk_path.startswith('%SOFTWARE%'):
-            cwd = fileUtils.get_current_working_dir()
-            print('Resolving Path with CurrentWorkingDirectory...')
-            print(f'Path to resolve: {self.disk_path}')
-            if str(cwd).endswith('Python'):
-                ally_tools_software_dir = str(Path(Path(cwd).parent, 'Software'))
-            else:
-                ally_tools_software_dir = str(Path(cwd, 'Software'))
-            resolved_path = self.disk_path.replace('%SOFTWARE%', ally_tools_software_dir)
-            print(f'Resolved path: {resolved_path}')
-            return resolved_path
         if self.disk_path.startswith('?'):
             alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             for char in alphabet:
