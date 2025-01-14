@@ -28,11 +28,10 @@ show_verbose = True
 # ----------------------------------------------------------------------------------------------------------------------
 # CODE
 
-def config_section_map(cfg_file_path, section, variable, bypass_error=False):
+def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypass_error=False):
     """
     Retrieve a value from a section of a config file.
     :param cfg_file_path: Path to the config file to look into
-    :type cfg_file_path: str
     :param section: Name of section in which the value you want is found
     :type section: str
     :param variable: Name of the value you want to get as return

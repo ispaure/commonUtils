@@ -25,7 +25,7 @@ class File:
             pass
 
 
-def get_file_path_list(dir_name, recursive=True, filter_extension=None):
+def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None):
     """
     Returns list of all files under a specific directory.
     :param dir_name: Directory in which to look under
@@ -221,7 +221,7 @@ def open_dir_path(dir_path):
               '\nAttempted path: ' + dir_path)
 
 
-def write_file(file_path, write_str: Union[str, List[str]]):
+def write_file(file_path: Union[str, Path], write_str: Union[str, List[str]]):
     """
     Creates a file (if not created yet) and writes to it
     :param file_path: Path to write to
@@ -348,3 +348,17 @@ def get_user_application_support() -> Path:
 
 def get_user_appdata_roaming() -> Path:
     return Path(os.environ.get('APPDATA'))
+
+
+def is_file(path: Path) -> bool:
+    if os.path.isfile(path):
+        return True
+    else:
+        return False
+
+
+def is_dir(path: Union[str, Path]) -> bool:
+    if os.path.isdir(path):
+        return True
+    else:
+        return False
