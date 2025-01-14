@@ -225,7 +225,7 @@ def write_file(file_path, write_str: Union[str, List[str]]):
     """
     Creates a file (if not created yet) and writes to it
     :param file_path: Path to write to
-    :type file_path: str
+    :type file_path: Union[Path, str]
     :param write_str: String to write (or List of strings)
     :type write_str: str
     """
