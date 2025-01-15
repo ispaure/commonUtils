@@ -323,12 +323,18 @@ def make_dir(directory):
 
 
 def get_current_working_dir() -> Path:
-    cwd = Path(os.getcwd())
+    current_file = os.path.abspath(__file__)
+    cwd = Path(current_file).parent.parent
     cwd_resolved = Path.resolve(cwd)
-    if cwd_resolved.name == 'Python':
-        return cwd_resolved
-    else:
-        return Path(cwd_resolved, 'Python')
+    return cwd_resolved
+
+    # Old method, only works on windows and not always
+    # cwd = Path(os.getcwd())
+    # cwd_resolved = Path.resolve(cwd)
+    # if cwd_resolved.name == 'Python':
+    #     return cwd_resolved
+    # else:
+    #     return Path(cwd_resolved, 'Python')
 
 
 def get_user_home_dir() -> Path:
