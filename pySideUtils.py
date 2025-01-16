@@ -3,6 +3,7 @@ import os
 import platform
 from commonUtils import logUtils
 from commonUtils import debugUtils
+from commonUtils import fileUtils
 
 # if sys.platform != 'win32' and platform.processor() == 'arm':
 from PySide6.QtCore import *
@@ -20,10 +21,9 @@ def set_font(q_thing):
     else:
         modifier = 0
 
-    if sys.platform == 'win32':
-        if not rog_ally:
-            font_size = 10 + modifier
-    else:
+    if fileUtils.get_os() == 'Windows':
+        font_size = 10 + modifier
+    elif fileUtils.get_os() == 'macOS':
         font_size = 13 + modifier
     q_thing.setFont(QFont('Arial', font_size))
 
