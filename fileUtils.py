@@ -344,6 +344,10 @@ def get_user_home_dir() -> Path:
     return Path.home()
 
 
+def get_user_name() -> str:
+    return Path(get_user_home_dir()).name
+
+
 def get_user_lib_dir() -> Path:
     return Path(get_user_home_dir(), 'Library')
 
