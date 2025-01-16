@@ -22,25 +22,56 @@ class DiskApp(App):
         self.path_mac = path_mac
 
     def launch(self):
-        resolved_path = self.path_win
-        if resolved_path is None:
-            msg = f'{self.name} is not currently installed. Install first and try again!'
+        op_sys = fileUtils.get_os()
+        if op_sys == 'Windows':
+            self.__launch_windows()
+        elif op_sys == 'macOS':
+            self.__launch_macos()
+        elif op_sys == 'Linux':
+            self.__launch_linux()
+
+    def __validate_exec(self, exec_path):
+        if exec_path is None or exec_path == 'None':
+            msg = f'{self.name} path is not specified (None) for current Operating System! Update code and try again!'
             display_msg_box_ok('App Launcher', msg)
-        elif not os.path.isfile(resolved_path):
-            msg = f'{self.name} is not currently installed. Install first and try again!'
+            return False
+        elif not os.path.isfile(exec_path):
+            msg = (f'{self.name} is not currently installed (Expected location: {exec_path}). '
+                   f'Install first and try again!')
             display_msg_box_ok('App Launcher', msg)
-        elif resolved_path.endswith('.ps1'):  # If powershell, run as powershell
-            powerShellWrapper.exec_powershell(resolved_path)
-        elif resolved_path.endswith('.cmd') or resolved_path.endswith('.bat'):  # If CMD, run in new window
+            return False
+        return True
+    
+    def __launch_windows(self):
+        path_win_str = str(self.path_win)
+
+        if not self.__validate_exec(path_win_str):
+            return
+
+        if path_win_str.endswith('.ps1'):  # If powershell, run as powershell
+            powerShellWrapper.exec_powershell(path_win_str)
+        elif path_win_str.endswith('.cmd') or path_win_str.endswith('.bat'):  # If CMD, run in new window
             cwd = fileUtils.get_current_working_dir()
             ally_tools_temp_dir = str(Path(Path(cwd).parent, 'temp'))
             temp_file_path = str(Path(ally_tools_temp_dir, 'exec.bat'))
-            print(f'executing custom temp file path script: {temp_file_path}')
-            cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False, in_new_window=temp_file_path)
+            print(f'App Launcher: Executing Temp Batch File: {temp_file_path}')
+            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, in_new_window=temp_file_path)
         else:
-            print('Regular Launch')
-            # subprocess.run([resolved_path], check=True, shell=True)
-            cmdShellWrapper.exec_cmd(resolved_path, wait_for_output=False)
+            print('App Launcher: Executing Regular Launch')
+            # subprocess.run([path_win_str], check=True, shell=True)
+            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False)
+
+    def __launch_macos(self):
+
+        path_macos_str = str(self.path_mac)
+
+        if not self.__validate_exec(path_macos_str):
+            return
+
+        cmdShellWrapper.exec_cmd(str(path_macos_str), wait_for_output=False)
+
+    def __launch_linux(self):
+        print('Linux Launch not coded yet')
 
 
 class StoreApp(App):
