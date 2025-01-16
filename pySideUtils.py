@@ -14,13 +14,17 @@ rog_ally = False
 
 
 def set_font(q_thing):
+
+    if rog_ally:
+        modifier = 6
+    else:
+        modifier = 0
+
     if sys.platform == 'win32':
         if not rog_ally:
-            font_size = 10
-        else:
-            font_size = 16
+            font_size = 10 + modifier
     else:
-        font_size = 13
+        font_size = 13 + modifier
     q_thing.setFont(QFont('Arial', font_size))
 
 

@@ -7,6 +7,7 @@ import os
 from commonUtils import fileUtils
 from pathlib import Path
 import subprocess
+from commonUtils.pySideUtils import *
 
 
 class App:
@@ -67,6 +68,12 @@ class StoreApp(App):
         return None
 
     def launch(self):
-        aumid = self.get_application_user_model_id()
-        if aumid is not None:
-            os.system(f'explorer shell:appsFolder\\{aumid}')
+        op_sys = fileUtils.get_os()
+        if op_sys == 'Windows':
+            aumid = self.get_application_user_model_id()
+            if aumid is not None:
+                os.system(f'explorer shell:appsFolder\\{aumid}')
+        elif op_sys == 'macOS':
+            display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
+        elif op_sys == 'Linux':
+            display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
