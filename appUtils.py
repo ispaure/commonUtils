@@ -15,27 +15,13 @@ class App:
 
 
 class DiskApp(App):
-    def __init__(self, name, disk_path: Union[str, None] = None):
+    def __init__(self, name, path_win: Union[str, Path, None], path_mac: Union[str, Path, None] = None):
         super().__init__(name)
-        self.disk_path = disk_path
-
-    def __get_resolved_path(self):
-        """
-        Get disk path properly (if there's a question mark as first char, don't know which drive it's in)
-        """
-        if self.disk_path.startswith('?'):
-            alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-            for char in alphabet:
-                attempted_path = f'{char}{self.disk_path[1:]}'
-                if os.path.isfile(attempted_path):
-                    return attempted_path
-            return None
-        else:
-            return os.path.expandvars(self.disk_path)
-
+        self.path_win = path_win
+        self.path_mac = path_mac
 
     def launch(self):
-        resolved_path = self.__get_resolved_path()
+        resolved_path = self.path_win
         if resolved_path is None:
             msg = f'{self.name} is not currently installed. Install first and try again!'
             display_msg_box_ok('App Launcher', msg)
