@@ -368,3 +368,10 @@ def is_dir(path: Union[str, Path]) -> bool:
         return True
     else:
         return False
+
+
+def get_os() -> 'str':
+    if sys.platform == 'win32':
+        return 'Windows'
+    elif sys.platform == 'darwin':
+        return 'macOS'
