@@ -6,6 +6,19 @@ import sys
 import subprocess
 from shutil import copyfile
 from typing import *
+import stat
+from commonUtils.wrappers import cmdShellWrapper
+
+
+def get_os() -> 'str':
+    if sys.platform == 'win32':
+        return 'Windows'
+    elif sys.platform == 'darwin':
+        return 'macOS'
+
+
+if get_os() == 'Windows':
+    from commonUtils import junctionUtils
 
 
 class File:
@@ -149,31 +162,46 @@ def create_symbolic_link(source_dir, destination_dir):
     os.symlink(source_dir, destination_dir)
 
 
-def update_symbolic_link(source: Path, destination: Path, allow_dir_deletion=False):
+def update_symbolic_link(source: Path, destination: Path, allow_destination_deletion=False):
     """
     Creates a symbolic link (allowing directory deletion if a directory exists at source when specified only)
     If a link already exists, see if it points to the right folder, else updates it.
     """
     tool_name = f'Update Symbolic Link'
-    print(f'{tool_name}: "{source}", Destination: "{destination}"')
+    print(f'{tool_name}: (Source: "{source}", Destination: "{destination}")')
 
-    # Delete folder if it's there and not a symlink
-    if os.path.isdir(destination) and not os.path.islink(destination):
-        if allow_dir_deletion:
-            delete_dir(destination)
-        else:
-            msg = f'{tool_name}: Directory already exists at source location: "{source}". Aborting!\n' \
-                  f'Note: To bypass, set allow_dir_deletion flag to True.'
-            print(msg)
-            return
-
+    # If source for symbolic link does not exist, abort right now!
     if not os.path.exists(source):
         msg = f'{tool_name}: Source "{source}" for symbolic link does not exist, Aborting!'
         print(msg)
         return
 
+    # If there is something there other than a symbolic link, wipe it (if authorized)
+    if os.path.exists(destination) and not is_symbolic_link(destination):
+        if not allow_destination_deletion:
+            msg = f'{tool_name}: Entity already exists at source location: "{source}". Aborting!\n' \
+                  f'Note: To bypass, set allow_dir_deletion flag to True.'
+            print(msg)
+            return
+        else:
+            if is_junction(destination):
+                print(f'{tool_name}: Destination is junction, unsure how to delete as of yet!')
+                return
+            elif is_hard_link(destination):
+                print(f'{tool_name}: Destination is hard link, unsure how to delete as of yet!')
+            elif os.path.isfile(destination):
+                print(f'{tool_name}: Destination is not supposed to be a file, not deleting!')
+            elif is_mount_point(destination):
+                print(f'{tool_name}: Destination is a mount point, unsure how to delete as of yet!')
+                delete_symbolic_link(destination)
+                print('deleted')
+            elif is_dir(destination):
+                delete_dir(destination)
+            else:
+                print(f'{tool_name}: Destination is unknown type, unsure how to delete as of yet!')
+
     # If it's a symbolic link, see if path matches expected
-    if os.path.islink(destination):
+    if is_symbolic_link(destination):
         destination_link_path = os.path.realpath(destination)
         if str(Path(destination_link_path)) != str(source):
             msg = f'Symbolic Link Destination Path does not correspond to desired location! \n' \
@@ -194,6 +222,94 @@ def update_symbolic_link(source: Path, destination: Path, allow_dir_deletion=Fal
         print(msg)
         # Make a link to the folder
         create_symbolic_link(source, destination)
+
+
+def is_hard_link(path: Union[str, Path]):
+    if isinstance(path, str):
+        path_str = path
+    elif isinstance(path, Path):
+        path_str = str(path)
+    else:
+        print('Wrong type!')
+        return None
+
+    try:
+        # Get file stats
+        stat_info = os.stat(path_str)
+
+        # Check the number of hard links
+        if stat_info.st_nlink > 1:
+            return True
+        else:
+            return False
+    except FileNotFoundError:
+        print(f"File not found: {path_str}")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+
+def is_junction(path: Union[str, Path]):
+    if get_os() == 'Windows':
+        return junctionUtils.is_junction(path)
+    else:
+        return False
+
+
+def is_symbolic_link(path: Union[str, Path]):
+    if os.path.islink(path):
+        return True
+    else:
+        return False
+
+
+def is_mount(path: Union[str, Path]):
+    if os.path.ismount(path):
+        return True
+    else:
+        return False
+
+
+def is_mount_point(path: Union[str, Path]):
+    if get_os() != 'Windows':
+        return False
+
+    # Convert type
+    if isinstance(path, str):
+        path_str = path
+    elif isinstance(path, Path):
+        path_str = str(path)
+    else:
+        print('Wrong type!')
+        return None
+
+    # FSUTIL QUERY
+    output_lines = cmdShellWrapper.exec_cmd(f'fsutil reparsepoint query "{path_str}"')
+    for line in output_lines:
+        if line == 'Tag value: Mount Point':
+            return True
+    return False
+
+
+def is_dir(path: Union[str, Path]):
+    """
+    Returns whether a path is a directory.
+    More accurate than os.path.isdir as it will return False if the target is a junction, symbolic link or hard link
+    """
+
+    if not os.path.isdir(path):
+        return False
+    elif is_hard_link(path):
+        return False
+    elif is_junction(path):
+        return False
+    elif is_mount_point(path):
+        return False
+    elif is_symbolic_link(path):
+        return False
+    else:
+        return True
 
 
 def get_split_character():
@@ -365,17 +481,3 @@ def is_file(path: Path) -> bool:
         return True
     else:
         return False
-
-
-def is_dir(path: Union[str, Path]) -> bool:
-    if os.path.isdir(path):
-        return True
-    else:
-        return False
-
-
-def get_os() -> 'str':
-    if sys.platform == 'win32':
-        return 'Windows'
-    elif sys.platform == 'darwin':
-        return 'macOS'
