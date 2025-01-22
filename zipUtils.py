@@ -4,9 +4,13 @@ import zipfile
 from shutil import make_archive
 import os
 import sys
+from pathlib import Path
+from typing import *
+import subprocess
+import shutil
 
 
-def unzip_file(source_file, destination_dir, pwd=None):
+def unzip_file(source_file: Union[str, Path], destination_dir: Union[str, Path], pwd: bool = None):
     """
     Extracts zip file to desired location.
     :param source_file: Path to file to extract.
@@ -16,18 +20,34 @@ def unzip_file(source_file, destination_dir, pwd=None):
     :param pwd: Password for extraction. Leave none if archive is not password protected.
     :type pwd: str
     """
+    if isinstance(source_file, Path):
+        source_file_str = str(source_file)
+    elif isinstance(source_file, str):
+        source_file_str = source_file
+    else:
+        print('UNZIP File: Wrong Input Type for Source File')
+        return
+
+    if isinstance(destination_dir, Path):
+        destination_dir_str = str(destination_dir)
+    elif isinstance(destination_dir, str):
+        destination_dir_str = destination_dir
+    else:
+        print('UNZIP File: Wrong Input Type for Destination Directory')
+        return
+
     if pwd is None:
-        with zipfile.ZipFile(source_file, 'r') as zip_ref:
-            zip_ref.extractall(destination_dir)
+        with zipfile.ZipFile(source_file_str, 'r') as zip_ref:
+            zip_ref.extractall(destination_dir_str)
     else:
         # # Legacy: Only works with ZIP 2.0 encryption method (legacy; unsecure)
         # with zipfile.ZipFile(source_file, 'r') as zip_ref:
         #     zip_ref.extractall(path=destination_dir, members=None, pwd=pwd.encode())
 
         # Following method works with both ZIP 2.0 AND AES-256 encryption methods (secure)
-        with pyzipper.AESZipFile(source_file, 'r', compression=pyzipper.ZIP_DEFLATED,
+        with pyzipper.AESZipFile(source_file_str, 'r', compression=pyzipper.ZIP_DEFLATED,
                                  encryption=pyzipper.WZ_AES) as extracted_zip:
-            extracted_zip.extractall(path=destination_dir,
+            extracted_zip.extractall(path=destination_dir_str,
                                      pwd=str.encode(pwd))
 
 
@@ -78,3 +98,80 @@ def zip_file(source, destination, keep_root=True):
         make_zipfile_keep_root(destination, source)
     else:
         make_zipfile_discard_root(source, destination[:-len('.zip')])
+
+
+def extract_file_from_dmg(dmg_path, target_filename, output_dir):
+    # Step 1: Mount the DMG
+    try:
+        mount_output = subprocess.check_output(["hdiutil", "attach", dmg_path], text=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to mount DMG: {e}")
+        return
+
+    # Parse the mount point from the output
+    lines = mount_output.splitlines()
+    mount_point = None
+    for line in lines:
+        if "/Volumes/" in line:
+            mount_point = line.split("\t")[-1]
+            break
+
+    if not mount_point:
+        print("Failed to find the mount point.")
+        return
+
+    try:
+        # Step 2: Find the target file
+        target_path = os.path.join(mount_point, target_filename)
+        if not os.path.exists(target_path):
+            print(f"{target_filename} not found in the DMG.")
+            return
+
+        # Step 3: Copy the file to the output directory
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        shutil.copy(target_path, output_dir)
+        print(f"Copied {target_filename} to {output_dir}")
+
+    finally:
+        # Step 4: Unmount the DMG
+        subprocess.call(["hdiutil", "detach", mount_point])
+
+
+def extract_directory_from_dmg(dmg_path, target_directory, output_dir):
+    # Step 1: Mount the DMG
+    try:
+        mount_output = subprocess.check_output(["hdiutil", "attach", dmg_path], text=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to mount DMG: {e}")
+        return
+
+    # Parse the mount point from the output
+    lines = mount_output.splitlines()
+    mount_point = None
+    for line in lines:
+        if "/Volumes/" in line:
+            mount_point = line.split("\t")[-1]
+            break
+
+    if not mount_point:
+        print("Failed to find the mount point.")
+        return
+
+    try:
+        # Step 2: Find the target directory
+        target_path = os.path.join(mount_point, target_directory)
+        if not os.path.isdir(target_path):
+            print(f"{target_directory} not found in the DMG.")
+            return
+
+        # Step 3: Copy the directory to the output location
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        destination = os.path.join(output_dir, os.path.basename(target_directory))
+        shutil.copytree(target_path, destination)
+        print(f"Copied {target_directory} to {output_dir}")
+
+    finally:
+        # Step 4: Unmount the DMG
+        subprocess.call(["hdiutil", "detach", mount_point])
