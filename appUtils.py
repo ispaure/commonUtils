@@ -108,3 +108,24 @@ class StoreApp(App):
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
         elif op_sys == 'Linux':
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+
+
+def get_app_run_permissions(app_path: Path):
+    """
+    For macOS, gets the run permissions for a given .app by entering chmod +x in the terminal.
+    """
+
+    # Get Contents/MacOS path
+    contents_macos_path = Path(app_path, 'Contents', 'MacOS')
+    if not os.path.isdir(contents_macos_path):
+        print('Can\'t get app run permissions, no Contents/MacOS sub folder!')
+        return
+
+    exec_path_lst = []
+    # Figure out the exec list
+    exec_path_lst = fileUtils.get_file_path_list(contents_macos_path)
+
+    # For each exec list, apply permissions
+    for exec_path in exec_path_lst:
+        fileUtils.get_permission(exec_path)
+

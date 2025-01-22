@@ -94,19 +94,27 @@ def append_line_lst_to_file(line_lst, file_path):
             f.write('\n' + line)
 
 
-def get_dirs_path_list(dir_path):
+def get_dirs_path_list(dir_path: Union[Path, str]):
     """
     Returns a list of valid directory paths within a directory. Function copied from Blue Hole Addon scripts.
     :param dir_path: Directory in which to look for directories
     :type dir_path: str
     :rtype: lst
     """
+    if isinstance(dir_path, str):
+        dir_path_str = dir_path
+    elif isinstance(dir_path, Path):
+        dir_path_str = str(dir_path)
+    else:
+        print('Wrong type sent to fileUtils.get_dirs_path_list!')
+        return None
+
     dir_path_lst = []
     # Get list of items within a directory
-    atlas_sub_dir_item_lst = os.listdir(dir_path)
+    atlas_sub_dir_item_lst = os.listdir(dir_path_str)
     # Create a path from items within the directory, and if they are a directory, add them to the directories list.
     for item in atlas_sub_dir_item_lst:
-        item_dir = str(Path(dir_path, item))
+        item_dir = str(Path(dir_path_str, item))
         if os.path.isdir(item_dir):
             dir_path_lst.append(item_dir)
     return dir_path_lst
@@ -481,3 +489,13 @@ def is_file(path: Path) -> bool:
         return True
     else:
         return False
+
+
+def get_permission(path: Path):
+    """
+    For macOS, gets permission of a file. Helpful if a file won't run or open
+    """
+    tool_name = 'MacOS Permission'
+    # App Run permissions
+    print(f'{tool_name}: Getting CHMOD+X Permission for "{path}"...')
+    cmdShellWrapper.exec_cmd(f'chmod +x "{path}"')
