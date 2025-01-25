@@ -195,8 +195,8 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
             if is_junction(destination):
                 print(f'{tool_name}: Destination is junction, unsure how to delete as of yet!')
                 return
-            elif is_hard_link(destination):
-                print(f'{tool_name}: Destination is hard link, unsure how to delete as of yet!')
+            # elif is_hard_link(destination):
+            #     print(f'{tool_name}: Destination is hard link, unsure how to delete as of yet!')
             elif os.path.isfile(destination):
                 print(f'{tool_name}: Destination is not supposed to be a file, not deleting!')
             elif is_mount_point(destination):
@@ -233,6 +233,7 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
 
 
 def is_hard_link(path: Union[str, Path]):
+    # TODO: This seems to be broken, unsure it even works
     if isinstance(path, str):
         path_str = path
     elif isinstance(path, Path):
@@ -308,8 +309,8 @@ def is_dir(path: Union[str, Path]):
 
     if not os.path.isdir(path):
         return False
-    elif is_hard_link(path):
-        return False
+    # elif is_hard_link(path):
+    #     return False
     elif is_junction(path):
         return False
     elif is_mount_point(path):
