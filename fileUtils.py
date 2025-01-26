@@ -187,7 +187,7 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
     # If there is something there other than a symbolic link, wipe it (if authorized)
     if os.path.exists(destination) and not is_symbolic_link(destination):
         if not allow_destination_deletion:
-            msg = f'{tool_name}: Entity already exists at source location: "{source}". Aborting!\n' \
+            msg = f'{tool_name}: Entity already exists at destination location: "{source}". Aborting!\n' \
                   f'Note: To bypass, set allow_dir_deletion flag to True.'
             print(msg)
             return
