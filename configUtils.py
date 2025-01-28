@@ -28,6 +28,7 @@ show_verbose = True
 # ----------------------------------------------------------------------------------------------------------------------
 # CODE
 
+
 def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypass_error=False):
     """
     Retrieve a value from a section of a config file.
@@ -84,6 +85,8 @@ def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypas
                         break
                     elif line.startswith(f'{variable} = '):
                         return line.split(' = ')[-1]
+                    elif line.startswith(f'{variable}='):
+                        return line.split('=')[-1]
         return None
 
 
@@ -160,8 +163,12 @@ def config_set_variable(cfg_file_path, section, variable, value):
         if section_line in line:
             in_good_section = True
         if in_good_section:
-            if variable_line_to_set in line:
-                new_lines_lst.append(variable_line_to_set + ' ' + value)
+            if f'{variable} = ' in line:
+                new_lines_lst.append(f'{variable} = {value}')
+                in_good_section = False
+                line_appended_this_round = True
+            elif f'{variable}=' in line:
+                new_lines_lst.append(f'{variable}={value}')
                 in_good_section = False
                 line_appended_this_round = True
         if not line_appended_this_round:
