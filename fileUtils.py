@@ -469,6 +469,19 @@ def get_user_home_dir() -> Path:
     return Path.home()
 
 
+def get_user_documents_dir() -> Path:
+    """
+    Gets the current user's documents directory
+    """
+    op_sys = get_os()
+    match op_sys:
+        case 'macOS':
+            return Path(get_user_home_dir(), 'Documents')
+        case _:
+            print(f'Platform not suppported for get_user_documents_dir as of yet!')
+            return None
+
+
 def get_user_name() -> str:
     return Path(get_user_home_dir()).name
 
