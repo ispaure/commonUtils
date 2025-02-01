@@ -1,7 +1,7 @@
 import sys
 import os
 import platform
-from commonUtils import logUtils
+from commonUtils.debugUtils import *
 from commonUtils import debugUtils
 from commonUtils import fileUtils
 
@@ -11,6 +11,7 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 
 
+tool_name = 'pySide6 Wrapper'
 rog_ally = False
 
 
@@ -55,10 +56,10 @@ class Palette:
 def button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
     def clicked():
         if args is None:
-            logUtils.log_msg('Executing Button Function')
+            log(Severity.DEBUG, tool_name, 'Executing Button Function')
             fn()
         else:
-            logUtils.log_msg('Executing Button Function (with Arguments)')
+            log(Severity.DEBUG, tool_name, 'Executing Button Function (with Arguments)')
             fn(args)
 
     push_button = QPushButton(target)

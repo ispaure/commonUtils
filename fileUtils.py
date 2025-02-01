@@ -519,5 +519,5 @@ def get_permission(path: Path):
     """
     tool_name = 'MacOS Permission'
     # App Run permissions
-    print(f'{tool_name}: Getting CHMOD+X Permission for "{path}"...')
+    log(Severity.DEBUG, tool_name, 'Getting CHMOD+X Permission for "{path}"')
     cmdShellWrapper.exec_cmd(f'chmod +x "{path}"')
