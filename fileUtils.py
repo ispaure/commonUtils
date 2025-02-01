@@ -125,6 +125,7 @@ def delete_dir(dir_path):
     """
     Deletes a directory on disk
     """
+    log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
     rmtree(dir_path)
 
 

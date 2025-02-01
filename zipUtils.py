@@ -1,3 +1,5 @@
+from commonUtils.debugUtils import *
+from commonUtils import fileUtils
 import pyzipper
 import patoolib
 import zipfile
@@ -20,12 +22,14 @@ def unzip_file(source_file: Union[str, Path], destination_dir: Union[str, Path],
     :param pwd: Password for extraction. Leave none if archive is not password protected.
     :type pwd: str
     """
+    tool_name = 'Extract ZIP File'
+
     if isinstance(source_file, Path):
         source_file_str = str(source_file)
     elif isinstance(source_file, str):
         source_file_str = source_file
     else:
-        print('UNZIP File: Wrong Input Type for Source File')
+        log(Severity.ERROR, tool_name, 'Wrong Input type for Source File')
         return
 
     if isinstance(destination_dir, Path):
@@ -33,13 +37,15 @@ def unzip_file(source_file: Union[str, Path], destination_dir: Union[str, Path],
     elif isinstance(destination_dir, str):
         destination_dir_str = destination_dir
     else:
-        print('UNZIP File: Wrong Input Type for Destination Directory')
+        log(Severity.ERROR, tool_name, 'Wrong Input type for Destination Directory')
         return
 
     if pwd is None:
+        log(Severity.DEBUG, tool_name, f'Extracting archive from "{source_file}" to "{destination_dir}"')
         with zipfile.ZipFile(source_file_str, 'r') as zip_ref:
             zip_ref.extractall(destination_dir_str)
     else:
+        log(Severity.DEBUG, tool_name, f'Extracting password-protected archive from "{source_file}" to "{destination_dir}"')
         # # Legacy: Only works with ZIP 2.0 encryption method (legacy; unsecure)
         # with zipfile.ZipFile(source_file, 'r') as zip_ref:
         #     zip_ref.extractall(path=destination_dir, members=None, pwd=pwd.encode())
@@ -61,9 +67,12 @@ def unrar_file(source_file, destination_dir, unrar_sw_path: str = None):
     :param unrar_sw_path: Path to the unrar software (for macOS)
     :type unrar_sw_path: str
     """
+    tool_name = 'Extract RAR File'
     if sys.platform == 'win32':
+        log(Severity.DEBUG, Severity.DEBUG, f'Extracting archive from "{source_file}" to "{destination_dir}"')
         patoolib.extract_archive(source_file, outdir=destination_dir)
     else:
+        log(Severity.DEBUG, Severity.DEBUG, f'Extracting archive from "{source_file}" to "{destination_dir}"')
         patoolib.extract_archive(source_file, outdir=destination_dir, program=unrar_sw_path)
     # TODO: Doesn't work for macos because cant find software. Need program= flag with proper software
     # TODO: Or alternate solution is interfacing with Keka through Commandline perhaps?: https://github.com/aonez/Keka/wiki/Terminal-support
@@ -101,11 +110,18 @@ def zip_file(source, destination, keep_root=True):
 
 
 def extract_file_from_dmg(dmg_path, target_filename, output_dir):
+    tool_name = 'DMG File Extractor'
+    # Make sure on macOS
+    if fileUtils.get_os() != 'macOS':
+        log(Severity.ERROR, tool_name, 'OS Unsupported for this operation!')
+        return
+
     # Step 1: Mount the DMG
     try:
+        log(Severity.DEBUG, tool_name, f'Mounting DMG File "{dmg_path}"')
         mount_output = subprocess.check_output(["hdiutil", "attach", dmg_path], text=True)
     except subprocess.CalledProcessError as e:
-        print(f"Failed to mount DMG: {e}")
+        log(Severity.ERROR, tool_name, f"Failed to mount DMG: {e}")
         return
 
     # Parse the mount point from the output
@@ -117,21 +133,21 @@ def extract_file_from_dmg(dmg_path, target_filename, output_dir):
             break
 
     if not mount_point:
-        print("Failed to find the mount point.")
+        log(Severity.ERROR, tool_name, f"Failed to find the mount point: '{dmg_path}'")
         return
 
     try:
         # Step 2: Find the target file
         target_path = os.path.join(mount_point, target_filename)
         if not os.path.exists(target_path):
-            print(f"{target_filename} not found in the DMG.")
+            log(Severity.ERROR, tool_name, f"{target_filename} not found in the DMG.")
             return
 
         # Step 3: Copy the file to the output directory
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         shutil.copy(target_path, output_dir)
-        print(f"Copied {target_filename} to {output_dir}")
+        log(Severity.DEBUG, tool_name, f"Copied {target_filename} to {output_dir}")
 
     finally:
         # Step 4: Unmount the DMG
@@ -139,11 +155,18 @@ def extract_file_from_dmg(dmg_path, target_filename, output_dir):
 
 
 def extract_directory_from_dmg(dmg_path, target_directory, output_dir):
+    tool_name = 'DMG Directory Extractor'
+    # Make sure on macOS
+    if fileUtils.get_os() != 'macOS':
+        log(Severity.ERROR, tool_name, 'OS Unsupported for this operation!')
+        return
+
     # Step 1: Mount the DMG
     try:
+        log(Severity.DEBUG, tool_name, f'Mounting DMG File "{dmg_path}"')
         mount_output = subprocess.check_output(["hdiutil", "attach", dmg_path], text=True)
     except subprocess.CalledProcessError as e:
-        print(f"Failed to mount DMG: {e}")
+        log(Severity.ERROR, tool_name, f"Failed to mount DMG: {e}")
         return
 
     # Parse the mount point from the output
@@ -155,14 +178,14 @@ def extract_directory_from_dmg(dmg_path, target_directory, output_dir):
             break
 
     if not mount_point:
-        print("Failed to find the mount point.")
+        log(Severity.ERROR, tool_name, f"Failed to find the mount point: '{dmg_path}'")
         return
 
     try:
         # Step 2: Find the target directory
         target_path = os.path.join(mount_point, target_directory)
         if not os.path.isdir(target_path):
-            print(f"{target_directory} not found in the DMG.")
+            log(Severity.ERROR, tool_name, f"{target_directory} not found in the DMG.")
             return
 
         # Step 3: Copy the directory to the output location
@@ -170,7 +193,7 @@ def extract_directory_from_dmg(dmg_path, target_directory, output_dir):
             os.makedirs(output_dir)
         destination = os.path.join(output_dir, os.path.basename(target_directory))
         shutil.copytree(target_path, destination)
-        print(f"Copied {target_directory} to {output_dir}")
+        log(Severity.DEBUG, tool_name, f"Copied {target_directory} to {output_dir}")
 
     finally:
         # Step 4: Unmount the DMG
