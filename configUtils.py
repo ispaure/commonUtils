@@ -4,6 +4,7 @@ Functions to read through a (.ini) file.
 
 import configparser
 from commonUtils import fileUtils
+from commonUtils.debugUtils import *
 from typing import *
 from pathlib import Path
 
@@ -22,7 +23,7 @@ __status__ = 'Development'
 # ----------------------------------------------------------------------------------------------------------------------
 # DEBUG
 
-show_verbose = True
+show_verbose = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -41,6 +42,7 @@ def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypas
     :type bypass_error: bool
     :rtype: str
     """
+    tool_name = 'config_section_map'
 
     # REGULAR APPROVED METHOD
     if not bypass_error:
@@ -50,7 +52,7 @@ def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypas
             with open(cfg_file_path, 'r', encoding='utf-8-sig') as f:
                 config.read_file(f)
         except Exception as e:
-            print(f"Error reading config file: {e}")
+            log(Severity.ERROR, tool_name, f"Error reading config file: {e}")
             return None
 
         # Retrieve dictionary of the section
@@ -61,12 +63,12 @@ def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypas
                 try:
                     dict1[option] = config.get(section, option)
                     if dict1[option] == -1:
-                        print("skip: %s" % option)
+                        log(Severity.ERROR, tool_name, "skip: %s" % option)
                 except Exception as e:
-                    print(f"Exception on {option}: {e}")
+                    log(Severity.ERROR, tool_name, f"Exception on {option}: {e}")
                     dict1[option] = None
         except Exception as e:
-            print(f"Error accessing section '{section}': {e}")
+            log(Severity.ERROR, tool_name, f"Error accessing section '{section}': {e}")
             return None
 
         # Return the requested variable
@@ -185,12 +187,16 @@ def config_set_add_variable(cfg_file_path, section, variable, value):
     """
     Don't know if something is there already, add if not else set
     """
+    tool_name = 'config_set_add_variable'
     return_val = config_section_map(cfg_file_path, section, variable, bypass_error=True)
-    print(f'Return Value: "{return_val}"')
+    if show_verbose:
+        log(Severity.DEBUG, tool_name, f'Return Value: "{return_val}"')
     if return_val is None:
-        print('Variable is None, adding variable...')
+        if show_verbose:
+            log(Severity.DEBUG, tool_name, 'Variable is None, adding variable...')
         config_add_variable(cfg_file_path, section, variable, value)
     else:
-        print('Variable exists, setting variable...')
+        if show_verbose:
+            log(Severity.DEBUG, tool_name, 'Variable exists, setting variable...')
         config_set_variable(cfg_file_path, section, variable, value)
 
