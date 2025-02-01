@@ -1,3 +1,4 @@
+import os
 import sys
 import enum
 from datetime import datetime
@@ -5,6 +6,10 @@ from datetime import datetime
 # Settings
 include_time = False
 verbose_debug = True
+
+# Enable ANSI escape codes on Windows CMD
+if sys.platform.startswith("win"):
+    os.system("")
 
 
 def print_debug_msg(msg, show_verbose):
