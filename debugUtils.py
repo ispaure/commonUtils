@@ -48,12 +48,17 @@ class DebugLogger:
             skip_char = ''
 
         popup_title = f"{timestamp}{skip_char}[{severity.value}] {title}"
-        full_message = f"{timestamp}{skip_char}[{severity.value}] {title}: {message}"
 
-        # line skips always put text a bit further on line
-        num_spaces = len(timestamp) + len(f'{severity.value}') + len(title) + 5 + len(skip_char)
-        space_str = ' ' * num_spaces
-        full_message_for_print = full_message.replace('\n', f'\n{space_str}')
+        if '\n' not in message:
+            full_message_for_print = f"{timestamp}{skip_char}[{severity.value}] {title}: {message}"
+        else:
+            full_message = (f"{timestamp}{skip_char}[{severity.value}] {title}\n"
+                            f"{message}")
+            # line skips always put text a bit further on line
+            num_spaces = len(timestamp) + len(f'{severity.value}') + 3 + len(skip_char)
+            space_str = ' ' * num_spaces
+            full_message_for_print = full_message.replace('\n', f'\n{space_str}')
+            full_message_for_print += '\n'
 
         # Format color
         match severity:
