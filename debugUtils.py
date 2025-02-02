@@ -2,6 +2,7 @@ import os
 import sys
 import enum
 from datetime import datetime
+from commonUtils import pySideUtils
 
 # Settings
 include_time = False
@@ -34,7 +35,7 @@ class DebugLogger:
     def __init__(self, log_file="debug.log"):
         self.log_file = log_file
 
-    def log_debug(self, severity: Severity, title: str, message: str):
+    def log_debug(self, severity: Severity, title: str, message: str, popup: bool = False):
         if severity == Severity.DEBUG and not verbose_debug:
             return
 
@@ -46,36 +47,39 @@ class DebugLogger:
             timestamp = ''
             skip_char = ''
 
+        popup_title = f"{timestamp}{skip_char}[{severity.value}] {title}"
         full_message = f"{timestamp}{skip_char}[{severity.value}] {title}: {message}"
 
         # line skips always put text a bit further on line
         num_spaces = len(timestamp) + len(f'{severity.value}') + len(title) + 5 + len(skip_char)
         space_str = ' ' * num_spaces
-        full_message = full_message.replace('\n', f'\n{space_str}')
-        # if '\n' in full_message:
-        #     full_message += '\n'
+        full_message_for_print = full_message.replace('\n', f'\n{space_str}')
 
         # Format color
         match severity:
             case Severity.DEBUG:
-                colored_msg = f'\033[35m{full_message}\033[0m'
+                colored_msg = f'\033[35m{full_message_for_print}\033[0m'
             case Severity.INFO:
-                colored_msg = full_message
+                colored_msg = full_message_for_print
             case Severity.WARNING:
-                colored_msg = f'\033[33m{full_message}\033[0m'
+                colored_msg = f'\033[33m{full_message_for_print}\033[0m'
             case Severity.ERROR:
-                colored_msg = f'\033[31m{full_message}\033[0m'
+                colored_msg = f'\033[31m{full_message_for_print}\033[0m'
             case Severity.CRITICAL:
-                colored_msg = f'\033[41;37m{full_message}\033[0m'
+                colored_msg = f'\033[41;37m{full_message_for_print}\033[0m'
             case _:
-                colored_msg = full_message
+                colored_msg = full_message_for_print
 
         # Print to console
         print(colored_msg)
 
         # Append to log file
-        with open(self.log_file, "a") as log:
-            log.write(full_message + "\n")
+        with open(self.log_file, "a") as log_item:
+            log_item.write(full_message_for_print + "\n")
+
+        # If popup, show popup
+        if popup:
+            pySideUtils.display_msg_box_ok(popup_title, message)
 
 
 # Create a singleton instance of the logger

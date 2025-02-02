@@ -166,10 +166,32 @@ def create_symbolic_link(source_dir, destination_dir):
     """
     Creates a symbolic link from the source dir to the destination dir
     """
-    # if sys.platform == 'win32':
-    #     subprocess.check_call(['cmd', '/c', 'mklink', '/J', str(source_dir), str(destination_dir)])
-    # else:
-    os.symlink(source_dir, destination_dir)
+    tool_name = 'Create Symbolic Link'
+
+    # Resolve source dir (avoiding potential issues when creating a link)
+    if isinstance(source_dir, Path):
+        source_dir_resolved = source_dir.resolve()
+    elif isinstance(source_dir, str):
+        source_dir_path = Path(source_dir)
+        source_dir_resolved = source_dir_path.resolve()
+    else:
+        log(Severity.ERROR, tool_name, 'Source Dir Input is not a Path or string!')
+        return
+
+    # If there is no directory within where the symbolic link is supposed to be created, there will be an error.
+    # Create directory if required
+    if isinstance(destination_dir, Path):
+        destination_dir_parent = destination_dir.parent
+    elif isinstance(destination_dir, str):
+        destination_dir_path = Path(destination_dir)
+        destination_dir_parent = destination_dir_path.parent
+    else:
+        log(Severity.ERROR, tool_name, 'Destination Dir Input is not a Path or string!')
+        return
+    if not os.path.isdir(destination_dir_parent):
+        make_dir(destination_dir_parent)
+
+    os.symlink(source_dir_resolved, destination_dir)
 
 
 def update_symbolic_link(source: Path, destination: Path, allow_destination_deletion=False):
@@ -452,6 +474,7 @@ def make_dir(directory):
     Creates directory at location (if it doesn't exist)
     """
     if not os.path.exists(directory):
+        log(Severity.DEBUG, 'Make Directory', f'Creating Directory at "{directory}"')
         Path(directory).mkdir(parents=True, exist_ok=True)
 
 

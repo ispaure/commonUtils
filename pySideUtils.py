@@ -1,14 +1,11 @@
-import sys
-import os
-import platform
 from commonUtils.debugUtils import *
 from commonUtils import debugUtils
 from commonUtils import fileUtils
 
-# if sys.platform != 'win32' and platform.processor() == 'arm':
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
+from typing import *
 
 
 tool_name = 'pySide6 Wrapper'
