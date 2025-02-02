@@ -63,7 +63,7 @@ class DebugLogger:
         # Format color
         match severity:
             case Severity.DEBUG:
-                colored_msg = f'\033[35m{full_message_for_print}\033[0m'
+                colored_msg = f'\033[90m{full_message_for_print}\033[0m'
             case Severity.INFO:
                 colored_msg = full_message_for_print
             case Severity.WARNING:
