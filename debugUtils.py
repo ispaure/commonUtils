@@ -5,8 +5,12 @@ from datetime import datetime
 from commonUtils import pySideUtils
 
 # Settings
-include_time = False
-verbose_debug = True
+include_time = False  # Show absolute time
+use_time_delta = True  # Show time since last debug message
+verbose_debug = True  # Show debug-level entries
+
+# Global variable to track last timestamp
+last_timestamp = None
 
 # Enable ANSI escape codes on Windows CMD
 if sys.platform.startswith("win"):
@@ -39,13 +43,25 @@ class DebugLogger:
         if severity == Severity.DEBUG and not verbose_debug:
             return
 
+        global last_timestamp
+
         # Format the log message
+        current_time = datetime.now()
         if include_time:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            skip_char = ' '
+            timestamp = current_time.strftime("%H:%M:%S")
+        elif use_time_delta:
+            if last_timestamp is None:
+                delta_str = '0.000s'
+            else:
+                delta = (current_time - last_timestamp).total_seconds()
+                delta_str = f'{delta:.3f}s'
+            timestamp = delta_str
         else:
             timestamp = ''
-            skip_char = ''
+
+        last_timestamp = current_time
+
+        skip_char = ' ' if timestamp else ''
 
         popup_title = f"{timestamp}{skip_char}[{severity.value}] {title}"
 
@@ -60,7 +76,7 @@ class DebugLogger:
             full_message_for_print = full_message.replace('\n', f'\n{space_str}')
             full_message_for_print += '\n'
 
-        # Format color
+        # Print message with colors
         match severity:
             case Severity.DEBUG:
                 colored_msg = f'\033[90m{full_message_for_print}\033[0m'
