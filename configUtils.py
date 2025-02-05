@@ -76,19 +76,24 @@ def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypas
 
     # UNORTHODOX METHOD TO USE IF CONFIG FILE IS BROKEN
     else:
+        # Var to search for
+        section_line = f'[{section}]'
+        var_line_type_a = f'{variable} = '
+        var_line_type_b = f'{variable}='
+
         line_lst = fileUtils.read_file(cfg_file_path)
         right_section = False
         for line in line_lst:
-            if line == f'[{section}]':
+            if line == section_line:
                 right_section = True
             else:
                 if right_section:
-                    if line.startswith('['):
-                        break
-                    elif line.startswith(f'{variable} = '):
+                    if line.startswith(var_line_type_a):
                         return line.split(' = ')[-1]
-                    elif line.startswith(f'{variable}='):
+                    elif line.startswith(var_line_type_b):
                         return line.split('=')[-1]
+                    elif line.startswith('['):
+                        break
         return None
 
 
@@ -109,31 +114,31 @@ def config_add_variable(cfg_file_path, section, variable, value):
     # Read the lines from the config file and store in a list
     lines_lst = fileUtils.read_file(cfg_file_path)
 
+    # Make new lines to add
+    section_line = f'[{section}]'
+    variable_line_to_add = variable + ' = ' + value
+
     # See if the section is already there
     section_is_there = False
     for line in lines_lst:
-        if '[{section}]'.format(section=section) in line:
+        if line == section_line:
             section_is_there = True
             break
 
     # Make list for new lines
     new_lines_lst = []
 
-    # Make new lines to add
-    section_line_to_add = '[{section}]'.format(section=section)
-    variable_line_to_add = variable + ' = ' + value
-
     # If section was there, add a line after the section with new variable and value
     if section_is_there:
         for line in lines_lst:
             new_lines_lst.append(line)
-            if section_line_to_add in line:
+            if line == section_line:
                 new_lines_lst.append(variable_line_to_add)
     else:
         # Add the existing lines first
         new_lines_lst = lines_lst
         # At the end, add the new section
-        new_lines_lst.append('\n' + section_line_to_add)
+        new_lines_lst.append('\n' + section_line)
         # After, add its variable and value
         new_lines_lst.append(variable_line_to_add)
 
@@ -157,7 +162,8 @@ def config_set_variable(cfg_file_path, section, variable, value):
 
     # Determine key lines
     section_line = '[{section}]'.format(section=section)
-    variable_line_to_set = variable + ' ='
+    var_line_type_a = f'{variable} = '
+    var_line_type_b = f'{variable}='
 
     in_good_section = False
     for line in lines_lst:
@@ -165,11 +171,11 @@ def config_set_variable(cfg_file_path, section, variable, value):
         if section_line in line:
             in_good_section = True
         if in_good_section:
-            if f'{variable} = ' in line:
+            if line.startswith(var_line_type_a):
                 new_lines_lst.append(f'{variable} = {value}')
                 in_good_section = False
                 line_appended_this_round = True
-            elif f'{variable}=' in line:
+            elif line.startswith(var_line_type_b):
                 new_lines_lst.append(f'{variable}={value}')
                 in_good_section = False
                 line_appended_this_round = True
