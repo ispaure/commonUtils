@@ -114,9 +114,17 @@ def config_add_variable(cfg_file_path, section, variable, value):
     # Read the lines from the config file and store in a list
     lines_lst = fileUtils.read_file(cfg_file_path)
 
+    if lines_lst > 1:
+        if ' = ' in lines_lst[1]:
+            equal_format = ' = '
+        else:
+            equal_format = '='
+    else:
+        equal_format = ' = '
+
     # Make new lines to add
     section_line = f'[{section}]'
-    variable_line_to_add = variable + ' = ' + value
+    variable_line_to_add = f'{variable}{equal_format}{value}'
 
     # See if the section is already there
     section_is_there = False
