@@ -114,7 +114,7 @@ def config_add_variable(cfg_file_path, section, variable, value):
     # Read the lines from the config file and store in a list
     lines_lst = fileUtils.read_file(cfg_file_path)
 
-    if lines_lst > 1:
+    if len(lines_lst) > 1:
         if ' = ' in lines_lst[1]:
             equal_format = ' = '
         else:
