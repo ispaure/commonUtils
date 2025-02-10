@@ -10,17 +10,6 @@ from pathlib import Path
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# AUTHORSHIP INFORMATION
-
-__author__ = 'Marc-André Voyer'
-__copyright__ = 'Copyright (C) 2020-2022, Marc-André Voyer'
-__license__ = "GNU General Public License"
-__maintainer__ = 'Marc-André Voyer'
-__email__ = 'marcandre.voyer@gmail.com'
-__status__ = 'Development'
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 # DEBUG
 
 show_verbose = False
