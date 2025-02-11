@@ -12,6 +12,46 @@ tool_name = 'pySide6 Wrapper'
 rog_ally = False
 
 
+class ProgressBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Layout for the progress bar
+        layout = QVBoxLayout()
+
+        # Progress Bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+
+        # Start Button
+        self.button = QPushButton("Start Progress")
+        self.button.clicked.connect(self.start_progress)
+        layout.addWidget(self.button)
+
+        # Set layout
+        self.setLayout(layout)
+
+        # Timer for updating progress
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_progress)
+        self.progress_value = 0
+
+    def start_progress(self):
+        self.progress_value = 0
+        self.progress_bar.setValue(self.progress_value)
+        self.timer.start(100)  # Updates every 100ms
+
+    def update_progress(self):
+        if self.progress_value < 100:
+            self.progress_value += 5
+            self.progress_bar.setValue(self.progress_value)
+        else:
+            self.timer.stop()
+
+
 def set_font(q_thing):
 
     if rog_ally:
@@ -404,3 +444,46 @@ def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=
     msg_box.setStandardButtons(msg_box.Ok | msg_box.Help)
     msg_box.exec_()
     return True
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# PROGRESS BAR WINDOW
+
+class ProgressBarWindow(Window):
+    def __init__(self, title: str):
+        super().__init__(title, main_window=False)
+
+        # Set dimensions
+        self.width = 300
+        self.height = 50
+        self.dlg.resize(int(self.width), int(self.height))  # Explicitly set the window size
+        self.dlg.setWindowTitle(title)
+        self.dlg.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+
+        # Create layout
+        layout = QVBoxLayout()
+
+        # Create progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+
+        # Attach layout to dialog
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.dlg.setLayout(layout)  # Set layout for QDialog
+
+        _translate = QCoreApplication.translate  # Keep this as it is
+
+    def update_progress(self, value):
+        """Update the progress bar"""
+        self.progress_bar.setValue(value)
+        QApplication.processEvents()  # Keep UI responsive
+
+
+def display_progress_bar(title: str):
+    progress_window = ProgressBarWindow(title)
+    progress_window.dlg.show()  # Show the window but don't block execution
+    return progress_window
