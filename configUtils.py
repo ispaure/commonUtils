@@ -203,3 +203,25 @@ def config_set_add_variable(cfg_file_path, section, variable, value):
             log(Severity.DEBUG, tool_name, 'Variable exists, setting variable...')
         config_set_variable(cfg_file_path, section, variable, value)
 
+
+def config_remove_section(cfg_file_path, section):
+    """
+    Remove a section from a config file
+    """
+    tool_name = 'config_remove_section'
+    line_lst = fileUtils.read_file(cfg_file_path)
+    new_line_lst = []
+    section_str = f'[{section}]'
+    in_right_section = False
+    for line in line_lst:
+        if line.startswith(section_str):
+            in_right_section = True
+        elif not in_right_section:
+            new_line_lst.append(line + '\n')
+        else:
+            if line.startswith('['):
+                in_right_section = False
+                new_line_lst.append(line + '\n')
+
+    fileUtils.write_file(cfg_file_path, new_line_lst)
+
