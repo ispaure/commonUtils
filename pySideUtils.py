@@ -1,5 +1,4 @@
-from commonUtils.debugUtils import *
-from commonUtils import debugUtils
+from commonUtils import logUtils
 from commonUtils import fileUtils
 from commonUtils.debugUtils import *
 
@@ -192,7 +191,7 @@ class Window:
             if self.maximized:
                 self.dlg.showMaximized()
         else:
-            debugUtils.exit_msg('Wrong type for Window.dlg')
+            exit_msg('Wrong type for Window.dlg')
 
 
 def button_open_win(text: str, target: QWidget, rect: QRect, window):
