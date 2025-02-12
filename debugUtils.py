@@ -2,7 +2,7 @@ import os
 import sys
 import enum
 from datetime import datetime
-from commonUtils.pySideUtils import display_msg_box_ok
+from commonUtils import pySideUtils
 
 # Settings
 include_time = False  # Show absolute time
@@ -100,7 +100,7 @@ class DebugLogger:
 
         # If popup, show popup
         if popup:
-            display_msg_box_ok(popup_title, message)
+            pySideUtils.display_msg_box_ok(popup_title, message)
 
 
 # Create a singleton instance of the logger
@@ -108,5 +108,3 @@ logger_instance = DebugLogger()
 
 # Alias for the log_debug method
 log = logger_instance.log_debug
-
-log(Severity.CRITICAL, 'WOW', 'MUCHWOWTEST')
