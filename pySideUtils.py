@@ -59,10 +59,17 @@ def set_font(q_thing):
     else:
         modifier = 0
 
-    if fileUtils.get_os() == 'Windows':
-        font_size = 10 + modifier
-    elif fileUtils.get_os() == 'macOS':
-        font_size = 13 + modifier
+    match fileUtils.get_os():
+        case 'Windows':
+            font_size = 10 + modifier
+        case 'macOS':
+            font_size = 13 + modifier
+        case 'Linux':
+            font_size = 10 + modifier
+        case _:
+            log(Severity, 'Set Font', 'Unsupported OS!')
+            return
+
     q_thing.setFont(QFont('Arial', font_size))
 
 

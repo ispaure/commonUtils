@@ -11,11 +11,16 @@ from commonUtils.wrappers import cmdShellWrapper
 from commonUtils.debugUtils import *
 
 
-def get_os() -> 'str':
-    if sys.platform == 'win32':
-        return 'Windows'
-    elif sys.platform == 'darwin':
-        return 'macOS'
+def get_os() -> str:
+    match sys.platform:
+        case 'win32':
+            return 'Windows'
+        case 'darwin':
+            return 'macOS'
+        case 'linux':
+            return 'Linux'
+        case _:
+            return 'Unknown'
 
 
 if get_os() == 'Windows':
