@@ -80,7 +80,8 @@ class DiskApp(App):
         if not self.__validate_exec(path_linux_str):
             return
 
-        cmdShellWrapper.exec_cmd(path_linux_str, wait_for_output=False)
+        cmdShellWrapper.exec_cmd(path_linux_str, wait_for_output=False)  # TODO: TYPICAL COMMAND, SEE IF WORKS FOR OTHER STUFF (LIKE LAUNCHING APPS)
+        # cmdShellWrapper.exec_cmd(["bash", path_linux_str], wait_for_output=True)  # TODO: For now this works for bash, but idk for other scenarios...
 
 
 class StoreApp(App):

@@ -1,4 +1,3 @@
-
 import subprocess
 import time
 from commonUtils.debugUtils import print_debug_msg as print_debug_msg
@@ -7,10 +6,9 @@ from typing import *
 from pathlib import Path
 import os
 import commonUtils.fileUtils as fileUtils
+from commonUtils.debugUtils import *
 
-
-show_verbose = False
-
+show_verbose = True
 
 def delete_script_file(file_path):
     # Delete script file if exists. Returns false if could not delete
@@ -21,6 +19,15 @@ def delete_script_file(file_path):
             return False
     return True
 
+def should_use_shell(command):
+    """Decide whether to use shell=True based on command and OS"""
+    if isinstance(command, list):
+        return False  # List commands always work with shell=False
+    if fileUtils.get_os() == 'Windows':
+        return True  # Windows prefers shell=True for most cases
+    if any(symbol in command for symbol in ["|", ">", "&", ";"]):
+        return True  # Linux/macOS shell syntax requires shell=True
+    return False
 
 def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path] = None):
     """
@@ -55,23 +62,34 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
     # If code must be executed in new cmd window
     if in_new_window is not None:
         # If to open in new window, write commands in bat file and launch bat file.
-        if sys.platform == 'win32':
-            # Will need to write to file and launch that with script instead
-            sync_file_path = str(in_new_window)
-            # Delete existing file at path
-            result = delete_script_file(sync_file_path)
-            if not result:
-                return False
-            # Write command to file
-            command = command.replace('&', '&&')
-            command = command.replace('%', '%%')
-            fileUtils.write_file(sync_file_path, command)
-            # Replace command by command to open previously written file
-            command = 'start ' + sync_file_path
-        # If to open in new window, reformat command (in macOS)
-        else:
-            macos_cmd_in_new_window = "osascript -e 'tell app \"Terminal\" to do script \"{}\"'"
-            command = macos_cmd_in_new_window.format(command.replace('"', '\\"'))
+        match fileUtils.get_os():
+            case 'Windows':
+                # Will need to write to file and launch that with script instead
+                sync_file_path = str(in_new_window)
+                # Delete existing file at path
+                result = delete_script_file(sync_file_path)
+                if not result:
+                    return False
+                # Write command to file
+                command = command.replace('&', '&&')
+                command = command.replace('%', '%%')
+                fileUtils.write_file(sync_file_path, command)
+                # Replace command by command to open previously written file
+                command = 'start ' + sync_file_path
+            # If to open in new window, reformat command for Ubuntu (Linux)
+
+            case 'Linux':
+                # TODO: Launching in new window does not work on Linux currently, for some reason! Even though running this command through the terminal works.
+                command = f'gnome-terminal -- bash -c "{command}; exec bash"'
+
+            # If to open in new window, reformat command for macOS
+            case 'macOS':
+                macos_cmd_in_new_window = "osascript -e 'tell app \"Terminal\" to do script \"{}\"'"
+                command = macos_cmd_in_new_window.format(command.replace('"', '\\"'))
+
+            case _:
+                log(Severity.CRITICAL, 'cmdShellWrapper', 'Platform not supported!')
+                return
 
     # Time out value (in milliseconds)
     time_out = 15
@@ -81,9 +99,12 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
     print_debug_msg('Command to send:', show_verbose)
     print_debug_msg(command, show_verbose)
 
+    # Should use shell?
+    use_shell = should_use_shell(command)
+
     # Open subprocess, until all output is received.
     p_open = subprocess.Popen(command,
-                             shell=True,
+                             shell=use_shell,  # In case of doubt, this used to be set to always true before doing linux stuff!
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
                              stdin=None)
