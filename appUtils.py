@@ -16,19 +16,23 @@ class App:
 
 
 class DiskApp(App):
-    def __init__(self, name, path_win: Union[str, Path, None], path_mac: Union[str, Path, None] = None):
+    def __init__(self, name,
+                 path_win: Union[str, Path, None] = None,
+                 path_mac: Union[str, Path, None] = None,
+                 path_linux: Union[str, Path, None] = None):
         super().__init__(name)
         self.path_win = path_win
         self.path_mac = path_mac
+        self.path_linux = path_linux
 
     def launch(self):
-        op_sys = fileUtils.get_os()
-        if op_sys == 'Windows':
-            self.__launch_windows()
-        elif op_sys == 'macOS':
-            self.__launch_macos()
-        elif op_sys == 'Linux':
-            self.__launch_linux()
+        match fileUtils.get_os():
+            case 'Windows':
+                self.__launch_windows()
+            case 'macOS':
+                self.__launch_macos()
+            case 'Linux':
+                self.__launch_linux()
 
     def __validate_exec(self, exec_path):
         if exec_path is None or exec_path == 'None':
@@ -68,10 +72,15 @@ class DiskApp(App):
         if not self.__validate_exec(path_macos_str):
             return
 
-        cmdShellWrapper.exec_cmd(str(path_macos_str), wait_for_output=False)
+        cmdShellWrapper.exec_cmd(path_macos_str, wait_for_output=False)
 
     def __launch_linux(self):
-        print('Linux Launch not coded yet')
+        path_linux_str = str(self.path_linux)
+
+        if not self.__validate_exec(path_linux_str):
+            return
+
+        cmdShellWrapper.exec_cmd(path_linux_str, wait_for_output=False)
 
 
 class StoreApp(App):
