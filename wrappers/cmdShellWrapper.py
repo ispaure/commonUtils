@@ -10,6 +10,7 @@ from commonUtils.debugUtils import *
 
 show_verbose = True
 
+
 def delete_script_file(file_path):
     # Delete script file if exists. Returns false if could not delete
     if os.path.exists(file_path):
@@ -19,15 +20,18 @@ def delete_script_file(file_path):
             return False
     return True
 
+
 def should_use_shell(command):
     """Decide whether to use shell=True based on command and OS"""
-    if isinstance(command, list):
-        return False  # List commands always work with shell=False
-    if fileUtils.get_os() == 'Windows':
+    if fileUtils.get_os() == 'Windows' or fileUtils.get_os() == 'macOS':  # TODO: Added macOS back here to patch up, idk if want this!
         return True  # Windows prefers shell=True for most cases
-    if any(symbol in command for symbol in ["|", ">", "&", ";"]):
+    elif isinstance(command, list):
+        return False  # List commands always work with shell=False
+    elif any(symbol in command for symbol in ["|", ">", "&", ";"]):
         return True  # Linux/macOS shell syntax requires shell=True
-    return False
+    else:
+        return False
+
 
 def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path] = None):
     """
@@ -104,10 +108,10 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
 
     # Open subprocess, until all output is received.
     p_open = subprocess.Popen(command,
-                             shell=use_shell,  # In case of doubt, this used to be set to always true before doing linux stuff!
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             stdin=None)
+                              shell=use_shell,  # In case of doubt, this used to be set to always true before doing linux stuff!
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              stdin=None)
 
     # Run loop for as long as receive new lines
     output_lines = []
