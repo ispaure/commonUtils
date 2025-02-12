@@ -1,6 +1,7 @@
 from commonUtils.debugUtils import *
 from commonUtils import debugUtils
 from commonUtils import fileUtils
+from commonUtils.debugUtils import *
 
 from PySide6.QtCore import *
 from PySide6.QtGui import *
