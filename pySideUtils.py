@@ -1,6 +1,6 @@
 from commonUtils import logUtils
 from commonUtils import fileUtils
-from commonUtils.debugUtils import *
+from commonUtils import debugUtils
 
 from PySide6.QtCore import *
 from PySide6.QtGui import *
@@ -67,7 +67,7 @@ def set_font(q_thing):
         case 'Linux':
             font_size = 10 + modifier
         case _:
-            log(Severity, 'Set Font', 'Unsupported OS!')
+            debugUtils.log(debugUtils.Severity, 'Set Font', 'Unsupported OS!')
             return
 
     q_thing.setFont(QFont('Arial', font_size))
@@ -100,10 +100,10 @@ class Palette:
 def button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
     def clicked():
         if args is None:
-            log(Severity.DEBUG, tool_name, 'Executing Button Function')
+            debugUtils.log(debugUtils.Severity.DEBUG, tool_name, 'Executing Button Function')
             fn()
         else:
-            log(Severity.DEBUG, tool_name, 'Executing Button Function (with Arguments)')
+            debugUtils.log(debugUtils.Severity.DEBUG, tool_name, 'Executing Button Function (with Arguments)')
             fn(args)
 
     push_button = QPushButton(target)
