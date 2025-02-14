@@ -1,14 +1,15 @@
-from commonUtils import logUtils
-from commonUtils import fileUtils
-from commonUtils import debugUtils
-from commonUtils.osUtils import *
-
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-from PySide6.QtWidgets import *
 from typing import *
 import os
 import ctypes
+
+# Common utilities
+from commonUtils import logUtils, fileUtils, debugUtils
+from commonUtils.osUtils import *
+
+# PySide6 (Qt) modules
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
 
 tool_name = 'pySide6 Wrapper'

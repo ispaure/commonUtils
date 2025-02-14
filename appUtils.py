@@ -1,14 +1,15 @@
-from commonUtils.wrappers import cmdShellWrapper
-from commonUtils.pySideUtils import *
-from commonUtils.wrappers import powerShellWrapper
-import os
 from typing import *
-import os
-from commonUtils import fileUtils
 from pathlib import Path
+import os
 import subprocess
+
+# Common utilities
+from commonUtils import fileUtils
 from commonUtils.osUtils import *
 from commonUtils.pySideUtils import *
+
+# Wrappers
+from commonUtils.wrappers import cmdShellWrapper, powerShellWrapper
 
 
 class App:

@@ -1,8 +1,10 @@
-from commonUtils import fileUtils
 import os
-from pathlib import Path
 import ctypes
 from ctypes import wintypes
+from pathlib import Path
+
+# Common utilities
+from commonUtils import fileUtils
 
 # Define constants
 FILE_ATTRIBUTE_REPARSE_POINT = 0x0400

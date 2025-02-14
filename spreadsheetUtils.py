@@ -1,8 +1,9 @@
 from typing import *
 from pathlib import Path
-from commonUtils import logUtils
 import os
-from commonUtils import fileUtils
+
+# Common utilities
+from commonUtils import fileUtils, logUtils
 
 
 class Cell:
