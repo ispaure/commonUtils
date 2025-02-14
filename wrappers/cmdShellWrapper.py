@@ -4,6 +4,7 @@ from typing import *
 from pathlib import Path
 import commonUtils.fileUtils as fileUtils
 from commonUtils.debugUtils import *
+from commonUtils.osUtils import *
 
 show_verbose = False
 
@@ -20,7 +21,7 @@ def delete_script_file(file_path):
 
 def should_use_shell(command):
     """Decide whether to use shell=True based on command and OS"""
-    if fileUtils.get_os() == 'Windows' or fileUtils.get_os() == 'macOS':  # TODO: Added macOS back here to patch up, idk if want this!
+    if get_os() == OS.WIN or get_os() == OS.MAC:  # TODO: Added macOS back here to patch up, idk if want this!
         return True  # Windows prefers shell=True for most cases
     elif isinstance(command, list):
         return False  # List commands always work with shell=False
@@ -63,8 +64,8 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
     # If code must be executed in new cmd window
     if in_new_window is not None:
         # If to open in new window, write commands in bat file and launch bat file.
-        match fileUtils.get_os():
-            case 'Windows':
+        match get_os():
+            case OS.WIN:
                 # Will need to write to file and launch that with script instead
                 sync_file_path = str(in_new_window)
                 # Delete existing file at path
@@ -79,12 +80,12 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
                 command = 'start ' + sync_file_path
             # If to open in new window, reformat command for Ubuntu (Linux)
 
-            case 'Linux':
+            case OS.LINUX:
                 # TODO: Launching in new window does not work on Linux currently, for some reason! Even though running this command through the terminal works.
                 command = f'gnome-terminal -- bash -c "{command}; exec bash"'
 
             # If to open in new window, reformat command for macOS
-            case 'macOS':
+            case OS.MAC:
                 macos_cmd_in_new_window = "osascript -e 'tell app \"Terminal\" to do script \"{}\"'"
                 command = macos_cmd_in_new_window.format(command.replace('"', '\\"'))
 

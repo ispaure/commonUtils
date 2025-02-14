@@ -7,6 +7,7 @@ import os
 from commonUtils import fileUtils
 from pathlib import Path
 import subprocess
+from commonUtils.osUtils import *
 from commonUtils.pySideUtils import *
 
 
@@ -21,12 +22,12 @@ class DiskApp(App):
         self.path = path
 
     def launch(self):
-        match fileUtils.get_os():
-            case 'Windows':
+        match get_os():
+            case OS.WIN:
                 self.__launch_windows()
-            case 'macOS':
+            case OS.MAC:
                 self.__launch_macos()
-            case 'Linux':
+            case OS.LINUX:
                 self.__launch_linux()
 
     def __validate_exec(self, exec_path):
@@ -104,14 +105,14 @@ class StoreApp(App):
         return None
 
     def launch(self):
-        op_sys = fileUtils.get_os()
-        if op_sys == 'Windows':
+        op_sys = get_os()
+        if op_sys == OS.WIN:
             aumid = self.get_application_user_model_id()
             if aumid is not None:
                 os.system(f'explorer shell:appsFolder\\{aumid}')
-        elif op_sys == 'macOS':
+        elif op_sys == OS.MAC:
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
-        elif op_sys == 'Linux':
+        elif op_sys == OS.LINUX:
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
 
 

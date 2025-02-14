@@ -5,6 +5,7 @@ import patoolib
 import zipfile
 from shutil import make_archive
 import os
+from commonUtils.osUtils import *
 import sys
 from pathlib import Path
 from typing import *
@@ -112,7 +113,7 @@ def zip_file(source, destination, keep_root=True):
 def extract_file_from_dmg(dmg_path, target_filename, output_dir):
     tool_name = 'DMG File Extractor'
     # Make sure on macOS
-    if fileUtils.get_os() != 'macOS':
+    if get_os() != OS.MAC:
         log(Severity.ERROR, tool_name, 'OS Unsupported for this operation!')
         return
 
@@ -157,7 +158,7 @@ def extract_file_from_dmg(dmg_path, target_filename, output_dir):
 def extract_directory_from_dmg(dmg_path, target_directory, output_dir):
     tool_name = 'DMG Directory Extractor'
     # Make sure on macOS
-    if fileUtils.get_os() != 'macOS':
+    if get_os() != OS.MAC:
         log(Severity.ERROR, tool_name, 'OS Unsupported for this operation!')
         return
 

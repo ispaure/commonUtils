@@ -6,28 +6,29 @@ class OS(Enum):
     WIN = "Windows"
     MAC = "macOS"
     LINUX = "Linux"
+    UNKNOWN = "Unknown"
 
 
-def get_os() -> str:
+def get_os() -> OS:
     match sys.platform:
         case 'win32':
-            return 'Windows'
+            return OS.WIN
         case 'darwin':
-            return 'macOS'
+            return OS.MAC
         case 'linux':
-            return 'Linux'
+            return OS.LINUX
         case _:
-            return 'Unknown'
+            return OS.UNKNOWN
 
 
 def get_os_path(path_win=None, path_mac=None, path_linux=None):
     """Returns the correct path based on the current operating system."""
     match get_os():
-        case 'Windows':
+        case OS.WIN:
             return path_win
-        case 'macOS':
+        case OS.MAC:
             return path_mac
-        case 'Linux':
+        case OS.LINUX:
             return path_linux
         case _:
             return None  # If OS is unknown or no path is provided
