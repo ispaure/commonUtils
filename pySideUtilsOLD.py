@@ -1,5 +1,5 @@
 """
-PySide Utils for creating GUI (needs a few outside packages, I know they are in Maya but IDK for the others).
+Legacy PySide Utils for creating GUI (needs a few outside packages, I know they are in Maya but IDK for the others).
 """
 import sys
 import platform
