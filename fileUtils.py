@@ -27,6 +27,19 @@ if get_os() == 'Windows':
     from commonUtils import junctionUtils
 
 
+def get_os_path(path_win=None, path_mac=None, path_linux=None):
+    """Returns the correct path based on the current operating system."""
+    match get_os():
+        case 'Windows':
+            return path_win
+        case 'macOS':
+            return path_mac
+        case 'Linux':
+            return path_linux
+        case _:
+            return None  # If OS is unknown or no path is provided
+
+
 class File:
     def __init__(self, path):
         self.path = path
