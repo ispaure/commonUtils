@@ -3,8 +3,8 @@ from enum import Enum
 
 
 class OS(Enum):
-    WINDOWS = "Windows"
-    MACOS = "macOS"
+    WIN = "Windows"
+    MAC = "macOS"
     LINUX = "Linux"
 
 
