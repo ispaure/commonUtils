@@ -1,6 +1,7 @@
 from commonUtils import logUtils
 from commonUtils import fileUtils
 from commonUtils import debugUtils
+from commonUtils.osUtils import *
 
 from PySide6.QtCore import *
 from PySide6.QtGui import *
@@ -61,12 +62,12 @@ def set_font(q_thing):
     else:
         modifier = 0
 
-    match fileUtils.get_os():
-        case 'Windows':
+    match get_os():
+        case OS.WIN:
             font_size = 10 + modifier
-        case 'macOS':
+        case OS.MAC:
             font_size = 13 + modifier
-        case 'Linux':
+        case OS.LINUX:
             font_size = 10 + modifier
         case _:
             debugUtils.log(debugUtils.Severity, 'Set Font', 'Unsupported OS!')
@@ -106,8 +107,8 @@ def initialize_q_app():
     q_app.setStyle('Fusion')
 
     # If on Windows, set to dark mode always with a palette (if not, it doesn't handle it properly)
-    match fileUtils.get_os():
-        case 'Windows':  # Windows
+    match get_os():
+        case OS.WIN:  # Windows
             os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
             palette_cls = Palette()
             palette_cls.set_dark()
@@ -519,7 +520,7 @@ def display_progress_bar(title: str):
 
 def hide_console_window():
     """Hides the console window on Windows if not in debug mode."""
-    match fileUtils.get_os():
+    match get_os():
         case "Windows":
             ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
         case _:

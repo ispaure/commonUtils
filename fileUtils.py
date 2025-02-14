@@ -9,11 +9,12 @@ from typing import *
 import stat
 from commonUtils.wrappers import cmdShellWrapper
 from commonUtils.debugUtils import *
-
 from commonUtils.osUtils import *
 
+from commonUtils import osUtils
 
-if get_os() == 'Windows':
+
+if get_os() == OS.WIN:
     from commonUtils import junctionUtils
 
 
@@ -285,7 +286,7 @@ def is_hard_link(path: Union[str, Path]):
 
 
 def is_junction(path: Union[str, Path]):
-    if get_os() == 'Windows':
+    if get_os() == OS.WIN:
         return junctionUtils.is_junction(path)
     else:
         return False
@@ -306,7 +307,7 @@ def is_mount(path: Union[str, Path]):
 
 
 def is_mount_point(path: Union[str, Path]):
-    if get_os() != 'Windows':
+    if get_os() != OS.WIN:
         return False
 
     # Convert type
@@ -501,7 +502,7 @@ def get_user_documents_dir() -> Path:
     """
     op_sys = get_os()
     match op_sys:
-        case 'macOS':
+        case OS.MAC:
             return Path(get_user_home_dir(), 'Documents')
         case _:
             print(f'Platform not suppported for get_user_documents_dir as of yet!')
