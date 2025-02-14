@@ -3,8 +3,9 @@ import time
 from typing import *
 from pathlib import Path
 import commonUtils.fileUtils as fileUtils
-from commonUtils.debugUtils import *
+from commonUtils import debugUtils
 from commonUtils.osUtils import *
+import os
 
 show_verbose = False
 
@@ -58,7 +59,10 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
         decoded_line = line_str.decode()
         cleaned_line = decoded_line.rstrip('\n')  # Remove n from end of line
         cleaned_line = cleaned_line.rstrip('\r')  # Remove r from end of line
-        print_debug_msg(cleaned_line, show_verbose)  # Print line (if debug)
+
+        if show_verbose:
+            debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', cleaned_line)
+
         return cleaned_line
 
     # If code must be executed in new cmd window
@@ -90,16 +94,16 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
                 command = macos_cmd_in_new_window.format(command.replace('"', '\\"'))
 
             case _:
-                log(Severity.CRITICAL, 'cmdShellWrapper', 'Platform not supported!')
+                debugUtils.log(debugUtils.Severity.CRITICAL, 'cmdShellWrapper', 'Platform not supported!')
                 return
 
     # Time out value (in milliseconds)
     time_out = 15
 
     # If debug, print command that was sent
-    print_debug_msg('Initiating Execute Shell Command procedure.', show_verbose)
-    print_debug_msg('Command to send:', show_verbose)
-    print_debug_msg(command, show_verbose)
+    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', 'Initiating Execute Shell Command procedure.')
+    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', 'Command to send:')
+    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', command)
 
     # Should use shell?
     use_shell = should_use_shell(command)
@@ -148,9 +152,6 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
             if now - loop_begin_time > time_out:
                 terminate_p_open(p_open)
                 break
-
-    # If debug, print result
-    print_debug_msg('Output lines:', show_verbose)
 
     # Clean the output lines
     output_lines_cleaned = []
