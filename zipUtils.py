@@ -1,16 +1,20 @@
-from commonUtils.debugUtils import *
-from commonUtils import fileUtils
+from typing import *
+from pathlib import Path
+import os
+import sys
+import shutil
+import subprocess
+from shutil import make_archive
+
+# Compression utilities
 import pyzipper
 import patoolib
 import zipfile
-from shutil import make_archive
-import os
+
+# Common utilities
+from commonUtils import fileUtils
 from commonUtils.osUtils import *
-import sys
-from pathlib import Path
-from typing import *
-import subprocess
-import shutil
+from commonUtils.debugUtils import *
 
 
 def unzip_file(source_file: Union[str, Path], destination_dir: Union[str, Path], pwd: bool = None):

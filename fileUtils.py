@@ -1,17 +1,16 @@
-import os
-import stat
-from shutil import rmtree
-from pathlib import Path
-import sys
-import subprocess
-from shutil import copyfile
 from typing import *
+import os
+import sys
 import stat
-from commonUtils.wrappers import cmdShellWrapper
-from commonUtils.debugUtils import *
-from commonUtils.osUtils import *
+import subprocess
+from pathlib import Path
+from shutil import rmtree, copyfile
 
+# Common utilities
 from commonUtils import osUtils
+from commonUtils.osUtils import *
+from commonUtils.debugUtils import *
+from commonUtils.wrappers import cmdShellWrapper
 
 
 if get_os() == OS.WIN:

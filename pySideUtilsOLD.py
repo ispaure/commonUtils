@@ -3,6 +3,7 @@ Legacy PySide Utils for creating GUI (needs a few outside packages, I know they 
 """
 import sys
 import platform
+
 if sys.platform != 'win32' and platform.processor() == 'arm':
 
     # Alternative worked before fuck up

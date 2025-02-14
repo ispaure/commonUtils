@@ -1,11 +1,14 @@
-import subprocess
-import time
 from typing import *
 from pathlib import Path
+import os
+import subprocess
+import time
+
+# Common utilities
 import commonUtils.fileUtils as fileUtils
 from commonUtils import debugUtils
 from commonUtils.osUtils import *
-import os
+
 
 show_verbose = False
 

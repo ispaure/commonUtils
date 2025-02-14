@@ -2,11 +2,13 @@
 Functions to read through a (.ini) file.
 """
 
-import configparser
-from commonUtils import fileUtils
-from commonUtils.debugUtils import *
 from typing import *
 from pathlib import Path
+import configparser
+
+# Common utilities
+from commonUtils import fileUtils
+from commonUtils.debugUtils import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------

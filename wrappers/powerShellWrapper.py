@@ -1,9 +1,13 @@
-from commonUtils.wrappers import cmdShellWrapper
 from typing import *
-import subprocess
-from commonUtils import debugUtils
-import ctypes
 import os
+import subprocess
+import ctypes
+
+# Common utilities
+from commonUtils import debugUtils
+
+# Wrappers
+from commonUtils.wrappers import cmdShellWrapper
 
 
 def exec_powershell(command, wait_for_output=True):
