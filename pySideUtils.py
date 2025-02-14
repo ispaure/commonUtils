@@ -6,6 +6,8 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from typing import *
+import os
+import ctypes
 
 
 tool_name = 'pySide6 Wrapper'
@@ -95,6 +97,25 @@ class Palette:
         self.palette.setColor(QPalette.Link, QColor(42, 130, 218))
         self.palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
         self.palette.setColor(QPalette.HighlightedText, Qt.black)
+
+
+def initialize_q_app():
+
+    # Create QApplication, which is the PySide6 UI Application. One per project!
+    q_app = QApplication([])
+    q_app.setStyle('Fusion')
+
+    # If on Windows, set to dark mode always with a palette (if not, it doesn't handle it properly)
+    match fileUtils.get_os():
+        case 'Windows':  # Windows
+            os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
+            palette_cls = Palette()
+            palette_cls.set_dark()
+            q_app.setPalette(palette_cls.palette)
+        case _:
+            pass
+
+    return q_app
 
 
 def button(text: str, target: QWidget, rect: QRect, fn=None, args=None):
@@ -494,3 +515,13 @@ def display_progress_bar(title: str):
     progress_window = ProgressBarWindow(title)
     progress_window.dlg.show()  # Show the window but don't block execution
     return progress_window
+
+
+def hide_console_window():
+    """Hides the console window on Windows if not in debug mode."""
+    match fileUtils.get_os():
+        case "Windows":
+            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+        case _:
+            # TODO: Make Window Hide-able on Other OS
+            debugUtils.log(debugUtils.Severity.WARNING, 'Main', 'Could Not Hide CMD Window!')
