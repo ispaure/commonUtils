@@ -105,6 +105,10 @@ class DebugLogger:
         if popup:
             pySideUtils.display_msg_box_ok(popup_title, message)
 
+        # If Critical, end application
+        if severity == Severity.CRITICAL:
+            sys.exit(1)
+
 
 # Create a singleton instance of the logger
 logger_instance = DebugLogger()
