@@ -13,8 +13,11 @@ from commonUtils.debugUtils import *
 from commonUtils.wrappers import cmdShellWrapper
 
 
-if get_os() == OS.WIN:
-    from commonUtils import junctionUtils
+match get_os():
+    case OS.WIN:
+        from commonUtils import junctionUtils
+    case OS.LINUX:
+        import pwd
 
 
 class File:
@@ -492,7 +495,13 @@ def get_user_home_dir() -> Path:
     """
     Get the current user's home directory
     """
-    return Path.home()
+    match get_os():
+        case OS.WIN | OS.MAC:
+            return Path.home()
+        case OS.LINUX:  # Will work even if using sudo
+            user = os.getenv("SUDO_USER") or os.getenv("USER")  # Prefer real user
+            home_dir = Path(pwd.getpwnam(user).pw_dir if user else os.path.expanduser("~"))
+            return home_dir
 
 
 def get_user_documents_dir() -> Path:
