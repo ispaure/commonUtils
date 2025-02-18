@@ -31,23 +31,11 @@ class DiskApp(App):
                 self.__launch_macos()
             case OS.LINUX:
                 self.__launch_linux()
-
-    def __validate_exec(self, exec_path):
-        if exec_path is None or exec_path == 'None':
-            msg = f'{self.name} path is not specified (None) for current Operating System! Update code and try again!'
-            display_msg_box_ok('App Launcher', msg)
-            return False
-        elif not os.path.isfile(exec_path):
-            msg = (f'{self.name} is not currently installed (Expected location: {exec_path}). '
-                   f'Install first and try again!')
-            display_msg_box_ok('App Launcher', msg)
-            return False
-        return True
     
     def __launch_windows(self):
         path_win_str = str(self.exec_path)
 
-        if not self.__validate_exec(path_win_str):
+        if not validate_exec(self.name, path_win_str):
             return
 
         if path_win_str.endswith('.ps1'):  # If powershell, run as powershell
@@ -67,7 +55,7 @@ class DiskApp(App):
 
         path_macos_str = str(self.exec_path)
 
-        if not self.__validate_exec(path_macos_str):
+        if not validate_exec(self.name, path_macos_str):
             return
 
         cmdShellWrapper.exec_cmd(path_macos_str, wait_for_output=False)
@@ -75,7 +63,7 @@ class DiskApp(App):
     def __launch_linux(self):
         path_linux_str = str(self.exec_path)
 
-        if not self.__validate_exec(path_linux_str):
+        if not validate_exec(self.name, path_linux_str):
             return
 
         cmdShellWrapper.exec_cmd(path_linux_str, wait_for_output=False)  # TODO: TYPICAL COMMAND, SEE IF WORKS FOR OTHER STUFF (LIKE LAUNCHING APPS)
@@ -107,25 +95,58 @@ class StoreApp(App):
         return None
 
     def launch(self):
-        op_sys = get_os()
-        if op_sys == OS.WIN:
-            aumid = self.get_application_user_model_id()
-            if aumid is not None:
-                os.system(f'explorer shell:appsFolder\\{aumid}')
-        elif op_sys == OS.MAC:
-            display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
-        elif op_sys == OS.LINUX:
-            display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+        match get_os():
+            case OS.WIN:
+                aumid = self.get_application_user_model_id()
+                if aumid is not None:
+                    os.system(f'explorer shell:appsFolder\\{aumid}')
+            case OS.MAC:
+                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
+            case OS.LINUX:
+                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+            case _:
+                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on (Undefined)')
 
 
 class Flatpak(App):
-    def __init__(self, name: str, exec_path: Union[str, Path, None]):
+    def __init__(self, name: str, app_id: Union[str, None]):
         super().__init__(name)
+        self.app_id = app_id
+
+    def launch(self):
+        try:
+            subprocess.run(["flatpak","run", f'{self.app_id}'], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error launching Flatpak {self.name}: {e}")
 
 
 class AppImage(App):
     def __init__(self, name: str, exec_path: Union[str, Path, None]):
         super().__init__(name)
+        self.exec_path = Path(exec_path) if exec_path else None
+
+    def launch(self, in_new_window: bool = True):
+        """
+        Launch the AppImage application.
+        :param in_new_window: Whether to open the AppImage in a new terminal window (Linux only)
+        """
+        if not validate_exec(self.name, self.exec_path):
+            return
+
+        cmdShellWrapper.exec_cmd(f'{self.exec_path}')
+
+
+def validate_exec(name, exec_path):
+    if exec_path is None or exec_path == 'None':
+        msg = f'{name} path is not specified (None) for current Operating System! Update code and try again!'
+        display_msg_box_ok('App Launcher', msg)
+        return False
+    elif not os.path.isfile(exec_path):
+        msg = (f'{name} is not currently installed (Expected location: {exec_path}). '
+               f'Install first and try again!')
+        display_msg_box_ok('App Launcher', msg)
+        return False
+    return True
 
 
 def get_app_run_permissions(app_path: Path):
