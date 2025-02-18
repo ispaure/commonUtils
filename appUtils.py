@@ -18,9 +18,10 @@ class App:
 
 
 class DiskApp(App):
-    def __init__(self, name, path: Union[str, Path, None]):
+    def __init__(self, name, exec_path: Union[str, Path, None], install_path: Union[Path, None] = None):
         super().__init__(name)
-        self.path = path
+        self.exec_path = exec_path
+        self.install_path = install_path
 
     def launch(self):
         match get_os():
@@ -44,7 +45,7 @@ class DiskApp(App):
         return True
     
     def __launch_windows(self):
-        path_win_str = str(self.path)
+        path_win_str = str(self.exec_path)
 
         if not self.__validate_exec(path_win_str):
             return
@@ -64,7 +65,7 @@ class DiskApp(App):
 
     def __launch_macos(self):
 
-        path_macos_str = str(self.path)
+        path_macos_str = str(self.exec_path)
 
         if not self.__validate_exec(path_macos_str):
             return
@@ -72,7 +73,7 @@ class DiskApp(App):
         cmdShellWrapper.exec_cmd(path_macos_str, wait_for_output=False)
 
     def __launch_linux(self):
-        path_linux_str = str(self.path)
+        path_linux_str = str(self.exec_path)
 
         if not self.__validate_exec(path_linux_str):
             return
@@ -115,6 +116,16 @@ class StoreApp(App):
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
         elif op_sys == OS.LINUX:
             display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+
+
+class Flatpak(App):
+    def __init__(self, name: str, exec_path: Union[str, Path, None]):
+        super().__init__(name)
+
+
+class AppImage(App):
+    def __init__(self, name: str, exec_path: Union[str, Path, None]):
+        super().__init__(name)
 
 
 def get_app_run_permissions(app_path: Path):
