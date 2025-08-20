@@ -533,6 +533,10 @@ def get_user_appdata_roaming() -> Path:
     return Path(os.environ.get('APPDATA'))
 
 
+def get_user_appdata_local() -> Path:
+    return Path(os.environ.get('LOCALAPPDATA'))
+
+
 def is_file(path: Path) -> bool:
     if os.path.isfile(path):
         return True
@@ -548,3 +552,4 @@ def get_permission(path: Path):
     # App Run permissions
     log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{path}"')
     cmdShellWrapper.exec_cmd(f'chmod +x "{path}"')
+
