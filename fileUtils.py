@@ -4,7 +4,7 @@ import sys
 import stat
 import subprocess
 from pathlib import Path
-from shutil import rmtree, copyfile
+from shutil import rmtree, copyfile, move
 
 # Common utilities
 from commonUtils import osUtils
@@ -21,20 +21,47 @@ match get_os():
 
 
 class File:
-    def __init__(self, path):
+    def __init__(self, path: Path):
         self.path = path
-        self.name = self.get_name()
+        self.name = self.__get_name()
+        self.ext: Union[str, None] = self.__get_ext()
+        self.size: Union[int, None] = self.__get_size()
 
-    def get_name(self):
-        name_incl_ext = self.path.split(get_split_character())[-1]
-        if '.' in name_incl_ext:
-            return name_incl_ext.split('.').join('.')[-1]
+    def __get_name(self) -> str:
+        """Return the file name without extension."""
+        return self.path.stem
+
+    def __get_ext(self) -> Union[str, None]:
+        """Return the file extension (without the dot)."""
+        if self.path.suffix:
+            ext = self.path.suffix.lstrip('.')
+            return ext.lower()
         else:
-            return name_incl_ext
+            return None
 
-    def get_ext(self):
-        if '.' in self.path.split(get_split_character())[-1]:
-            pass
+    def __get_size(self) -> Union[int, None]:
+        """Return the file size in bytes, or None if file does not exist."""
+        try:
+            return self.path.stat().st_size
+        except FileNotFoundError:
+            return None
+
+
+class TXTFile(File):
+    def __init__(self, path: Path):
+        super().__init__(path)
+
+    def get_line_lst(self):
+        return read_file(self.path)
+
+
+def hang_n_terminate():
+    """
+    Hangs the script, quits on keypress
+    :return:
+    """
+    input('Dev-implemented break point! Press key to exit!')
+    sys.exit()
 
 
 def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None):
@@ -49,7 +76,7 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
     """
     # create a list of file and subdirectories
     # names in the given directory
-    list_of_files = os.listdir(dir_name)
+    list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
     all_files = list()
     # Iterate over all the entries
     for entry in list_of_files:
@@ -71,6 +98,25 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
         return filtered_files
 
     return all_files
+
+
+def move_file(src: Path, dest: Path):
+    """
+    Moves a file from src to dest, overwriting if it already exists.
+    """
+    src = Path(src)
+    dest = Path(dest)
+
+    # Ensure destination folder exists
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # If destination exists, delete it first
+    if dest.exists():
+        dest.unlink()
+
+    # Move the file
+    log(Severity.DEBUG, 'fileUtils.move_file', f'Moving file from "{src}" to "{dest}"')
+    move(str(src), str(dest))
 
 
 def read_file(file_path: Union[str, Path]):
@@ -117,6 +163,23 @@ def get_dirs_path_list(dir_path: Union[Path, str]):
         if os.path.isdir(item_dir):
             dir_path_lst.append(item_dir)
     return dir_path_lst
+
+
+def create_n_wipe_dir(path: Path):
+    """
+    Creates directory at path if it does not exist, also wipes contents and double-check it's fully empty.
+    """
+    if not os.path.isdir(path):
+        make_dir(path)
+    if not is_dir_empty(path):
+        delete_dir_contents(path)
+        # Double-Check that it is empty now
+        if not is_dir_empty(path):
+            log(Severity.CRITICAL, 'fileUtils.create_n_wipe_dir', f'Could not delete dir contents in {path}')
+
+
+def has_subdirectories(path: Path) -> bool:
+    return any(item.is_dir() for item in path.iterdir())
 
 
 def delete_dir(dir_path):
@@ -464,6 +527,7 @@ def copy_file(source, destination):
     make_dir(destination_dir)
 
     # Copy file
+    log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
     copyfile(source, destination)
 
 
@@ -472,8 +536,12 @@ def make_dir(directory):
     Creates directory at location (if it doesn't exist)
     """
     if not os.path.exists(directory):
-        log(Severity.DEBUG, 'Make Directory', f'Creating Directory at "{directory}"')
+        log(Severity.DEBUG, 'fileUtils.make_dir', f'Creating Directory at "{directory}"')
         Path(directory).mkdir(parents=True, exist_ok=True)
+
+
+def is_dir_empty(path: Path) -> bool:
+    return not any(path.iterdir())
 
 
 def get_current_working_dir() -> Path:
