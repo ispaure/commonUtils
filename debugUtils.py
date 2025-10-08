@@ -3,9 +3,6 @@ import sys
 import enum
 from datetime import datetime
 
-# Common utilities
-from commonUtils import pySideUtils
-
 
 # Settings
 include_time = False  # Show absolute time
@@ -103,7 +100,11 @@ class DebugLogger:
 
         # If popup, show popup
         if popup:
-            pySideUtils.display_msg_box_ok(popup_title, message)
+            try:
+                from commonUtils import pySideUtils  # local import breaks the cycle, so only do here when needed
+                pySideUtils.display_msg_box_ok(title, message)
+            except Exception:
+                print('Could not load pySideUtils!')
 
         # If Critical, end application
         if severity == Severity.CRITICAL:

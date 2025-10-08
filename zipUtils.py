@@ -17,6 +17,24 @@ from commonUtils.osUtils import *
 from commonUtils.debugUtils import *
 
 
+class ZIPFile(fileUtils.File):
+    def __init__(self, path: Path):
+        # Call the parent (File) initializer
+        super().__init__(path)
+
+    def extract(self, dest_path: Path):
+        """Extract the CBZ File"""
+        unzip_file(self.path, dest_path)
+
+    def get_root_file_lst(self) -> List[str]:
+        try:
+            with zipfile.ZipFile(self.path, 'r') as zip_ref:
+                # list of all entries at root (no '/')
+                return [Path(f).name for f in zip_ref.namelist() if '/' not in f]
+        except zipfile.BadZipFile:
+            log(Severity.CRITICAL, "CBZFile", f"Invalid ZIP structure in {self.path}")
+
+
 def unzip_file(source_file: Union[str, Path], destination_dir: Union[str, Path], pwd: bool = None):
     """
     Extracts zip file to desired location.
@@ -83,13 +101,13 @@ def unrar_file(source_file, destination_dir, unrar_sw_path: str = None):
     # TODO: Or alternate solution is interfacing with Keka through Commandline perhaps?: https://github.com/aonez/Keka/wiki/Terminal-support
 
 
-def zip_file(source, destination, keep_root=True):
+def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=True):
     """
     Create a zip file from the source to the destination.
     :param source: Source path to compress
-    :type source: str
+    :type source: Union[str, Path]
     :param destination: Destination path of compressed archive (incl. extension)
-    :type destination: str
+    :type destination: Union[str, Path]
     :param keep_root: When source is a dir, keeps the dir as part of the archive as a root folder (Default true)
     :type keep_root: bool
     """
@@ -105,13 +123,48 @@ def zip_file(source, destination, keep_root=True):
                         arcname = os.path.join(os.path.relpath(root, relroot), file)
                         zip.write(filename, arcname)
 
-    def make_zipfile_discard_root(source, destination):
-        make_archive(destination, 'zip', source)
+    def make_zipfile_discard_root(source_str, destination_str):
+        # Determine suffix
+        destination_path = Path(destination_str)
+        if destination_path.suffix:
+            ext = destination_path.suffix.lstrip('.')
+            ext = ext.lower()
+        else:
+            log(Severity.CRITICAL, 'zipUtils.zip_file', 'Destination path does not have an extension!')
+            sys.exit()
+        if ext == 'zip':
+            log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {destination_path}')
+            make_archive(destination_str[:-len('.zip')], 'zip', source_str)
+        else:  # If desired extension is not zip, create a zip regardless and then rename to extension we want (but throw error if there is zip at that location already)
+            if_was_zip_path = f'{destination_str[:-len(ext) - 1]}.zip'
+            if os.path.exists(if_was_zip_path):
+                log(Severity.CRITICAL, 'zipUtils.zip_file', f'Trying to overwrite file which should not be overwritten!: {if_was_zip_path}')
+                sys.exit()
+            else:
+                log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {if_was_zip_path}')
+                make_archive(destination_str[:-len(ext) - 1], 'zip', source_str)
+                fileUtils.move_file(Path(if_was_zip_path), destination_path)
+
+    if isinstance(source, str):
+        source_str = source
+    elif isinstance(source, Path):
+        source_str = str(source)
+    else:
+        log(Severity.CRITICAL, 'zipUtils.zip_file', 'Source is not a string or Path!')
+        sys.exit()
+
+    if isinstance(destination, str):
+        destination_str = destination
+    elif isinstance(destination, Path):
+        destination_str = str(destination)
+    else:
+        log(Severity.CRITICAL, 'zipUtils.zip_file', 'Destination is not a string or Path!')
+        sys.exit()
 
     if keep_root:
-        make_zipfile_keep_root(destination, source)
+        make_zipfile_keep_root(destination_str, source_str)
     else:
-        make_zipfile_discard_root(source, destination[:-len('.zip')])
+        make_zipfile_discard_root(source_str, destination_str)
 
 
 def extract_file_from_dmg(dmg_path, target_filename, output_dir):
