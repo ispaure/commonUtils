@@ -1,6 +1,7 @@
 """
 Hosts functions related to CBZ (ComicBook Zip) files
 """
+from __future__ import annotations
 from pathlib import Path
 from typing import *
 import commonUtils.fileUtils as fileUtils
@@ -11,10 +12,17 @@ from commonUtils.debugUtils import *
 from datetime import datetime
 
 
-# User defined settings
+# User Defined Settings
+
+# Default directory for conversion (What shows up as default in the UI)
 default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'ComicsTest', 'ToConvert')
-jpg_quality = 40  # 'quality' ranges from 1 (lowest) to 95 (highest)
-compression_tolerance = 75  # Keep the compressed image if it's no more than X % of the original. Else, keep original. (Only save space if compression was worth it)
+
+# Compression 'quality' ranges from 1 (lowest, smallest size) to 95 (highest, biggest size)
+jpg_quality_color = 40  # Should be higher for color than grayscale, else causes much-worse looking results
+jpg_quality_grayscale = 10  # Can be much lower than color, still yielding great results
+
+# Decide to keep the compressed image if its size is smaller than this percentage of the original.
+minimum_allowed_compression_percentage = 75
 
 # Temporary Folders for Compression
 temp_compression_path = Path(fileUtils.get_user_home_dir(), 'Temp_CBZ_Compression')
@@ -27,74 +35,132 @@ tool_name = 'commonUtils.cbzUtils'
 batch_target_dir: Union[str, None] = None  # Updated in code to the batch target dir
 
 
-class ComicInfoXML(fileUtils.File):
+class ComicInfoXML(xmlUtils.XMLFile):
     def __init__(self, path: Path):
         super().__init__(path)
+
+    def update_pages_in_line_lst(self, cbz_image_file_lst: List[CBZImageFile]):
+
+        # Check line list is not currently empty
+        if len(self.line_lst) == 0:
+            log(Severity.CRITICAL, tool_name, 'Cannot Update Pages in ComicInfo.xml line List as it is empty and not loaded!')
+
+        # Passed through pages section correctly
+        went_through_pages_section = False
+
+        # Build up the list of lines
+        updated_line_lst = []
+        in_page_section = False
+        for line in self.line_lst:
+            if not in_page_section:
+                updated_line_lst.append(line)
+                if line == '  <Pages>':
+                    in_page_section = True
+                    page_number = 0
+                    for cbz_image_file in cbz_image_file_lst:
+                        page_line = cbz_image_file.get_comicinfo_xml_line(page_number)
+                        updated_line_lst.append(page_line)
+                        page_number += 1
+            else:
+                if line == '  </Pages>':
+                    updated_line_lst.append(line)
+                    in_page_section = False
+                    went_through_pages_section = True
+
+        if not went_through_pages_section:
+            log(Severity.CRITICAL, tool_name, f'Did not go through Pages Section of ComicInfo.XML! {self.line_lst}')
+
+        self.line_lst = updated_line_lst
 
 
 class CompressionStats:
     def __init__(self):
-        self.start_datetime: str = ''
-        self.has_comicinfo_xml: Union[bool, None] = None
-        self.original_images_size: int = 0
-        self.compressed_images_size: int = 0
-        self.kept_images_size: int = 0
-        self.kept_images_compressed_cnt: int = 0
-        self.kept_images_original_cnt: int = 0
-
-    def reset(self):
-        self.start_datetime = ''
-        self.has_comicinfo_xml = None
+        self.has_comicinfo_xml: Optional[bool] = None
         self.original_images_size = 0
         self.compressed_images_size = 0
         self.kept_images_size = 0
         self.kept_images_compressed_cnt = 0
         self.kept_images_original_cnt = 0
 
-    def __add__(self, other: "CompressionStats") -> "CompressionStats":
+    def reset(self):
+        for key in (
+            "original_images_size", "compressed_images_size",
+            "kept_images_size", "kept_images_compressed_cnt",
+            "kept_images_original_cnt"
+        ):
+            setattr(self, key, 0)
+        self.has_comicinfo_xml = None
+
+    def __add__(self, other: CompressionStats) -> CompressionStats:
         new = CompressionStats()
-        new.original_images_size = self.original_images_size + other.original_images_size
-        new.compressed_images_size = self.compressed_images_size + other.compressed_images_size
-        new.kept_images_size = self.kept_images_size + other.kept_images_size
-        new.kept_images_compressed_cnt = self.kept_images_compressed_cnt + other.kept_images_compressed_cnt
-        new.kept_images_original_cnt = self.kept_images_original_cnt + other.kept_images_original_cnt
+        for key in (
+            "original_images_size", "compressed_images_size",
+            "kept_images_size", "kept_images_compressed_cnt",
+            "kept_images_original_cnt"
+        ):
+            setattr(new, key, getattr(self, key) + getattr(other, key))
         return new
 
-    def __iadd__(self, other: "CompressionStats") -> "CompressionStats":
-        self.original_images_size += other.original_images_size
-        self.compressed_images_size += other.compressed_images_size
-        self.kept_images_size += other.kept_images_size
-        self.kept_images_compressed_cnt += other.kept_images_compressed_cnt
-        self.kept_images_original_cnt += other.kept_images_original_cnt
+    def __iadd__(self, other: CompressionStats) -> CompressionStats:
+        for key in (
+            "original_images_size", "compressed_images_size",
+            "kept_images_size", "kept_images_compressed_cnt",
+            "kept_images_original_cnt"
+        ):
+            setattr(self, key, getattr(self, key) + getattr(other, key))
         return self
+
+    def get_summary(self):
+        summary = ("Compression Statistics:\n"
+                   f"  |Images|\n"
+                   f"    Original # Kept:     {self.kept_images_original_cnt}"
+                   f"    Compressed # Kept:   {self.kept_images_compressed_cnt}\n"
+                   f"  |Archive|\n"
+                   f"    Original Size:       {self.original_images_size} bytes\n"
+                   f"    New Size:            {self.kept_images_size} bytes\n"
+                   f"    Savings (%):         {self.kept_images_size/self.original_images_size*100}%")
+        return summary
 
     def print_summary(self):
         """Print only the integer stats in a clean format."""
-        print("📊 Compression Statistics:")
-        print(f"  Original images size:     {self.original_images_size}")
-        print(f"  Compressed images size:   {self.compressed_images_size}")
-        print(f"  Kept images total size:   {self.kept_images_size}")
-        print(f"  Kept compressed count:    {self.kept_images_compressed_cnt}")
-        print(f"  Kept original count:      {self.kept_images_original_cnt}")
+        print(self.get_summary())
+
+
+class CompressionLog:
+    def __init__(self, name: str):
+        self.name: str = name
+        self.ext = 'cbz'
+        self.__compression_log_line_lst: List[str] = []
+
+    def append(self, string: str):
+        self.__compression_log_line_lst.append(f'{string}\n')
+
+    def append_skip_line(self):
+        self.__compression_log_line_lst.append('')
+
+    def reset(self):
+        self.__compression_log_line_lst = []
+
+    def export(self, export_path: Path):
+        fileUtils.write_file(export_path, self.__compression_log_line_lst)
 
 
 class CBZImageFile(imageUtils.ImageFile):
     def __init__(self, path: Path):
         super().__init__(path)
-        self.page_number: Union[int, None] = self.__get_page_number()
     
-    def __get_page_number(self):
-        for char in self.name:
-            if char not in '0123456789':
-                # TODO: Solve this
-                # log(Severity.ERROR, 'cbzUtils.CBZImageFile', f'Cannot determine page number for {self.name}; non-numeric character in file name!')
-                return None
-        return int(self.name)
+    def get_comicinfo_xml_line(self, page_num: int):
+        """
+        Get the line for the image as it would appear in ComicInfo.XML
+        """
+        if page_num == 0:
+            return f'    <Page Image="{page_num}" ImageSize="{self.size}" ImageWidth="{self.width}" ImageHeight="{self.height}" Type="FrontCover" />'
+        else:
+            return f'    <Page Image="{page_num}" ImageSize="{self.size}" ImageWidth="{self.width}" ImageHeight="{self.height}" />'
 
 
 class CBZFile(zipUtils.ZIPFile):
     # TODO: Add function to rename image files if 1.jpg etc. because ComicRack doesn't read these properly. Add padding to them if that happens and repack. Before doing compression, in a separate function entirely.
-    # TODO: Rebuild ComicInfo.xml file (update with newer resolution and/or size, so it doesn't crash ComicRack on opening the files)
     # TODO: Test with a large comics folder and see if issues occur.
     # TODO: Detect if image is black and white vs. color and apply different compression settings (BW is more forgiving)
     def __init__(self, path: Path):
@@ -108,6 +174,7 @@ class CBZFile(zipUtils.ZIPFile):
         # Compression stats
         self.compression_stats: CompressionStats = CompressionStats()
         # Compression log
+        self.compression_log: CompressionLog = CompressionLog(self.name)
         self.__compression_log_line_lst: List[str] = []
 
     def is_already_compressed(self):
@@ -116,13 +183,13 @@ class CBZFile(zipUtils.ZIPFile):
     def compress_to_jpgs(self):
         func_name = 'compress_to_jpgs'
 
-        # Reset Log and Stats
+        # Reset Stats and Log
         self.compression_stats.reset()
-        self.reset_compression_log()
+        self.compression_log.reset()
 
-        self.append_to_compression_log(f'Compression Log for {self.name}.{self.ext}')
-        self.compression_stats.start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.append_to_compression_log(f'Start Date/Time: {self.compression_stats.start_datetime}')
+        self.compression_log.append(f'Compression Log for {self.name}.{self.ext}')
+        self.compression_log.append(f'Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self.compression_log.append_skip_line()
 
         # Simplify Path for Logging (if possible)
         if batch_target_dir is not None:
@@ -146,7 +213,7 @@ class CBZFile(zipUtils.ZIPFile):
         # Attempt to find ComicInfo.xml
         comic_info_xml_path = Path(temp_dir_extracted_cbz, 'ComicInfo.xml')
         if os.path.isfile(comic_info_xml_path):
-            comic_info_xml = xmlUtils.XMLFile(comic_info_xml_path)
+            comic_info_xml = ComicInfoXML(comic_info_xml_path)
             self.compression_stats.has_comicinfo_xml = True
         else:
             comic_info_xml = None
@@ -164,7 +231,6 @@ class CBZFile(zipUtils.ZIPFile):
                 img_file_cls_lst.append(image_file_cls)
             elif str(file_cls.path) != str(comic_info_xml_path):
                 log(Severity.CRITICAL, f'cbzUtils.CBZFile.{func_name}', f'Unexpected File within "{self.path}": "{file_cls.path}"')
-        self.append_to_compression_log(f'Original Images Size: {self.compression_stats.original_images_size} bytes')
 
         # Create Compressed_JPGs Directory
         fileUtils.create_n_wipe_dir(temp_dir_compressed_jpgs)
@@ -173,34 +239,41 @@ class CBZFile(zipUtils.ZIPFile):
         for img_file_cls in img_file_cls_lst:
             img_file_cls.compress_to_jpg(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.jpg'), quality=jpg_quality)
             self.compression_stats.compressed_images_size += img_file_cls.compressed_image.size
-        self.append_to_compression_log(f'Compressed Images Size: {self.compression_stats.compressed_images_size} bytes')
 
         # Create Result Directory
         fileUtils.create_n_wipe_dir(temp_dir_result)
 
         # Select compressed image if at least smaller by specified amount, else keep original
+        page_count = 0
         kept_image_cls_lst: List[CBZImageFile] = []
         for img_file_cls in img_file_cls_lst:
-            if img_file_cls.compressed_image.size < img_file_cls.size * compression_tolerance / 100:
+            page_count += 1
+            if img_file_cls.compressed_image.size < img_file_cls.size * minimum_allowed_compression_percentage / 100:
                 kept_image_cls = img_file_cls.compressed_image
+                self.compression_log.append(f'Page #{page_count:04d}: "{kept_image_cls.get_description}, Verdict: Compressed Image')
                 self.compression_stats.kept_images_compressed_cnt += 1
             else:
                 kept_image_cls = img_file_cls
+                self.compression_log.append(f'Page #{page_count:04d}: {kept_image_cls.get_description}, Verdict: Original Image')
                 self.compression_stats.kept_images_original_cnt += 1
             self.compression_stats.kept_images_size += kept_image_cls.size
             kept_image_cls_lst.append(kept_image_cls)
-
-        # Add some statistics to the log file
-        self.append_to_compression_log(f'Kept Images Size: {self.compression_stats.kept_images_size} bytes')
-        self.append_to_compression_log(f'Kept Original Images Count: {self.compression_stats.kept_images_original_cnt} Image(s)')
-        self.append_to_compression_log(f'Kept Compressed Images Count: {self.compression_stats.kept_images_compressed_cnt} Image(s)')
 
         # Move kept images to result folder
         for kept_image_cls in kept_image_cls_lst:
             fileUtils.copy_file(kept_image_cls.path, Path(temp_dir_result, f'{kept_image_cls.name}.{kept_image_cls.ext}'))
 
+        # Rebuild ComicInfo.XML
+        if comic_info_xml is not None:
+            comic_info_xml.import_line_lst()
+            comic_info_xml.update_pages_in_line_lst(kept_image_cls_lst)
+            comic_info_xml.export(Path(temp_dir_result, 'ComicInfo.xml'))
+
+        # Add summary to compression log
+        self.compression_log.append_skip_line()
+        self.compression_log.append(self.compression_stats.get_summary())
         # Dump Compression Log File on Disk
-        self.export_compression_log(Path(temp_dir_result, 'CompressionLog.txt'))
+        self.compression_log.export(Path(temp_dir_result, 'CompressionLog.txt'))
 
         # Overwrite existing .CBZ with contents of the Result Directory
         zipUtils.zip_file(temp_dir_result, self.path, keep_root=False)
@@ -211,15 +284,6 @@ class CBZFile(zipUtils.ZIPFile):
 
         # Log Finished Compression
         log(Severity.INFO, tool_name, f'Completed Compression of "{simplified_path}"!')
-
-    def append_to_compression_log(self, string: str):
-        self.__compression_log_line_lst.append(f'{string}\n')
-
-    def reset_compression_log(self):
-        self.__compression_log_line_lst = []
-
-    def export_compression_log(self, export_path: Path):
-        fileUtils.write_file(export_path, self.__compression_log_line_lst)
 
 
 def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):

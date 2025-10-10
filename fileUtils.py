@@ -50,9 +50,22 @@ class File:
 class TXTFile(File):
     def __init__(self, path: Path):
         super().__init__(path)
+        self.line_lst = []
 
-    def get_line_lst(self):
-        return read_file(self.path)
+    def import_line_lst(self):
+        self.line_lst = read_file(self.path)
+
+    def export(self, path: Union[Path, None] = None):
+        export_path = path or self.path
+
+        with open(export_path, "w", encoding="utf-8") as f:
+            for i, line in enumerate(self.line_lst):
+                if i < len(self.line_lst) - 1:
+                    f.write(f"{line}\n")
+                else:
+                    f.write(line)
+
+
 
 
 def hang_n_terminate():
