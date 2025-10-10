@@ -1,6 +1,6 @@
 from pathlib import Path
 import commonUtils.fileUtils as fileUtils
-from PIL import Image, ImageStat
+from PIL import Image, ImageStat, ImageOps
 from commonUtils.debugUtils import *
 from typing import *
 
@@ -77,45 +77,50 @@ class ImageFile(fileUtils.File):
                 f"Failed to determine if image is color for {self.path}: {e}")
             raise
 
-    def compress_to_jpg(self, dest_path, quality_grayscale: int, quality_color: int):
+    def compress_to_jpg(self,
+                        dest_path,
+                        quality_grayscale: int,
+                        quality_color: int,
+                        max_long_edge: int | None = None):
         """
         Compresses the image file to a .JPG at the destination path.
 
         - Automatically converts non-RGB formats (e.g. RGBA, P) to RGB.
         - Overwrites existing file at dest_path if present.
-        - 'quality' ranges from 1 (lowest) to 95 (highest). Default = 90.
+        - 'quality' ranges from 1 (lowest) to 95 (highest).
+        - If max_long_edge is set (e.g., 2200), longest side is capped to that size.
         """
-
         try:
             with Image.open(self.path) as img:
+                # (Optional but recommended)
+                # img = ImageOps.exif_transpose(img)
 
-                # Set color property (if it is not loaded yet)
                 if self.color is None:
                     self.__set_color_property()
 
-                # If grayscale, use grayscale quality, else use color quality
-                if self.color:
-                    quality = quality_color
-                else:
-                    quality = quality_grayscale
+                quality = quality_color if self.color else quality_grayscale
 
                 # Convert if image has alpha channel or palette
                 if img.mode in ("RGBA", "LA", "P"):
                     img = img.convert("RGB")
 
-                # Ensure the destination directory exists
+                # >>> NEW: downscale by longest edge (after conversions, before save)
+                if max_long_edge is not None and max_long_edge > 0:
+                    if max(img.size) > max_long_edge:
+                        img.thumbnail((max_long_edge, max_long_edge), Image.Resampling.LANCZOS)
+
                 dest_path = Path(dest_path)
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-                # Save as JPEG
                 img.save(dest_path, "JPEG", quality=quality, optimize=True)
 
-                # Return an image file for the result
                 self.compressed_image = self.__class__(dest_path)
                 self.compressed_image.color = self.color
 
         except Exception as e:
-            log(Severity.CRITICAL, 'fileUtils.imageUtils.ImageFile.compress_to_jpg', f'Failed to convert/compress image {self.path}: {e}')
+            log(Severity.CRITICAL,
+                'fileUtils.imageUtils.ImageFile.compress_to_jpg',
+                f'Failed to convert/compress image {self.path}: {e}')
 
     def get_description(self):
         if self.color is None:
