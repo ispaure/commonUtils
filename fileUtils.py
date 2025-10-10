@@ -217,9 +217,13 @@ def delete_dir_contents(dir_path):
     rem_dir_lst = get_dirs_path_list(dir_path)
     for rem_dir in rem_dir_lst:
         delete_dir(rem_dir)
+    if len(get_dirs_path_list(dir_path)) > 0:
+        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every directory!')
     rem_file_lst = get_file_path_list(dir_path)
     for rem_file in rem_file_lst:
         delete_file(rem_file)
+    if len(get_file_path_list(dir_path)) > 0:
+        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
 
 
 def delete_file(file_path):
