@@ -22,7 +22,8 @@ default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'ComicsTest', 'ToC
 
 jpg_quality_color = 70  # Acceptable: 50, Good: 70, Overkill: 90
 jpg_quality_grayscale = 30  # Acceptable: 15, Good: 30, Overkill: 45
-max_long_edge = 2560
+max_long_edge: Union[None, int] = None
+max_height: Union[None, int] = 2560
 
 # Decide to keep the compressed image if its size is smaller than this percentage of the original.
 minimum_allowed_compression_percentage = 75
@@ -308,7 +309,7 @@ class CBZFile(zipUtils.ZIPFile):
 
         # Compress to JPG
         for img_file_cls in img_file_cls_lst:
-            img_file_cls.compress_to_jpg(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.jpg'), quality_grayscale=jpg_quality_grayscale, quality_color=jpg_quality_color, max_long_edge=max_long_edge)
+            img_file_cls.compress_to_jpg(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.jpg'), quality_grayscale=jpg_quality_grayscale, quality_color=jpg_quality_color, max_long_edge=max_long_edge, max_height=max_height)
             self.compression_stats.compressed_images_size += img_file_cls.compressed_image.size
 
         # Create Result Directory
