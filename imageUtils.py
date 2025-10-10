@@ -77,14 +77,14 @@ class ImageFile(fileUtils.File):
                 f"Failed to determine if image is color for {self.path}: {e}")
             raise
 
-    def compress_to_jpg(self,
-                        dest_path,
-                        quality_grayscale: int,
-                        quality_color: int,
-                        max_long_edge: int | None = None,
-                        max_height: int | None = None):
+    def compress(self,
+                 dest_path,
+                 quality_grayscale: int,
+                 quality_color: int,
+                 max_long_edge: int | None = None,
+                 max_height: int | None = None):
         """
-        Compresses the image file to a .JPG at the destination path.
+        Compresses the image file to a .JPG or .WEBP at the destination path.
 
         - Automatically converts non-RGB formats (e.g. RGBA, P) to RGB.
         - Overwrites existing file at dest_path if present.
@@ -92,11 +92,11 @@ class ImageFile(fileUtils.File):
         - If max_long_edge is set (e.g., 2200), longest side is capped to that size.
         - If max_height is set (e.g., 3200), height is capped to that size.
           Both caps can be used independently or together.
+        - Output format is deduced from dest_path extension (.jpg/.jpeg/.webp)
         """
         try:
             with Image.open(self.path) as img:
-                # (Optional but recommended)
-                # img = ImageOps.exif_transpose(img)
+                img = ImageOps.exif_transpose(img)
 
                 if self.color is None:
                     self.__set_color_property()
@@ -107,7 +107,7 @@ class ImageFile(fileUtils.File):
                 if img.mode in ("RGBA", "LA", "P"):
                     img = img.convert("RGB")
 
-                # --- Unified downscale (applies both constraints in one resize) ---
+                # --- Unified downscale ---
                 w, h = img.size
                 scale = 1.0
 
@@ -120,19 +120,25 @@ class ImageFile(fileUtils.File):
                 if scale < 1.0:
                     new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
                     img = img.resize(new_size, Image.Resampling.LANCZOS)
-                # -------------------------------------------------------------------
+                # --------------------------
 
                 dest_path = Path(dest_path)
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-                img.save(dest_path, "JPEG", quality=quality, optimize=True)
+                ext = dest_path.suffix.lower()
+                if ext in (".jpg", ".jpeg"):
+                    img.save(dest_path, "JPEG", quality=quality, optimize=True)
+                elif ext == ".webp":
+                    img.save(dest_path, "WEBP", quality=quality, method=6)
+                else:
+                    raise ValueError(f"Unsupported export format: {ext}")
 
                 self.compressed_image = self.__class__(dest_path)
                 self.compressed_image.color = self.color
 
         except Exception as e:
             log(Severity.CRITICAL,
-                'fileUtils.imageUtils.ImageFile.compress_to_jpg',
+                'fileUtils.imageUtils.ImageFile.compress',
                 f'Failed to convert/compress image {self.path}: {e}')
 
     def get_description(self):
