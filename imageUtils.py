@@ -81,7 +81,8 @@ class ImageFile(fileUtils.File):
                         dest_path,
                         quality_grayscale: int,
                         quality_color: int,
-                        max_long_edge: int | None = None):
+                        max_long_edge: int | None = None,
+                        max_height: int | None = None):
         """
         Compresses the image file to a .JPG at the destination path.
 
@@ -89,6 +90,8 @@ class ImageFile(fileUtils.File):
         - Overwrites existing file at dest_path if present.
         - 'quality' ranges from 1 (lowest) to 95 (highest).
         - If max_long_edge is set (e.g., 2200), longest side is capped to that size.
+        - If max_height is set (e.g., 3200), height is capped to that size.
+          Both caps can be used independently or together.
         """
         try:
             with Image.open(self.path) as img:
@@ -104,10 +107,20 @@ class ImageFile(fileUtils.File):
                 if img.mode in ("RGBA", "LA", "P"):
                     img = img.convert("RGB")
 
-                # >>> NEW: downscale by longest edge (after conversions, before save)
-                if max_long_edge is not None and max_long_edge > 0:
-                    if max(img.size) > max_long_edge:
-                        img.thumbnail((max_long_edge, max_long_edge), Image.Resampling.LANCZOS)
+                # --- Unified downscale (applies both constraints in one resize) ---
+                w, h = img.size
+                scale = 1.0
+
+                if max_height is not None and max_height > 0 and h > max_height:
+                    scale = min(scale, max_height / float(h))
+
+                if max_long_edge is not None and max_long_edge > 0 and max(w, h) > max_long_edge:
+                    scale = min(scale, max_long_edge / float(max(w, h)))
+
+                if scale < 1.0:
+                    new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                # -------------------------------------------------------------------
 
                 dest_path = Path(dest_path)
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
