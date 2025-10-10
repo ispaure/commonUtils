@@ -1,11 +1,11 @@
 from pathlib import Path
 import commonUtils.fileUtils as fileUtils
-from PIL import Image
+from PIL import Image, ImageStat
 from commonUtils.debugUtils import *
 from typing import *
 
 
-image_file_cls_supported_ext_lst = ['jpg', 'jpeg', 'bmp', 'tiff', 'webp', 'png']  # Supported Extensions by the ImageFile class
+image_file_cls_supported_ext_lst = ['jpg', 'jpeg', 'bmp', 'tif', 'tiff', 'webp', 'png']  # Supported Extensions by the ImageFile class
 
 
 class ImageFile(fileUtils.File):
@@ -26,43 +26,56 @@ class ImageFile(fileUtils.File):
             with Image.open(self.path) as img:
                 self.width, self.height = img.size
         except Exception as e:
-            log(Severity.CRITICAL, "fileUtils.imageUtils.ImageFile._load_dimensions",
+            log(Severity.CRITICAL, "fileUtils.imageUtils.ImageFile.__set_width_height",
                 f"Failed to read image dimensions for {self.path}: {e}")
 
-    def __set_color_property(self):
+    from PIL import Image, ImageChops
+
+    def __set_color_property(self, chroma_std_threshold: float = 2.5, sample_max: int = 512) -> bool:
         """
-        Returns True if the image is in color, False if it's grayscale.
-        Efficiently checks image mode or pixel variance.
+        Sets and returns self.color:
+          - True  => color image
+          - False => grayscale image
+
+        Heuristic:
+          - Convert to YCbCr and examine stddev of Cb/Cr (chroma) channels.
+          - Truly grayscale images have ~flat Cb/Cr => very low stddev.
+          - JPEG artifacts or slight noise tolerated via threshold.
+
+        Params:
+          chroma_std_threshold: raise to be more forgiving (treat near-gray as grayscale).
+          sample_max: downsize longest edge to this for speed; does not affect accuracy much.
         """
         try:
             with Image.open(self.path) as img:
-                # Fast-path: mode already indicates grayscale
+                # Fast path for obvious grayscale modes
                 if img.mode in ("1", "L", "LA"):
-                    return False
-                if img.mode in ("RGB", "RGBA", "P"):
-                    # Convert to RGB to normalize channels
-                    rgb_img = img.convert("RGB")
-
-                    # Get a small sample (10x10 or entire if smaller)
-                    w, h = rgb_img.size
-                    sample = rgb_img.crop((0, 0, min(10, w), min(10, h)))
-
-                    # Get pixel data
-                    pixels = list(sample.getdata())
-
-                    # If all pixels have R=G=B → grayscale
-                    for r, g, b in pixels:
-                        if r != g or g != b:
-                            return True
                     self.color = False
+                    return self.color
 
-                # Other modes (CMYK, etc.) are assumed color
-                self.color = True
+                # Normalize to YCbCr
+                ycbcr = img.convert("YCbCr")
+
+                # Optional downscale for speed on huge images
+                w, h = ycbcr.size
+                m = max(w, h)
+                if m > sample_max:
+                    scale = sample_max / float(m)
+                    ycbcr = ycbcr.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.BILINEAR)
+
+                _, cb, cr = ycbcr.split()
+                cb_std = ImageStat.Stat(cb).stddev[0]
+                cr_std = ImageStat.Stat(cr).stddev[0]
+
+                # If both chroma stddevs are tiny, it's grayscale
+                is_color = (cb_std > chroma_std_threshold) or (cr_std > chroma_std_threshold)
+                self.color = is_color
+                return self.color
 
         except Exception as e:
-            log(Severity.WARNING, "fileUtils.imageUtils.ImageFile.__is_color",
+            log(Severity.CRITICAL, "fileUtils.imageUtils.ImageFile.__set_color_property",
                 f"Failed to determine if image is color for {self.path}: {e}")
-            return True  # assume color if uncertain
+            raise
 
     def compress_to_jpg(self, dest_path, quality_grayscale: int, quality_color: int):
         """
@@ -99,6 +112,7 @@ class ImageFile(fileUtils.File):
 
                 # Return an image file for the result
                 self.compressed_image = self.__class__(dest_path)
+                self.compressed_image.color = self.color
 
         except Exception as e:
             log(Severity.CRITICAL, 'fileUtils.imageUtils.ImageFile.compress_to_jpg', f'Failed to convert/compress image {self.path}: {e}')

@@ -18,8 +18,10 @@ from datetime import datetime
 default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'ComicsTest', 'ToConvert')
 
 # Compression 'quality' ranges from 1 (lowest, smallest size) to 95 (highest, biggest size)
-jpg_quality_color = 40  # Should be higher for color than grayscale, else causes much-worse looking results
-jpg_quality_grayscale = 10  # Can be much lower than color, still yielding great results
+# Should be higher for color than grayscale, else causes much-worse looking results
+
+jpg_quality_color = 65  # Acceptable: 50, Good: 70, Overkill: 90
+jpg_quality_grayscale = 30  # Acceptable: 15, Good: 35, Overkill: 45
 
 # Decide to keep the compressed image if its size is smaller than this percentage of the original.
 minimum_allowed_compression_percentage = 75
@@ -81,12 +83,19 @@ class CompressionStats:
         self.kept_images_size = 0
         self.kept_images_compressed_cnt = 0
         self.kept_images_original_cnt = 0
+        self.total_file_count = 0
+        self.compressed_file_count = 0
+        self.already_compressed_file_count = 0
+        self.bad_naming_file_count = 0
+        self.error_during_compression = 0
 
     def reset(self):
         for key in (
             "original_images_size", "compressed_images_size",
             "kept_images_size", "kept_images_compressed_cnt",
-            "kept_images_original_cnt"
+            "kept_images_original_cnt", "total_file_count",
+            "compressed_file_count", "already_compressed_file_count",
+            "bad_naming_file_count", "error_during_compression"
         ):
             setattr(self, key, 0)
         self.has_comicinfo_xml = None
@@ -96,7 +105,9 @@ class CompressionStats:
         for key in (
             "original_images_size", "compressed_images_size",
             "kept_images_size", "kept_images_compressed_cnt",
-            "kept_images_original_cnt"
+            "kept_images_original_cnt", "total_file_count",
+            "compressed_file_count", "already_compressed_file_count",
+            "bad_naming_file_count", "error_during_compression"
         ):
             setattr(new, key, getattr(self, key) + getattr(other, key))
         return new
@@ -105,20 +116,52 @@ class CompressionStats:
         for key in (
             "original_images_size", "compressed_images_size",
             "kept_images_size", "kept_images_compressed_cnt",
-            "kept_images_original_cnt"
+            "kept_images_original_cnt", "total_file_count",
+            "compressed_file_count", "already_compressed_file_count",
+            "bad_naming_file_count", "error_during_compression"
         ):
             setattr(self, key, getattr(self, key) + getattr(other, key))
         return self
 
     def get_summary(self):
-        summary = ("Compression Statistics:\n"
-                   f"  |Images|\n"
-                   f"    Original # Kept:     {self.kept_images_original_cnt}"
-                   f"    Compressed # Kept:   {self.kept_images_compressed_cnt}\n"
-                   f"  |Archive|\n"
-                   f"    Original Size:       {self.original_images_size} bytes\n"
-                   f"    New Size:            {self.kept_images_size} bytes\n"
-                   f"    Savings (%):         {self.kept_images_size/self.original_images_size*100}%")
+        if self.original_images_size == 0:
+            return "Compression Statistics:\n  Nothing was compressed!"
+
+        summary = "||Compression Statistics||\n"
+
+        # conversions and helpers
+        def to_mb(value_bytes: int) -> float:
+            return value_bytes / (1024 * 1024)
+
+        reduction_bytes = self.original_images_size - self.kept_images_size
+        new_size_mb = to_mb(self.kept_images_size)
+        orig_size_mb = to_mb(self.original_images_size)
+        reduction_mb = to_mb(reduction_bytes)
+        reduction_pct = 100 - (self.kept_images_size / self.original_images_size * 100)
+        new_pct = self.kept_images_size / self.original_images_size * 100
+
+        if getattr(self, "total_file_count", 0) > 0:
+            summary += (
+                "  |CBZ Files|\n"
+                f"    Total File Count in Dir:    {self.total_file_count}\n"
+                f"    Already Compressed:         {self.already_compressed_file_count}\n"
+                f"    Bad Page Naming (Aborted):  {self.bad_naming_file_count}\n"
+                f"    Error During Compression:   {self.error_during_compression}\n"
+                f"    Successful Compression:     {self.compressed_file_count}\n"
+            )
+
+        summary += (
+            f"  |Images|\n"
+            f"    Original # Kept:            {self.kept_images_original_cnt}\n"
+            f"    Compressed # Kept:          {self.kept_images_compressed_cnt}\n"
+            f"  |Archive|\n"
+            f"    Original Size:              {orig_size_mb:.2f} MB\n"
+            f"    Reduction Size:             {reduction_mb:.2f} MB\n"
+            f"    New Size:                   {new_size_mb:.2f} MB\n"
+            f"    Reduction (%):              -{reduction_pct:.2f}%\n"
+            f"    New (%):                    {new_pct:.2f}%"
+        )
+
         return summary
 
     def print_summary(self):
@@ -136,7 +179,7 @@ class CompressionLog:
         self.__compression_log_line_lst.append(f'{string}\n')
 
     def append_skip_line(self):
-        self.__compression_log_line_lst.append('')
+        self.__compression_log_line_lst.append('\n')
 
     def reset(self):
         self.__compression_log_line_lst = []
@@ -160,9 +203,8 @@ class CBZImageFile(imageUtils.ImageFile):
 
 
 class CBZFile(zipUtils.ZIPFile):
-    # TODO: Add function to rename image files if 1.jpg etc. because ComicRack doesn't read these properly. Add padding to them if that happens and repack. Before doing compression, in a separate function entirely.
+    # TODO: Correct files with 1.jpg (right now they are skipped, but would be nice to resolve them so I can run the script on them too).
     # TODO: Test with a large comics folder and see if issues occur.
-    # TODO: Detect if image is black and white vs. color and apply different compression settings (BW is more forgiving)
     def __init__(self, path: Path):
         super().__init__(path)
 
@@ -180,6 +222,15 @@ class CBZFile(zipUtils.ZIPFile):
     def is_already_compressed(self):
         return any(f == 'CompressionLog.txt' for f in self.get_root_file_lst())
 
+    def pages_badly_named(self):
+        for f in self.get_root_file_lst():
+            if len(f) < 2:
+                return True
+            else:
+                if f[1] == '.':
+                    return True
+        return False
+
     def compress_to_jpgs(self):
         func_name = 'compress_to_jpgs'
 
@@ -187,8 +238,9 @@ class CBZFile(zipUtils.ZIPFile):
         self.compression_stats.reset()
         self.compression_log.reset()
 
-        self.compression_log.append(f'Compression Log for {self.name}.{self.ext}')
+        self.compression_log.append(f'|| Compression Log for "{self.name}.{self.ext}" ||')
         self.compression_log.append(f'Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        self.compression_log.append(f'Quality Setting for JPG Compression: Grayscale: "{jpg_quality_grayscale}", Color: "{jpg_quality_color}"')
         self.compression_log.append_skip_line()
 
         # Simplify Path for Logging (if possible)
@@ -200,15 +252,33 @@ class CBZFile(zipUtils.ZIPFile):
         # Log Compressing
         log(Severity.INFO, tool_name, f'Compressing "{simplified_path}"!')
 
+        # Wipe directories
+        fileUtils.delete_dir_contents(temp_compression_path)
+
         # Create Extracted_CBZ Directory
         fileUtils.create_n_wipe_dir(temp_dir_extracted_cbz)
 
         # Extract .CBZ in Directory
         self.extract(temp_dir_extracted_cbz)
 
-        # If there is any subdirectory, it's unexpected. Critical error
+        # If there is any subdirectory, it could be unexpected
         if fileUtils.has_subdirectories(temp_dir_extracted_cbz):
-            log(Severity.CRITICAL, f'cbzUtils.CBZFile.{func_name}', f'Unexpected Directory within {self.path}')
+            dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
+            if len(dir_path_lst) > 1:
+                log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'There is more than one subdirectory in the .CBZ file. Unsure how to proceed!')
+                return False
+            file_lst = fileUtils.get_file_path_list(temp_dir_extracted_cbz, recursive=False)
+            for file in file_lst:
+                file_path = Path(file)
+                if str(file_path.name) != 'ComicInfo.xml':
+                    log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'There was a subdirectory in the .CBZ file and the root has other thing(s) than ComicInfo.XML (such as {file_path.name}). Unsure how to proceed!')
+                    return False
+            if len(fileUtils.get_dirs_path_list(dir_path_lst[0])) > 0:
+                log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'The subdirectory in the .CBZ file has at least one subdirectory itself. Unsure how to proceed!')
+                return False
+            subdir_file_lst = fileUtils.get_file_path_list(dir_path_lst[0])
+            for subdir_file in subdir_file_lst:
+                fileUtils.move_file(subdir_file, Path(temp_dir_extracted_cbz, Path(subdir_file).name))
 
         # Attempt to find ComicInfo.xml
         comic_info_xml_path = Path(temp_dir_extracted_cbz, 'ComicInfo.xml')
@@ -229,15 +299,15 @@ class CBZFile(zipUtils.ZIPFile):
                 image_file_cls = CBZImageFile(file_path)
                 self.compression_stats.original_images_size += image_file_cls.size
                 img_file_cls_lst.append(image_file_cls)
-            elif str(file_cls.path) != str(comic_info_xml_path):
+            elif Path(file_cls.path).name not in ['ComicInfo.xml', 'Thumbs.db'] and file_cls.ext not in ['sfv', 'nfo']:
                 log(Severity.CRITICAL, f'cbzUtils.CBZFile.{func_name}', f'Unexpected File within "{self.path}": "{file_cls.path}"')
 
         # Create Compressed_JPGs Directory
         fileUtils.create_n_wipe_dir(temp_dir_compressed_jpgs)
 
-        # Convert to JPG
+        # Compress to JPG
         for img_file_cls in img_file_cls_lst:
-            img_file_cls.compress_to_jpg(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.jpg'), quality=jpg_quality)
+            img_file_cls.compress_to_jpg(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.jpg'), quality_grayscale=jpg_quality_grayscale, quality_color=jpg_quality_color)
             self.compression_stats.compressed_images_size += img_file_cls.compressed_image.size
 
         # Create Result Directory
@@ -250,11 +320,11 @@ class CBZFile(zipUtils.ZIPFile):
             page_count += 1
             if img_file_cls.compressed_image.size < img_file_cls.size * minimum_allowed_compression_percentage / 100:
                 kept_image_cls = img_file_cls.compressed_image
-                self.compression_log.append(f'Page #{page_count:04d}: "{kept_image_cls.get_description}, Verdict: Compressed Image')
+                self.compression_log.append(f'Page #{page_count:04d}: "{kept_image_cls.get_description()}, Verdict: Compressed Image')
                 self.compression_stats.kept_images_compressed_cnt += 1
             else:
                 kept_image_cls = img_file_cls
-                self.compression_log.append(f'Page #{page_count:04d}: {kept_image_cls.get_description}, Verdict: Original Image')
+                self.compression_log.append(f'Page #{page_count:04d}: {kept_image_cls.get_description()}, Verdict: Original Image')
                 self.compression_stats.kept_images_original_cnt += 1
             self.compression_stats.kept_images_size += kept_image_cls.size
             kept_image_cls_lst.append(kept_image_cls)
@@ -284,6 +354,7 @@ class CBZFile(zipUtils.ZIPFile):
 
         # Log Finished Compression
         log(Severity.INFO, tool_name, f'Completed Compression of "{simplified_path}"!')
+        return True
 
 
 def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
@@ -318,6 +389,9 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
         log_message += '(Not Recursive)'
     log(Severity.INFO, tool_name, log_message)
 
+    # Stats
+    compression_stats = CompressionStats()
+
     # Get list of .CBZ Files (as strings)
     cbz_file_path_lst: List[str] = fileUtils.get_file_path_list(target_dir, recursive, filter_extension='cbz')
 
@@ -330,17 +404,28 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
     # Filter for cbz files which need conversion
     cbz_file_cls_to_compress_lst: List[CBZFile] = []
     for cbz_file_cls in cbz_file_cls_lst:
-        if not cbz_file_cls.is_already_compressed():
+        if cbz_file_cls.is_already_compressed():
+            compression_stats.already_compressed_file_count += 1
+            log(Severity.WARNING, tool_name, f'Skipping "{cbz_file_cls.name}.{cbz_file_cls.ext}"; Already Compressed!')
+        elif cbz_file_cls.pages_badly_named():
+            compression_stats.bad_naming_file_count += 1
+            log(Severity.WARNING, tool_name, f'Skipping "{cbz_file_cls.name}.{cbz_file_cls.ext}"; Page images are missing padding (ex. 1.jpg, 2.jpg). Fix naming and try again!')
+        else:
             cbz_file_cls_to_compress_lst.append(cbz_file_cls)
 
     # Log number of files not yet compressed
     log(Severity.INFO, tool_name, f'{len(cbz_file_cls_to_compress_lst)}/{len(cbz_file_cls_lst)} ({len(cbz_file_cls_to_compress_lst)/len(cbz_file_cls_lst)*100}%) of CBZ Files Awaiting Compression!')
 
     # Compress CBZ
-    compression_stats = CompressionStats()
+    compression_stats.total_file_count = len(cbz_file_cls_lst)
+    compression_stats.compressed_file_count = len(cbz_file_cls_to_compress_lst)
     for cbz_file in cbz_file_cls_to_compress_lst:
-        cbz_file.compress_to_jpgs()
-        compression_stats += cbz_file.compression_stats
+        result = cbz_file.compress_to_jpgs()
+        if result:
+            compression_stats.compressed_file_count += 1
+            compression_stats += cbz_file.compression_stats
+        else:
+            compression_stats.error_during_compression += 1
     compression_stats.print_summary()
 
 
