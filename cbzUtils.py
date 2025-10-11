@@ -255,7 +255,7 @@ class CBZFile(zipUtils.ZIPFile):
                     return True
         return False
 
-    def compress_to_jpgs(self):
+    def compress_to_webp(self):
         func_name = 'compress_to_jpgs'
 
         # Reset Stats and Log
@@ -276,14 +276,24 @@ class CBZFile(zipUtils.ZIPFile):
         # Log Compressing
         log(Severity.INFO, tool_name, f'Compressing "{simplified_path}"!')
 
-        # Wipe directories
+        # If bad path, error and skip
+        if self.pages_badly_named():
+            msg = f'Pages are badly named (ex. 1.jpg), need to do additional scripting to be able to fix these files. Unsure how to proceed! Skip!'
+            log(Severity.ERROR, tool_name, msg)
+            return False
+
+        # Wipe directories before starting
         fileUtils.delete_dir_contents(temp_compression_path)
 
         # Create Extracted_CBZ Directory
         fileUtils.create_n_wipe_dir(temp_dir_extracted_cbz)
 
         # Extract .CBZ in Directory
-        self.extract(temp_dir_extracted_cbz)
+        result = self.extract(temp_dir_extracted_cbz)
+        if not result:
+            msg = f'Unable to extract "{self.path}" properly!'
+            log(Severity.ERROR, tool_name, msg)
+            return False
 
         # Delete __MACOSX directories if there are any. Before evaluating other stuff.
         dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
@@ -330,12 +340,13 @@ class CBZFile(zipUtils.ZIPFile):
                 self.compression_stats.original_images_size += image_file_cls.size
                 img_file_cls_lst.append(image_file_cls)
             elif Path(file_cls.path).name not in ['ComicInfo.xml', 'Thumbs.db'] and file_cls.ext not in ['sfv', 'nfo']:
-                log(Severity.CRITICAL, f'cbzUtils.CBZFile.{func_name}', f'Unexpected File within "{self.path}": "{file_cls.path}"')
+                log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'Unexpected File within "{self.path}": "{file_cls.path}"')
+                return False
 
         # Create Compressed_JPGs Directory
         fileUtils.create_n_wipe_dir(temp_dir_compressed_jpgs)
 
-        # Compress to JPG
+        # Compress to WEBP
         for img_file_cls in img_file_cls_lst:
             img_file_cls.compress(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.webp'), quality_grayscale=img_quality_grayscale, quality_color=img_quality_color, max_long_edge=max_long_edge, max_height=max_height)
             self.compression_stats.compressed_images_size += img_file_cls.compressed_image.size
@@ -437,9 +448,6 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
         if cbz_file_cls.is_already_compressed():
             compression_stats.already_compressed_file_count += 1
             log(Severity.WARNING, tool_name, f'Skipping "{cbz_file_cls.name}.{cbz_file_cls.ext}"; Already Compressed!')
-        elif cbz_file_cls.pages_badly_named():
-            compression_stats.bad_naming_file_count += 1
-            log(Severity.WARNING, tool_name, f'Skipping "{cbz_file_cls.name}.{cbz_file_cls.ext}"; Page images are missing padding (ex. 1.jpg, 2.jpg). Fix naming and try again!')
         else:
             cbz_file_cls_to_compress_lst.append(cbz_file_cls)
 
@@ -448,13 +456,13 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
 
     # Compress CBZ
     compression_stats.total_file_count = len(cbz_file_cls_lst)
-    compression_stats.compressed_file_count = len(cbz_file_cls_to_compress_lst)
     for cbz_file in cbz_file_cls_to_compress_lst:
-        result = cbz_file.compress_to_jpgs()
+        result = cbz_file.compress_to_webp()
         if result:
             compression_stats.compressed_file_count += 1
             compression_stats += cbz_file.compression_stats
         else:
+            log(Severity.ERROR, tool_name, f'Skipped compression of "{cbz_file.path}" because it encountered an unrecoverable error! See log for details')
             compression_stats.error_during_compression += 1
     compression_stats.print_summary()
 
