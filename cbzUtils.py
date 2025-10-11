@@ -63,15 +63,23 @@ class ComicInfoXML(xmlUtils.XMLFile):
         updated_line_lst = []
         in_page_section = False
         for line in self.line_lst:
+            if line.startswith('  <PageCount>'):
+                updated_line_lst.append(f'  <PageCount>{len(cbz_image_file_lst)}</PageCount>')
+                continue
             if not in_page_section:
-                updated_line_lst.append(line)
-                if line == '  <Pages>':
+                # If this occurs early, not in page section, but already hit this. there wasn't any '  <Pages>' before :(
+                if line == '  <Pages />':
+                    log(Severity.WARNING, tool_name, 'ComicInfoXML.update_pages_in_line_lst: Hit the <Pages /> line, meaning no page information was previously registered. Repairing...')
+                    updated_line_lst.append('  <Pages>')
+                    self.append_pages_lines(cbz_image_file_lst, updated_line_lst)
+                    updated_line_lst.append('  </Pages>')
+                    went_through_pages_section = True
+                elif line == '  <Pages>':
+                    updated_line_lst.append(line)
+                    self.append_pages_lines(cbz_image_file_lst, updated_line_lst)
                     in_page_section = True
-                    page_number = 0
-                    for cbz_image_file in cbz_image_file_lst:
-                        page_line = cbz_image_file.get_comicinfo_xml_line(page_number)
-                        updated_line_lst.append(page_line)
-                        page_number += 1
+                else:
+                    updated_line_lst.append(line)
             else:
                 if line == '  </Pages>':
                     updated_line_lst.append(line)
@@ -82,6 +90,13 @@ class ComicInfoXML(xmlUtils.XMLFile):
             log(Severity.CRITICAL, tool_name, f'Did not go through Pages Section of ComicInfo.XML! {self.line_lst}')
 
         self.line_lst = updated_line_lst
+
+    def append_pages_lines(self, cbz_image_file_lst, updated_line_lst):
+        page_number = 0
+        for cbz_image_file in cbz_image_file_lst:
+            page_line = cbz_image_file.get_comicinfo_xml_line(page_number)
+            updated_line_lst.append(page_line)
+            page_number += 1
 
 
 class CompressionStats:
