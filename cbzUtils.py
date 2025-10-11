@@ -270,6 +270,12 @@ class CBZFile(zipUtils.ZIPFile):
         # Extract .CBZ in Directory
         self.extract(temp_dir_extracted_cbz)
 
+        # Delete __MACOSX directories if there are any. Before evaluating other stuff.
+        dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
+        for dir in dir_path_lst:
+            if Path(dir).name == '__MACOSX':
+                fileUtils.delete_dir(dir)
+
         # If there is any subdirectory, it could be unexpected
         if fileUtils.has_subdirectories(temp_dir_extracted_cbz):
             dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
