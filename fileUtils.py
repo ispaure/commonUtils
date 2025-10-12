@@ -32,7 +32,7 @@ class File:
         return self.path.stem
 
     def __get_ext(self) -> Union[str, None]:
-        """Return the file extension (without the dot)."""
+        """Return the file extension (without the dot). And always lower"""
         if self.path.suffix:
             ext = self.path.suffix.lstrip('.')
             return ext.lower()
@@ -214,7 +214,7 @@ def delete_dir(dir_path) -> bool:
     """
     log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
     rmtree(dir_path)
-    return os.path.isdir(dir_path)
+    return not os.path.isdir(dir_path)
 
 
 def delete_dir_contents(dir_path):

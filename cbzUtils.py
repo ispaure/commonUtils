@@ -560,5 +560,3 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
             log(Severity.ERROR, tool_name, f'Skipped compression of "{cbz_file.path}" because it encountered an unrecoverable error! See log for details')
             compression_stats.error_during_compression += 1
     compression_stats.print_summary()
-
-
