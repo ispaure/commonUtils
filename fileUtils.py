@@ -113,23 +113,36 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
     return all_files
 
 
-def move_file(src: Path, dest: Path):
+def move_file(src: Path, dest: Path) -> bool:
     """
     Moves a file from src to dest, overwriting if it already exists.
+    Returns True if successful, False otherwise.
     """
     src = Path(src)
     dest = Path(dest)
 
-    # Ensure destination folder exists
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # Ensure destination folder exists
+        dest.parent.mkdir(parents=True, exist_ok=True)
 
-    # If destination exists, delete it first
-    if dest.exists():
-        dest.unlink()
+        # If destination exists, delete it first
+        if dest.exists():
+            dest.unlink()
 
-    # Move the file
-    log(Severity.DEBUG, 'fileUtils.move_file', f'Moving file from "{src}" to "{dest}"')
-    move(str(src), str(dest))
+        # Move the file
+        log(Severity.DEBUG, 'fileUtils.move_file', f'Moving file from \"{src}\" to \"{dest}\"')
+        move(str(src), str(dest))
+
+        # Verify move succeeded
+        if dest.exists() and not src.exists():
+            return True
+        else:
+            log(Severity.CRITICAL, 'fileUtils.move_file', f'Move may have failed: src exists={src.exists()}, dest exists={dest.exists()}')
+            return False
+
+    except Exception as e:
+        log(Severity.CRITICAL, 'fileUtils.move_file', f'Error moving file from \"{src}\" to \"{dest}\": {e}')
+        return False
 
 
 def read_file(file_path: Union[str, Path]):
@@ -195,12 +208,13 @@ def has_subdirectories(path: Path) -> bool:
     return any(item.is_dir() for item in path.iterdir())
 
 
-def delete_dir(dir_path):
+def delete_dir(dir_path) -> bool:
     """
     Deletes a directory on disk
     """
     log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
     rmtree(dir_path)
+    return os.path.isdir(dir_path)
 
 
 def delete_dir_contents(dir_path):
@@ -523,16 +537,39 @@ def write_file_append(file_path, write_str):
         f.write('\n' + str(write_str))
 
 
-def rename_file(original_name, new_name, force=False):
+def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
     """
-    Renames a file on disk
+    Renames a file on disk.
+    If `force` is True, and the destination exists, it will be deleted first.
+    Returns True if successful, False otherwise.
     """
+    original_name = Path(original_name)
+    new_name = Path(new_name)
 
-    # If force set to On, Windows + File Path exists already, delete it before renaming file
-    if sys.platform == 'win32' and force and os.path.exists(new_name):
-        delete_file(new_name)
+    try:
+        # If forced overwrite and destination exists on Windows
+        if sys.platform == 'win32' and force and new_name.exists():
+            delete_file(new_name)
 
-    os.rename(original_name, new_name)
+        # Ensure parent directory for new file exists
+        new_name.parent.mkdir(parents=True, exist_ok=True)
+
+        # Perform rename
+        log(Severity.DEBUG, 'fileUtils.rename_file', f'Renaming file from "{original_name}" to "{new_name}"')
+        os.rename(original_name, new_name)
+
+        # Verify success
+        if new_name.exists() and not original_name.exists():
+            return True
+        else:
+            log(Severity.WARNING, 'fileUtils.rename_file',
+                f'Rename may have failed: original exists={original_name.exists()}, new exists={new_name.exists()}')
+            return False
+
+    except Exception as e:
+        log(Severity.ERROR, 'fileUtils.rename_file',
+            f'Error renaming file from "{original_name}" to "{new_name}": {e}')
+        return False
 
 
 def copy_file(source, destination):
