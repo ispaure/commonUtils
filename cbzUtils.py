@@ -38,7 +38,7 @@ minimum_allowed_compression_percentage = 75
 # Temporary Folders for Compression
 temp_compression_path = Path(fileUtils.get_user_home_dir(), 'Temp_CBZ_Compression')
 temp_dir_extracted_cbz = Path(temp_compression_path, '1_Extracted_CBZ')
-temp_dir_compressed_jpgs = Path(temp_compression_path, '2_Compressed_JPGs')
+temp_dir_compressed_imgs = Path(temp_compression_path, '2_Compressed_Images')
 temp_dir_result = Path(temp_compression_path, '3_Result')
 
 
@@ -255,6 +255,124 @@ class CBZFile(zipUtils.ZIPFile):
                     return True
         return False
 
+    def sanitize_extracted_cbz(self, extracted_dir) -> bool:
+        """
+        Sanitize files of an extracted CBZ whenever possible. AKA clean up dirty files!
+        If not possible, return an error.
+        """
+        sanitize_tool_name = 'cbzUtils.CBZFile.sanitize_extracted_cbz'
+        expected_root_file_lst = ['ComicInfo.xml', 'CompressionLog.txt']
+
+        # Delete __MACOSX directories if there are any. Before evaluating other stuff.
+        dir_path_lst = fileUtils.get_dirs_path_list(extracted_dir)
+        for dir_path in dir_path_lst:
+            if Path(dir_path).name == '__MACOSX':
+                result = fileUtils.delete_dir(dir_path)
+                if result:
+                    msg = 'Found rogue folder "__MACOSX" in archive, deleted!'
+                    log(Severity.WARNING, sanitize_tool_name, msg)
+                # Abort (critical) if could not delete directory
+                else:
+                    msg = f'Could not delete __MACOSX directory in {self.path}!'
+                    log(Severity.CRITICAL, sanitize_tool_name, msg)
+                    return False
+
+        # If there is any subdirectory, it could be unexpected
+        if fileUtils.has_subdirectories(extracted_dir):
+            dir_path_lst = fileUtils.get_dirs_path_list(extracted_dir)
+
+            # Abort if more than one directory
+            if len(dir_path_lst) > 1:
+                msg = f'Unexpected: There is more than one subdirectory in the .CBZ file.'
+                log(Severity.ERROR, sanitize_tool_name, msg)
+                return False
+
+            # Abort if (weird files in root + a subdirectory)
+            file_lst = fileUtils.get_file_path_list(extracted_dir, recursive=False)
+            for file in file_lst:
+                file_path = Path(file)
+                if str(file_path.name) not in expected_root_file_lst:
+                    msg = (f'Unexpected: There was a subdirectory in the .CBZ file and the root has other thing(s) than'
+                           f' ComicInfo.XML (such as {file_path.name}). Unsure how to proceed!')
+                    log(Severity.ERROR, sanitize_tool_name, msg)
+                    return False
+
+            # Abort if subdirectory also has a subdirectory
+            if len(fileUtils.get_dirs_path_list(dir_path_lst[0])) > 0:
+                msg = f'The subdirectory in the .CBZ file has at least one subdirectory itself. Unsure how to proceed!'
+                log(Severity.ERROR, sanitize_tool_name, msg)
+                return False
+
+            # Move files out of the subdirectory into the root
+            subdir_file_lst = fileUtils.get_file_path_list(dir_path_lst[0])
+            for subdir_file in subdir_file_lst:
+                destination = Path(extracted_dir, Path(subdir_file).name)
+                result = fileUtils.move_file(subdir_file, destination)
+                if not result:
+                    msg = f'File move unsuccessful (source: "{subdir_file}", destination: "{destination}")!'
+                    log(Severity.CRITICAL, sanitize_tool_name, msg)
+                    return False
+
+        # Validate file names have padding
+        root_file_lst = fileUtils.get_file_path_list(extracted_dir, recursive=False)  # Get file path list new because files may have been moved here in previous steps.
+        need_padding_repair = False
+        for root_file in root_file_lst:
+            file_name_with_ext = Path(root_file).name
+            if len(file_name_with_ext) < 2:  # If file name is incredibly short, throw error
+                msg = f'File in root has unbelievably tiny name "{file_name_with_ext}". Investigate!'
+                log(Severity.CRITICAL, sanitize_tool_name, msg)
+                return False
+            if file_name_with_ext[1] == '.':  # If file name has a . in 2nd position, is something like 1.jpg
+                msg = (f'Pages within archive are named without padding (ex. 1.jpg), which can lead to improper '
+                       f'sorting in applications such as ComicRack. Renaming with padding...')
+                log(Severity.WARNING, sanitize_tool_name, msg)
+                need_padding_repair = True
+                break  # Identified that we need padding repair, no need to process further in verifications.
+
+        # Padding repair
+        if need_padding_repair:  # When flagged previously as needed.
+            # Get padding length
+            if len(root_file_lst) < 99:
+                padding = 2
+            elif len(root_file_lst) < 990:
+                padding = 3
+            else:
+                padding = 5
+            for root_file in root_file_lst:
+                file_name_with_ext = Path(root_file).name
+                # Don't need to rename these
+                if file_name_with_ext in expected_root_file_lst:
+                    continue
+                # Remaining file names with extension should not have more than 1 dot
+                if file_name_with_ext.count('.') != 1:
+                    msg = f'File has weird number of dots in filename (just expecting number and extension)!'
+                    log(Severity.CRITICAL, sanitize_tool_name, msg)
+                    return False
+                # Get the file name without the extension
+                file_name_without_ext = file_name_with_ext.split('.')[0]
+                ext = file_name_with_ext.split('.')[1]
+                for char in file_name_without_ext:
+                    if char not in '0123456789':
+                        msg = f'File naming makes padding repair impossible! Name: {file_name_with_ext}'
+                        log(Severity.CRITICAL, sanitize_tool_name, msg)
+                        return False
+                # Determine padding name
+                padded_file_name_without_ext = file_name_without_ext.zfill(padding)
+                # Determine padding path
+                padded_path = Path(extracted_dir, f'{padded_file_name_without_ext}.{ext}')
+                # If padded path is same as original (ex. 10.jpg with 2 of padding remains 10.jpg), no need to rename
+                if str(root_file) == str(padded_path):
+                    continue
+                # Rename file
+                result = fileUtils.rename_file(root_file, padded_path)
+                if not result:
+                    msg = f'File {root_file} could not be renamed!'
+                    log(Severity.CRITICAL, sanitize_tool_name, msg)
+                    return False
+
+        # Everything went as expected
+        return True
+
     def compress_to_webp(self):
         func_name = 'compress_to_jpgs'
 
@@ -276,12 +394,8 @@ class CBZFile(zipUtils.ZIPFile):
         # Log Compressing
         log(Severity.INFO, tool_name, f'Compressing "{simplified_path}"!')
 
-        # If bad path, error and skip
-        if self.pages_badly_named():
-            msg = f'Pages are badly named (ex. 1.jpg), need to do additional scripting to be able to fix these files. Unsure how to proceed! Skip!'
-            log(Severity.ERROR, tool_name, msg)
-            return False
-
+        # Make compression directory if did not exist
+        fileUtils.make_dir(temp_compression_path)
         # Wipe directories before starting
         fileUtils.delete_dir_contents(temp_compression_path)
 
@@ -295,30 +409,11 @@ class CBZFile(zipUtils.ZIPFile):
             log(Severity.ERROR, tool_name, msg)
             return False
 
-        # Delete __MACOSX directories if there are any. Before evaluating other stuff.
-        dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
-        for dir in dir_path_lst:
-            if Path(dir).name == '__MACOSX':
-                fileUtils.delete_dir(dir)
-
-        # If there is any subdirectory, it could be unexpected
-        if fileUtils.has_subdirectories(temp_dir_extracted_cbz):
-            dir_path_lst = fileUtils.get_dirs_path_list(temp_dir_extracted_cbz)
-            if len(dir_path_lst) > 1:
-                log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'There is more than one subdirectory in the .CBZ file. Unsure how to proceed!')
-                return False
-            file_lst = fileUtils.get_file_path_list(temp_dir_extracted_cbz, recursive=False)
-            for file in file_lst:
-                file_path = Path(file)
-                if str(file_path.name) != 'ComicInfo.xml':
-                    log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'There was a subdirectory in the .CBZ file and the root has other thing(s) than ComicInfo.XML (such as {file_path.name}). Unsure how to proceed!')
-                    return False
-            if len(fileUtils.get_dirs_path_list(dir_path_lst[0])) > 0:
-                log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', f'The subdirectory in the .CBZ file has at least one subdirectory itself. Unsure how to proceed!')
-                return False
-            subdir_file_lst = fileUtils.get_file_path_list(dir_path_lst[0])
-            for subdir_file in subdir_file_lst:
-                fileUtils.move_file(subdir_file, Path(temp_dir_extracted_cbz, Path(subdir_file).name))
+        result = self.sanitize_extracted_cbz(temp_dir_extracted_cbz)
+        if not result:
+            msg = f'Unable to sanitize extracted archive "{self.path}" properly!'
+            log(Severity.ERROR, tool_name, msg)
+            return False
 
         # Attempt to find ComicInfo.xml
         comic_info_xml_path = Path(temp_dir_extracted_cbz, 'ComicInfo.xml')
@@ -344,11 +439,11 @@ class CBZFile(zipUtils.ZIPFile):
                 return False
 
         # Create Compressed_JPGs Directory
-        fileUtils.create_n_wipe_dir(temp_dir_compressed_jpgs)
+        fileUtils.create_n_wipe_dir(temp_dir_compressed_imgs)
 
         # Compress to WEBP
         for img_file_cls in img_file_cls_lst:
-            img_file_cls.compress(dest_path=Path(temp_dir_compressed_jpgs, f'{img_file_cls.name}.webp'), quality_grayscale=img_quality_grayscale, quality_color=img_quality_color, max_long_edge=max_long_edge, max_height=max_height)
+            img_file_cls.compress(dest_path=Path(temp_dir_compressed_imgs, f'{img_file_cls.name}.webp'), quality_grayscale=img_quality_grayscale, quality_color=img_quality_color, max_long_edge=max_long_edge, max_height=max_height)
             self.compression_stats.compressed_images_size += img_file_cls.compressed_image.size
 
         # Create Result Directory
