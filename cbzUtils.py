@@ -534,6 +534,9 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
     # Build list of CBZFile
     cbz_file_cls_lst: List[CBZFile] = []
     for cbz_file_path in cbz_file_path_lst:
+        if Path(cbz_file_path).name.startswith('._'):
+            log(Severity.WARNING, tool_name, f'Skipping file {cbz_file_path} because it is a macOS metadata file!')
+            continue
         cbz_file_cls = CBZFile(Path(cbz_file_path))
         cbz_file_cls_lst.append(cbz_file_cls)
 
