@@ -262,6 +262,7 @@ class CBZFile(zipUtils.ZIPFile):
         """
         sanitize_tool_name = 'cbzUtils.CBZFile.sanitize_extracted_cbz'
         expected_root_file_lst = ['ComicInfo.xml', 'CompressionLog.txt']
+        delete_from_root_lst = ['README.txt', '.DS_Store']
 
         # Delete __MACOSX directories if there are any. Before evaluating other stuff.
         dir_path_lst = fileUtils.get_dirs_path_list(extracted_dir)
@@ -312,6 +313,12 @@ class CBZFile(zipUtils.ZIPFile):
                     msg = f'File move unsuccessful (source: "{subdir_file}", destination: "{destination}")!'
                     log(Severity.CRITICAL, sanitize_tool_name, msg)
                     return False
+
+        # Delete files in root that are not supposed to be there
+        root_file_lst = fileUtils.get_file_path_list(extracted_dir, recursive=False)
+        for root_file in root_file_lst:
+            if Path(root_file).name in delete_from_root_lst:
+                fileUtils.delete_file(root_file)
 
         # Validate file names have padding
         root_file_lst = fileUtils.get_file_path_list(extracted_dir, recursive=False)  # Get file path list new because files may have been moved here in previous steps.
@@ -373,7 +380,7 @@ class CBZFile(zipUtils.ZIPFile):
         # Everything went as expected
         return True
 
-    def compress_to_webp(self):
+    def compress_to_webp(self, always_keep_compressed: bool = False):
         func_name = 'compress_to_jpgs'
 
         # Reset Stats and Log
@@ -383,6 +390,8 @@ class CBZFile(zipUtils.ZIPFile):
         self.compression_log.append(f'|| Compression Log for "{self.name}.{self.ext}" ||')
         self.compression_log.append(f'Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         self.compression_log.append(f'Quality Setting for JPG Compression: Grayscale: "{img_quality_grayscale}", Color: "{img_quality_color}"')
+        if always_keep_compressed:
+            self.compression_log.append(f'Parameter: Always Keep Compressed Image, Regardless if Smaller')
         self.compression_log.append_skip_line()
 
         # Simplify Path for Logging (if possible)
@@ -454,9 +463,13 @@ class CBZFile(zipUtils.ZIPFile):
         kept_image_cls_lst: List[CBZImageFile] = []
         for img_file_cls in img_file_cls_lst:
             page_count += 1
-            if img_file_cls.compressed_image.size < img_file_cls.size * minimum_allowed_compression_percentage / 100:
+            if always_keep_compressed or img_file_cls.compressed_image.size < img_file_cls.size * minimum_allowed_compression_percentage / 100:
+                if always_keep_compressed:
+                    verdict = 'ALWAYS Compressed Image'
+                else:
+                    verdict = 'Compressed Image'
                 kept_image_cls = img_file_cls.compressed_image
-                self.compression_log.append(f'Page #{page_count:04d}: "{kept_image_cls.get_description()}, Verdict: Compressed Image')
+                self.compression_log.append(f'Page #{page_count:04d}: "{kept_image_cls.get_description()}, Verdict: {verdict}')
                 self.compression_stats.kept_images_compressed_cnt += 1
             else:
                 kept_image_cls = img_file_cls
@@ -493,7 +506,7 @@ class CBZFile(zipUtils.ZIPFile):
         return True
 
 
-def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
+def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True, always_keep_compressed: bool = False):
     """
     Tool to compress .CBZ files, so they take less space. Only tested on macOS for now.
 
@@ -514,6 +527,7 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
         -Space Savings (Before -> After) (Number & Percentage)
     :param target_dir:
     :param recursive: When True, compress .CBZ within subdirectories
+    :param always_keep_compressed: When True, always take the compressed image in lieu of the original file.
     """
     global batch_target_dir
     batch_target_dir = str(target_dir)
@@ -555,7 +569,7 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True):
     # Compress CBZ
     compression_stats.total_file_count = len(cbz_file_cls_lst)
     for cbz_file in cbz_file_cls_to_compress_lst:
-        result = cbz_file.compress_to_webp()
+        result = cbz_file.compress_to_webp(always_keep_compressed=always_keep_compressed)
         if result:
             compression_stats.compressed_file_count += 1
             compression_stats += cbz_file.compression_stats
