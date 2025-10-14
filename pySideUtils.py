@@ -432,8 +432,8 @@ def display_msg_box_ok_cancel(title, message, fn_ok=None, fn_cancel=None, icon='
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'OK', fn_ok, 'Cancel', fn_cancel)
     msg_box.setStandardButtons(msg_box.StandardButton.Ok | msg_box.StandardButton.Cancel)
-    msg_box.exec_()
-    return True
+    result = msg_box.exec_()
+    return result == msg_box.StandardButton.Ok
 
 
 def display_msg_box_ok(title, message, icon='warning', width=300, height=400):
