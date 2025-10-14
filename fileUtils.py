@@ -23,9 +23,13 @@ match get_os():
 class File:
     def __init__(self, path: Path):
         self.path = path
-        self.name = self.__get_name()
+        self.file_name = self.__get_file_name()
+        self.name_without_ext = self.__get_name()
         self.ext: Union[str, None] = self.__get_ext()
         self.size: Union[int, None] = self.__get_size()
+
+    def __get_file_name(self) -> str:
+        return self.path.name
 
     def __get_name(self) -> str:
         """Return the file name without extension."""
