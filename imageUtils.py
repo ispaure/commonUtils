@@ -5,7 +5,7 @@ from commonUtils.debugUtils import *
 from typing import *
 
 
-image_file_cls_supported_ext_lst = ['jpg', 'jpeg', 'bmp', 'tif', 'tiff', 'webp', 'png']  # Supported Extensions by the ImageFile class
+image_file_cls_supported_ext_lst = ['jpg', 'jpeg', 'bmp', 'tif', 'tiff', 'webp', 'png', 'gif']  # Supported Extensions by the ImageFile class
 
 
 class ImageFile(fileUtils.File):
@@ -148,7 +148,7 @@ class ImageFile(fileUtils.File):
             color_description = 'Color'
         else:
             color_description = 'Grayscale'
-        return (f'{self.name}.{self.ext} - Dimensions: {self.width}x{self.height}, Color: {color_description}, '
+        return (f'{self.file_name} - Dimensions: {self.width}x{self.height}, Color: {color_description}, '
                 f'Size {self.size} bytes')
 
 
