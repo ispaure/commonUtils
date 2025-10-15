@@ -57,9 +57,15 @@ class TXTFile(File):
         self.line_lst = []
 
     def import_line_lst(self):
+        """
+        Import the lines from the text file into self.line_lst
+        """
         self.line_lst = read_file(self.path)
 
     def export(self, path: Union[Path, None] = None):
+        """
+        Export self.line_lst to the given path if provided (else use the current file path)
+        """
         export_path = path or self.path
 
         with open(export_path, "w", encoding="utf-8") as f:
