@@ -24,14 +24,14 @@ class File:
     def __init__(self, path: Path):
         self.path = path
         self.file_name = self.__get_file_name()
-        self.name_without_ext = self.__get_name()
+        self.name_without_ext = self.__get_name_without_ext()
         self.ext: Union[str, None] = self.__get_ext()
         self.size: Union[int, None] = self.__get_size()
 
     def __get_file_name(self) -> str:
         return self.path.name
 
-    def __get_name(self) -> str:
+    def __get_name_without_ext(self) -> str:
         """Return the file name without extension."""
         return self.path.stem
 
@@ -49,6 +49,10 @@ class File:
             return self.path.stat().st_size
         except FileNotFoundError:
             return None
+
+    def delete_file(self) -> bool:
+        result = delete_file(self.path)
+        return result
 
 
 class TXTFile(File):
@@ -87,9 +91,29 @@ def hang_n_terminate():
     sys.exit()
 
 
-def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None):
+def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
     """
-    Returns list of all files under a specific directory.
+    Returns list of all files under a specific directory. Properly sorted
+
+    Input example:
+    root/
+    ├── b.txt
+    ├── z.txt
+    ├── a_folder/
+    │   └── a.txt
+    └── z_folder/
+        └── z.txt
+
+    Output example:
+    root/b.txt
+    root/z.txt
+    root/a_folder/a.txt
+    root/z_folder/z.txt
+
+    This is what we often want (root files first, then files in folders in order).
+    Note: Does not sort well 1, 10, 11 type stuff (work well with 01, 10, 11!)
+    So if required, add padding before sorting.
+
     :param dir_name: Directory in which to look under
     :type dir_name: str
     :param recursive: Indicate if sub-directories should be included, recursively
@@ -100,6 +124,7 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
     # create a list of file and subdirectories
     # names in the given directory
     list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
+
     all_files = list()
     # Iterate over all the entries
     for entry in list_of_files:
@@ -177,10 +202,11 @@ def append_line_lst_to_file(line_lst, file_path):
 
 def get_dirs_path_list(dir_path: Union[Path, str]):
     """
-    Returns a list of valid directory paths within a directory. Function copied from Blue Hole Addon scripts.
+    Returns a sorted list of valid directory paths within a directory.
+    Function copied from Blue Hole Addon scripts and updated to sort alphabetically.
     :param dir_path: Directory in which to look for directories
-    :type dir_path: str
-    :rtype: lst
+    :type dir_path: str | Path
+    :rtype: list[str]
     """
     if isinstance(dir_path, str):
         dir_path_str = dir_path
@@ -198,6 +224,9 @@ def get_dirs_path_list(dir_path: Union[Path, str]):
         item_dir = str(Path(dir_path_str, item))
         if os.path.isdir(item_dir):
             dir_path_lst.append(item_dir)
+
+    # Sort alphabetically (case-insensitive)
+    dir_path_lst.sort(key=lambda s: s.lower())
     return dir_path_lst
 
 
@@ -250,8 +279,16 @@ def delete_dir_contents(dir_path):
         log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
 
 
-def delete_file(file_path):
-    os.remove(file_path)
+def delete_file(file_path) -> bool:
+    """
+    Deletes a file on disk.
+    Returns True if successfully deleted, False otherwise.
+    """
+    try:
+        os.remove(file_path)
+        return not os.path.exists(file_path)
+    except Exception:
+        return False
 
 
 def delete_symbolic_link(dir_path):
