@@ -82,7 +82,7 @@ class ImageFile(fileUtils.File):
                  quality_grayscale: int,
                  quality_color: int,
                  max_long_edge: int | None = None,
-                 max_height: int | None = None):
+                 max_height: int | None = None) -> bool:
         """
         Compresses the image file to a .JPG or .WEBP at the destination path.
 
@@ -131,15 +131,18 @@ class ImageFile(fileUtils.File):
                 elif ext == ".webp":
                     img.save(dest_path, "WEBP", quality=quality, method=6)
                 else:
-                    raise ValueError(f"Unsupported export format: {ext}")
+                    log(Severity.CRITICAL, 'ImageFile.compress', f"Unsupported export format: {ext}")
+                    return False
 
                 self.compressed_image = self.__class__(dest_path)
                 self.compressed_image.color = self.color
+                return True
 
         except Exception as e:
             log(Severity.CRITICAL,
                 'fileUtils.imageUtils.ImageFile.compress',
                 f'Failed to convert/compress image {self.path}: {e}')
+            return False
 
     def get_description(self):
         if self.color is None:
