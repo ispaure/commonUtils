@@ -43,7 +43,6 @@ temp_dir_result = Path(temp_compression_path, '3_Result')
 
 
 tool_name = 'commonUtils.cbzUtils'
-batch_target_dir: Union[str, None] = None  # Updated in code to the batch target dir
 
 
 class ComicInfoXML(xmlUtils.XMLFile):
@@ -408,14 +407,8 @@ class CBZFile(zipUtils.ZIPFile):
             self.compression_log.append(f'Parameter: Always Keep Compressed Image, Regardless if Smaller')
         self.compression_log.append_skip_line()
 
-        # Simplify Path for Logging (if possible)
-        if batch_target_dir is not None:
-            path_str = str(self.path)
-            simplified_path = path_str.replace(batch_target_dir, '...')
-        else:
-            simplified_path = str(self.path)
         # Log Compressing
-        log(Severity.INFO, tool_name, f'Compressing "{simplified_path}"!')
+        log(Severity.INFO, tool_name, f'Compressing "{self.file_name}"!')
 
         # Make compression directory if did not exist
         fileUtils.make_dir(temp_compression_path)
@@ -517,7 +510,7 @@ class CBZFile(zipUtils.ZIPFile):
         fileUtils.delete_dir_contents(temp_compression_path)
 
         # Log Finished Compression
-        log(Severity.INFO, tool_name, f'Completed Compression of "{simplified_path}" ({self.compression_stats.get_original_size_mb():.2f} MB > {self.compression_stats.get_new_size_mb():.2f} MB)!')
+        log(Severity.INFO, tool_name, f'Completed Compression of "{self.file_name}" ({self.compression_stats.get_original_size_mb():.2f} MB > {self.compression_stats.get_new_size_mb():.2f} MB)!')
         return True
 
 
@@ -544,8 +537,7 @@ def batch_compress_cbz(target_dir: Union[str, Path], recursive: bool = True, alw
     :param recursive: When True, compress .CBZ within subdirectories
     :param always_keep_compressed: When True, always take the compressed image in lieu of the original file.
     """
-    global batch_target_dir
-    batch_target_dir = str(target_dir)
+
     # Display basic information in console
     log_message = f'Initialize Batch Compress .CBZ in {target_dir} '
     if recursive:
