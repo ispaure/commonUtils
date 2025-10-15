@@ -139,7 +139,7 @@ class ImageFile(fileUtils.File):
                 return True
 
         except Exception as e:
-            log(Severity.CRITICAL,
+            log(Severity.ERROR,
                 'fileUtils.imageUtils.ImageFile.compress',
                 f'Failed to convert/compress image {self.path}: {e}')
             return False
