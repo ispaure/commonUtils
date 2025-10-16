@@ -337,7 +337,41 @@ class CBZFile(zipUtils.ZIPFile):
                     log(Severity.ERROR, sanitize_tool_name, msg)
                     return False
 
-            # Abort if any subdirectory itself has a subdirectory
+            # ----------------------------------------------------------------------------------------------------------
+            # Weird Edge case I had to account for (else it's repetitive manual work)
+            # If there is exactly one directory, which itself contains no files and exactly one subdirectory
+            # And that subdirectory does not contain itself anymore subdirectories, move the files to the directory.
+            if len(dir_path_lst) == 1:
+                dir_path = dir_path_lst[0]
+                dir_subdir_lst = fileUtils.get_dirs_path_list(dir_path)
+                dir_file_path_lst = fileUtils.get_file_path_list(dir_path, recursive=False)
+                if len(dir_subdir_lst) == 1 and len(dir_file_path_lst) == 0:
+                    subdir_path = Path(dir_subdir_lst[0])
+                    if not fileUtils.has_subdirectories(subdir_path):
+                        subdir_file_path_lst = fileUtils.get_file_path_list(subdir_path, recursive=False)
+                        if len(subdir_file_path_lst) > 0:
+                            msg = ('Found only a single directory, which itself contains no files and exactly one '
+                                   'subdirectory, which itself contains files but not any more directories. '
+                                   'Moving files from the subdirectory to the directory.')
+                            log(Severity.WARNING, tool_name, msg)
+                            for subdir_file_path in subdir_file_path_lst:
+                                destination_file_path = subdir_file_path.replace(str(subdir_path), str(dir_path))
+                                result = fileUtils.move_file(Path(subdir_file_path), Path(destination_file_path))
+                                if not result:
+                                    msg = f'File move unsuccessful (source: "{subdir_file_path}", destination: "{destination_file_path}")!'
+                                    log(Severity.CRITICAL, sanitize_tool_name, msg)
+                                    return False
+                            result = fileUtils.delete_dir(subdir_path)
+                            if not result:
+                                msg = f'Directory deletion was unsuccessful: "{subdir_path}"!'
+                                log(Severity.CRITICAL, sanitize_tool_name, msg)
+                                return False
+
+            # Refresh dir_path_lst because it may have changed
+            dir_path_lst = fileUtils.get_dirs_path_list(extracted_dir)
+            # ----------------------------------------------------------------------------------------------------------
+
+            # Abort if any directory itself has a subdirectory
             for dir_path in dir_path_lst:
                 if fileUtils.has_subdirectories(Path(dir_path)):
                     msg = (f'The subdirectory "{Path(dir_path).name}" has at least one subdirectory itself, which is '
@@ -345,9 +379,10 @@ class CBZFile(zipUtils.ZIPFile):
                     log(Severity.ERROR, sanitize_tool_name, msg)
                     return False
 
-            # If there was just one subdirectory, move the files in it to the root
+            # If there was just one directory, move the files in it to the root
             if len(dir_path_lst) == 1:
-                subdir_file_lst = fileUtils.get_file_path_list(dir_path_lst[0], recursive=False)
+                dir_path = dir_path_lst[0]
+                subdir_file_lst = fileUtils.get_file_path_list(dir_path, recursive=False)
                 for subdir_file in subdir_file_lst:
                     file_cls = fileUtils.File(Path(subdir_file))
                     destination_path = Path(extracted_dir, file_cls.file_name)
@@ -356,6 +391,17 @@ class CBZFile(zipUtils.ZIPFile):
                         msg = f'File move unsuccessful (source: "{file_cls.path}", destination: "{destination_path}")!'
                         log(Severity.CRITICAL, sanitize_tool_name, msg)
                         return False
+                # Delete empty dir after everything has been moved to the root
+                if not fileUtils.has_subdirectories(Path(dir_path)) and len(fileUtils.get_file_path_list(dir_path, recursive=True)) == 0:
+                    result = fileUtils.delete_dir(dir_path)
+                    if not result:
+                        msg = f'Could not delete "{dir_path}"!'
+                        log(Severity.CRITICAL, tool_name, msg)
+                        return False
+                else:
+                    msg = f'Could not delete "{dir_path}" because it is not empty!'
+                    log(Severity.CRITICAL, tool_name, msg)
+                    return False
 
         # Get updated list of files (things may have been moved in previous step)
         extracted_file_lst = fileUtils.get_file_path_list(extracted_dir, recursive=True)
