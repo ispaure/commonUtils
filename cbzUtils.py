@@ -275,7 +275,7 @@ class CBZFile(zipUtils.ZIPFile):
         """
         sanitize_tool_name = 'cbzUtils.CBZFile.sanitize_extracted_cbz'
         expected_file_name_lst = ['ComicInfo.xml', 'CompressionLog.txt']
-        to_delete_file_name_lst = ['.DS_Store', 'Thumbs.db']
+        to_delete_file_name_lst = ['.DS_Store', 'Thumbs.db', 'Thumbs1.db']
 
         # Delete __MACOSX directories if there are any. Before evaluating other stuff.
         dir_path_lst = fileUtils.get_dirs_path_list(extracted_dir)
@@ -308,7 +308,7 @@ class CBZFile(zipUtils.ZIPFile):
             elif file_cls.file_name in expected_file_name_lst:
                 continue
             # If File is of these file types, not expected in archive unless previous "continue"
-            elif file_cls.ext in ['txt', 'url']:
+            elif file_cls.ext in ['txt', 'url', 'nfo', 'html']:
                 msg = f'Deleting unexpected file of extension .{file_cls.ext}: "{file_cls.file_name}"'
                 log(Severity.WARNING, sanitize_tool_name, msg)
                 result = file_cls.delete_file()
