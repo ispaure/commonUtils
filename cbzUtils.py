@@ -308,7 +308,7 @@ class CBZFile(zipUtils.ZIPFile):
             elif file_cls.file_name in expected_file_name_lst:
                 continue
             # If File is of these file types, not expected in archive unless previous "continue"
-            elif file_cls.ext in ['txt', 'url', 'nfo', 'html']:
+            elif file_cls.ext in ['txt', 'url', 'nfo', 'html', 'sfv']:
                 msg = f'Deleting unexpected file of extension .{file_cls.ext}: "{file_cls.file_name}"'
                 log(Severity.WARNING, sanitize_tool_name, msg)
                 result = file_cls.delete_file()
