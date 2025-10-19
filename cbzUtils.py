@@ -413,8 +413,8 @@ class CBZFile(zipUtils.ZIPFile):
                        f'the original .CBZ file required!')
                 log(Severity.ERROR, sanitize_tool_name, msg)
                 return False
-            elif file_cls.file_name[1] == '.':
-                msg = (f'Pages within archive are named without padding (ex. 1.jpg), which can lead to improper '
+            elif file_cls.file_name[1] == '.' and file_cls.file_name[0] in '0123456789':
+                msg = (f'Page "{file_cls.file_name}" within archive are named without padding (ex. 1.jpg), which can lead to improper '
                        f'sorting in applications such as ComicRack. Renaming with padding...')
                 log(Severity.WARNING, sanitize_tool_name, msg)
                 need_padding_repair = True
