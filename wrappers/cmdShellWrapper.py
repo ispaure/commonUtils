@@ -10,8 +10,7 @@ from commonUtils import debugUtils
 from commonUtils.osUtils import *
 
 
-show_verbose = False
-
+tool_name = 'commonUtils/cmdShellWrapper.py'
 
 def delete_script_file(file_path):
     # Delete script file if exists. Returns false if could not delete
@@ -63,10 +62,12 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
         cleaned_line = decoded_line.rstrip('\n')  # Remove n from end of line
         cleaned_line = cleaned_line.rstrip('\r')  # Remove r from end of line
 
-        if show_verbose:
-            debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', cleaned_line)
+        debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', cleaned_line)
 
         return cleaned_line
+
+    # Log command to execute
+    debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Executing command: {command}')
 
     # If code must be executed in new cmd window
     if in_new_window is not None:
@@ -103,17 +104,12 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
     # Time out value (in milliseconds)
     time_out = 15
 
-    # If debug, print command that was sent
-    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', 'Initiating Execute Shell Command procedure.')
-    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', 'Command to send:')
-    debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', command)
-
     # Should use shell?
     use_shell = should_use_shell(command)
 
     # Open subprocess, until all output is received.
     p_open = subprocess.Popen(command,
-                              shell=use_shell,  # In case of doubt, this used to be set to always true before doing linux stuff!
+                              shell=use_shell,  # In case of doubt, used to be set to always true before linux!
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
                               stdin=None)

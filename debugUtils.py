@@ -7,7 +7,7 @@ from datetime import datetime
 # Settings
 include_time = False  # Show absolute time
 use_time_delta = True  # Show time since last debug message
-verbose_debug = False  # Show debug-level entries
+verbose_debug = True  # Show debug-level entries
 
 # Global variable to track last timestamp
 last_timestamp = None
