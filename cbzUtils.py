@@ -15,7 +15,7 @@ from datetime import datetime
 # User Defined Settings
 
 # Default directory for conversion (What shows up as default in the UI)
-default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'ComicsTest', 'ToConvert')
+default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'Server', 'Local', 'ComicRack')
 
 # Compression 'quality' ranges from 1 (lowest, smallest size) to 95 (highest, biggest size)
 # Should be higher for color than grayscale, else causes much-worse looking results
