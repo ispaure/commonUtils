@@ -41,8 +41,7 @@ class DiskApp(App):
         if path_win_str.endswith('.ps1'):  # If powershell, run as powershell
             powerShellWrapper.exec_powershell(path_win_str)
         elif path_win_str.endswith('.cmd') or path_win_str.endswith('.bat'):  # If CMD, run in new window
-            cwd = fileUtils.get_current_working_dir()
-            ally_tools_temp_dir = str(Path(Path(cwd).parent, 'temp'))
+            ally_tools_temp_dir = fileUtils.get_project_temp_dir()
             temp_file_path = str(Path(ally_tools_temp_dir, 'exec.bat'))
             print(f'App Launcher: Executing Temp Batch File: {temp_file_path}')
             cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, in_new_window=temp_file_path)

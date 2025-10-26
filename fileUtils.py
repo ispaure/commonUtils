@@ -651,14 +651,10 @@ def get_current_working_dir() -> Path:
     cwd_resolved = Path.resolve(cwd)
     return cwd_resolved
 
-    # Old method, only works on windows and not always
-    # cwd = Path(os.getcwd())
-    # cwd_resolved = Path.resolve(cwd)
-    # if cwd_resolved.name == 'Python':
-    #     return cwd_resolved
-    # else:
-    #     return Path(cwd_resolved, 'Python')
-
+def get_project_temp_dir() -> Path:
+    cwd = get_current_working_dir()
+    temp_dir_path = Path(Path(cwd).parent, 'temp')
+    return temp_dir_path
 
 def get_user_home_dir() -> Path:
     """
