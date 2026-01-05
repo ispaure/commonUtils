@@ -189,7 +189,7 @@ def batch_compress_image(target_dir: Union[str, Path], recursive: bool = True, a
     for img_file_cls in original_img_file_cls_lst:
         if img_file_cls.ext != 'webp':
             log(Severity.DEBUG, f'imageUtils.{func_name}', f'Compressing {img_file_cls.file_name}...')
-            dest_path = img_file_cls.path.with_suffix('webp')
+            dest_path = img_file_cls.path.with_suffix('.webp')
             result = img_file_cls.compress(dest_path=dest_path,
                                            quality_grayscale=img_quality_grayscale,
                                            quality_color=img_quality_color,
