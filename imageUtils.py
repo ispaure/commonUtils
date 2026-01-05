@@ -5,7 +5,21 @@ from commonUtils.debugUtils import *
 from typing import *
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# User defined settings
 image_file_cls_supported_ext_lst = ['jpg', 'jpeg', 'bmp', 'tif', 'tiff', 'webp', 'png', 'gif']  # Supported Extensions by the ImageFile class
+
+default_path_to_convert_img = Path(fileUtils.get_user_home_dir(), 'Images2Convert')
+
+# WEBP Settings
+img_quality_color = 60  # Acceptable: 45, Good: 60, Overkill: 90
+img_quality_grayscale = 35  # Acceptable: 25, Good: 35, Overkill: 45
+img_max_long_edge: Union[None, int] = 5000
+img_max_height: Union[None, int] = None
+
+# Decide to keep the compressed image if its size is smaller than this percentage of the original.
+img_min_allowed_compression_percentage = 75
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ImageFile(fileUtils.File):
@@ -155,3 +169,45 @@ class ImageFile(fileUtils.File):
                 f'Size {self.size} bytes')
 
 
+def batch_compress_image(target_dir: Union[str, Path], recursive: bool = True, always_keep_compressed: bool = False):
+    """Batch compresses images, updating the original file with the changed file."""
+    func_name = 'batch_compress_image'
+
+    # --------------------------------------------------------------------------------------------------------------
+    # STEP ONE: GATHER LIST OF IMAGE FILES TO CONVERT
+    original_img_file_cls_lst: List[ImageFile] = []
+    file_lst = fileUtils.get_file_path_list(target_dir, recursive=recursive)
+    for file in file_lst:
+        file_path = Path(file)
+        file_cls = fileUtils.File(file_path)
+        if file_cls.ext in image_file_cls_supported_ext_lst:
+            image_file_cls = ImageFile(file_path)
+            original_img_file_cls_lst.append(image_file_cls)
+
+    # --------------------------------------------------------------------------------------------------------------
+    # STEP TWO: COMPRESS LIST OF IMAGES TO .WEBP, REPLACE IF SMALLER OR ALWAYS_KEEP_COMPRESSED
+    for img_file_cls in original_img_file_cls_lst:
+        if img_file_cls.ext != 'webp':
+            log(Severity.DEBUG, f'imageUtils.{func_name}', f'Compressing {img_file_cls.file_name}...')
+            dest_path = img_file_cls.path.with_suffix('webp')
+            result = img_file_cls.compress(dest_path=dest_path,
+                                           quality_grayscale=img_quality_grayscale,
+                                           quality_color=img_quality_color,
+                                           max_long_edge=img_max_long_edge,
+                                           max_height=img_max_height)
+            if not result:
+                msg = f'An error occurred whilst compressing {img_file_cls.file_name}!'
+                log(Severity.ERROR, f'cbzUtils.{func_name}', msg)
+                return False
+
+            # STEP THREE: SELECT IMAGES TO KEEP
+            if always_keep_compressed or img_file_cls.compressed_image.size < img_file_cls.size * img_min_allowed_compression_percentage / 100:
+                fileUtils.delete_file(img_file_cls.path)
+            else:
+                fileUtils.delete_file(img_file_cls.compressed_image.path)
+        else:
+            msg = f'Image {img_file_cls.file_name} is already webp! Skipping...'
+            log(Severity.DEBUG, f'imageUtils.{func_name}', msg)
+
+    # Done
+    log(Severity.INFO, 'Image Compression', 'Images Compression Completed successfully!')

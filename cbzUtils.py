@@ -15,7 +15,7 @@ from datetime import datetime
 # User Defined Settings
 
 # Default directory for conversion (What shows up as default in the UI)
-default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'Server', 'Local', 'Server-Lib-ComicRack')
+default_path_to_convert_cbz = Path(fileUtils.get_user_home_dir(), 'Server', 'Local', 'Server-Lib-ComicRack')
 
 # Compression 'quality' ranges from 1 (lowest, smallest size) to 95 (highest, biggest size)
 # Should be higher for color than grayscale, else causes much-worse looking results
@@ -27,13 +27,13 @@ default_path_to_convert = Path(fileUtils.get_user_home_dir(), 'Server', 'Local',
 # max_height: Union[None, int] = 2560
 
 # WEBP Settings
-img_quality_color = 60  # Acceptable: 45, Good: 60, Overkill: 90
-img_quality_grayscale = 35  # Acceptable: 25, Good: 35, Overkill: 45
-max_long_edge: Union[None, int] = None
-max_height: Union[None, int] = 2400
+cbz_img_quality_color = 60  # Acceptable: 45, Good: 60, Overkill: 90
+cbz_img_quality_grayscale = 35  # Acceptable: 25, Good: 35, Overkill: 45
+cbz_img_max_long_edge: Union[None, int] = None
+cbz_img_max_height: Union[None, int] = 2400
 
 # Decide to keep the compressed image if its size is smaller than this percentage of the original.
-minimum_allowed_compression_percentage = 75
+cbz_img_min_allowed_compression_percentage = 75
 
 # Temporary Folders for Compression
 temp_compression_path = Path(fileUtils.get_user_home_dir(), 'Temp_CBZ_Compression')
@@ -519,7 +519,7 @@ class CBZFile(zipUtils.ZIPFile):
         # --------------------------------------------------------------------------------------------------------------
         # START LOGS
         log(Severity.INFO, tool_name, f'Compressing "{self.file_name}"!')
-        self.compression_log.append_msg_start(img_quality_grayscale, img_quality_color, always_keep_compressed)
+        self.compression_log.append_msg_start(cbz_img_quality_grayscale, cbz_img_quality_color, always_keep_compressed)
 
         # --------------------------------------------------------------------------------------------------------------
         # STEP ONE : EXTRACTION OF .CBZ IN TEMP DIRECTORY
@@ -569,10 +569,10 @@ class CBZFile(zipUtils.ZIPFile):
             img_compress_file_path = Path(img_compress_dir_path_str, f'{img_file_cls.name_without_ext}.webp')
 
             result = img_file_cls.compress(dest_path=img_compress_file_path,
-                                           quality_grayscale=img_quality_grayscale,
-                                           quality_color=img_quality_color,
-                                           max_long_edge=max_long_edge,
-                                           max_height=max_height)
+                                           quality_grayscale=cbz_img_quality_grayscale,
+                                           quality_color=cbz_img_quality_color,
+                                           max_long_edge=cbz_img_max_long_edge,
+                                           max_height=cbz_img_max_height)
             if not result:
                 msg = f'An error occurred whilst compressing {img_file_cls.file_name}!'
                 log(Severity.ERROR, f'cbzUtils.CBZFile.{func_name}', msg)
@@ -586,7 +586,7 @@ class CBZFile(zipUtils.ZIPFile):
         for img_file_cls in img_file_cls_lst:
             page_count += 1
             # Select compressed image if at least smaller by specified amount, else keep original
-            if always_keep_compressed or img_file_cls.compressed_image.size < img_file_cls.size * minimum_allowed_compression_percentage / 100:
+            if always_keep_compressed or img_file_cls.compressed_image.size < img_file_cls.size * cbz_img_min_allowed_compression_percentage / 100:
                 if always_keep_compressed:
                     verdict = 'ALWAYS Compressed Image'
                 else:
