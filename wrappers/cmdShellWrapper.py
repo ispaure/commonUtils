@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 import shlex
+import shutil
 
 # Common utilities
 import commonUtils.fileUtils as fileUtils
@@ -12,28 +13,6 @@ from commonUtils.osUtils import *
 
 
 tool_name = 'commonUtils/cmdShellWrapper.py'
-
-
-def delete_script_file(file_path):
-    # Delete script file if exists. Returns false if could not delete
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        if os.path.exists(file_path):
-            print('Could not remove properly, do NOT continue with sync')
-            return False
-    return True
-
-
-def should_use_shell(command):
-    """Decide whether to use shell=True based on command and OS"""
-    if get_os() == OS.WIN or get_os() == OS.MAC:  # TODO: Added macOS back here to patch up, idk if want this!
-        return True  # Windows prefers shell=True for most cases
-    elif isinstance(command, list):
-        return False  # List commands always work with shell=False
-    elif any(symbol in command for symbol in ["|", ">", "&", ";"]):
-        return True  # Linux/macOS shell syntax requires shell=True
-    else:
-        return False
 
 
 def exec_cmd(command: str,
@@ -80,14 +59,105 @@ def exec_cmd(command: str,
         debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', cleaned_line)
         return cleaned_line
 
+    # ------------------------------
+    # Linux terminal helpers (UPDATED)
+    # ------------------------------
+
     def pick_linux_terminal() -> Optional[str]:
         """
         Prefer terminals that exist on the system.
+
+        - Respects $TERMINAL if set.
+        - Detects KDE vs GNOME and prefers a likely default.
+        - Includes common modern terminals that may exist on Fedora/Bazzite.
         """
-        for term in ("konsole", "gnome-terminal", "xterm"):
+        # 1) Respect user preference if set
+        env_term = os.environ.get("TERMINAL")
+        if env_term:
+            # TERMINAL might include args; take the binary part
+            bin_name = env_term.split()[0]
+            if shutil.which(bin_name):
+                return bin_name
+
+        # 2) Desktop-session hints (KDE vs GNOME)
+        desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower()
+        session = (os.environ.get("DESKTOP_SESSION") or "").lower()
+        prefer_kde = ("kde" in desktop) or ("plasma" in desktop) or ("kde" in session) or ("plasma" in session)
+
+        # 3) Candidate lists
+        kde_first = ["konsole"]
+        gnome_first = ["kgx", "gnome-terminal", "ptyxis"]  # kgx = GNOME Console
+        common = [
+            "xterm",
+            "kitty",
+            "alacritty",
+            "wezterm",
+            "footclient",
+            "tilix",
+            "xfce4-terminal",
+            "lxterminal",
+            "mate-terminal",
+            "ptyxis",
+        ]
+
+        candidates = (kde_first + gnome_first + common) if prefer_kde else (gnome_first + kde_first + common)
+
+        for term in candidates:
             if shutil.which(term):
                 return term
         return None
+
+    def build_linux_new_window_cmd(term: str, command: str) -> str:
+        """
+        Build a shell command (string) that opens a new terminal window
+        and keeps it open after the command runs.
+
+        Uses bash -lc so the command behaves like a normal terminal command.
+        """
+        bash_lc_arg = shlex.quote(command)
+
+        # KDE Konsole
+        if term == "konsole":
+            return f'konsole --hold -e bash -lc {bash_lc_arg}'
+
+        # GNOME terminals
+        if term in ("gnome-terminal", "kgx"):
+            # Run the command, then keep the terminal open with an interactive bash
+            return f'{term} -- bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # Ptyxis (often present on Fedora/Bazzite)
+        if term == "ptyxis":
+            # Similar semantics: run command then keep open with exec bash
+            # Using "--" to separate ptyxis args from the command.
+            return f'ptyxis -- bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # XTerm
+        if term == "xterm":
+            return f'xterm -hold -e bash -lc {bash_lc_arg}'
+
+        # XFCE terminal
+        if term == "xfce4-terminal":
+            # xfce4-terminal supports --hold on many versions; even if not, exec bash keeps it open
+            return f'xfce4-terminal --hold -e bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # Kitty
+        if term == "kitty":
+            return f'kitty bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # Alacritty
+        if term == "alacritty":
+            return f'alacritty -e bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # WezTerm
+        if term == "wezterm":
+            return f'wezterm start -- bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # Foot (Wayland)
+        if term == "footclient":
+            return f'footclient bash -lc {shlex.quote(command + "; exec bash")}'
+
+        # Generic fallback: try "-e" which many terminals support
+        return f'{term} -e bash -lc {shlex.quote(command + "; exec bash")}'
 
     # Log command to execute
     debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Executing command: {command}')
@@ -103,11 +173,6 @@ def exec_cmd(command: str,
                 # Keep window open after completion:
                 # - start "" ... : empty title required when the next token is quoted
                 # - cmd.exe /k   : keep window open
-                #
-                # We wrap your original command in a new cmd window that stays open.
-                # shell=True is assumed globally right now.
-                #
-                # NOTE: If your command already includes its own quotes, that’s fine.
                 new_window_cmd = f'cmd.exe /c start "" cmd.exe /k "{command}"'
 
             case OS.LINUX:
@@ -116,24 +181,11 @@ def exec_cmd(command: str,
                     debugUtils.log(
                         debugUtils.Severity.CRITICAL,
                         tool_name,
-                        "No supported terminal found (konsole/gnome-terminal/xterm)."
+                        "No supported terminal found (konsole/kgx/gnome-terminal/ptyxis/xterm/kitty/alacritty/wezterm/footclient...)."
                     )
                     return False
 
-                # Run like a terminal command and keep the window open.
-                # We quote the entire command as a single bash -lc argument.
-                bash_lc_arg = shlex.quote(command)
-
-                if term == "konsole":
-                    # --hold keeps window open after command finishes
-                    new_window_cmd = f'konsole --hold -e bash -lc {bash_lc_arg}'
-                elif term == "gnome-terminal":
-                    # exec bash keeps it open after command completes
-                    # (bash -lc runs the command; then we run an interactive bash)
-                    new_window_cmd = f'gnome-terminal -- bash -lc {shlex.quote(command + "; exec bash")}'
-                else:
-                    # xterm -hold keeps window open
-                    new_window_cmd = f'xterm -hold -e bash -lc {bash_lc_arg}'
+                new_window_cmd = build_linux_new_window_cmd(term, command)
 
             case OS.MAC:
                 # Run command via bash, then keep terminal open
