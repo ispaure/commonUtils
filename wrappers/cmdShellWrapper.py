@@ -108,7 +108,7 @@ def exec_cmd(command: str,
                 # shell=True is assumed globally right now.
                 #
                 # NOTE: If your command already includes its own quotes, that’s fine.
-                new_window_cmd = f'cmd.exe /c start "" cmd.exe /k {command}'
+                new_window_cmd = f'cmd.exe /c start "" cmd.exe /k "{command}"'
 
             case OS.LINUX:
                 term = pick_linux_terminal()
