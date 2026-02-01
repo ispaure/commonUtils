@@ -34,13 +34,16 @@ def should_use_shell(command):
         return False
 
 
-def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path] = None):
+def exec_cmd(command: str,
+             wait_for_output: bool = True,
+             in_new_window: bool = False):
     """
     Execute command from CMD shell (Windows) or the terminal (MacOS & Linux)
-    :param command: Command to execute
-    :type command: str
-    :return: List of lines are returned
-    :rtype: lst of str
+
+    Notes:
+    - If in_new_window=True, command is launched in a new terminal window and THIS FUNCTION RETURNS IMMEDIATELY.
+      (No output capture in the parent process.)
+    - For simplicity right now, shell=True is always used (per your request).
     """
 
     def terminate_p_open(p_open_to_close):
@@ -49,113 +52,169 @@ def exec_cmd(command, wait_for_output=True, in_new_window: Union[None, str, Path
         :param p_open_to_close: Popen to close
         :type p_open_to_close: subprocess.Popen
         """
-        p_open_to_close.stderr.close()
-        p_open_to_close.stdout.close()
-        if p_open_to_close.stdin is not None:
-            p_open_to_close.stdin.close()
+        try:
+            if p_open_to_close.stderr:
+                p_open_to_close.stderr.close()
+        except Exception:
+            pass
+        try:
+            if p_open_to_close.stdout:
+                p_open_to_close.stdout.close()
+        except Exception:
+            pass
+        try:
+            if p_open_to_close.stdin is not None:
+                p_open_to_close.stdin.close()
+        except Exception:
+            pass
 
-    def clean_output_line(line_str):
+    def clean_output_line(line_str: bytes) -> str:
         """
         Clean output lines so they only keep relevant information.
         """
-        decoded_line = line_str.decode()
-        cleaned_line = decoded_line.rstrip('\n')  # Remove n from end of line
-        cleaned_line = cleaned_line.rstrip('\r')  # Remove r from end of line
+        decoded_line = line_str.decode(errors="replace")
+        cleaned_line = decoded_line.rstrip('\n').rstrip('\r')
 
         debugUtils.log(debugUtils.Severity.DEBUG, 'cmdShellWrapper', cleaned_line)
-
         return cleaned_line
+
+    def pick_linux_terminal() -> Optional[str]:
+        """
+        Prefer terminals that exist on the system.
+        """
+        for term in ("konsole", "gnome-terminal", "xterm"):
+            if shutil.which(term):
+                return term
+        return None
 
     # Log command to execute
     debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Executing command: {command}')
 
-    # If code must be executed in new cmd window
-    if in_new_window is not None:
-        # If to open in new window, write commands in bat file and launch bat file.
+    # If code must be executed in new terminal window
+    if in_new_window:
+        # You said: if launching in new window, you never need to wait for output.
+        # Force no-wait behavior and return immediately after launch.
+        wait_for_output = False
+
         match get_os():
             case OS.WIN:
-                # Will need to write to file and launch that with script instead
-                sync_file_path = str(in_new_window)
-                # Delete existing file at path
-                result = delete_script_file(sync_file_path)
-                if not result:
-                    return False
-                # Write command to file
-                command = command.replace('&', '&&')
-                command = command.replace('%', '%%')
-                fileUtils.write_file(sync_file_path, command)
-                # Replace command by command to open previously written file
-                command = 'start ' + sync_file_path
-            # If to open in new window, reformat command for Ubuntu (Linux)
+                # Keep window open after completion:
+                # - start "" ... : empty title required when the next token is quoted
+                # - cmd.exe /k   : keep window open
+                #
+                # We wrap your original command in a new cmd window that stays open.
+                # shell=True is assumed globally right now.
+                #
+                # NOTE: If your command already includes its own quotes, that’s fine.
+                new_window_cmd = f'cmd.exe /c start "" cmd.exe /k {command}'
 
             case OS.LINUX:
-                # TODO: Launching in new window does not work on Linux currently, for some reason! Even though running this command through the terminal works.
-                command = f'gnome-terminal -- bash -c "{command}; exec bash"'
+                term = pick_linux_terminal()
+                if not term:
+                    debugUtils.log(
+                        debugUtils.Severity.CRITICAL,
+                        tool_name,
+                        "No supported terminal found (konsole/gnome-terminal/xterm)."
+                    )
+                    return False
 
-            # If to open in new window, reformat command for macOS
+                # Run like a terminal command and keep the window open.
+                # We quote the entire command as a single bash -lc argument.
+                bash_lc_arg = shlex.quote(command)
+
+                if term == "konsole":
+                    # --hold keeps window open after command finishes
+                    new_window_cmd = f'konsole --hold -e bash -lc {bash_lc_arg}'
+                elif term == "gnome-terminal":
+                    # exec bash keeps it open after command completes
+                    # (bash -lc runs the command; then we run an interactive bash)
+                    new_window_cmd = f'gnome-terminal -- bash -lc {shlex.quote(command + "; exec bash")}'
+                else:
+                    # xterm -hold keeps window open
+                    new_window_cmd = f'xterm -hold -e bash -lc {bash_lc_arg}'
+
             case OS.MAC:
-                macos_cmd_in_new_window = "osascript -e 'tell app \"Terminal\" to do script \"{}\"'"
-                command = macos_cmd_in_new_window.format(command.replace('"', '\\"'))
+                # Open in Terminal.app, bring it to front, and keep window open.
+                # We'll run through bash -lc, then run `exec bash` to keep it open.
+                # AppleScript strings need escaping of backslashes and quotes.
+                bash_cmd = f"bash -lc {shlex.quote(command + '; exec bash')}"
+                applescript_cmd = bash_cmd.replace("\\", "\\\\").replace('"', '\\"')
+
+                new_window_cmd = (
+                    "osascript -e 'tell application \"Terminal\" "
+                    "to activate' "
+                    f"-e 'tell application \"Terminal\" to do script \"{applescript_cmd}\"'"
+                )
 
             case _:
-                debugUtils.log(debugUtils.Severity.CRITICAL, 'cmdShellWrapper', 'Platform not supported!')
-                return
+                debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, 'Platform not supported!')
+                return False
 
-    # Time out value (in milliseconds)
+        debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Launching in new window: {new_window_cmd}')
+
+        # For simplicity right now: always shell=True
+        try:
+            subprocess.Popen(new_window_cmd, shell=True, stdin=None)
+            return []  # launched; no output captured
+        except Exception as e:
+            debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, f'Failed to launch in new window: {e}')
+            return False
+
+    # --- Normal (same-window) execution path ---
+
+    # Time out value (in seconds) — your comment said ms, but time.time() is seconds.
     time_out = 15
 
     # Should use shell?
-    use_shell = should_use_shell(command)
+    # use_shell = should_use_shell(command)
+    use_shell = True  # per your request for now
 
-    # Open subprocess, until all output is received.
-    p_open = subprocess.Popen(command,
-                              shell=use_shell,  # In case of doubt, used to be set to always true before linux!
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE,
-                              stdin=None)
+    # Open subprocess
+    p_open = subprocess.Popen(
+        command,
+        shell=use_shell,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=None
+    )
 
-    # Run loop for as long as receive new lines
-    output_lines = []
+    output_lines: list[bytes] = []
     loop_begin_time = time.time()
-    stdout_lst = []
-    stderr_lst = []
+    stdout_lst: list[bytes] = []
+    stderr_lst: list[bytes] = []
 
     if wait_for_output:
         while True:
-            # Status, whether it's finished shelling out results or not.
             status = p_open.poll()
-            p_open.stdout.flush()
+            if p_open.stdout:
+                try:
+                    p_open.stdout.flush()
+                except Exception:
+                    pass
 
-            # Standard output
-            stdout = p_open.stdout.readlines()
-            # Standard error
-            stderr = p_open.stderr.readlines()
+            stdout = p_open.stdout.readlines() if p_open.stdout else []
+            stderr = p_open.stderr.readlines() if p_open.stderr else []
 
-            if len(stdout) > 0:
+            if stdout:
                 stdout_lst += stdout
-            if len(stderr) > 0:
+            if stderr:
                 stderr_lst += stderr
 
-            # There is new output. Reset counter to current time.
-            if stderr or stdout:
+            if stdout or stderr:
                 loop_begin_time = time.time()
 
-            # If finished
-            if status is not None:  # When status is not None, has finished sending results.
+            if status is not None:
                 output_lines = stdout_lst + stderr_lst
-                terminate_p_open(p_open)  # Terminate open process
+                terminate_p_open(p_open)
                 break
 
-            # If took too long, break off from the while loop
-            now = time.time()
-            if now - loop_begin_time > time_out:
+            if (time.time() - loop_begin_time) > time_out:
                 terminate_p_open(p_open)
                 break
 
     # Clean the output lines
-    output_lines_cleaned = []
+    output_lines_cleaned: list[str] = []
     for line in output_lines:
-        output_lines_cleaned.append(clean_output_line(line))  # Append clean line to result
+        output_lines_cleaned.append(clean_output_line(line))
 
-    # Return result
     return output_lines_cleaned
