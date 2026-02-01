@@ -18,7 +18,7 @@ def get_os() -> OS:
         case 'linux':
             return OS.LINUX
         case _:
-            return OS.UNKNOWN
+            raise RuntimeError(f'Unsupported platform: {sys.platform}')
 
 
 def get_os_path(path_win=None, path_mac=None, path_linux=None):
