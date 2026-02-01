@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import subprocess
 import time
+import shlex
 
 # Common utilities
 import commonUtils.fileUtils as fileUtils
@@ -11,6 +12,7 @@ from commonUtils.osUtils import *
 
 
 tool_name = 'commonUtils/cmdShellWrapper.py'
+
 
 def delete_script_file(file_path):
     # Delete script file if exists. Returns false if could not delete
@@ -134,17 +136,21 @@ def exec_cmd(command: str,
                     new_window_cmd = f'xterm -hold -e bash -lc {bash_lc_arg}'
 
             case OS.MAC:
-                # Open in Terminal.app, bring it to front, and keep window open.
-                # We'll run through bash -lc, then run `exec bash` to keep it open.
-                # AppleScript strings need escaping of backslashes and quotes.
+                # Run command via bash, then keep terminal open
                 bash_cmd = f"bash -lc {shlex.quote(command + '; exec bash')}"
+
+                # Escape for AppleScript string literal (double quotes and backslashes)
                 applescript_cmd = bash_cmd.replace("\\", "\\\\").replace('"', '\\"')
 
-                new_window_cmd = (
-                    "osascript -e 'tell application \"Terminal\" "
-                    "to activate' "
-                    f"-e 'tell application \"Terminal\" to do script \"{applescript_cmd}\"'"
+                applescript = (
+                    'tell application "Terminal"\n'
+                    '  activate\n'
+                    f'  do script "{applescript_cmd}"\n'
+                    'end tell'
                 )
+
+                subprocess.Popen(["osascript", "-e", applescript], stdin=None)
+                return []
 
             case _:
                 debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, 'Platform not supported!')
