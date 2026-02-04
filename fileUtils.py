@@ -20,6 +20,9 @@ match get_os():
         import pwd
 
 
+delete_debug_prompt: bool = True
+
+
 class File:
     def __init__(self, path: Path):
         self.path = path
@@ -51,6 +54,8 @@ class File:
             return None
 
     def delete_file(self) -> bool:
+        if delete_debug_prompt:
+            log(Severity.WARNING, 'Delete File', f'Deleting "{self.path}", proceed?', popup=True)
         result = delete_file(self.path)
         return result
 
@@ -251,7 +256,10 @@ def delete_dir(dir_path) -> bool:
     """
     Deletes a directory on disk
     """
-    log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
+    if delete_debug_prompt:
+        log(Severity.WARNING, 'Delete Directory', f'Deleting "{dir_path}", proceed?', popup=True)
+    else:
+        log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
     rmtree(dir_path)
     return not os.path.isdir(dir_path)
 
