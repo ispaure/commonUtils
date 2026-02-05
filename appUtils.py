@@ -132,7 +132,7 @@ class AppImage(App):
         super().__init__(name)
         self.exec_path = Path(exec_path) if exec_path else None
 
-    def launch(self, in_new_window: bool = True):
+    def launch(self):
         """
         Launch the AppImage application.
         :param in_new_window: Whether to open the AppImage in a new terminal window (Linux only)
@@ -143,8 +143,6 @@ class AppImage(App):
         ensure_executable(self.exec_path)
 
         cmdShellWrapper.exec_cmd(str(self.exec_path))
-        # # avoid "sh -c"; launch directly
-        # subprocess.Popen([str(self.exec_path)], cwd=str(self.exec_path.parent))
 
 
 def validate_exec(name, exec_path):
