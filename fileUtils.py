@@ -20,7 +20,7 @@ match get_os():
         import pwd
 
 
-delete_debug_prompt: bool = True
+delete_debug_prompt: bool = False
 
 
 class File:

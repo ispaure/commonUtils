@@ -142,8 +142,9 @@ class AppImage(App):
 
         ensure_executable(self.exec_path)
 
-        # avoid "sh -c"; launch directly
-        subprocess.Popen([str(self.exec_path)], cwd=str(self.exec_path.parent))
+        cmdShellWrapper.exec_cmd(str(self.exec_path))
+        # # avoid "sh -c"; launch directly
+        # subprocess.Popen([str(self.exec_path)], cwd=str(self.exec_path.parent))
 
 
 def validate_exec(name, exec_path):
