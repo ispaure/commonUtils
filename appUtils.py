@@ -2,6 +2,7 @@ from typing import *
 from pathlib import Path
 import os
 import subprocess
+import stat
 
 # Common utilities
 from commonUtils import fileUtils
@@ -120,8 +121,14 @@ class Flatpak(App):
             print(f"Error launching Flatpak {self.name}: {e}")
 
 
+def ensure_executable(path: Path) -> None:
+    mode = path.stat().st_mode
+    if not (mode & stat.S_IXUSR):
+        path.chmod(mode | stat.S_IXUSR)
+
+
 class AppImage(App):
-    def __init__(self, name: str, exec_path: Union[str, Path, None]):
+    def __init__(self, name: str, exec_path):
         super().__init__(name)
         self.exec_path = Path(exec_path) if exec_path else None
 
@@ -133,7 +140,10 @@ class AppImage(App):
         if not validate_exec(self.name, self.exec_path):
             return
 
-        cmdShellWrapper.exec_cmd(f'{self.exec_path}')
+        ensure_executable(self.exec_path)
+
+        # avoid "sh -c"; launch directly
+        subprocess.Popen([str(self.exec_path)], cwd=str(self.exec_path.parent))
 
 
 def validate_exec(name, exec_path):
