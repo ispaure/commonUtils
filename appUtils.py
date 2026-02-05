@@ -142,7 +142,20 @@ class AppImage(App):
 
         ensure_executable(self.exec_path)
 
-        cmdShellWrapper.exec_cmd(str(self.exec_path))
+        # Detach from base process: new session + don't hold stdout/stderr pipes
+        p = subprocess.Popen(
+            [str(self.exec_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True,  # like setsid(); makes it independent of parent terminal
+            cwd=str(self.exec_path.parent),
+            env=os.environ.copy(),
+        )
+        return p.pid
+
+        # cmdShellWrapper.exec_cmd(str(self.exec_path), wait_for_output=False)
 
 
 def validate_exec(name, exec_path):
