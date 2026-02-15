@@ -1,13 +1,20 @@
-from typing import *
-import os
-import subprocess
-import ctypes
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
-# Common utilities
-from commonUtils import debugUtils
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# IMPORTS
+
+import subprocess
 
 # Wrappers
-from commonUtils.wrappers import cmdShellWrapper
+from . import cmdShellWrapper
 
 
 def exec_powershell(command, wait_for_output=True):
@@ -23,7 +30,6 @@ def exec_powershell(command, wait_for_output=True):
             return result.stdout.splitlines()
         else:
             print("Error:\n", result.stderr)
-            debugUtils.exit_msg('Critical Failure!')
     else:
         # Use Regular CMD, but with Powershell script instead!
         # Add \ before " in command, as we'll need to put it in quotes in next step

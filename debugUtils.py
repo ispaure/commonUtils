@@ -1,10 +1,25 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# IMPORTS
+
 import os
 import sys
 import enum
 from datetime import datetime
+from . import uiUtils
 
 
 # Settings
+write_to_log = False
 include_time = False  # Show absolute time
 use_time_delta = True  # Show time since last debug message
 verbose_debug = True  # Show debug-level entries
@@ -22,9 +37,8 @@ def print_debug_msg(msg, show_verbose):
         print(msg)
 
 
-def exit_msg(msg):
-    print(msg)
-    sys.exit()
+class DebugException(Exception):
+    pass
 
 
 class Severity(enum.Enum):
@@ -63,8 +77,6 @@ class DebugLogger:
 
         skip_char = ' ' if timestamp else ''
 
-        popup_title = f"{timestamp}{skip_char}[{severity.value}] {title}"
-
         if '\n' not in message:
             full_message_for_print = f"{timestamp}{skip_char}[{severity.value}] {title}: {message}"
         else:
@@ -95,20 +107,17 @@ class DebugLogger:
         print(colored_msg)
 
         # Append to log file
-        with open(self.log_file, "a") as log_item:
-            log_item.write(full_message_for_print + "\n")
+        if write_to_log:
+            with open(self.log_file, "a") as log_item:
+                log_item.write(full_message_for_print + "\n")
 
         # If popup, show popup
         if popup:
-            try:
-                from commonUtils import pySideUtils  # local import breaks the cycle, so only do here when needed
-                pySideUtils.display_msg_box_ok(title, message)
-            except Exception:
-                print('Could not load pySideUtils!')
+            uiUtils.display_msg_box_ok(title, message)
 
         # If Critical, end application
         if severity == Severity.CRITICAL:
-            sys.exit(1)
+            raise DebugException(full_message_for_print)
 
 
 # Create a singleton instance of the logger

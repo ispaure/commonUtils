@@ -1,12 +1,25 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# IMPORTS
+
 from typing import *
 from pathlib import Path
 import shutil
 import subprocess
 
 # Common utilities
-from commonUtils import fileUtils
-from commonUtils.osUtils import *
-from commonUtils.debugUtils import *
+from . import fileUtils
+from .osUtils import *
+from .debugUtils import *
 
 
 class DMGFile(fileUtils.File):
