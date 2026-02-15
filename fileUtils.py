@@ -735,3 +735,34 @@ def get_permission(path: Path):
     log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{path}"')
     cmdShellWrapper.exec_cmd(f'chmod +x "{path}"')
 
+
+def ensure_file_writable_if_exists(file_path: str | Path) -> bool:
+    """
+    Ensures the file is writable by the owner, without removing any
+    existing permissions.
+
+    Returns False if the file does not exist.
+    Raises PermissionError / OSError on failure.
+    """
+    p = Path(file_path)
+
+    if not p.exists() or not p.is_file():
+        return False
+
+    match get_os():
+        case OS.MAC | OS.LINUX:
+            st = os.stat(p)
+            if not (st.st_mode & stat.S_IWUSR):
+                os.chmod(p, st.st_mode | stat.S_IWUSR)
+
+        case OS.WIN:
+            # Best-effort: clear read-only attribute
+            st = os.stat(p)
+            if not (st.st_mode & stat.S_IWRITE):
+                os.chmod(p, st.st_mode | stat.S_IWRITE)
+
+        case _:
+            raise RuntimeError("Unsupported OS")
+
+    return True
+
