@@ -20,7 +20,7 @@ from pathlib import Path
 from shutil import rmtree, copyfile, move
 
 # Common utilities
-from commonUtils import osUtils
+from . import osUtils
 from .osUtils import *
 from .debugUtils import *
 from .wrappers import cmdShellWrapper
