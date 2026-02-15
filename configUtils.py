@@ -292,7 +292,7 @@ def config_set_add_variable(cfg_file_path, section, variable, value):
     Don't know if something is there already, add if not else set
     """
     tool_name = 'config_set_add_variable'
-    return_val = config_section_map(cfg_file_path, section, variable, bypass_error=True)
+    return_val = config_section_map(cfg_file_path, section, variable, fallback_to_bypass=False)
     if show_verbose:
         log(Severity.DEBUG, tool_name, f'Return Value: "{return_val}"')
     if return_val is None:
