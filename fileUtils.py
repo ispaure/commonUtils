@@ -98,8 +98,6 @@ class TXTFile(File):
                     f.write(line)
 
 
-
-
 def hang_n_terminate():
     """
     Hangs the script, quits on keypress
