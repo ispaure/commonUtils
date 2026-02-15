@@ -35,71 +35,148 @@ show_verbose = False
 # CODE
 
 
-def config_section_map(cfg_file_path: Union[str, Path], section, variable, bypass_error=False):
+def config_section_map(
+    cfg_file_path: Union[str, Path],
+    section: str,
+    variable: str,
+    *,
+    allow_duplicates: bool = False,
+    fallback_to_bypass: bool = False,
+    case_sensitive_keys: bool = False,
+    strip_value: bool = True,
+) -> Optional[str]:
     """
-    Retrieve a value from a section of a config file.
-    :param cfg_file_path: Path to the config file to look into
-    :param section: Name of section in which the value you want is found
-    :type section: str
-    :param variable: Name of the value you want to get as return
-    :type variable: str
-    :param bypass_error: Cheap way to read from cfg file, unorthodox. Do if needed for files with errors
-    :type bypass_error: bool
-    :rtype: str
+    Retrieve a value from a section of a config (.ini) file.
+
+    Behavior:
+    - Strict parser by default (will raise on duplicates unless allow_duplicates=True).
+    - Interpolation disabled (safer; avoids '%' surprises).
+    - UTF-8 with BOM supported via 'utf-8-sig'.
+
+    Options:
+    - allow_duplicates: if True, allows duplicate sections/keys (last one wins).
+    - fallback_to_bypass: if True, if ConfigParser can't read the file, do a simple line-scan fallback.
+    - case_sensitive_keys: if True, preserves key case (ConfigParser default lowercases keys).
+    - strip_value: if True, strips whitespace from returned value.
+
+    Returns:
+        The value (str) if found, else None.
     """
-    tool_name = 'config_section_map'
+    tool_name = "config_section_map"
+    path = Path(cfg_file_path)
 
-    # REGULAR APPROVED METHOD
-    if not bypass_error:
-        # Read the config file
-        config = configparser.ConfigParser()
-        try:
-            with open(cfg_file_path, 'r', encoding='utf-8-sig') as f:
-                config.read_file(f)
-        except Exception as e:
-            log(Severity.ERROR, tool_name, f"Error reading config file: {e}")
+    # Decide key normalization
+    lookup_key = variable if case_sensitive_keys else variable.lower()
+
+    def _post(val: Optional[str]) -> Optional[str]:
+        if val is None:
             return None
+        return val.strip() if strip_value else val
 
-        # Retrieve dictionary of the section
-        dict1 = {}
-        try:
-            options = config.options(section)
-            for option in options:
-                try:
-                    dict1[option] = config.get(section, option)
-                    if dict1[option] == -1:
-                        log(Severity.ERROR, tool_name, "skip: %s" % option)
-                except Exception as e:
-                    log(Severity.ERROR, tool_name, f"Exception on {option}: {e}")
-                    dict1[option] = None
-        except Exception as e:
-            log(Severity.ERROR, tool_name, f"Error accessing section '{section}': {e}")
-            return None
+    # ---- Normal parsing route ----
+    config = configparser.ConfigParser(
+        interpolation=None,
+        strict=not allow_duplicates,
+    )
+    if case_sensitive_keys:
+        config.optionxform = str  # preserve original key case
 
-        # Return the requested variable
-        return dict1.get(variable)
+    try:
+        with path.open("r", encoding="utf-8-sig") as f:
+            config.read_file(f)
+    except Exception as e:
+        if not fallback_to_bypass:
+            # During refactors this is usually preferable: fail loudly.
+            raise
+        # Fall back to bypass scan
+        log(Severity.ERROR, tool_name, f"ConfigParser failed on '{path}': {e}. Falling back to bypass scan.")
+        return _post(_bypass_scan_ini(path, section, lookup_key, case_sensitive_keys=case_sensitive_keys))
 
-    # UNORTHODOX METHOD TO USE IF CONFIG FILE IS BROKEN
-    else:
-        # Var to search for
-        section_line = f'[{section}]'
-        var_line_type_a = f'{variable} = '
-        var_line_type_b = f'{variable}='
-
-        line_lst = fileUtils.read_file(cfg_file_path)
-        right_section = False
-        for line in line_lst:
-            if line == section_line:
-                right_section = True
-            else:
-                if right_section:
-                    if line.startswith(var_line_type_a):
-                        return line.split(' = ')[-1]
-                    elif line.startswith(var_line_type_b):
-                        return line.split('=')[-1]
-                    elif line.startswith('['):
-                        break
+    # Section missing
+    if not config.has_section(section):
         return None
+
+    # Option missing (note: if case_sensitive_keys=False, ConfigParser lowercased keys)
+    if not config.has_option(section, lookup_key):
+        return None
+
+    try:
+        return _post(config.get(section, lookup_key))
+    except Exception as e:
+        # If value retrieval fails for some reason, mirror the same fallback behavior
+        if fallback_to_bypass:
+            log(Severity.ERROR, tool_name, f"Error getting '{lookup_key}' from [{section}] in '{path}': {e}. "
+                                          f"Falling back to bypass scan.")
+            return _post(_bypass_scan_ini(path, section, lookup_key, case_sensitive_keys=case_sensitive_keys))
+        raise
+
+
+def _bypass_scan_ini(
+    cfg_file_path: Union[str, Path],
+    section: str,
+    variable: str,
+    *,
+    case_sensitive_keys: bool = False,
+) -> Optional[str]:
+    """
+    Very tolerant .ini scanner:
+    - Finds [section] blocks
+    - Accepts 'k=v' or 'k = v'
+    - Strips blank lines and comments (# or ;)
+    - Stops when next [section] starts
+
+    Does NOT support multiline values.
+    """
+    path = Path(cfg_file_path)
+
+    # Prefer your existing fileUtils if you want; otherwise read directly.
+    try:
+        txt = fileUtils.TXTFile(path)
+        txt.import_line_lst()
+        lines = txt.line_lst
+    except Exception:
+        # Fallback read
+        lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+
+    target_section = f"[{section}]"
+    in_section = False
+
+    for raw in lines:
+        line = raw.strip()
+
+        if not line or line.startswith(("#", ";")):
+            continue
+
+        # New section header
+        if line.startswith("[") and line.endswith("]"):
+            in_section = (line == target_section)
+            continue
+
+        if not in_section:
+            continue
+
+        # Remove inline comments (simple heuristic)
+        for c in (";", "#"):
+            if c in line:
+                line = line.split(c, 1)[0].strip()
+
+        if "=" not in line:
+            continue
+
+        k, v = line.split("=", 1)
+        k = k.strip()
+        v = v.strip()
+
+        if not case_sensitive_keys:
+            k = k.lower()
+            var_cmp = variable.lower()
+        else:
+            var_cmp = variable
+
+        if k == var_cmp:
+            return v
+
+    return None
 
 
 def config_add_variable(cfg_file_path, section, variable, value):

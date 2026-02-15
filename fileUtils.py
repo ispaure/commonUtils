@@ -78,11 +78,13 @@ class TXTFile(File):
         super().__init__(path)
         self.line_lst = []
 
-    def import_line_lst(self):
+    def import_line_lst(self) -> List[str]:
         """
         Import the lines from the text file into self.line_lst
         """
-        self.line_lst = read_file(self.path)
+        with open(self.path, "r", encoding="utf-8-sig") as f:
+            self.line_lst = f.read().splitlines()
+        return self.line_lst
 
     def export(self, path: Union[Path, None] = None):
         """
@@ -203,8 +205,10 @@ def read_file(file_path: Union[str, Path]):
     :type file_path: str
     :rtype: lst
     """
-    f = open(file_path, 'r', encoding='utf-8-sig')
-    return f.read().splitlines()
+    log(Severity.WARNING, 'fileUtils.read_file', 'DEPRECATED METHOD IN USE; RESOLVE!')
+    txt = TXTFile(file_path)
+    txt.import_line_lst()
+    return txt.line_lst
 
 
 def append_line_lst_to_file(line_lst, file_path):
