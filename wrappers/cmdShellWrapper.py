@@ -17,9 +17,10 @@ tool_name = 'commonUtils/cmdShellWrapper.py'
 
 def exec_cmd(command: str,
              wait_for_output: bool = True,
-             in_new_window: bool = False):
+             in_new_window: bool = False,
+             time_out: float = 15):
     """
-    Execute command from CMD shell (Windows) or the terminal (MacOS & Linux)
+    Execute command from CMD shell (Windows) or the terminal (macOS & Linux)
 
     Notes:
     - If in_new_window=True, command is launched in a new terminal window and THIS FUNCTION RETURNS IMMEDIATELY.
@@ -219,9 +220,6 @@ def exec_cmd(command: str,
             return False
 
     # --- Normal (same-window) execution path ---
-
-    # Time out value (in seconds) — your comment said ms, but time.time() is seconds.
-    time_out = 15
 
     # Should use shell?
     # use_shell = should_use_shell(command)
