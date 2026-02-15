@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Hosts functions related to CBZ (ComicBook Zip) files
 """
@@ -15,7 +16,6 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
-from __future__ import annotations
 from pathlib import Path
 from typing import *
 from . import fileUtils, xmlUtils, zipUtils, imageUtils
