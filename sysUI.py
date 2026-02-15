@@ -22,7 +22,8 @@ import subprocess
 import shutil
 
 # Blue Hole
-from ..commonUtils.wrappers import cmdShellWrapper
+from .wrappers import cmdShellWrapper
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # CODE
