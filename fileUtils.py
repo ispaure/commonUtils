@@ -266,7 +266,7 @@ def has_subdirectories(path: Path) -> bool:
     return any(item.is_dir() for item in path.iterdir())
 
 
-def delete_dir(dir_path) -> bool:
+def delete_dir(dir_path: Path) -> bool:
     """
     Deletes a directory on disk
     """
@@ -513,11 +513,11 @@ def is_dir(path: Union[str, Path]):
 
 
 def get_split_character():
-    if sys.platform == 'win32':
-        split_character = '\\'
-    else:
-        split_character = '/'
-    return split_character
+    match get_os():
+        case OS.WIN:
+            return '\\'
+        case OS.MAC | OS.LINUX:
+            return '/'
 
 
 def open_dir_path(dir_path):
