@@ -1,3 +1,16 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# IMPORTS
+
 from typing import *
 import os
 import sys
@@ -8,9 +21,9 @@ from shutil import rmtree, copyfile, move
 
 # Common utilities
 from commonUtils import osUtils
-from commonUtils.osUtils import *
-from commonUtils.debugUtils import *
-from commonUtils.wrappers import cmdShellWrapper
+from .osUtils import *
+from .debugUtils import *
+from .wrappers import cmdShellWrapper
 
 
 match get_os():

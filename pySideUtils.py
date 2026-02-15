@@ -1,10 +1,23 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# IMPORTS
+
 from typing import *
 import os
 import ctypes
 
 # Common utilities
-from commonUtils import logUtils, fileUtils, debugUtils
-from commonUtils.osUtils import *
+from . import logUtils, fileUtils, debugUtils
+from .osUtils import *
 
 # PySide6 (Qt) modules
 from PySide6.QtCore import *
@@ -462,8 +475,8 @@ def display_msg_box_yes_no(title, message, fn_yes=None, fn_no=None, icon='questi
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, '&Yes', fn_yes, '&No', fn_no)
     msg_box.setStandardButtons(msg_box.Yes | msg_box.No)
-    msg_box.exec_()
-    return True
+    result = msg_box.exec_()
+    return result == msg_box.StandardButton.Yes
 
 
 def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=300, height=400):
