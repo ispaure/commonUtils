@@ -112,7 +112,7 @@ class DebugLogger:
                 log_item.write(full_message_for_print + "\n")
 
         # If popup, show popup
-        if popup:
+        if popup or severity == Severity.CRITICAL:
             uiUtils.display_msg_box_ok(title, message)
 
         # If Critical, end application
