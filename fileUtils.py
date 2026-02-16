@@ -27,7 +27,7 @@ from .wrappers import cmdShellWrapper
 
 match get_os():
     case OS.WIN:
-        from commonUtils import junctionUtils
+        from . import junctionUtils
     case OS.LINUX:
         import pwd
 
