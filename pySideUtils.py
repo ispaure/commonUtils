@@ -16,7 +16,7 @@ import os
 import ctypes
 
 # Common utilities
-from . import logUtils, fileUtils, debugUtils
+from . import logUtils, fileUtils, debugUtils, steamUtils
 from .osUtils import *
 
 # PySide6 (Qt) modules
@@ -113,6 +113,36 @@ class Palette:
         self.palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
         self.palette.setColor(QPalette.HighlightedText, Qt.black)
 
+    def set_navy(self):
+        navy_window = QColor(18, 30, 49)          # main background
+        navy_button = QColor(28, 44, 68)          # buttons
+        navy_base = QColor(12, 20, 36)            # input fields
+        navy_alt = QColor(22, 36, 58)             # alternate rows
+        navy_highlight = QColor(64, 140, 255)     # selection highlight
+        navy_link = QColor(90, 170, 255)          # links
+
+        self.palette.setColor(QPalette.Window, navy_window)
+        self.palette.setColor(QPalette.WindowText, Qt.white)
+
+        self.palette.setColor(QPalette.Base, navy_base)
+        self.palette.setColor(QPalette.AlternateBase, navy_alt)
+
+        self.palette.setColor(QPalette.ToolTipBase, navy_base)
+        self.palette.setColor(QPalette.ToolTipText, Qt.white)
+
+        self.palette.setColor(QPalette.Text, Qt.white)
+
+        self.palette.setColor(QPalette.Button, navy_button)
+        self.palette.setColor(QPalette.ButtonText, Qt.white)
+
+        self.palette.setColor(QPalette.BrightText, QColor(255, 85, 85))
+
+        self.palette.setColor(QPalette.Link, navy_link)
+
+        self.palette.setColor(QPalette.Highlight, navy_highlight)
+        self.palette.setColor(QPalette.HighlightedText, Qt.black)
+
+
 
 def initialize_q_app():
 
@@ -127,6 +157,13 @@ def initialize_q_app():
             palette_cls = Palette()
             palette_cls.set_dark()
             q_app.setPalette(palette_cls.palette)
+        case OS.LINUX:
+            if steamUtils.is_linux_steam_big_picture():
+                palette_cls = Palette()
+                palette_cls.set_navy()
+                q_app.setPalette(palette_cls.palette)
+            else:
+                pass
         case _:
             pass
 
