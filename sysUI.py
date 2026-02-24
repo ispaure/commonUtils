@@ -50,11 +50,30 @@ def display_msg_box_ok(title: str, message: str):
                 MB_OK = 0
             ctypes.windll.user32.MessageBoxW(0, message, title, MbConstants.MB_OK)
 
-        case OS.MAC:  # macOS
-            message = message.replace('"', '').replace("'", '')
+        case OS.MAC:
             import subprocess
-            cmd = f"""osascript -e 'Tell application "System Events" to display dialog "{message}" with title "{title}" buttons {{"OK"}} default button "OK"'"""
-            subprocess.run(cmd, shell=True)
+
+            applescript = r'''
+        on run argv
+            set theTitle to item 1 of argv
+            set theMessage to item 2 of argv
+            tell application "System Events"
+                activate
+                display dialog theMessage with title theTitle buttons {"OK"} default button "OK"
+            end tell
+        end run
+        '''.strip()
+
+            p = subprocess.run(
+                ["osascript", "-e", applescript, title, message],
+                capture_output=True,
+                text=True
+            )
+
+            if p.returncode != 0:
+                print("osascript failed:", p.returncode)
+                if p.stderr:
+                    print("osascript stderr:", p.stderr.strip())
 
         case OS.LINUX:
             # Mirror show_prompt Linux approach: try GUI tools, then a blocking console fallback.
