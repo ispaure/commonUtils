@@ -301,6 +301,30 @@ def delete_dir_contents(dir_path):
         log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
 
 
+def make_file_writable(path: Path) -> None:
+    """
+    Ensure the given file is writable.
+    Raises FileNotFoundError if the path does not exist.
+    """
+
+    if not path.exists():
+        raise FileNotFoundError(f"Path does not exist: {path}")
+
+    match get_os():
+
+        case OS.WIN:
+            # Remove read-only attribute
+            os.chmod(path, stat.S_IWRITE)
+
+        case OS.MAC | OS.LINUX:
+            # Add user write permission while preserving other bits
+            current_mode = path.stat().st_mode
+            path.chmod(current_mode | stat.S_IWUSR)
+
+        case _:
+            raise RuntimeError(f"Unsupported OS for make_file_writable: {get_os()}")
+
+
 def delete_file(file_path) -> bool:
     """
     Deletes a file on disk.
