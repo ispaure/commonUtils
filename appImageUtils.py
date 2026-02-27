@@ -12,7 +12,6 @@ __status__ = 'Production'
 # IMPORTS
 
 from pathlib import Path
-from typing import *
 
 # Common utilities
 from . import fileUtils
