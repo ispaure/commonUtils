@@ -602,10 +602,6 @@ def write_file(file_path: Union[str, Path], write_str: Union[str, List[str]]):
         f.writelines(write_str)
     f.close()
 
-    # If macOS, ensure can be run
-    if not sys.platform == 'win32':
-        subprocess.check_call(['chmod', '+x', file_path])
-
 
 def search_replace_xml(xml_file_path, search_str, replace_str):
     """

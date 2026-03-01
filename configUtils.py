@@ -190,9 +190,11 @@ def config_add_variable(cfg_file_path: Union[str, Path], section: str, variable:
     """
     path = Path(cfg_file_path)
 
-    lines_lst = fileUtils.read_file(path)
+    file_cls = fileUtils.TXTFile(path)
+    file_cls.import_line_lst()
+
     # Normalize to "no trailing newline" per element
-    lines_lst = [ln.rstrip("\n") for ln in lines_lst]
+    lines_lst = [ln.rstrip("\n") for ln in file_cls.line_lst]
 
     section_line = f'[{section}]'
 
@@ -244,8 +246,10 @@ def config_set_variable(cfg_file_path: Union[str, Path], section: str, variable:
     """
     path = Path(cfg_file_path)
 
-    lines_lst = fileUtils.read_file(path)
-    lines_lst = [ln.rstrip("\n") for ln in lines_lst]
+    cfg_file = fileUtils.TXTFile(path)
+    cfg_file.import_line_lst()
+
+    lines_lst = [ln.rstrip("\n") for ln in cfg_file.line_lst]
 
     section_header = f"[{section}]"
     in_good_section = False
@@ -310,19 +314,20 @@ def config_remove_section(cfg_file_path, section):
     Remove a section from a config file
     """
     tool_name = 'config_remove_section'
-    line_lst = fileUtils.read_file(cfg_file_path)
+    cfg_txt_file = fileUtils.TXTFile(cfg_file_path)
+    cfg_txt_file.import_line_lst()
     new_line_lst = []
     section_str = f'[{section}]'
     in_right_section = False
-    for line in line_lst:
+    for line in cfg_txt_file.line_lst:
         if line.startswith(section_str):
             in_right_section = True
         elif not in_right_section:
-            new_line_lst.append(line + '\n')
+            new_line_lst.append(line)
         else:
             if line.startswith('['):
                 in_right_section = False
-                new_line_lst.append(line + '\n')
+                new_line_lst.append(line)
 
-    fileUtils.write_file(cfg_file_path, new_line_lst)
-
+    cfg_txt_file.line_lst = new_line_lst
+    cfg_txt_file.export()
