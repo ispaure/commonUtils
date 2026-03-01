@@ -201,5 +201,5 @@ def get_app_run_permissions(app_path: Path):
 
     # For each exec list, apply permissions
     for exec_path in exec_path_lst:
-        fileUtils.get_permission(exec_path)
+        fileUtils.set_executable_permission(exec_path)
 

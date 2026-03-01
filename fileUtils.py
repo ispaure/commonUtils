@@ -89,8 +89,25 @@ class TXTFile(File):
         """
         Export self.line_lst to the given path if provided (else use the current file path)
         """
+        # Ensures there is no \n in lines (exporter already takes care of that). Critical error if that's the case.
+        for i, line in enumerate(self.line_lst):
+            if "\n" in line:
+                log(Severity.CRITICAL,
+                    "TXTFile.export",
+                    f"Slash N found in export on line {i}: {repr(line)}. "
+                    "Please resolve upstream (exporter adds newlines automatically).")
+
+        # Get export path
         export_path = path or self.path
 
+        # Make export dir (if missing)
+        export_dir = export_path.parent
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        # Ensure file writable if exists
+        ensure_file_writable_if_exists(export_path)
+
+        # Write file
         with open(export_path, "w", encoding="utf-8") as f:
             for i, line in enumerate(self.line_lst):
                 if i < len(self.line_lst) - 1:
@@ -569,6 +586,8 @@ def write_file(file_path: Union[str, Path], write_str: Union[str, List[str]]):
     :param write_str: String to write (or List of strings)
     :type write_str: str
     """
+    log(Severity.WARNING, 'fileUtils.write_file', 'DEPRECATED METHOD IN USE; RESOLVE!')
+
     # Get folder in which the file is
     file_dir = Path(file_path).parent
 
@@ -697,10 +716,12 @@ def get_current_working_dir() -> Path:
     cwd_resolved = Path.resolve(cwd)
     return cwd_resolved
 
+
 def get_project_temp_dir() -> Path:
     cwd = get_current_working_dir()
     temp_dir_path = Path(Path(cwd).parent, 'temp')
     return temp_dir_path
+
 
 def get_user_home_dir() -> Path:
     """
@@ -749,7 +770,7 @@ def is_file(path: Path) -> bool:
         return False
 
 
-def get_permission(path: Path):
+def set_executable_permission(path: Path):
     """
     For macOS, gets permission of a file. Helpful if a file won't run or open
     """
@@ -788,4 +809,3 @@ def ensure_file_writable_if_exists(file_path: str | Path) -> bool:
             raise RuntimeError("Unsupported OS")
 
     return True
-
