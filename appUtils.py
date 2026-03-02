@@ -184,7 +184,7 @@ def validate_exec(name, exec_path):
     return True
 
 
-def get_app_run_permissions(app_path: Path):
+def set_app_executable_permissions(app_path: Path):
     """
     For macOS, gets the run permissions for a given .app by entering chmod +x in the terminal.
     """
@@ -201,5 +201,5 @@ def get_app_run_permissions(app_path: Path):
 
     # For each exec list, apply permissions
     for exec_path in exec_path_lst:
-        fileUtils.set_executable_permission(exec_path)
-
+        file_cls = fileUtils.File(Path(exec_path))
+        file_cls.set_executable_permission()

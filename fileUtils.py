@@ -101,6 +101,15 @@ class File:
 
         return True
 
+    def set_executable_permission(self):
+        """
+        For macOS / Linux, gets permission of a file to be an executable. Helpful if a file won't run or open
+        """
+        tool_name = 'MacOS Permission'
+        # App Run permissions
+        log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{self.path}"')
+        cmdShellWrapper.exec_cmd(f'chmod +x "{self.path}"')
+
 
 class TXTFile(File):
     def __init__(self, path: Path):
@@ -333,30 +342,6 @@ def delete_dir_contents(dir_path):
         delete_file(rem_file)
     if len(get_file_path_list(dir_path)) > 0:
         log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
-
-
-def make_file_writable(path: Path) -> None:
-    """
-    Ensure the given file is writable.
-    Raises FileNotFoundError if the path does not exist.
-    """
-
-    if not path.exists():
-        raise FileNotFoundError(f"Path does not exist: {path}")
-
-    match get_os():
-
-        case OS.WIN:
-            # Remove read-only attribute
-            os.chmod(path, stat.S_IWRITE)
-
-        case OS.MAC | OS.LINUX:
-            # Add user write permission while preserving other bits
-            current_mode = path.stat().st_mode
-            path.chmod(current_mode | stat.S_IWUSR)
-
-        case _:
-            raise RuntimeError(f"Unsupported OS for make_file_writable: {get_os()}")
 
 
 def delete_file(file_path) -> bool:
@@ -756,13 +741,3 @@ def is_file(path: Path) -> bool:
         return True
     else:
         return False
-
-
-def set_executable_permission(path: Path):
-    """
-    For macOS, gets permission of a file. Helpful if a file won't run or open
-    """
-    tool_name = 'MacOS Permission'
-    # App Run permissions
-    log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{path}"')
-    cmdShellWrapper.exec_cmd(f'chmod +x "{path}"')
