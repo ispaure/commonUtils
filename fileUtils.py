@@ -526,40 +526,6 @@ def open_dir_path(dir_path):
               '\nAttempted path: ' + dir_path)
 
 
-def search_replace_xml(xml_file_path, search_str, replace_str):
-    """
-    Search and replace in designated xml file. Overwrites file with results.
-    :param xml_file_path: Path of XML file (must incl. ext.)
-    :type xml_file_path: str
-    :param search_str: String to search for
-    :type search_str: str
-    :param replace_str: String to replace with
-    :type replace_str: str
-    """
-
-    new_line_lst = []
-    reading_file = open(xml_file_path, "r")
-    content = reading_file.read()
-    for line in content.splitlines():  # or whatever arbitrary loop
-        line_decoded = line
-        line_replaced = line_decoded.replace(search_str, replace_str)
-        new_line_lst.append(line_replaced)
-
-    print('THIS FILE HAS LINES: ' + str(len(new_line_lst)))
-    reading_file = open(xml_file_path, 'w')
-
-    current_line_count = 0
-    for line in new_line_lst:
-        current_line_count += 1
-
-        if current_line_count < len(new_line_lst):
-            reading_file.write(line + '\n')
-        else:
-            reading_file.write(line)
-
-    reading_file.close()
-
-
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
     """
     Renames a file on disk.
