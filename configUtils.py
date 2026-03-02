@@ -231,10 +231,8 @@ def config_add_variable(cfg_file_path: Union[str, Path], section: str, variable:
         new_lines_lst.append(section_line)
         new_lines_lst.append(variable_line_to_add)
 
-    fileUtils.ensure_file_writable_if_exists(path)
-
-    with open(path, "w", encoding="utf-8-sig") as f:
-        f.write("\n".join(new_lines_lst) + "\n")
+    file_cls.line_lst = new_lines_lst
+    file_cls.write_lines()
 
 
 def config_set_variable(cfg_file_path: Union[str, Path], section: str, variable: str, value: str):
@@ -280,15 +278,8 @@ def config_set_variable(cfg_file_path: Union[str, Path], section: str, variable:
 
         new_lines_lst.append(ln)
 
-    # Under your assumption, replaced should always be True here.
-    # If you'd prefer a hard fail during refactor, uncomment:
-    # if not replaced:
-    #     raise KeyError(f"Variable '{variable}' not found in section [{section}] ({path})")
-
-    fileUtils.ensure_file_writable_if_exists(path)
-
-    with open(path, "w", encoding="utf-8-sig") as f:
-        f.write("\n".join(new_lines_lst) + "\n")
+    cfg_file.line_lst = new_lines_lst
+    cfg_file.write_lines()
 
 
 def config_set_add_variable(cfg_file_path, section, variable, value):
