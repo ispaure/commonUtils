@@ -155,15 +155,6 @@ class TXTFile(File):
                     f.write(line)
 
 
-def hang_n_terminate():
-    """
-    Hangs the script, quits on keypress
-    :return:
-    """
-    input('Dev-implemented break point! Press key to exit!')
-    sys.exit()
-
-
 def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
     """
     Returns list of all files under a specific directory. Properly sorted
@@ -251,15 +242,6 @@ def move_file(src: Path, dest: Path) -> bool:
     except Exception as e:
         log(Severity.CRITICAL, 'fileUtils.move_file', f'Error moving file from \"{src}\" to \"{dest}\": {e}')
         return False
-
-
-def append_line_lst_to_file(line_lst, file_path):
-    """
-    Appends a list of lines to the end of a file
-    """
-    for line in line_lst:
-        with open(file_path, 'a') as f:
-            f.write('\n' + line)
 
 
 def get_dirs_path_list(dir_path: Union[Path, str]):
