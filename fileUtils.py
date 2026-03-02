@@ -77,7 +77,7 @@ class TXTFile(File):
         super().__init__(path)
         self.line_lst = []
 
-    def import_line_lst(self) -> List[str]:
+    def read_lines(self) -> List[str]:
         """
         Import the lines from the text file into self.line_lst
         """
@@ -85,7 +85,7 @@ class TXTFile(File):
             self.line_lst = f.read().splitlines()
         return self.line_lst
 
-    def export(self, path: Union[Path, None] = None):
+    def write_lines(self, path: Union[Path, None] = None):
         """
         Export self.line_lst to the given path if provided (else use the current file path)
         """
@@ -212,19 +212,6 @@ def move_file(src: Path, dest: Path) -> bool:
     except Exception as e:
         log(Severity.CRITICAL, 'fileUtils.move_file', f'Error moving file from \"{src}\" to \"{dest}\": {e}')
         return False
-
-
-def read_file(file_path: Union[str, Path]):
-    """
-    Returns each line of a text file as part of a list.
-    :param file_path: File path to read
-    :type file_path: str
-    :rtype: lst
-    """
-    log(Severity.WARNING, 'fileUtils.read_file', 'DEPRECATED METHOD IN USE; RESOLVE!')
-    txt = TXTFile(file_path)
-    txt.import_line_lst()
-    return txt.line_lst
 
 
 def append_line_lst_to_file(line_lst, file_path):
@@ -576,31 +563,6 @@ def open_dir_path(dir_path):
     else:
         print('ERROR: UNABLE TO OPEN PROJECT DIRECTORY.'
               '\nAttempted path: ' + dir_path)
-
-
-def write_file(file_path: Union[str, Path], write_str: Union[str, List[str]]):
-    """
-    Creates a file (if not created yet) and writes to it
-    :param file_path: Path to write to
-    :type file_path: Union[Path, str]
-    :param write_str: String to write (or List of strings)
-    :type write_str: str
-    """
-    log(Severity.WARNING, 'fileUtils.write_file', 'DEPRECATED METHOD IN USE; RESOLVE!')
-
-    # Get folder in which the file is
-    file_dir = Path(file_path).parent
-
-    # Create directory to store file in, if not created yet
-    Path(file_dir).mkdir(parents=True, exist_ok=True)
-
-    # Write to the file
-    f = open(file_path, 'w+')
-    if isinstance(write_str, str):
-        f.write(write_str)
-    elif isinstance(write_str, List):
-        f.writelines(write_str)
-    f.close()
 
 
 def search_replace_xml(xml_file_path, search_str, replace_str):
