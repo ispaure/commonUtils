@@ -12,8 +12,6 @@ __status__ = 'Production'
 # IMPORTS
 
 from typing import *
-import os
-import sys
 import stat
 import subprocess
 from pathlib import Path
@@ -448,33 +446,6 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
         log(Severity.DEBUG, tool_name, msg)
 
 
-def is_hard_link(path: Union[str, Path]):
-    # TODO: This seems to be broken, unsure it even works
-    if isinstance(path, str):
-        path_str = path
-    elif isinstance(path, Path):
-        path_str = str(path)
-    else:
-        print('Wrong type!')
-        return None
-
-    try:
-        # Get file stats
-        stat_info = os.stat(path_str)
-
-        # Check the number of hard links
-        if stat_info.st_nlink > 1:
-            return True
-        else:
-            return False
-    except FileNotFoundError:
-        print(f"File not found: {path_str}")
-        return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
-
-
 def is_junction(path: Union[str, Path]):
     if get_os() == OS.WIN:
         return junctionUtils.is_junction(path)
@@ -484,13 +455,6 @@ def is_junction(path: Union[str, Path]):
 
 def is_symbolic_link(path: Union[str, Path]):
     if os.path.islink(path):
-        return True
-    else:
-        return False
-
-
-def is_mount(path: Union[str, Path]):
-    if os.path.ismount(path):
         return True
     else:
         return False
@@ -596,14 +560,6 @@ def search_replace_xml(xml_file_path, search_str, replace_str):
     reading_file.close()
 
 
-def write_file_append(file_path, write_str):
-    """
-    Appends text on an additional line in an existing text file
-    """
-    with open(file_path, 'a') as f:
-        f.write('\n' + str(write_str))
-
-
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
     """
     Renames a file on disk.
@@ -672,30 +628,11 @@ def get_current_working_dir() -> Path:
     return cwd_resolved
 
 
-def get_project_temp_dir() -> Path:
-    cwd = get_current_working_dir()
-    temp_dir_path = Path(Path(cwd).parent, 'temp')
-    return temp_dir_path
-
-
 def get_user_home_dir() -> Path:
     """
     Get the current user's home directory
     """
     return Path.home()
-
-
-def get_user_documents_dir() -> Path:
-    """
-    Gets the current user's documents directory
-    """
-    op_sys = get_os()
-    match op_sys:
-        case OS.MAC:
-            return Path(get_user_home_dir(), 'Documents')
-        case _:
-            print(f'Platform not suppported for get_user_documents_dir as of yet!')
-            return None
 
 
 def get_user_name() -> str:
@@ -716,10 +653,3 @@ def get_user_appdata_roaming() -> Path:
 
 def get_user_appdata_local() -> Path:
     return Path(os.environ.get('LOCALAPPDATA'))
-
-
-def is_file(path: Path) -> bool:
-    if os.path.isfile(path):
-        return True
-    else:
-        return False
