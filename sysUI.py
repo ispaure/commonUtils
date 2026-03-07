@@ -26,8 +26,33 @@ from .wrappers import cmdShellWrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# CODE
+# HELPERS
 
+def _get_windows_owner_hwnd() -> int:
+    """
+    Try to get a sensible owner window handle for native Windows message boxes.
+
+    Prefer the foreground window, then the active window, then fall back to 0.
+    """
+    try:
+        user32 = ctypes.windll.user32
+
+        hwnd = user32.GetForegroundWindow()
+        if hwnd:
+            return hwnd
+
+        hwnd = user32.GetActiveWindow()
+        if hwnd:
+            return hwnd
+
+    except Exception as ex:
+        log(Severity.WARNING, 'UI Utils', f'Could not get Windows owner hwnd: {ex}')
+
+    return 0
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# CODE
 
 def display_msg_box_ok(title: str, message: str):
     """
@@ -47,8 +72,20 @@ def display_msg_box_ok(title: str, message: str):
     match get_os():
         case OS.WIN:
             class MbConstants:
-                MB_OK = 0
-            ctypes.windll.user32.MessageBoxW(0, message, title, MbConstants.MB_OK)
+                MB_OK = 0x00000000
+                MB_SETFOREGROUND = 0x00010000
+                MB_TOPMOST = 0x00040000
+                MB_TASKMODAL = 0x00002000
+
+            hwnd = _get_windows_owner_hwnd()
+            flags = (
+                MbConstants.MB_OK
+                | MbConstants.MB_SETFOREGROUND
+                | MbConstants.MB_TOPMOST
+                | MbConstants.MB_TASKMODAL
+            )
+
+            ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
 
         case OS.MAC:
             import subprocess
@@ -162,7 +199,10 @@ def display_msg_box_ok_cancel(title, message):
     print('Showing dialog box.')
 
     class MbConstants:
-        MB_OKCANCEL = 1
+        MB_OKCANCEL = 0x00000001
+        MB_SETFOREGROUND = 0x00010000
+        MB_TOPMOST = 0x00040000
+        MB_TASKMODAL = 0x00002000
         IDCANCEL = 2
         IDOK = 1
 
@@ -171,7 +211,14 @@ def display_msg_box_ok_cancel(title, message):
 
     # Show Dialog Window (Windows) and return user input
     def show_prompt_windows(message, title):
-        return ctypes.windll.user32.MessageBoxW(0, message, title, MbConstants.MB_OKCANCEL)
+        hwnd = _get_windows_owner_hwnd()
+        flags = (
+            MbConstants.MB_OKCANCEL
+            | MbConstants.MB_SETFOREGROUND
+            | MbConstants.MB_TOPMOST
+            | MbConstants.MB_TASKMODAL
+        )
+        return ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
 
     # Show Dialog Window (MacOS) and return user input
     def show_prompt_macos(message, title):
@@ -188,6 +235,7 @@ def display_msg_box_ok_cancel(title, message):
                 return True
             elif rc == MbConstants.IDCANCEL:
                 return False
+            return False
 
         case OS.MAC:
             message = message.replace('"', '')
@@ -210,8 +258,6 @@ def display_msg_box_ok_cancel(title, message):
                 except Exception:
                     return 1
 
-                # 1) KDE: kdialog (0=yes/ok, 1=no/cancel)
-
             if shutil.which("kdialog"):
                 # --yesno shows Yes/No; good enough for OK/Cancel semantics
                 rc = run_cmd(["kdialog", "--title", safe_title, "--yesno", safe_message])
@@ -219,7 +265,6 @@ def display_msg_box_ok_cancel(title, message):
                     return True
                 return False
 
-                # 2) GNOME: zenity (0=OK, 1=Cancel)
             if shutil.which("zenity"):
                 rc = run_cmd([
                     "zenity",
@@ -233,7 +278,6 @@ def display_msg_box_ok_cancel(title, message):
                     return True
                 return False
 
-                # 3) X11: xmessage (button return codes vary by version; use explicit mapping)
             if shutil.which("xmessage"):
                 # xmessage returns the "exit code" of the chosen button when mapped as OK:0,Cancel:1
                 rc = run_cmd([
@@ -247,7 +291,6 @@ def display_msg_box_ok_cancel(title, message):
                     return True
                 return False
 
-                # 4) Last resort: console prompt (won't block Blender UI if launched from terminal)
             try:
                 resp = input(f"{safe_title}\n{safe_message}\nType 'ok' to continue, anything else to cancel: ").strip().lower()
                 if resp in ("ok", "o", "yes", "y"):
