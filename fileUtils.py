@@ -509,21 +509,22 @@ def get_split_character():
             return '/'
 
 
-def open_dir_path(dir_path):
+def open_dir_path(dir_path: Union[str, Path]):
     """
     Opens the directory path that is given as a string
     :param dir_path: Directory to open
     :type dir_path: str
     """
-    if os.path.isdir(dir_path):  # Validate string is in fact a path
+    path_str = str(dir_path)
+    if os.path.isdir(path_str):  # Validate string is in fact a path
         if sys.platform == "win32":
-            os.startfile(dir_path)
+            os.startfile(path_str)
         else:
             opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.call([opener, dir_path])
+            subprocess.call([opener, path_str])
     else:
         print('ERROR: UNABLE TO OPEN PROJECT DIRECTORY.'
-              '\nAttempted path: ' + dir_path)
+              '\nAttempted path: ' + path_str)
 
 
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
