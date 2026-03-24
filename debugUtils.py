@@ -18,13 +18,20 @@ from datetime import datetime
 from . import uiUtils
 
 
-# Settings
+# ----------------------------------------------------------------------------------------------------------------------
+# SETTINGS
+
 write_to_log = False
 include_time = False  # Show absolute time
 use_time_delta = True  # Show time since last debug message
 verbose_debug = True  # Show debug-level entries
 
-# Global variable to track last timestamp
+# Optional project prefix (e.g. "Blue Hole")
+project_prefix: str | None = None
+
+# ----------------------------------------------------------------------------------------------------------------------
+# GLOBAL STATE
+
 last_timestamp = None
 
 # Enable ANSI escape codes on Windows CMD
@@ -42,11 +49,11 @@ class DebugException(Exception):
 
 
 class Severity(enum.Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+    DEBUG = "DBG"
+    INFO = "INF"
+    WARNING = "WRN"
+    ERROR = "ERR"
+    CRITICAL = "CRT"
 
 
 class DebugLogger:
@@ -59,8 +66,17 @@ class DebugLogger:
 
         global last_timestamp
 
-        # Format the log message
+        # ------------------------------------------------------------------------------------------------------------------
+        # PREFIX HANDLING
+
+        if project_prefix:
+            title = f"{project_prefix} | {title}"
+
+        # ------------------------------------------------------------------------------------------------------------------
+        # TIMESTAMP
+
         current_time = datetime.now()
+
         if include_time:
             timestamp = current_time.strftime("%H:%M:%S")
         elif use_time_delta:
@@ -77,18 +93,26 @@ class DebugLogger:
 
         skip_char = ' ' if timestamp else ''
 
+        # ------------------------------------------------------------------------------------------------------------------
+        # MESSAGE FORMATTING
+
+        severity_str = severity.value
+
         if '\n' not in message:
-            full_message_for_print = f"{timestamp}{skip_char}[{severity.value}] {title}: {message}"
+            full_message_for_print = f"{timestamp}{skip_char}[{severity_str}] {title}: {message}"
         else:
-            full_message = (f"{timestamp}{skip_char}[{severity.value}] {title}\n"
+            full_message = (f"{timestamp}{skip_char}[{severity_str}] {title}\n"
                             f"{message}")
-            # line skips always put text a bit further on line
-            num_spaces = len(timestamp) + len(f'{severity.value}') + 3 + len(skip_char)
+
+            num_spaces = len(timestamp) + len(skip_char) + len(severity_str) + 3
             space_str = ' ' * num_spaces
+
             full_message_for_print = full_message.replace('\n', f'\n{space_str}')
             full_message_for_print += '\n'
 
-        # Print message with colors
+        # ------------------------------------------------------------------------------------------------------------------
+        # COLORING
+
         match severity:
             case Severity.DEBUG:
                 colored_msg = f'\033[90m{full_message_for_print}\033[0m'
@@ -103,24 +127,25 @@ class DebugLogger:
             case _:
                 colored_msg = full_message_for_print
 
-        # Print to console
+        # ------------------------------------------------------------------------------------------------------------------
+        # OUTPUT
+
         print(colored_msg)
 
-        # Append to log file
         if write_to_log:
             with open(self.log_file, "a") as log_item:
                 log_item.write(full_message_for_print + "\n")
 
-        # If popup, show popup
         if popup or severity == Severity.CRITICAL:
             uiUtils.display_msg_box_ok(title, message)
 
-        # If Critical, end application
         if severity == Severity.CRITICAL:
             raise DebugException(full_message_for_print)
 
 
-# Create a singleton instance of the logger
+# ----------------------------------------------------------------------------------------------------------------------
+# SINGLETON
+
 logger_instance = DebugLogger()
 
 # Alias for the log_debug method
