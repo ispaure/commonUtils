@@ -242,7 +242,7 @@ def move_file(src: Path, dest: Path) -> bool:
         return False
 
 
-def get_dirs_path_list(dir_path: Union[Path, str]):
+def get_dirs_path_list(dir_path: Union[Path, str]) -> Optional[List[str]]:
     """
     Returns a sorted list of valid directory paths within a directory.
     Function copied from Blue Hole Addon scripts and updated to sort alphabetically.
