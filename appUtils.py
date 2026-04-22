@@ -16,6 +16,7 @@ from pathlib import Path
 import os
 import subprocess
 import stat
+import shlex
 
 # Common utilities
 from .pySideUtils import *
@@ -66,13 +67,17 @@ class DiskApp(App):
             cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False)
 
     def __launch_macos(self):
-
         path_macos_str = str(self.exec_path)
 
         if not validate_exec(self.name, path_macos_str):
             return
 
-        cmdShellWrapper.exec_cmd(path_macos_str, wait_for_output=False)
+        quoted_path = shlex.quote(path_macos_str)
+
+        if path_macos_str.endswith('.command') or path_macos_str.endswith('.sh'):
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True)
+        else:
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
 
     def __launch_linux(self):
         path_linux_str = str(self.exec_path)
