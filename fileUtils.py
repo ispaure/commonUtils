@@ -152,6 +152,20 @@ class TXTFile(File):
                 else:
                     f.write(line)
 
+    def edit_in_default_editor(self):
+        path_str = str(self.path)
+
+        match get_os():
+            case OS.WIN:
+                subprocess.run(["start", "", path_str], shell=True)
+            case OS.MAC:
+                result = subprocess.run(["open", path_str], capture_output=True)
+                if result.returncode != 0:
+                    # Fallback to TextEdit
+                    subprocess.Popen(["open", "-a", "TextEdit", path_str])
+            case OS.LINUX:
+                subprocess.run(["xdg-open", path_str])
+
 
 def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
     """
