@@ -199,6 +199,9 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
     """
     # create a list of file and subdirectories
     # names in the given directory
+    msg = 'This function is being deprecated, please transition to get_file_list_from_path'
+    log(Severity.WARNING, 'get_file_path_list', msg)
+
     list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
 
     all_files = list()
@@ -221,6 +224,33 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
                 filtered_files.append(file)
         return filtered_files
 
+    return all_files
+
+
+def get_file_list_from_path(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[File]:
+    """
+    Returns list of File objects under a specific directory.
+    Keeps same ordering/behavior as deprecated get_file_path_list.
+    """
+    base_path = Path(dir_name)
+    list_of_entries = sorted(os.listdir(base_path))  # same sorting behavior
+    all_files: List[File] = []
+    for entry in list_of_entries:
+        full_path = base_path / entry
+        if full_path.is_dir():
+            if recursive:
+                all_files += get_file_list_from_path(full_path, recursive=recursive, filter_extension=filter_extension)
+        else:
+            all_files.append(File(full_path))
+
+    # Apply filter (same logic as before)
+    if filter_extension is not None:
+        ext = "." + filter_extension.lower()
+        filtered_files = []
+        for file in all_files:
+            if file.path.name.lower().endswith(ext):
+                filtered_files.append(file)
+        return filtered_files
     return all_files
 
 
