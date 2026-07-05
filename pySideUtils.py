@@ -143,7 +143,6 @@ class Palette:
         self.palette.setColor(QPalette.HighlightedText, Qt.black)
 
 
-
 def initialize_q_app():
 
     # Create QApplication, which is the PySide6 UI Application. One per project!
@@ -154,9 +153,9 @@ def initialize_q_app():
     match get_os():
         case OS.WIN:  # Windows
             os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
-            palette_cls = Palette()
-            palette_cls.set_dark()
-            q_app.setPalette(palette_cls.palette)
+            # palette_cls = Palette()
+            # palette_cls.set_dark()
+            # q_app.setPalette(palette_cls.palette)
         case OS.LINUX:
             if steamUtils.is_linux_steam_big_picture():
                 palette_cls = Palette()
