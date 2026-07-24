@@ -64,10 +64,17 @@ class File:
             return None
 
     def delete_file(self) -> bool:
+        """
+        Deletes the file on disk.
+        Returns True if successfully deleted, False otherwise.
+        """
         if delete_debug_prompt:
             log(Severity.WARNING, 'Delete File', f'Deleting "{self.path}", proceed?', popup=True)
-        result = delete_file(self.path)
-        return result
+        try:
+            os.remove(self.path)
+            return not self.path.exists()
+        except Exception:
+            return False
 
     def make_writable(self) -> bool:
         """
@@ -229,28 +236,34 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
 
 def get_file_list_from_path(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[File]:
     """
-    Returns list of File objects under a specific directory.
-    Keeps same ordering/behavior as deprecated get_file_path_list.
+    Returns a list of File objects under a specific directory.
+    Uses the appropriate File subclass based on the file extension.
+    Keeps the same ordering/behavior as deprecated get_file_path_list.
     """
     base_path = Path(dir_name)
-    list_of_entries = sorted(os.listdir(base_path))  # same sorting behavior
+    list_of_entries = sorted(os.listdir(base_path))
     all_files: List[File] = []
+
     for entry in list_of_entries:
         full_path = base_path / entry
+
         if full_path.is_dir():
             if recursive:
-                all_files += get_file_list_from_path(full_path, recursive=recursive, filter_extension=filter_extension)
+                all_files += get_file_list_from_path(
+                    full_path,
+                    recursive=recursive,
+                    filter_extension=filter_extension,
+                )
+        elif full_path.suffix.lower() == '.txt':
+            all_files.append(TXTFile(full_path))
         else:
             all_files.append(File(full_path))
 
-    # Apply filter (same logic as before)
+    # Apply file extension filter
     if filter_extension is not None:
-        ext = "." + filter_extension.lower()
-        filtered_files = []
-        for file in all_files:
-            if file.path.name.lower().endswith(ext):
-                filtered_files.append(file)
-        return filtered_files
+        ext = filter_extension.lower().lstrip('.')
+        return [file for file in all_files if file.ext == ext]
+
     return all_files
 
 
@@ -359,12 +372,15 @@ def delete_dir_contents(dir_path):
     rem_dir_lst = get_dirs_path_list(dir_path)
     for rem_dir in rem_dir_lst:
         delete_dir(rem_dir)
+
     if len(get_dirs_path_list(dir_path)) > 0:
         log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every directory!')
-    rem_file_lst = get_file_path_list(dir_path)
+
+    rem_file_lst: List[File] = get_file_list_from_path(dir_path)
     for rem_file in rem_file_lst:
-        delete_file(rem_file)
-    if len(get_file_path_list(dir_path)) > 0:
+        rem_file.delete_file()
+
+    if len(get_file_list_from_path(dir_path)) > 0:
         log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
 
 
@@ -373,6 +389,9 @@ def delete_file(file_path) -> bool:
     Deletes a file on disk.
     Returns True if successfully deleted, False otherwise.
     """
+    msg = 'This function is being deprecated, please transition to File.delete_file'
+    log(Severity.WARNING, 'delete_file', msg)
+
     try:
         os.remove(file_path)
         return not os.path.exists(file_path)
@@ -582,8 +601,8 @@ def rename_file(original_name: Path, new_name: Path, force: bool = False) -> boo
 
     try:
         # If forced overwrite and destination exists on Windows
-        if sys.platform == 'win32' and force and new_name.exists():
-            delete_file(new_name)
+        if force and sys.platform == 'win32' and new_name.exists():
+            File(new_name).delete_file()
 
         # Ensure parent directory for new file exists
         new_name.parent.mkdir(parents=True, exist_ok=True)
@@ -606,17 +625,29 @@ def rename_file(original_name: Path, new_name: Path, force: bool = False) -> boo
         return False
 
 
-def copy_file(source, destination):
+def copy_file(source: Union[str, Path], destination: Union[str, Path]) -> bool:
     """
-    Copies file from source to destination.
-    """
-    # If destination directory does not exist, create
-    destination_dir = os.path.dirname(destination)
-    make_dir(destination_dir)
+    Copy a file from source to destination.
 
-    # Copy file
-    log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
-    copyfile(source, destination)
+    Returns:
+        True if the file was copied successfully.
+        False if the copy failed.
+    """
+    source = Path(source)
+    destination = Path(destination)
+
+    try:
+        # Create the destination directory if necessary
+        make_dir(destination.parent)
+
+        log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
+
+        copyfile(source, destination)
+        return True
+
+    except (OSError, IOError) as error:
+        log(Severity.ERROR, 'fileUtils.copy_file', f'Failed to copy file from "{source}" to "{destination}": {error}')
+        return False
 
 
 def make_dir(directory):
