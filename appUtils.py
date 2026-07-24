@@ -200,11 +200,9 @@ def set_app_executable_permissions(app_path: Path):
         print('Can\'t get app run permissions, no Contents/MacOS sub folder!')
         return
 
-    exec_path_lst = []
     # Figure out the exec list
-    exec_path_lst = fileUtils.get_file_path_list(contents_macos_path)
+    exec_file_lst: List[fileUtils.File] = fileUtils.get_file_list_from_path(contents_macos_path)
 
-    # For each exec list, apply permissions
-    for exec_path in exec_path_lst:
-        file_cls = fileUtils.File(Path(exec_path))
-        file_cls.set_executable_permission()
+    # For each exec file, apply permissions
+    for exec_file in exec_file_lst:
+        exec_file.set_executable_permission()
