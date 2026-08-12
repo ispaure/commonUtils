@@ -33,20 +33,30 @@ tool_name = 'commonUtils/cmdShellWrapper.py'
 def exec_cmd(command: str,
              wait_for_output: bool = True,
              in_new_window: bool = False,
-             time_out: float = 15):
+             time_out: float = 15,
+             cwd: Optional[Union[str, Path]] = None):
     """
-    Execute command from CMD shell (Windows) or the terminal (macOS & Linux)
+    Execute command from CMD shell (Windows) or the terminal (macOS & Linux).
+
+    :param command: Command to execute.
+    :param wait_for_output: Whether to wait for and capture command output.
+    :param in_new_window: Whether to execute the command in a new terminal window.
+    :param time_out: Maximum amount of idle time to wait for output.
+    :param cwd: Working directory in which the command should execute.
 
     Notes:
     - If in_new_window=True, command is launched in a new terminal window and THIS FUNCTION RETURNS IMMEDIATELY.
       (No output capture in the parent process.)
-    - For simplicity right now, shell=True is always used (per your request).
+    - For simplicity right now, shell=True is always used.
     """
+
+    # Normalize working directory
+    cwd = str(cwd) if cwd is not None else None
 
     def terminate_p_open(p_open_to_close):
         """
-        Close Popen subprocess
-        :param p_open_to_close: Popen to close
+        Close Popen subprocess.
+        :param p_open_to_close: Popen to close.
         :type p_open_to_close: subprocess.Popen
         """
         try:
@@ -54,11 +64,13 @@ def exec_cmd(command: str,
                 p_open_to_close.stderr.close()
         except Exception:
             pass
+
         try:
             if p_open_to_close.stdout:
                 p_open_to_close.stdout.close()
         except Exception:
             pass
+
         try:
             if p_open_to_close.stdin is not None:
                 p_open_to_close.stdin.close()
@@ -76,7 +88,7 @@ def exec_cmd(command: str,
         return cleaned_line
 
     # ------------------------------
-    # Linux terminal helpers (UPDATED)
+    # Linux terminal helpers
     # ------------------------------
 
     def pick_linux_terminal() -> Optional[str]:
@@ -87,6 +99,7 @@ def exec_cmd(command: str,
         - Detects KDE vs GNOME and prefers a likely default.
         - Includes common modern terminals that may exist on Fedora/Bazzite.
         """
+
         # 1) Respect user preference if set
         env_term = os.environ.get("TERMINAL")
         if env_term:
@@ -102,7 +115,7 @@ def exec_cmd(command: str,
 
         # 3) Candidate lists
         kde_first = ["konsole"]
-        gnome_first = ["kgx", "gnome-terminal", "ptyxis"]  # kgx = GNOME Console
+        gnome_first = ["kgx", "gnome-terminal", "ptyxis"]
         common = [
             "xterm",
             "kitty",
@@ -121,6 +134,7 @@ def exec_cmd(command: str,
         for term in candidates:
             if shutil.which(term):
                 return term
+
         return None
 
     def build_linux_new_window_cmd(term: str, command: str) -> str:
@@ -153,7 +167,6 @@ def exec_cmd(command: str,
 
         # XFCE terminal
         if term == "xfce4-terminal":
-            # xfce4-terminal supports --hold on many versions; even if not, exec bash keeps it open
             return f'xfce4-terminal --hold -e bash -lc {shlex.quote(command + "; exec bash")}'
 
         # Kitty
@@ -178,10 +191,15 @@ def exec_cmd(command: str,
     # Log command to execute
     debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Executing command: {command}')
 
-    # If code must be executed in new terminal window
+    if cwd is not None:
+        debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Working directory: {cwd}')
+
+    # ------------------------------
+    # New terminal window
+    # ------------------------------
+
     if in_new_window:
-        # You said: if launching in new window, you never need to wait for output.
-        # Force no-wait behavior and return immediately after launch.
+        # If launching in a new window, we never need to wait for output.
         wait_for_output = False
 
         match get_os():
@@ -194,18 +212,21 @@ def exec_cmd(command: str,
             case OS.LINUX:
                 term = pick_linux_terminal()
                 if not term:
-                    debugUtils.log(
-                        debugUtils.Severity.CRITICAL,
-                        tool_name,
-                        "No supported terminal found (konsole/kgx/gnome-terminal/ptyxis/xterm/kitty/alacritty/wezterm/footclient...)."
-                    )
+                    debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, "No supported terminal found (konsole/kgx/gnome-terminal/ptyxis/xterm/kitty/alacritty/wezterm/footclient...).")
                     return False
 
                 new_window_cmd = build_linux_new_window_cmd(term, command)
 
             case OS.MAC:
-                # Run command via bash, then keep terminal open
-                bash_cmd = f"bash -lc {shlex.quote(command + '; exec bash')}"
+                # Terminal.app creates the shell itself, so setting cwd on the
+                # osascript process is not sufficient. Explicitly cd instead.
+                terminal_command = command
+
+                if cwd is not None:
+                    terminal_command = f'cd {shlex.quote(cwd)} && {terminal_command}'
+
+                # Run command via bash, then keep Terminal open
+                bash_cmd = f"bash -lc {shlex.quote(terminal_command + '; exec bash')}"
 
                 # Escape for AppleScript string literal (double quotes and backslashes)
                 applescript_cmd = bash_cmd.replace("\\", "\\\\").replace('"', '\\"')
@@ -228,13 +249,15 @@ def exec_cmd(command: str,
 
         # For simplicity right now: always shell=True
         try:
-            subprocess.Popen(new_window_cmd, shell=True, stdin=None)
-            return []  # launched; no output captured
+            subprocess.Popen(new_window_cmd, shell=True, stdin=None, cwd=cwd)
+            return []
         except Exception as e:
             debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, f'Failed to launch in new window: {e}')
             return False
 
-    # --- Normal (same-window) execution path ---
+    # ------------------------------
+    # Normal (same-window) execution
+    # ------------------------------
 
     # Should use shell?
     # use_shell = should_use_shell(command)
@@ -246,7 +269,8 @@ def exec_cmd(command: str,
         shell=use_shell,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        stdin=None
+        stdin=None,
+        cwd=cwd
     )
 
     output_lines: list[bytes] = []
@@ -257,6 +281,7 @@ def exec_cmd(command: str,
     if wait_for_output:
         while True:
             status = p_open.poll()
+
             if p_open.stdout:
                 try:
                     p_open.stdout.flush()
@@ -268,6 +293,7 @@ def exec_cmd(command: str,
 
             if stdout:
                 stdout_lst += stdout
+
             if stderr:
                 stderr_lst += stderr
 
@@ -285,6 +311,7 @@ def exec_cmd(command: str,
 
     # Clean the output lines
     output_lines_cleaned: list[str] = []
+
     for line in output_lines:
         output_lines_cleaned.append(clean_output_line(line))
 

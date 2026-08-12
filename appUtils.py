@@ -46,72 +46,80 @@ class DiskApp(App):
                 self.__launch_macos()
             case OS.LINUX:
                 self.__launch_linux()
-    
+
     def __launch_windows(self):
-        path_win_str = str(self.exec_path)
+        path_win = Path(self.exec_path)
+        path_win_str = str(path_win)
 
         if not validate_exec(self.name, path_win_str):
             return
 
-        if path_win_str.endswith('.ps1'):  # If powershell, run as powershell
+        cwd = path_win.parent
+
+        if path_win_str.lower().endswith('.ps1'):  # If PowerShell, run as PowerShell
             powerShellWrapper.exec_powershell(path_win_str)
-        elif path_win_str.endswith('.cmd') or path_win_str.endswith('.bat'):  # If CMD, run in new window
-            # ally_tools_temp_dir = fileUtils.get_project_temp_dir()
-            # temp_file_path = str(Path(ally_tools_temp_dir, 'exec.bat'))
-            # print(f'App Launcher: Executing Temp Batch File: {temp_file_path}')
-            # cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, in_new_window=temp_file_path)
-            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, in_new_window=True)
+
+        elif path_win_str.lower().endswith(('.cmd', '.bat')):  # If CMD, run in new window
+            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, in_new_window=True, cwd=cwd)
+
         else:
             print('App Launcher: Executing Regular Launch')
-            # subprocess.run([path_win_str], check=True, shell=True)
-            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False)
+            cmdShellWrapper.exec_cmd(path_win_str, wait_for_output=False, cwd=cwd)
 
     def __launch_macos(self):
-        path_macos_str = str(self.exec_path)
+        path_macos = Path(self.exec_path)
+        path_macos_str = str(path_macos)
 
         if not validate_exec(self.name, path_macos_str):
             return
 
+        cwd = path_macos.parent
         quoted_path = shlex.quote(path_macos_str)
 
-        if path_macos_str.endswith('.command') or path_macos_str.endswith('.sh'):
-            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True)
+        if path_macos_str.lower().endswith(('.command', '.sh')):
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
         else:
-            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, cwd=cwd)
 
     def __launch_linux(self):
-        path_linux_str = str(self.exec_path)
+        path_linux = Path(self.exec_path)
+        path_linux_str = str(path_linux)
 
         if not validate_exec(self.name, path_linux_str):
             return
 
+        cwd = path_linux.parent
         quoted_path = shlex.quote(path_linux_str)
-        if path_linux_str.endswith('.sh'):
-            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True)
+
+        if path_linux_str.lower().endswith('.sh'):
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
         else:
-            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, cwd=cwd)
 
 
 class StoreApp(App):
-    def __init__(self, name, win_app_name: str):
+    def __init__(self, name: str, win_app_name: str):
         super().__init__(name)
-        # Name of App Displayed on Request to PowerShell
         self.win_app_name = win_app_name
 
     def get_application_user_model_id(self) -> Union[str, None]:
         """
-        Use this to get the application user model ID of an application from the Windows Store
-        :param name: The expected Name of the Application
+        Use this to get the application user model ID of an application from the Windows Store.
+        :return: The application's Application User Model ID, if found.
         """
         exec_cmd = 'Get-StartApps | Where-Object { $_.Name -like "*NAME*" }'.replace('*NAME*', f'*{self.win_app_name}*')
+
         print(f'Searching for {self.win_app_name}\'s Application User Model ID...')
+
         ps_output = powerShellWrapper.exec_powershell(exec_cmd)
         print(ps_output)
+
         for line in ps_output:
             if line.startswith(f'{self.win_app_name} '):
                 aumid = line.split(' ')[-1]
                 print(f'{self.name}\'s Application User Model ID Found!: {aumid}')
                 return aumid
+
         error_msg = f'Could not recover Application User Model ID for: {self.name}. Install first and try again!'
         display_msg_box_ok('App Launcher', error_msg)
         return None
@@ -122,10 +130,13 @@ class StoreApp(App):
                 aumid = self.get_application_user_model_id()
                 if aumid is not None:
                     os.system(f'explorer shell:appsFolder\\{aumid}')
+
             case OS.MAC:
                 display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
+
             case OS.LINUX:
                 display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+
             case _:
                 display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on (Undefined)')
 
@@ -137,13 +148,14 @@ class Flatpak(App):
 
     def launch(self):
         try:
-            subprocess.run(["flatpak","run", f'{self.app_id}'], check=True)
+            subprocess.run(["flatpak", "run", f'{self.app_id}'], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error launching Flatpak {self.name}: {e}")
 
 
 def ensure_executable(path: Path) -> None:
     mode = path.stat().st_mode
+
     if not (mode & stat.S_IXUSR):
         path.chmod(mode | stat.S_IXUSR)
 
@@ -156,7 +168,6 @@ class AppImage(App):
     def launch(self):
         """
         Launch the AppImage application.
-        :param in_new_window: Whether to open the AppImage in a new terminal window (Linux only)
         """
         if not validate_exec(self.name, self.exec_path):
             return
@@ -170,13 +181,12 @@ class AppImage(App):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True,
-            start_new_session=True,  # like setsid(); makes it independent of parent terminal
+            start_new_session=True,
             cwd=str(self.exec_path.parent),
             env=os.environ.copy(),
         )
-        return p.pid
 
-        # cmdShellWrapper.exec_cmd(str(self.exec_path), wait_for_output=False)
+        return p.pid
 
 
 def validate_exec(name, exec_path):
@@ -184,11 +194,13 @@ def validate_exec(name, exec_path):
         msg = f'{name} path is not specified (None) for current Operating System! Update code and try again!'
         display_msg_box_ok('App Launcher', msg)
         return False
+
     elif not os.path.isfile(exec_path):
         msg = (f'{name} is not currently installed (Expected location: {exec_path}). '
                f'Install first and try again!')
         display_msg_box_ok('App Launcher', msg)
         return False
+
     return True
 
 
@@ -199,6 +211,7 @@ def set_app_executable_permissions(app_path: Path):
 
     # Get Contents/MacOS path
     contents_macos_path = Path(app_path, 'Contents', 'MacOS')
+
     if not os.path.isdir(contents_macos_path):
         print('Can\'t get app run permissions, no Contents/MacOS sub folder!')
         return
