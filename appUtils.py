@@ -86,7 +86,10 @@ class DiskApp(App):
             return
 
         quoted_path = shlex.quote(path_linux_str)
-        cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
+        if path_linux_str.endswith('.sh'):
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True)
+        else:
+            cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
 
 
 class StoreApp(App):
