@@ -85,8 +85,8 @@ class DiskApp(App):
         if not validate_exec(self.name, path_linux_str):
             return
 
-        cmdShellWrapper.exec_cmd(path_linux_str, wait_for_output=False)  # TODO: TYPICAL COMMAND, SEE IF WORKS FOR OTHER STUFF (LIKE LAUNCHING APPS)
-        # cmdShellWrapper.exec_cmd(["bash", path_linux_str], wait_for_output=True)  # TODO: For now this works for bash, but idk for other scenarios...
+        quoted_path = shlex.quote(path_linux_str)
+        cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False)
 
 
 class StoreApp(App):
