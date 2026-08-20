@@ -13,11 +13,8 @@ __status__ = 'Production'
 
 from typing import *
 from pathlib import Path
-import os
-import sys
 import stat
 import shutil
-import subprocess
 from shutil import make_archive
 import zlib
 from tempfile import NamedTemporaryFile
