@@ -412,6 +412,9 @@ def delete_dir_contents(dir_path):
 
 def delete_file(file_path) -> bool:
     """
+
+    >> THIS IS BEING DEPRECATED! USE File.delete_file instead! <<
+
     Deletes a file on disk.
     Returns True if successfully deleted, False otherwise.
     """
