@@ -174,107 +174,6 @@ class TXTFile(File):
                 subprocess.run(["xdg-open", path_str])
 
 
-def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
-
-    Returns list of all files under a specific directory. Properly sorted
-
-    Input example:
-    root/
-    ├── b.txt
-    ├── z.txt
-    ├── a_folder/
-    │   └── a.txt
-    └── z_folder/
-        └── z.txt
-
-    Output example:
-    root/b.txt
-    root/z.txt
-    root/a_folder/a.txt
-    root/z_folder/z.txt
-
-    This is what we often want (root files first, then files in folders in order).
-    Note: Does not sort well 1, 10, 11 type stuff (work well with 01, 10, 11!)
-    So if required, add padding before sorting.
-
-    :param dir_name: Directory in which to look under
-    :type dir_name: str
-    :param recursive: Indicate if sub-directories should be included, recursively
-    :param filter_extension: File extension to retain (when just want to retain all .txt files for example)
-    :type filter_extension: str
-    :rtype: lst
-    """
-    # create a list of file and subdirectories
-    # names in the given directory
-    msg = 'This function is being deprecated, please transition to Directory.list_files'
-    log(Severity.WARNING, 'get_file_path_list', msg)
-
-    list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
-
-    all_files = list()
-    # Iterate over all the entries
-    for entry in list_of_files:
-        # Create full path
-        full_path = os.path.join(dir_name, entry)
-        # If entry is a directory then get the list of files in this directory
-        if os.path.isdir(full_path):
-            if recursive:
-                all_files = all_files + get_file_path_list(full_path)
-        else:
-            all_files.append(full_path)
-
-    # If set a file type filter, filter.
-    if filter_extension is not None:
-        filtered_files = list()
-        for file in all_files:
-            if '.' + filter_extension.lower() == file[-len(filter_extension)-1:].lower():
-                filtered_files.append(file)
-        return filtered_files
-
-    return all_files
-
-
-def get_file_list_from_path(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[File]:
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
-
-    Returns a list of File objects under a specific directory.
-    Uses the appropriate File subclass based on the file extension.
-    Keeps the same ordering/behavior as deprecated get_file_path_list.
-    """
-
-    msg = 'This function is being deprecated, please transition to Directory.list_files'
-    log(Severity.WARNING, 'get_file_list_from_path', msg)
-
-    base_path = Path(dir_name)
-    list_of_entries = sorted(os.listdir(base_path))
-    all_files: List[File] = []
-
-    for entry in list_of_entries:
-        full_path = base_path / entry
-
-        if full_path.is_dir():
-            if recursive:
-                all_files += get_file_list_from_path(
-                    full_path,
-                    recursive=recursive,
-                    filter_extension=filter_extension,
-                )
-        elif full_path.suffix.lower() == '.txt':
-            all_files.append(TXTFile(full_path))
-        else:
-            all_files.append(File(full_path))
-
-    # Apply file extension filter
-    if filter_extension is not None:
-        ext = filter_extension.lower().lstrip('.')
-        return [file for file in all_files if file.ext == ext]
-
-    return all_files
-
-
 def move_file(src: Path, dest: Path) -> bool:
     """
     Moves a file from src to dest, overwriting if it already exists.
@@ -307,42 +206,6 @@ def move_file(src: Path, dest: Path) -> bool:
         return False
 
 
-def get_dirs_path_list(dir_path: Union[Path, str]) -> Optional[List[str]]:
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.list_directories instead! <<
-
-    Returns a sorted list of valid directory paths within a directory.
-    Function copied from Blue Hole Addon scripts and updated to sort alphabetically.
-    :param dir_path: Directory in which to look for directories
-    :type dir_path: str | Path
-    :rtype: list[str]
-    """
-
-    msg = 'This function is being deprecated, please transition to Directory.list_directories (which now returns Directory objects)'
-    log(Severity.WARNING, 'fileUtils.get_dirs_path_list', msg)
-
-    if isinstance(dir_path, str):
-        dir_path_str = dir_path
-    elif isinstance(dir_path, Path):
-        dir_path_str = str(dir_path)
-    else:
-        print('Wrong type sent to fileUtils.get_dirs_path_list!')
-        return None
-
-    dir_path_lst = []
-    # Get list of items within a directory
-    atlas_sub_dir_item_lst = os.listdir(dir_path_str)
-    # Create a path from items within the directory, and if they are a directory, add them to the directories list.
-    for item in atlas_sub_dir_item_lst:
-        item_dir = str(Path(dir_path_str, item))
-        if os.path.isdir(item_dir):
-            dir_path_lst.append(item_dir)
-
-    # Sort alphabetically (case-insensitive)
-    dir_path_lst.sort(key=lambda s: s.lower())
-    return dir_path_lst
-
-
 def create_n_wipe_dir(path: Path):
     """
     Creates directory at path if it does not exist, also wipes contents and double-check it's fully empty.
@@ -350,7 +213,8 @@ def create_n_wipe_dir(path: Path):
     if not os.path.isdir(path):
         make_dir(path)
     if not is_dir_empty(path):
-        delete_dir_contents(path)
+        from .dirUtils import Directory
+        Directory(path).delete_contents()
         # Double-Check that it is empty now
         if not is_dir_empty(path):
             log(Severity.CRITICAL, 'fileUtils.create_n_wipe_dir', f'Could not delete dir contents in {path}')
@@ -358,74 +222,6 @@ def create_n_wipe_dir(path: Path):
 
 def has_subdirectories(path: Path) -> bool:
     return any(item.is_dir() for item in path.iterdir())
-
-
-def delete_dir(dir_path: Path) -> bool:
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
-
-    Deletes a directory on disk
-    """
-
-    msg = 'This function is being deprecated, please transition to Directory.delete'
-    log(Severity.WARNING, 'fileUtils.delete_dir', msg)
-
-    if delete_debug_prompt:
-        log(Severity.WARNING, 'Delete Directory', f'Deleting "{dir_path}", proceed?', popup=True)
-    else:
-        log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
-    rmtree(dir_path)
-    return not os.path.isdir(dir_path)
-
-
-def delete_dir_contents(dir_path):
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
-
-    Deletes the files and folders within a directory (not the directory itself)
-    """
-
-    msg = 'This function is being deprecated, please transition to Directory.delete_contents'
-    log(Severity.WARNING, 'fileUtils.delete_dir_contents', msg)
-
-    # Make sure everything is not marked as non-writable
-    for root, dirs, files in os.walk(dir_path):
-        for fname in files:
-            full_path = os.path.join(root, fname)
-            os.chmod(full_path, stat.S_IWRITE)
-
-    # Wipe contents within dir
-    rem_dir_lst = get_dirs_path_list(dir_path)
-    for rem_dir in rem_dir_lst:
-        delete_dir(rem_dir)
-
-    if len(get_dirs_path_list(dir_path)) > 0:
-        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every directory!')
-
-    rem_file_lst: List[File] = get_file_list_from_path(dir_path)
-    for rem_file in rem_file_lst:
-        rem_file.delete_file()
-
-    if len(get_file_list_from_path(dir_path)) > 0:
-        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
-
-
-def delete_file(file_path) -> bool:
-    """
-
-    >> THIS IS BEING DEPRECATED! USE File.delete_file instead! <<
-
-    Deletes a file on disk.
-    Returns True if successfully deleted, False otherwise.
-    """
-    msg = 'This function is being deprecated, please transition to File.delete_file'
-    log(Severity.WARNING, 'delete_file', msg)
-
-    try:
-        os.remove(file_path)
-        return not os.path.exists(file_path)
-    except Exception:
-        return False
 
 
 def delete_symbolic_link(dir_path):
@@ -511,7 +307,8 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
                 return
             elif is_dir(destination):
                 msg += '\nDestination is a directory! Deleting...'
-                delete_dir(destination)
+                from .dirUtils import Directory
+                Directory(destination).delete()
             else:
                 msg += '\nDestination is unknown type, unsure how to delete as of yet!'
                 log(Severity.ERROR, tool_name, msg)
@@ -599,30 +396,6 @@ def get_split_character():
             return '\\'
         case OS.MAC | OS.LINUX:
             return '/'
-
-
-def open_dir_path(dir_path: Union[str, Path]):
-    """
-    >> THIS IS BEING DEPRECATED! USE Directory.open instead! <<
-
-    Opens the directory path that is given as a string
-    :param dir_path: Directory to open
-    :type dir_path: str
-    """
-
-    msg = 'This function is being deprecated, please transition to Directory.open'
-    log(Severity.WARNING, 'fileUtils.open_dir_path', msg)
-
-    path_str = str(dir_path)
-    if os.path.isdir(path_str):  # Validate string is in fact a path
-        if sys.platform == "win32":
-            os.startfile(path_str)
-        else:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.call([opener, path_str])
-    else:
-        print('ERROR: UNABLE TO OPEN PROJECT DIRECTORY.'
-              '\nAttempted path: ' + path_str)
 
 
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
@@ -730,3 +503,241 @@ def get_user_appdata_roaming() -> Path:
 
 def get_user_appdata_local() -> Path:
     return Path(os.environ.get('LOCALAPPDATA'))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# DEPRECATED FUNCTIONS
+#
+# The functions below are retained temporarily for compatibility with projects that still use commonUtils as a shared
+# library. New code should use the replacement APIs identified in each function's deprecation notice. Once dependent
+# projects have been migrated, these compatibility functions can be removed.
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
+    Returns list of all files under a specific directory. Properly sorted
+
+    Input example:
+    root/
+    ├── b.txt
+    ├── z.txt
+    ├── a_folder/
+    │   └── a.txt
+    └── z_folder/
+        └── z.txt
+
+    Output example:
+    root/b.txt
+    root/z.txt
+    root/a_folder/a.txt
+    root/z_folder/z.txt
+
+    This is what we often want (root files first, then files in folders in order).
+    Note: Does not sort well 1, 10, 11 type stuff (work well with 01, 10, 11!)
+    So if required, add padding before sorting.
+
+    :param dir_name: Directory in which to look under
+    :type dir_name: str
+    :param recursive: Indicate if sub-directories should be included, recursively
+    :param filter_extension: File extension to retain (when just want to retain all .txt files for example)
+    :type filter_extension: str
+    :rtype: lst
+    """
+    # create a list of file and subdirectories
+    # names in the given directory
+    msg = 'This function is being deprecated, please transition to Directory.list_files'
+    log(Severity.WARNING, 'get_file_path_list', msg)
+
+    list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
+
+    all_files = list()
+    # Iterate over all the entries
+    for entry in list_of_files:
+        # Create full path
+        full_path = os.path.join(dir_name, entry)
+        # If entry is a directory then get the list of files in this directory
+        if os.path.isdir(full_path):
+            if recursive:
+                all_files = all_files + get_file_path_list(full_path)
+        else:
+            all_files.append(full_path)
+
+    # If set a file type filter, filter.
+    if filter_extension is not None:
+        filtered_files = list()
+        for file in all_files:
+            if '.' + filter_extension.lower() == file[-len(filter_extension)-1:].lower():
+                filtered_files.append(file)
+        return filtered_files
+
+    return all_files
+
+
+def get_file_list_from_path(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[File]:
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
+    Returns a list of File objects under a specific directory.
+    Uses the appropriate File subclass based on the file extension.
+    Keeps the same ordering/behavior as deprecated get_file_path_list.
+    """
+
+    msg = 'This function is being deprecated, please transition to Directory.list_files'
+    log(Severity.WARNING, 'get_file_list_from_path', msg)
+
+    base_path = Path(dir_name)
+    list_of_entries = sorted(os.listdir(base_path))
+    all_files: List[File] = []
+
+    for entry in list_of_entries:
+        full_path = base_path / entry
+
+        if full_path.is_dir():
+            if recursive:
+                all_files += get_file_list_from_path(
+                    full_path,
+                    recursive=recursive,
+                    filter_extension=filter_extension,
+                )
+        elif full_path.suffix.lower() == '.txt':
+            all_files.append(TXTFile(full_path))
+        else:
+            all_files.append(File(full_path))
+
+    # Apply file extension filter
+    if filter_extension is not None:
+        ext = filter_extension.lower().lstrip('.')
+        return [file for file in all_files if file.ext == ext]
+
+    return all_files
+
+
+def get_dirs_path_list(dir_path: Union[Path, str]) -> Optional[List[str]]:
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_directories instead! <<
+
+    Returns a sorted list of valid directory paths within a directory.
+    Function copied from Blue Hole Addon scripts and updated to sort alphabetically.
+    :param dir_path: Directory in which to look for directories
+    :type dir_path: str | Path
+    :rtype: list[str]
+    """
+
+    msg = 'This function is being deprecated, please transition to Directory.list_directories (which now returns Directory objects)'
+    log(Severity.WARNING, 'fileUtils.get_dirs_path_list', msg)
+
+    if isinstance(dir_path, str):
+        dir_path_str = dir_path
+    elif isinstance(dir_path, Path):
+        dir_path_str = str(dir_path)
+    else:
+        print('Wrong type sent to fileUtils.get_dirs_path_list!')
+        return None
+
+    dir_path_lst = []
+    # Get list of items within a directory
+    atlas_sub_dir_item_lst = os.listdir(dir_path_str)
+    # Create a path from items within the directory, and if they are a directory, add them to the directories list.
+    for item in atlas_sub_dir_item_lst:
+        item_dir = str(Path(dir_path_str, item))
+        if os.path.isdir(item_dir):
+            dir_path_lst.append(item_dir)
+
+    # Sort alphabetically (case-insensitive)
+    dir_path_lst.sort(key=lambda s: s.lower())
+    return dir_path_lst
+
+
+def delete_dir(dir_path: Path) -> bool:
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
+    Deletes a directory on disk
+    """
+
+    msg = 'This function is being deprecated, please transition to Directory.delete'
+    log(Severity.WARNING, 'fileUtils.delete_dir', msg)
+
+    if delete_debug_prompt:
+        log(Severity.WARNING, 'Delete Directory', f'Deleting "{dir_path}", proceed?', popup=True)
+    else:
+        log(Severity.DEBUG, 'fileUtils', f'Deleting directory: "{dir_path}"')
+    rmtree(dir_path)
+    return not os.path.isdir(dir_path)
+
+
+def delete_dir_contents(dir_path):
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
+    Deletes the files and folders within a directory (not the directory itself)
+    """
+
+    msg = 'This function is being deprecated, please transition to Directory.delete_contents'
+    log(Severity.WARNING, 'fileUtils.delete_dir_contents', msg)
+
+    # Make sure everything is not marked as non-writable
+    for root, dirs, files in os.walk(dir_path):
+        for fname in files:
+            full_path = os.path.join(root, fname)
+            os.chmod(full_path, stat.S_IWRITE)
+
+    # Wipe contents within dir
+    rem_dir_lst = get_dirs_path_list(dir_path)
+    for rem_dir in rem_dir_lst:
+        delete_dir(rem_dir)
+
+    if len(get_dirs_path_list(dir_path)) > 0:
+        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every directory!')
+
+    rem_file_lst: List[File] = get_file_list_from_path(dir_path)
+    for rem_file in rem_file_lst:
+        rem_file.delete_file()
+
+    if len(get_file_list_from_path(dir_path)) > 0:
+        log(Severity.CRITICAL, 'fileUtils.delete_dir_contents', 'Could not delete every file!')
+
+
+def delete_file(file_path) -> bool:
+    """
+
+    >> THIS IS BEING DEPRECATED! USE File.delete_file instead! <<
+
+    Deletes a file on disk.
+    Returns True if successfully deleted, False otherwise.
+    """
+    msg = 'This function is being deprecated, please transition to File.delete_file'
+    log(Severity.WARNING, 'delete_file', msg)
+
+    try:
+        os.remove(file_path)
+        return not os.path.exists(file_path)
+    except Exception:
+        return False
+
+
+def open_dir_path(dir_path: Union[str, Path]):
+    """
+    >> THIS IS BEING DEPRECATED! USE Directory.open instead! <<
+
+    Opens the directory path that is given as a string
+    :param dir_path: Directory to open
+    :type dir_path: str
+    """
+
+    msg = 'This function is being deprecated, please transition to Directory.open'
+    log(Severity.WARNING, 'fileUtils.open_dir_path', msg)
+
+    path_str = str(dir_path)
+    if os.path.isdir(path_str):  # Validate string is in fact a path
+        if sys.platform == "win32":
+            os.startfile(path_str)
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([opener, path_str])
+    else:
+        print('ERROR: UNABLE TO OPEN PROJECT DIRECTORY.'
+              '\nAttempted path: ' + path_str)
