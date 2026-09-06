@@ -176,6 +176,8 @@ class TXTFile(File):
 
 def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[str]:
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
     Returns list of all files under a specific directory. Properly sorted
 
     Input example:
@@ -206,7 +208,7 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
     """
     # create a list of file and subdirectories
     # names in the given directory
-    msg = 'This function is being deprecated, please transition to get_file_list_from_path'
+    msg = 'This function is being deprecated, please transition to Directory.list_files'
     log(Severity.WARNING, 'get_file_path_list', msg)
 
     list_of_files = sorted(os.listdir(dir_name))  # Ensures alphabetical sorting
@@ -236,10 +238,16 @@ def get_file_path_list(dir_name: Union[str, Path], recursive=True, filter_extens
 
 def get_file_list_from_path(dir_name: Union[str, Path], recursive=True, filter_extension=None) -> List[File]:
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
     Returns a list of File objects under a specific directory.
     Uses the appropriate File subclass based on the file extension.
     Keeps the same ordering/behavior as deprecated get_file_path_list.
     """
+
+    msg = 'This function is being deprecated, please transition to Directory.list_files'
+    log(Severity.WARNING, 'get_file_list_from_path', msg)
+
     base_path = Path(dir_name)
     list_of_entries = sorted(os.listdir(base_path))
     all_files: List[File] = []
@@ -301,12 +309,18 @@ def move_file(src: Path, dest: Path) -> bool:
 
 def get_dirs_path_list(dir_path: Union[Path, str]) -> Optional[List[str]]:
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_directories instead! <<
+
     Returns a sorted list of valid directory paths within a directory.
     Function copied from Blue Hole Addon scripts and updated to sort alphabetically.
     :param dir_path: Directory in which to look for directories
     :type dir_path: str | Path
     :rtype: list[str]
     """
+
+    msg = 'This function is being deprecated, please transition to Directory.list_directories (which now returns Directory objects)'
+    log(Severity.WARNING, 'fileUtils.get_dirs_path_list', msg)
+
     if isinstance(dir_path, str):
         dir_path_str = dir_path
     elif isinstance(dir_path, Path):
@@ -348,8 +362,14 @@ def has_subdirectories(path: Path) -> bool:
 
 def delete_dir(dir_path: Path) -> bool:
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
     Deletes a directory on disk
     """
+
+    msg = 'This function is being deprecated, please transition to Directory.delete'
+    log(Severity.WARNING, 'fileUtils.delete_dir', msg)
+
     if delete_debug_prompt:
         log(Severity.WARNING, 'Delete Directory', f'Deleting "{dir_path}", proceed?', popup=True)
     else:
@@ -360,8 +380,14 @@ def delete_dir(dir_path: Path) -> bool:
 
 def delete_dir_contents(dir_path):
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.list_files instead! <<
+
     Deletes the files and folders within a directory (not the directory itself)
     """
+
+    msg = 'This function is being deprecated, please transition to Directory.delete_contents'
+    log(Severity.WARNING, 'fileUtils.delete_dir_contents', msg)
+
     # Make sure everything is not marked as non-writable
     for root, dirs, files in os.walk(dir_path):
         for fname in files:
@@ -574,10 +600,16 @@ def get_split_character():
 
 def open_dir_path(dir_path: Union[str, Path]):
     """
+    >> THIS IS BEING DEPRECATED! USE Directory.open instead! <<
+
     Opens the directory path that is given as a string
     :param dir_path: Directory to open
     :type dir_path: str
     """
+
+    msg = 'This function is being deprecated, please transition to Directory.open'
+    log(Severity.WARNING, 'fileUtils.open_dir_path', msg)
+
     path_str = str(dir_path)
     if os.path.isdir(path_str):  # Validate string is in fact a path
         if sys.platform == "win32":
