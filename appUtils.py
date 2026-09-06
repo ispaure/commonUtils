@@ -21,7 +21,7 @@ import shlex
 # Common utilities
 from .pySideUtils import *
 from .osUtils import *
-from . import fileUtils
+from . import fileUtils, dirUtils
 
 # Wrappers
 from .wrappers import cmdShellWrapper, powerShellWrapper
@@ -210,14 +210,14 @@ def set_app_executable_permissions(app_path: Path):
     """
 
     # Get Contents/MacOS path
-    contents_macos_path = Path(app_path, 'Contents', 'MacOS')
+    contents_macos_dir = dirUtils.Directory(Path(app_path, 'Contents', 'MacOS'))
 
-    if not os.path.isdir(contents_macos_path):
+    if not os.path.isdir(contents_macos_dir.path):
         print('Can\'t get app run permissions, no Contents/MacOS sub folder!')
         return
 
     # Figure out the exec list
-    exec_file_lst: List[fileUtils.File] = fileUtils.get_file_list_from_path(contents_macos_path)
+    exec_file_lst: List[fileUtils.File] = contents_macos_dir.list_files()
 
     # For each exec file, apply permissions
     for exec_file in exec_file_lst:
