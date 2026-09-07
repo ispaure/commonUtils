@@ -67,13 +67,24 @@ class File:
         """
         Deletes the file on disk.
         Returns True if successfully deleted, False otherwise.
+
+        macOS AppleDouble files starting with "._" are treated as successfully deleted
+        if they disappear before the delete operation completes.
         """
         if delete_debug_prompt:
             log(Severity.WARNING, 'Delete File', f'Deleting "{self.path}", proceed?', popup=True)
+
         try:
             os.remove(self.path)
             return not self.path.exists()
-        except Exception:
+        except FileNotFoundError as e:
+            if self.path.name.startswith('._'):
+                return True
+
+            log(Severity.ERROR, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
+            return False
+        except Exception as e:
+            log(Severity.ERROR, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
             return False
 
     def make_writable(self) -> bool:
