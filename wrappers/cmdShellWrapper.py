@@ -316,3 +316,20 @@ def exec_cmd(command: str,
         output_lines_cleaned.append(clean_output_line(line))
 
     return output_lines_cleaned
+
+def minimize_console_window() -> bool:
+    """Minimize the active process's terminal window (currently only works on Windows)"""
+    # TODO: Make Minimize Console Window work on macOS & Linux
+    match get_os():
+        case OS.WIN:
+            import ctypes
+            handle = ctypes.windll.kernel32.GetConsoleWindow()
+            ctypes.windll.user32.ShowWindow(handle, 6)
+            return True
+        case OS.MAC | OS.LINUX:
+            title = 'commonUtils.cmdShellWrapper.minimize_console_window'
+            msg = ('Minimize Console Window has only been implemented for Windows so far. Please update '
+                   'cmdShellWrapper with the cross-platform branches.')
+            debugUtils.log(debugUtils.Severity.WARNING, title, msg)
+
+    return False
