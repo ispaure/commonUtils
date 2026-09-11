@@ -59,6 +59,145 @@ def _get_windows_owner_hwnd() -> int:
     return 0
 
 
+def _display_msg_box_ok_cancel_windows(title: str, message: str) -> bool:
+    """
+    Display an OK/Cancel message box using the native Windows API.
+
+    Returns True when OK is selected.
+    Returns False when Cancel is selected or the dialog is dismissed.
+    """
+
+    class MbConstants:
+        MB_OKCANCEL = 0x00000001
+        MB_SETFOREGROUND = 0x00010000
+        MB_TOPMOST = 0x00040000
+        MB_TASKMODAL = 0x00002000
+        IDOK = 1
+
+    hwnd = _get_windows_owner_hwnd()
+
+    flags = (
+        MbConstants.MB_OKCANCEL
+        | MbConstants.MB_SETFOREGROUND
+        | MbConstants.MB_TOPMOST
+        | MbConstants.MB_TASKMODAL
+    )
+
+    result = ctypes.windll.user32.MessageBoxW(
+        hwnd,
+        message,
+        title,
+        flags
+    )
+
+    return result == MbConstants.IDOK
+
+
+def _display_msg_box_ok_cancel_macos(title: str, message: str) -> bool:
+    """
+    Display an OK/Cancel message box using AppleScript.
+
+    This preserves the existing cmdShellWrapper-based implementation.
+    """
+    message = message.replace('"', '')
+    message = message.replace("'", '')
+
+    command_str = (
+        "osascript -e "
+        "'Tell application \"System Events\" to display dialog "
+        "\"{message}\" with title \"{title}\"'"
+    ).format(
+        message=message,
+        title=title
+    )
+
+    return_val = cmdShellWrapper.exec_cmd(command_str)
+
+    return 'OK' in return_val[0]
+
+
+def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
+    """
+    Display an OK/Cancel message box using an available Linux dialog utility.
+
+    Tries kdialog, zenity, and xmessage in that order before falling back
+    to a console prompt.
+    """
+
+    # Minimal sanitization for shell tools
+    safe_title = title.replace('"', '').replace("'", "")
+    safe_message = message.replace('"', '').replace("'", "")
+
+    def run_cmd(args: list[str]) -> int:
+        """
+        Execute a dialog command and return its process return code.
+        """
+        try:
+            process = subprocess.run(
+                args,
+                capture_output=True,
+                text=True
+            )
+            return process.returncode
+        except Exception:
+            return 1
+
+    # KDE
+    if shutil.which("kdialog"):
+        # --yesno shows Yes/No; good enough for OK/Cancel semantics
+        result = run_cmd([
+            "kdialog",
+            "--title",
+            safe_title,
+            "--yesno",
+            safe_message
+        ])
+
+        return result == 0
+
+    # GNOME
+    if shutil.which("zenity"):
+        result = run_cmd([
+            "zenity",
+            "--question",
+            "--title",
+            safe_title,
+            "--text",
+            safe_message,
+            "--ok-label=OK",
+            "--cancel-label=Cancel",
+        ])
+
+        return result == 0
+
+    # X11
+    if shutil.which("xmessage"):
+        result = run_cmd([
+            "xmessage",
+            "-center",
+            "-title",
+            safe_title,
+            "-buttons",
+            "OK:0,Cancel:1",
+            safe_message,
+        ])
+
+        return result == 0
+
+    # Last resort: blocking console prompt
+    try:
+        response = input(
+            f"{safe_title}\n"
+            f"{safe_message}\n"
+            "Type 'ok' to continue, anything else to cancel: "
+        ).strip().lower()
+
+        return response in ("ok", "o", "yes", "y")
+
+    except Exception:
+        return False
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # CODE
 
@@ -193,117 +332,37 @@ def display_msg_box_ok(title: str, message: str):
 
             # Absolute last resort: log (non-blocking)
             log(Severity.CRITICAL, 'uiUtils: Could not popup message', f"{safe_title}\n{safe_message}")
+
     return True
 
 
-def display_msg_box_ok_cancel(title, message):
+def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     """
-    Displays dialog box
+    Display a native OK/Cancel dialog.
+
+    Returns True only when the user selects OK.
+    Returns False when the user selects Cancel or otherwise dismisses the dialog.
+
     :param title: Dialog box title
     :type title: str
     :param message: Message to be shown in dialog box
     :type message: str
+    :return: Whether the user selected OK.
+    :rtype: bool
     """
     print('Showing dialog box.')
 
-    class MbConstants:
-        MB_OKCANCEL = 0x00000001
-        MB_SETFOREGROUND = 0x00010000
-        MB_TOPMOST = 0x00040000
-        MB_TASKMODAL = 0x00002000
-        IDCANCEL = 2
-        IDOK = 1
-
-    # Prevent escape sequences
+    # Prevent escaped newlines and tabs from being displayed literally
     message = message.replace('\\n', '\n').replace('\\t', '\t')
 
-    # Show Dialog Window (Windows) and return user input
-    def show_prompt_windows(message, title):
-        hwnd = _get_windows_owner_hwnd()
-        flags = (
-            MbConstants.MB_OKCANCEL
-            | MbConstants.MB_SETFOREGROUND
-            | MbConstants.MB_TOPMOST
-            | MbConstants.MB_TASKMODAL
-        )
-        return ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
-
-    # Show Dialog Window (MacOS) and return user input
-    def show_prompt_macos(message, title):
-        command_str = "osascript -e 'Tell application \"System Events\" to display dialog \"{message}\" with title \"{title}\"'".format(message=message, title=title)
-        return_val = cmdShellWrapper.exec_cmd(command_str)
-        return return_val
-
-    # Since Blender API doesn't have proper message box that waits on user, we have to get a bit creative.
-
-    match get_os():  # Solution which only works on Windows
+    match get_os():
         case OS.WIN:
-            rc = show_prompt_windows(message, title)
-            if rc == MbConstants.IDOK:
-                return True
-            elif rc == MbConstants.IDCANCEL:
-                return False
-            return False
+            return _display_msg_box_ok_cancel_windows(title, message)
 
         case OS.MAC:
-            message = message.replace('"', '')
-            message = message.replace("'", '')
-            if 'OK' in show_prompt_macos(message, title)[0]:
-                return True
-            else:
-                return False
+            return _display_msg_box_ok_cancel_macos(title, message)
 
         case OS.LINUX:
-            # Minimal sanitization for shell tools
-            safe_title = title.replace('"', '').replace("'", "")
-            safe_message = message.replace('"', '').replace("'", "")
+            return _display_msg_box_ok_cancel_linux(title, message)
 
-            def run_cmd(args: list[str]) -> int:
-                # Return process returncode; never raises on non-zero.
-                try:
-                    p = subprocess.run(args, capture_output=True, text=True)
-                    return p.returncode
-                except Exception:
-                    return 1
-
-            if shutil.which("kdialog"):
-                # --yesno shows Yes/No; good enough for OK/Cancel semantics
-                rc = run_cmd(["kdialog", "--title", safe_title, "--yesno", safe_message])
-                if rc == 0:
-                    return True
-                return False
-
-            if shutil.which("zenity"):
-                rc = run_cmd([
-                    "zenity",
-                    "--question",
-                    "--title", safe_title,
-                    "--text", safe_message,
-                    "--ok-label=OK",
-                    "--cancel-label=Cancel",
-                ])
-                if rc == 0:
-                    return True
-                return False
-
-            if shutil.which("xmessage"):
-                # xmessage returns the "exit code" of the chosen button when mapped as OK:0,Cancel:1
-                rc = run_cmd([
-                    "xmessage",
-                    "-center",
-                    "-title", safe_title,
-                    "-buttons", "OK:0,Cancel:1",
-                    safe_message,
-                ])
-                if rc == 0:
-                    return True
-                return False
-
-            try:
-                resp = input(f"{safe_title}\n{safe_message}\nType 'ok' to continue, anything else to cancel: ").strip().lower()
-                if resp in ("ok", "o", "yes", "y"):
-                    return True
-            except Exception:
-                pass
-
-            return False
+    return False
