@@ -1,12 +1,10 @@
 """
 Native UI utilities that do not depend on PySide or another GUI framework.
 
-This module provides lightweight, platform-specific UI functionality using
-facilities available on the operating system, such as native Windows APIs,
-AppleScript on macOS, and common dialog tools on Linux.
+This module provides lightweight, platform-specific UI functionality using facilities available on the operating system,
+such as native Windows APIs, AppleScript on macOS, and common dialog tools on Linux.
 
-It primarily serves as the non-PySide backend for ``uiUtils`` when a Qt
-application context is unavailable or undesirable.
+It primarily serves as the non-PySide backend for ``uiUtils`` when a Qt application context is unavailable or undesirable.
 For Qt/PySide-based UI functionality, use ``pySideUtils`` instead.
 """
 
@@ -75,20 +73,8 @@ def _display_msg_box_ok_cancel_windows(title: str, message: str) -> bool:
         IDOK = 1
 
     hwnd = _get_windows_owner_hwnd()
-
-    flags = (
-        MbConstants.MB_OKCANCEL
-        | MbConstants.MB_SETFOREGROUND
-        | MbConstants.MB_TOPMOST
-        | MbConstants.MB_TASKMODAL
-    )
-
-    result = ctypes.windll.user32.MessageBoxW(
-        hwnd,
-        message,
-        title,
-        flags
-    )
+    flags = MbConstants.MB_OKCANCEL | MbConstants.MB_SETFOREGROUND | MbConstants.MB_TOPMOST | MbConstants.MB_TASKMODAL
+    result = ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
 
     return result == MbConstants.IDOK
 
@@ -99,20 +85,14 @@ def _display_msg_box_ok_cancel_macos(title: str, message: str) -> bool:
 
     This preserves the existing cmdShellWrapper-based implementation.
     """
-    message = message.replace('"', '')
-    message = message.replace("'", '')
+    message = message.replace('"', '').replace("'", '')
 
     command_str = (
-        "osascript -e "
-        "'Tell application \"System Events\" to display dialog "
+        "osascript -e 'Tell application \"System Events\" to display dialog "
         "\"{message}\" with title \"{title}\"'"
-    ).format(
-        message=message,
-        title=title
-    )
+    ).format(message=message, title=title)
 
     return_val = cmdShellWrapper.exec_cmd(command_str)
-
     return 'OK' in return_val[0]
 
 
@@ -120,8 +100,7 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
     """
     Display an OK/Cancel message box using an available Linux dialog utility.
 
-    Tries kdialog, zenity, and xmessage in that order before falling back
-    to a console prompt.
+    Tries kdialog, zenity, and xmessage in that order before falling back to a console prompt.
     """
 
     # Minimal sanitization for shell tools
@@ -129,15 +108,9 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
     safe_message = message.replace('"', '').replace("'", "")
 
     def run_cmd(args: list[str]) -> int:
-        """
-        Execute a dialog command and return its process return code.
-        """
+        """Execute a dialog command and return its process return code."""
         try:
-            process = subprocess.run(
-                args,
-                capture_output=True,
-                text=True
-            )
+            process = subprocess.run(args, capture_output=True, text=True)
             return process.returncode
         except Exception:
             return 1
@@ -145,55 +118,28 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
     # KDE
     if shutil.which("kdialog"):
         # --yesno shows Yes/No; good enough for OK/Cancel semantics
-        result = run_cmd([
-            "kdialog",
-            "--title",
-            safe_title,
-            "--yesno",
-            safe_message
-        ])
-
+        result = run_cmd(["kdialog", "--title", safe_title, "--yesno", safe_message])
         return result == 0
 
     # GNOME
     if shutil.which("zenity"):
         result = run_cmd([
-            "zenity",
-            "--question",
-            "--title",
-            safe_title,
-            "--text",
-            safe_message,
-            "--ok-label=OK",
-            "--cancel-label=Cancel",
+            "zenity", "--question", "--title", safe_title, "--text", safe_message, "--ok-label=OK",
+            "--cancel-label=Cancel"
         ])
-
         return result == 0
 
     # X11
     if shutil.which("xmessage"):
-        result = run_cmd([
-            "xmessage",
-            "-center",
-            "-title",
-            safe_title,
-            "-buttons",
-            "OK:0,Cancel:1",
-            safe_message,
-        ])
-
+        result = run_cmd(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0,Cancel:1", safe_message])
         return result == 0
 
     # Last resort: blocking console prompt
     try:
         response = input(
-            f"{safe_title}\n"
-            f"{safe_message}\n"
-            "Type 'ok' to continue, anything else to cancel: "
+            f"{safe_title}\n{safe_message}\nType 'ok' to continue, anything else to cancel: "
         ).strip().lower()
-
         return response in ("ok", "o", "yes", "y")
-
     except Exception:
         return False
 
@@ -248,11 +194,7 @@ def display_msg_box_ok(title: str, message: str):
         end run
         '''.strip()
 
-            p = subprocess.run(
-                ["osascript", "-e", applescript, title, message],
-                capture_output=True,
-                text=True
-            )
+            p = subprocess.run(["osascript", "-e", applescript, title, message], capture_output=True, text=True)
 
             if p.returncode != 0:
                 print("osascript failed:", p.returncode)
@@ -283,6 +225,7 @@ def display_msg_box_ok(title: str, message: str):
                     # Return process returncode; never raises on non-zero.
                     try:
                         p = subprocess.run(args, capture_output=True, text=True)
+
                         # Debug if it fails (this is what your old code hid)
                         if p.returncode != 0:
                             print("kdialog return code:", p.returncode)
@@ -290,37 +233,28 @@ def display_msg_box_ok(title: str, message: str):
                                 print("kdialog stdout:", p.stdout.strip())
                             if (p.stderr or "").strip():
                                 print("kdialog stderr:", p.stderr.strip())
+
                         return p.returncode
+
                     except Exception as e:
                         print("kdialog exception:", repr(e))
                         return 1
 
                 rc = run_cmd(["kdialog", "--title", safe_title, "--msgbox", safe_message])
+
                 # Regardless of rc, we attempted to show the message; return to avoid falling through.
                 return
 
             # 2) GNOME: zenity (blocks until OK)
             if shutil.which("zenity"):
                 print('method 2')
-                run_cmd([
-                    "zenity",
-                    "--info",
-                    "--title", safe_title,
-                    "--text", safe_message,
-                    "--ok-label=OK",
-                ])
+                run_cmd(["zenity", "--info", "--title", safe_title, "--text", safe_message, "--ok-label=OK"])
                 return
 
             # 3) X11: xmessage (blocks until OK)
             if shutil.which("xmessage"):
                 print('method3')
-                run_cmd([
-                    "xmessage",
-                    "-center",
-                    "-title", safe_title,
-                    "-buttons", "OK:0",
-                    safe_message,
-                ])
+                run_cmd(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0", safe_message])
                 return
 
             # 4) Last resort: blocking console prompt (best-effort)
@@ -358,10 +292,8 @@ def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     match get_os():
         case OS.WIN:
             return _display_msg_box_ok_cancel_windows(title, message)
-
         case OS.MAC:
             return _display_msg_box_ok_cancel_macos(title, message)
-
         case OS.LINUX:
             return _display_msg_box_ok_cancel_linux(title, message)
 
