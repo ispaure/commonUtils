@@ -1,5 +1,13 @@
 """
-Basic UI Functions that do not rely on PySide
+Native UI utilities that do not depend on PySide or another GUI framework.
+
+This module provides lightweight, platform-specific UI functionality using
+facilities available on the operating system, such as native Windows APIs,
+AppleScript on macOS, and common dialog tools on Linux.
+
+It primarily serves as the non-PySide backend for ``uiUtils`` when a Qt
+application context is unavailable or undesirable.
+For Qt/PySide-based UI functionality, use ``pySideUtils`` instead.
 """
 
 # ----------------------------------------------------------------------------------------------------------------------
