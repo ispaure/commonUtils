@@ -4,7 +4,7 @@
 __author__ = 'Marc-André Voyer'
 __copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
 __license__ = "MIT License"
-__maintainer__ = 'Marc-André Voyer'
+__maintainer__ = 'Marcandre.voyer@gmail.com'
 __email__ = 'marcandre.voyer@gmail.com'
 __status__ = 'Production'
 
@@ -34,9 +34,9 @@ class ZIPFile(fileUtils.File):
         # Call the parent (File) initializer
         super().__init__(path)
 
-    def extract(self, dest_path: Path) -> bool:
-        """Extract the CBZ File"""
-        return unzip_file(self.path, dest_path)
+    def extract(self, dest_path: Path, show_progress: bool = False) -> bool:
+        """Extract the ZIP File"""
+        return unzip_file(self.path, dest_path, show_progress=show_progress)
 
     def get_root_file_lst(self) -> List[str]:
         try:
@@ -49,7 +49,8 @@ class ZIPFile(fileUtils.File):
 
 def unzip_file(source_file: Union[str, Path],
                destination_dir: Union[str, Path],
-               pwd: Optional[str] = None) -> bool:
+               pwd: Optional[str] = None,
+               show_progress: bool = False) -> bool:
     """
     Extracts zip file to desired location.
     Returns True iff all entries extract & CRC-verify; otherwise False.
@@ -86,67 +87,91 @@ def unzip_file(source_file: Union[str, Path],
 
         src = Path(source_file_str)
         dest = Path(destination_dir_str)
+        progress_window = None
 
         try:
             dest.mkdir(parents=True, exist_ok=True)
+
             with zipfile.ZipFile(src, 'r') as zf:
-                for info in zf.infolist():
-                    # Directories
-                    if info.is_dir():
-                        (dest / info.filename).mkdir(parents=True, exist_ok=True)
-                        continue
+                file_info_lst = zf.infolist()
+                total_size = sum(info.file_size for info in file_info_lst if not info.is_dir())
+                extracted_size = 0
 
-                    # Optional: skip Unix symlinks for safety
-                    is_unix_symlink = (info.create_system == 3) and (
-                        stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK
-                    )
-                    if is_unix_symlink:
-                        log(Severity.WARNING, tool_name, f"Skipping symlink entry: {info.filename}")
-                        continue
+                if show_progress:
+                    from . import pySideUtils
+                    progress_window = pySideUtils.display_progress_bar(f'Extracting {src.name}')
 
-                    # Destination path for this member
-                    target_path = (dest / info.filename)
+                try:
+                    for info in file_info_lst:
+                        # Directories
+                        if info.is_dir():
+                            (dest / info.filename).mkdir(parents=True, exist_ok=True)
+                            continue
 
-                    # Path traversal guard
-                    if not _is_within(dest, target_path):
-                        log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
-                        return False
+                        # Optional: skip Unix symlinks for safety
+                        is_unix_symlink = (info.create_system == 3) and (
+                            stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK
+                        )
+                        if is_unix_symlink:
+                            log(Severity.WARNING, tool_name, f"Skipping symlink entry: {info.filename}")
+                            continue
 
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                        # Destination path for this member
+                        target_path = dest / info.filename
 
-                    # Stream to a temp file; CRC enforced by fully consuming the stream
-                    with NamedTemporaryFile(delete=False, dir=target_path.parent, prefix=".part_") as tmp:
-                        tmp_name = tmp.name
-                        try:
-                            with zf.open(info, 'r') as src_f:
-                                # Hint types to silence IDE warning about copyfileobj
-                                shutil.copyfileobj(
-                                    cast(BinaryIO, src_f),
-                                    cast(BinaryIO, tmp),
-                                    length=1024 * 1024  # 1 MiB chunks
-                                )
-                        except (zipfile.BadZipFile, zlib.error, OSError, RuntimeError) as e:
-                            # Clean up partial
-                            try:
-                                os.unlink(tmp_name)
-                            except OSError:
-                                pass
-                            log(Severity.ERROR, tool_name, f"[CRC/READ FAIL] {info.filename}: {e}")
+                        # Path traversal guard
+                        if not _is_within(dest, target_path):
+                            log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
                             return False
 
-                    # Atomic move into place only if read (and CRC) succeeded
-                    os.replace(tmp_name, target_path)
+                        target_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    # (Optional) Preserve mtime from ZIP entry
-                    try:
-                        import datetime, time
-                        dt = datetime.datetime(*info.date_time)  # local time tuple
-                        ts = int(time.mktime(dt.timetuple()))
-                        os.utime(target_path, (ts, ts))
-                    except Exception:
-                        pass
+                        # Stream to a temp file; CRC enforced by fully consuming the stream
+                        with NamedTemporaryFile(delete=False, dir=target_path.parent, prefix=".part_") as tmp:
+                            tmp_name = tmp.name
+                            try:
+                                with zf.open(info, 'r') as src_f:
+                                    while True:
+                                        chunk = src_f.read(1024 * 1024)  # 1 MiB chunks
+                                        if not chunk:
+                                            break
 
-            return True
+                                        tmp.write(chunk)
+
+                                        if progress_window is not None and total_size > 0:
+                                            extracted_size += len(chunk)
+                                            progress = int((extracted_size / total_size) * 100)
+                                            progress_window.update_progress(progress)
+
+                            except (zipfile.BadZipFile, zlib.error, OSError, RuntimeError) as e:
+                                # Clean up partial
+                                try:
+                                    os.unlink(tmp_name)
+                                except OSError:
+                                    pass
+                                log(Severity.ERROR, tool_name, f"[CRC/READ FAIL] {info.filename}: {e}")
+                                return False
+
+                        # Atomic move into place only if read (and CRC) succeeded
+                        os.replace(tmp_name, target_path)
+
+                        # (Optional) Preserve mtime from ZIP entry
+                        try:
+                            import datetime, time
+                            dt = datetime.datetime(*info.date_time)  # local time tuple
+                            ts = int(time.mktime(dt.timetuple()))
+                            os.utime(target_path, (ts, ts))
+                        except Exception:
+                            pass
+
+                    if progress_window is not None:
+                        progress_window.update_progress(100)
+
+                    return True
+
+                finally:
+                    if progress_window is not None:
+                        progress_window.dlg.close()
 
         except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError, RuntimeError) as e:
             log(Severity.ERROR, tool_name, f"[ZIP FAIL] {src}: {e}")
@@ -199,6 +224,7 @@ def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=
     :param keep_root: When source is a dir, keeps the dir as part of the archive as a root folder (Default true)
     :type keep_root: bool
     """
+
     def make_zipfile_keep_root(output_filename, source_dir):
         relroot = os.path.abspath(os.path.join(source_dir, os.pardir))
         with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zip:
@@ -220,6 +246,7 @@ def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=
         else:
             log(Severity.CRITICAL, 'zipUtils.zip_file', 'Destination path does not have an extension!')
             sys.exit()
+
         if ext == 'zip':
             log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {destination_path}')
             make_archive(destination_str[:-len('.zip')], 'zip', source_str)
