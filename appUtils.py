@@ -19,8 +19,8 @@ import stat
 import shlex
 
 # Common utilities
-from .pySideUtils import *
 from .osUtils import *
+from .debugUtils import log, Severity
 from . import fileUtils, dirUtils
 
 # Wrappers
@@ -41,7 +41,6 @@ class DiskApp(App):
     def launch(self, fully_detached: bool = False, open_console: bool = False):
         """
         Launch application.
-
         :param fully_detached: Launch application independently from the current process.
         :param open_console: Launch regular applications with a visible console / terminal window.
         """
@@ -193,7 +192,7 @@ class StoreApp(App):
                 return aumid
 
         error_msg = f'Could not recover Application User Model ID for: {self.name}. Install first and try again!'
-        display_msg_box_ok('App Launcher', error_msg)
+        log(Severity.ERROR, 'App Launcher', error_msg, popup=True)
         return None
 
     def launch(self):
@@ -204,13 +203,13 @@ class StoreApp(App):
                     os.system(f'explorer shell:appsFolder\\{aumid}')
 
             case OS.MAC:
-                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on macOS')
+                log(Severity.ERROR, 'Store App Launcher', 'Windows Apps not supported on macOS', popup=True)
 
             case OS.LINUX:
-                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on Linux')
+                log(Severity.ERROR, 'Store App Launcher', 'Windows Apps not supported on Linux', popup=True)
 
             case _:
-                display_msg_box_ok('Store App Launcher', 'Windows Apps not supported on (Undefined)')
+                log(Severity.ERROR, 'Store App Launcher', 'Windows Apps not supported on (Undefined)', popup=True)
 
 
 class Flatpak(App):
@@ -264,13 +263,13 @@ class AppImage(App):
 def validate_exec(name, exec_path):
     if exec_path is None or exec_path == 'None':
         msg = f'{name} path is not specified (None) for current Operating System! Update code and try again!'
-        display_msg_box_ok('App Launcher', msg)
+        log(Severity.ERROR, 'App Launcher', msg, popup=True)
         return False
 
     elif not os.path.isfile(exec_path):
         msg = (f'{name} is not currently installed (Expected location: {exec_path}). '
-               f'Install first and try again!')
-        display_msg_box_ok('App Launcher', msg)
+            f'Install first and try again!')
+        log(Severity.ERROR, 'App Launcher', msg, popup=True)
         return False
 
     return True
