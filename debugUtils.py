@@ -15,7 +15,7 @@ import os
 import sys
 import enum
 from datetime import datetime
-from . import uiUtils
+from . import ui
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -137,7 +137,7 @@ class DebugLogger:
                 log_item.write(full_message_for_print + "\n")
 
         if popup or severity == Severity.CRITICAL:
-            uiUtils.display_msg_box_ok(title, message)
+            ui.display_msg_box_ok(title, message)
 
         if severity == Severity.CRITICAL:
             raise DebugException(full_message_for_print)

@@ -1,8 +1,11 @@
 """
 UI utilities with automatic backend selection for supported generic functions.
 
-Generic UI functions are exposed directly through this package. Native platform-specific functionality is available
-through ``ui.native``, while PySide-specific functionality is lazily available through ``ui.pyside``.
+Generic UI functions are exposed directly through this package. Native platform-specific functionality and
+PySide-specific functionality are both lazily available through ``ui.native`` and ``ui.pyside``.
+
+Lazy backend loading avoids importing optional dependencies unnecessarily and helps prevent circular imports between
+UI backends and other commonUtils modules.
 """
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,8 +23,6 @@ __status__ = 'Production'
 
 import importlib
 
-from . import native
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 # SETTINGS
@@ -32,14 +33,25 @@ use_pyside = True  # Use PySide for supported generic UI functions when availabl
 # ----------------------------------------------------------------------------------------------------------------------
 # LAZY MODULE ACCESS
 
+def _get_backend(name: str):
+    """
+    Lazily import and return a UI backend.
+    """
+    module = globals().get(name)
+
+    if module is None:
+        module = importlib.import_module(f'{__name__}.{name}')
+        globals()[name] = module
+
+    return module
+
+
 def __getattr__(name: str):
     """
-    Lazily expose the optional PySide backend as ``ui.pyside``.
+    Lazily expose UI backends as ``ui.native`` and ``ui.pyside``.
     """
-    if name == 'pyside':
-        module = importlib.import_module(f'{__name__}.pyside')
-        globals()['pyside'] = module
-        return module
+    if name in ('native', 'pyside'):
+        return _get_backend(name)
 
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
@@ -50,18 +62,18 @@ def __getattr__(name: str):
 def display_msg_box_ok(title: str, message: str) -> bool:
     if use_pyside:
         try:
-            return pyside.display_msg_box_ok(title, message)
+            return _get_backend('pyside').display_msg_box_ok(title, message)
         except Exception as e:
             print(f'Could not display message using PySide: {e}')
 
-    return native.display_msg_box_ok(title, message)
+    return _get_backend('native').display_msg_box_ok(title, message)
 
 
 def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     if use_pyside:
         try:
-            return pyside.display_msg_box_ok_cancel(title, message)
+            return _get_backend('pyside').display_msg_box_ok_cancel(title, message)
         except Exception as e:
             print(f'Could not display message using PySide: {e}')
 
-    return native.display_msg_box_ok_cancel(title, message)
+    return _get_backend('native').display_msg_box_ok_cancel(title, message)
