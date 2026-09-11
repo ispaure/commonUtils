@@ -32,7 +32,37 @@ from .wrappers import cmdShellWrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# CONSTANTS
+
+_WINDOWS_MB_OK = 0x00000000
+_WINDOWS_MB_OKCANCEL = 0x00000001
+_WINDOWS_MB_SETFOREGROUND = 0x00010000
+_WINDOWS_MB_TOPMOST = 0x00040000
+_WINDOWS_MB_TASKMODAL = 0x00002000
+_WINDOWS_IDOK = 1
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 # HELPERS
+
+def _normalize_message(message: str) -> str:
+    """Convert escaped newlines and tabs into their actual characters."""
+    return message.replace('\\n', '\n').replace('\\t', '\t')
+
+
+def _sanitize_linux_dialog_text(value: str) -> str:
+    """Remove quote characters that may interfere with Linux dialog utilities."""
+    return value.replace('"', '').replace("'", "")
+
+
+def _run_dialog_command(args: list[str]) -> int:
+    """Execute a dialog command and return its process return code."""
+    try:
+        process = subprocess.run(args, capture_output=True, text=True)
+        return process.returncode
+    except Exception:
+        return 1
+
 
 def _get_windows_owner_hwnd() -> int:
     """
@@ -58,27 +88,16 @@ def _get_windows_owner_hwnd() -> int:
 
 
 def _display_msg_box_ok_windows(title: str, message: str) -> bool:
-    """
-    Display a message box with an OK button using the native Windows API.
-    """
-
-    class MbConstants:
-        MB_OK = 0x00000000
-        MB_SETFOREGROUND = 0x00010000
-        MB_TOPMOST = 0x00040000
-        MB_TASKMODAL = 0x00002000
-
+    """Display a message box with an OK button using the native Windows API."""
     hwnd = _get_windows_owner_hwnd()
-    flags = MbConstants.MB_OK | MbConstants.MB_SETFOREGROUND | MbConstants.MB_TOPMOST | MbConstants.MB_TASKMODAL
+    flags = _WINDOWS_MB_OK | _WINDOWS_MB_SETFOREGROUND | _WINDOWS_MB_TOPMOST | _WINDOWS_MB_TASKMODAL
 
     ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
     return True
 
 
 def _display_msg_box_ok_macos(title: str, message: str) -> bool:
-    """
-    Display a message box with an OK button using AppleScript.
-    """
+    """Display a message box with an OK button using AppleScript."""
     applescript = r'''
 on run argv
     set theTitle to item 1 of argv
@@ -106,44 +125,31 @@ def _display_msg_box_ok_linux(title: str, message: str) -> bool:
 
     Tries kdialog, zenity, and xmessage in that order before falling back to a console prompt.
     """
-    safe_title = title.replace('"', '').replace("'", "")
-    safe_message = message.replace('"', '').replace("'", "")
+    safe_title = _sanitize_linux_dialog_text(title)
+    safe_message = _sanitize_linux_dialog_text(message)
 
-    def run_cmd(args: list[str]) -> int:
-        """Execute a dialog command and return its process return code."""
-        try:
-            process = subprocess.run(args, capture_output=True, text=True)
-            return process.returncode
-        except Exception:
-            return 1
-
-    # KDE
     if shutil.which("kdialog"):
-        result = run_cmd(["kdialog", "--title", safe_title, "--msgbox", safe_message])
+        result = _run_dialog_command(["kdialog", "--title", safe_title, "--msgbox", safe_message])
 
         if result != 0:
             print("kdialog return code:", result)
 
         return True
 
-    # GNOME
     if shutil.which("zenity"):
-        run_cmd(["zenity", "--info", "--title", safe_title, "--text", safe_message, "--ok-label=OK"])
+        _run_dialog_command(["zenity", "--info", "--title", safe_title, "--text", safe_message, "--ok-label=OK"])
         return True
 
-    # X11
     if shutil.which("xmessage"):
-        run_cmd(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0", safe_message])
+        _run_dialog_command(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0", safe_message])
         return True
 
-    # Last resort: blocking console prompt
     try:
         input(f"{safe_title}\n{safe_message}\nPress Enter to continue...")
         return True
     except Exception:
         pass
 
-    # Absolute last resort: log
     log(Severity.CRITICAL, 'uiUtils: Could not popup message', f"{safe_title}\n{safe_message}")
     return False
 
@@ -155,19 +161,11 @@ def _display_msg_box_ok_cancel_windows(title: str, message: str) -> bool:
     Returns True when OK is selected.
     Returns False when Cancel is selected or the dialog is dismissed.
     """
-
-    class MbConstants:
-        MB_OKCANCEL = 0x00000001
-        MB_SETFOREGROUND = 0x00010000
-        MB_TOPMOST = 0x00040000
-        MB_TASKMODAL = 0x00002000
-        IDOK = 1
-
     hwnd = _get_windows_owner_hwnd()
-    flags = MbConstants.MB_OKCANCEL | MbConstants.MB_SETFOREGROUND | MbConstants.MB_TOPMOST | MbConstants.MB_TASKMODAL
+    flags = _WINDOWS_MB_OKCANCEL | _WINDOWS_MB_SETFOREGROUND | _WINDOWS_MB_TOPMOST | _WINDOWS_MB_TASKMODAL
     result = ctypes.windll.user32.MessageBoxW(hwnd, message, title, flags)
 
-    return result == MbConstants.IDOK
+    return result == _WINDOWS_IDOK
 
 
 def _display_msg_box_ok_cancel_macos(title: str, message: str) -> bool:
@@ -193,36 +191,26 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
 
     Tries kdialog, zenity, and xmessage in that order before falling back to a console prompt.
     """
-    safe_title = title.replace('"', '').replace("'", "")
-    safe_message = message.replace('"', '').replace("'", "")
+    safe_title = _sanitize_linux_dialog_text(title)
+    safe_message = _sanitize_linux_dialog_text(message)
 
-    def run_cmd(args: list[str]) -> int:
-        """Execute a dialog command and return its process return code."""
-        try:
-            process = subprocess.run(args, capture_output=True, text=True)
-            return process.returncode
-        except Exception:
-            return 1
-
-    # KDE
     if shutil.which("kdialog"):
-        result = run_cmd(["kdialog", "--title", safe_title, "--yesno", safe_message])
+        result = _run_dialog_command(["kdialog", "--title", safe_title, "--yesno", safe_message])
         return result == 0
 
-    # GNOME
     if shutil.which("zenity"):
-        result = run_cmd([
+        result = _run_dialog_command([
             "zenity", "--question", "--title", safe_title, "--text", safe_message, "--ok-label=OK",
             "--cancel-label=Cancel"
         ])
         return result == 0
 
-    # X11
     if shutil.which("xmessage"):
-        result = run_cmd(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0,Cancel:1", safe_message])
+        result = _run_dialog_command(
+            ["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0,Cancel:1", safe_message]
+        )
         return result == 0
 
-    # Last resort: blocking console prompt
     try:
         response = input(
             f"{safe_title}\n{safe_message}\nType 'ok' to continue, anything else to cancel: "
@@ -250,7 +238,7 @@ def display_msg_box_ok(title: str, message: str) -> bool:
     :return: Whether the dialog was handled.
     :rtype: bool
     """
-    message = message.replace('\\n', '\n').replace('\\t', '\t')
+    message = _normalize_message(message)
 
     match get_os():
         case OS.WIN:
@@ -279,7 +267,7 @@ def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     """
     print('Showing dialog box.')
 
-    message = message.replace('\\n', '\n').replace('\\t', '\t')
+    message = _normalize_message(message)
 
     match get_os():
         case OS.WIN:
