@@ -99,19 +99,19 @@ class Palette:
         self.palette = QPalette()
 
     def set_dark(self):
-        self.palette.setColor(QPalette.Window, QColor(53, 53, 53))
-        self.palette.setColor(QPalette.WindowText, Qt.white)
-        self.palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        self.palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        self.palette.setColor(QPalette.ToolTipBase, Qt.black)
-        self.palette.setColor(QPalette.ToolTipText, Qt.white)
-        self.palette.setColor(QPalette.Text, Qt.white)
-        self.palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        self.palette.setColor(QPalette.ButtonText, Qt.white)
-        self.palette.setColor(QPalette.BrightText, Qt.red)
-        self.palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        self.palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        self.palette.setColor(QPalette.HighlightedText, Qt.black)
+        self.palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+        self.palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        self.palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+        self.palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        self.palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.black)
+        self.palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+        self.palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+        self.palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        self.palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+        self.palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+        self.palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+        self.palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        self.palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
 
     def set_navy(self):
         navy_window = QColor(18, 30, 49)          # main background
@@ -121,26 +121,26 @@ class Palette:
         navy_highlight = QColor(64, 140, 255)     # selection highlight
         navy_link = QColor(90, 170, 255)          # links
 
-        self.palette.setColor(QPalette.Window, navy_window)
-        self.palette.setColor(QPalette.WindowText, Qt.white)
+        self.palette.setColor(QPalette.ColorRole.Window, navy_window)
+        self.palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
 
-        self.palette.setColor(QPalette.Base, navy_base)
-        self.palette.setColor(QPalette.AlternateBase, navy_alt)
+        self.palette.setColor(QPalette.ColorRole.Base, navy_base)
+        self.palette.setColor(QPalette.ColorRole.AlternateBase, navy_alt)
 
-        self.palette.setColor(QPalette.ToolTipBase, navy_base)
-        self.palette.setColor(QPalette.ToolTipText, Qt.white)
+        self.palette.setColor(QPalette.ColorRole.ToolTipBase, navy_base)
+        self.palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
 
-        self.palette.setColor(QPalette.Text, Qt.white)
+        self.palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
 
-        self.palette.setColor(QPalette.Button, navy_button)
-        self.palette.setColor(QPalette.ButtonText, Qt.white)
+        self.palette.setColor(QPalette.ColorRole.Button, navy_button)
+        self.palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
 
-        self.palette.setColor(QPalette.BrightText, QColor(255, 85, 85))
+        self.palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 85, 85))
 
-        self.palette.setColor(QPalette.Link, navy_link)
+        self.palette.setColor(QPalette.ColorRole.Link, navy_link)
 
-        self.palette.setColor(QPalette.Highlight, navy_highlight)
-        self.palette.setColor(QPalette.HighlightedText, Qt.black)
+        self.palette.setColor(QPalette.ColorRole.Highlight, navy_highlight)
+        self.palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
 
 
 def initialize_q_app():
@@ -206,7 +206,7 @@ class LineEdit:
         set_font(self.line_edit)
 
         if pw_field:
-            self.line_edit.setEchoMode(QLineEdit.Password)
+            self.line_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
     def txt(self):
         return self.line_edit.text()
@@ -241,7 +241,7 @@ class Window:
         #     # Add layout to manage positioning (optional for base Window)
         #     central_widget = QWidget()
         #     self.layout = QVBoxLayout(central_widget)
-        #     self.layout.addWidget(QLabel("Hello, world!", alignment=Qt.AlignCenter))
+        #     self.layout.addWidget(QLabel("Hello, world!", alignment=Qt.AlignmentFlag.AlignCenter))
         #     self.dlg.setCentralWidget(central_widget)
 
     def re_translate_ui(self):
@@ -255,8 +255,8 @@ class Window:
 
         # Do right thing, depending on type
         if isinstance(self.dlg, QDialog):
-            # For QDialog, use exec_()
-            self.dlg.exec_()
+            # For QDialog, use exec()
+            self.dlg.exec()
         elif isinstance(self.dlg, QMainWindow):
             # For QMainWindow, use show() and ensure app.exec() is called
             self.dlg.show()
@@ -369,8 +369,8 @@ def create_frame(target: QDialog, rect: QRect):
     frame = QFrame(target)
     frame.setGeometry(rect)
     frame.setObjectName('panel')
-    frame.setFrameShape(QFrame.Panel)
-    frame.setFrameShadow(QFrame.Plain)
+    frame.setFrameShape(QFrame.Shape.Panel)
+    frame.setFrameShadow(QFrame.Shadow.Plain)
     return frame
 
 
@@ -454,13 +454,13 @@ def create_msg_box_base(title, message, icon='default', width=300, height=400,
 
     # Set Icon
     if icon.lower() == 'critical':
-        msg_box.setIcon(msg_box.Icon.Critical)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
     elif icon.lower() == 'warning':
-        msg_box.setIcon(msg_box.Icon.Warning)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
     elif icon.lower() == 'information':
-        msg_box.setIcon(msg_box.Icon.Information)
+        msg_box.setIcon(QMessageBox.Icon.Information)
     elif icon.lower() == 'question':
-        msg_box.setIcon(msg_box.Icon.Question)
+        msg_box.setIcon(QMessageBox.Icon.Question)
 
     # Connect button to functions
     msg_box.buttonClicked.connect(button_pressed)
@@ -480,9 +480,9 @@ def display_msg_box_ok_cancel(title, message, fn_ok=None, fn_cancel=None, icon='
     Displays a message box with OK and Cancel buttons.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'OK', fn_ok, 'Cancel', fn_cancel)
-    msg_box.setStandardButtons(msg_box.StandardButton.Ok | msg_box.StandardButton.Cancel)
-    result = msg_box.exec_()
-    return result == msg_box.StandardButton.Ok
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+    result = msg_box.exec()
+    return result == QMessageBox.StandardButton.Ok
 
 
 def display_msg_box_ok(title, message, icon='warning', width=300, height=400):
@@ -490,8 +490,8 @@ def display_msg_box_ok(title, message, icon='warning', width=300, height=400):
     Displays a message box with OK button.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'OK')
-    msg_box.setStandardButtons(msg_box.StandardButton.Ok)
-    msg_box.exec_()
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+    msg_box.exec()
     return True
 
 
@@ -500,8 +500,8 @@ def display_msg_box_ignore_abort(title, message, fn_ignore=None, fn_abort=None, 
     Displays a message box with Ignore and Abort buttons.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'Ignore', fn_ignore, 'Abort', fn_abort)
-    msg_box.setStandardButtons(msg_box.Ignore | msg_box.Abort)
-    msg_box.exec_()
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ignore | QMessageBox.StandardButton.Abort)
+    msg_box.exec()
     return True
 
 
@@ -510,9 +510,9 @@ def display_msg_box_yes_no(title, message, fn_yes=None, fn_no=None, icon='questi
     Displays a message box with Yes and No buttons.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, '&Yes', fn_yes, '&No', fn_no)
-    msg_box.setStandardButtons(msg_box.Yes | msg_box.No)
-    result = msg_box.exec_()
-    return result == msg_box.StandardButton.Yes
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    result = msg_box.exec()
+    return result == QMessageBox.StandardButton.Yes
 
 
 def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=300, height=400):
@@ -520,8 +520,8 @@ def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=
     Displays a message box with Ok and Help buttons.
     """
     msg_box = create_msg_box_base(title, message, icon, width, height, 'Ok', None, 'Help', fn_help)
-    msg_box.setStandardButtons(msg_box.Ok | msg_box.Help)
-    msg_box.exec_()
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Help)
+    msg_box.exec()
     return True
 
 
@@ -537,7 +537,7 @@ class ProgressBarWindow(Window):
         self.height = 50
         self.dlg.resize(int(self.width), int(self.height))  # Explicitly set the window size
         self.dlg.setWindowTitle(title)
-        self.dlg.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+        self.dlg.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.CustomizeWindowHint | Qt.WindowType.WindowTitleHint)
 
         # Create layout
         layout = QVBoxLayout()
