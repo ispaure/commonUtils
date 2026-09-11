@@ -13,7 +13,7 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
-from . import sysUI
+from . import native_ui_utils
 
 use_pyside = True  # Uses pyside for UI, Else make dialog popup using os terminal
 
@@ -26,7 +26,7 @@ def display_msg_box_ok(title: str, message: str) -> bool:
         except Exception:
             print('Could not load pySideUtils / display message!')
     else:
-        return sysUI.display_msg_box_ok(title, message)
+        return native_ui_utils.display_msg_box_ok(title, message)
 
 
 def display_msg_box_ok_cancel(title: str, message: str) -> bool:
@@ -37,4 +37,4 @@ def display_msg_box_ok_cancel(title: str, message: str) -> bool:
         except Exception:
             print('Could not load pySideUtils / display message!')
     else:
-        return sysUI.display_msg_box_ok_cancel(title, message)
+        return native_ui_utils.display_msg_box_ok_cancel(title, message)
