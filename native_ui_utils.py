@@ -50,11 +50,6 @@ def _normalize_message(message: str) -> str:
     return message.replace('\\n', '\n').replace('\\t', '\t')
 
 
-def _sanitize_linux_dialog_text(value: str) -> str:
-    """Remove quote characters that may interfere with Linux dialog utilities."""
-    return value.replace('"', '').replace("'", "")
-
-
 def _run_dialog_command(args: list[str]) -> int:
     """Execute a dialog command and return its process return code."""
     try:
@@ -67,6 +62,7 @@ def _run_dialog_command(args: list[str]) -> int:
 def _get_windows_owner_hwnd() -> int:
     """
     Try to get a sensible owner window handle for native Windows message boxes.
+
 
     Prefer the foreground window, then the active window, then fall back to 0.
     """
@@ -125,11 +121,8 @@ def _display_msg_box_ok_linux(title: str, message: str) -> bool:
 
     Tries kdialog, zenity, and xmessage in that order before falling back to a console prompt.
     """
-    safe_title = _sanitize_linux_dialog_text(title)
-    safe_message = _sanitize_linux_dialog_text(message)
-
     if shutil.which("kdialog"):
-        result = _run_dialog_command(["kdialog", "--title", safe_title, "--msgbox", safe_message])
+        result = _run_dialog_command(["kdialog", "--title", title, "--msgbox", message])
 
         if result != 0:
             print("kdialog return code:", result)
@@ -137,20 +130,20 @@ def _display_msg_box_ok_linux(title: str, message: str) -> bool:
         return True
 
     if shutil.which("zenity"):
-        _run_dialog_command(["zenity", "--info", "--title", safe_title, "--text", safe_message, "--ok-label=OK"])
+        _run_dialog_command(["zenity", "--info", "--title", title, "--text", message, "--ok-label=OK"])
         return True
 
     if shutil.which("xmessage"):
-        _run_dialog_command(["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0", safe_message])
+        _run_dialog_command(["xmessage", "-center", "-title", title, "-buttons", "OK:0", message])
         return True
 
     try:
-        input(f"{safe_title}\n{safe_message}\nPress Enter to continue...")
+        input(f"{title}\n{message}\nPress Enter to continue...")
         return True
     except Exception:
         pass
 
-    log(Severity.CRITICAL, 'uiUtils: Could not popup message', f"{safe_title}\n{safe_message}")
+    log(Severity.CRITICAL, 'uiUtils: Could not popup message', f"{title}\n{message}")
     return False
 
 
@@ -191,29 +184,23 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
 
     Tries kdialog, zenity, and xmessage in that order before falling back to a console prompt.
     """
-    safe_title = _sanitize_linux_dialog_text(title)
-    safe_message = _sanitize_linux_dialog_text(message)
-
     if shutil.which("kdialog"):
-        result = _run_dialog_command(["kdialog", "--title", safe_title, "--yesno", safe_message])
+        result = _run_dialog_command(["kdialog", "--title", title, "--yesno", message])
         return result == 0
 
     if shutil.which("zenity"):
         result = _run_dialog_command([
-            "zenity", "--question", "--title", safe_title, "--text", safe_message, "--ok-label=OK",
-            "--cancel-label=Cancel"
+            "zenity", "--question", "--title", title, "--text", message, "--ok-label=OK", "--cancel-label=Cancel"
         ])
         return result == 0
 
     if shutil.which("xmessage"):
-        result = _run_dialog_command(
-            ["xmessage", "-center", "-title", safe_title, "-buttons", "OK:0,Cancel:1", safe_message]
-        )
+        result = _run_dialog_command(["xmessage", "-center", "-title", title, "-buttons", "OK:0,Cancel:1", message])
         return result == 0
 
     try:
         response = input(
-            f"{safe_title}\n{safe_message}\nType 'ok' to continue, anything else to cancel: "
+            f"{title}\n{message}\nType 'ok' to continue, anything else to cancel: "
         ).strip().lower()
 
         return response in ("ok", "o", "yes", "y")
