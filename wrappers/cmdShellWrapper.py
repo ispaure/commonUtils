@@ -27,7 +27,7 @@ from ..osUtils import *
 # ----------------------------------------------------------------------------------------------------------------------
 # CODE
 
-tool_name = 'commonUtils/cmdShellWrapper.py'
+tool_name = 'commonUtils/wrappers/cmdShellWrapper.py'
 
 
 def exec_cmd(command: str,
@@ -126,7 +126,6 @@ def exec_cmd(command: str,
             "xfce4-terminal",
             "lxterminal",
             "mate-terminal",
-            "ptyxis",
         ]
 
         candidates = (kde_first + gnome_first + common) if prefer_kde else (gnome_first + kde_first + common)
@@ -212,7 +211,12 @@ def exec_cmd(command: str,
             case OS.LINUX:
                 term = pick_linux_terminal()
                 if not term:
-                    debugUtils.log(debugUtils.Severity.CRITICAL, tool_name, "No supported terminal found (konsole/kgx/gnome-terminal/ptyxis/xterm/kitty/alacritty/wezterm/footclient...).")
+                    debugUtils.log(
+                        debugUtils.Severity.CRITICAL,
+                        tool_name,
+                        "No supported terminal found "
+                        "(konsole/kgx/gnome-terminal/ptyxis/xterm/kitty/alacritty/wezterm/footclient...)."
+                    )
                     return False
 
                 new_window_cmd = build_linux_new_window_cmd(term, command)
@@ -317,6 +321,7 @@ def exec_cmd(command: str,
 
     return output_lines_cleaned
 
+
 def minimize_console_window() -> bool:
     """Minimize the active process's terminal window (currently only works on Windows)"""
     # TODO: Make Minimize Console Window work on macOS & Linux
@@ -326,8 +331,9 @@ def minimize_console_window() -> bool:
             handle = ctypes.windll.kernel32.GetConsoleWindow()
             ctypes.windll.user32.ShowWindow(handle, 6)
             return True
+
         case OS.MAC | OS.LINUX:
-            title = 'commonUtils.cmdShellWrapper.minimize_console_window'
+            title = 'commonUtils.wrappers.cmdShellWrapper.minimize_console_window'
             msg = ('Minimize Console Window has only been implemented for Windows so far. Please update '
                    'cmdShellWrapper with the cross-platform branches.')
             debugUtils.log(debugUtils.Severity.WARNING, title, msg)

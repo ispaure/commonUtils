@@ -4,7 +4,7 @@
 __author__ = 'Marc-André Voyer'
 __copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
 __license__ = "MIT License"
-__maintainer__ = 'Marcandre.voyer@gmail.com'
+__maintainer__ = 'Marc-André Voyer'
 __email__ = 'marcandre.voyer@gmail.com'
 __status__ = 'Production'
 
@@ -98,8 +98,8 @@ def unzip_file(source_file: Union[str, Path],
                 extracted_size = 0
 
                 if show_progress:
-                    from . import pySideUtils
-                    progress_window = pySideUtils.display_progress_bar(f'Extracting {src.name}')
+                    from . import ui
+                    progress_window = ui.pyside.display_progress_bar(f'Extracting {src.name}')
 
                 try:
                     for info in file_info_lst:
@@ -205,11 +205,12 @@ def unrar_file(source_file, destination_dir, unrar_sw_path: str = None):
     """
     tool_name = 'Extract RAR File'
     if sys.platform == 'win32':
-        log(Severity.DEBUG, Severity.DEBUG, f'Extracting archive from "{source_file}" to "{destination_dir}"')
+        log(Severity.DEBUG, tool_name, f'Extracting archive from "{source_file}" to "{destination_dir}"')
         patoolib.extract_archive(source_file, outdir=destination_dir)
     else:
-        log(Severity.DEBUG, Severity.DEBUG, f'Extracting archive from "{source_file}" to "{destination_dir}"')
+        log(Severity.DEBUG, tool_name, f'Extracting archive from "{source_file}" to "{destination_dir}"')
         patoolib.extract_archive(source_file, outdir=destination_dir, program=unrar_sw_path)
+
     # TODO: Doesn't work for macos because cant find software. Need program= flag with proper software
     # TODO: Or alternate solution is interfacing with Keka through Commandline perhaps?: https://github.com/aonez/Keka/wiki/Terminal-support
 
@@ -250,10 +251,13 @@ def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=
         if ext == 'zip':
             log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {destination_path}')
             make_archive(destination_str[:-len('.zip')], 'zip', source_str)
-        else:  # If desired extension is not zip, create a zip regardless and then rename to extension we want (but throw error if there is zip at that location already)
+        else:
+            # If desired extension is not zip, create a zip regardless and then rename to extension we want
+            # (but throw error if there is zip at that location already)
             if_was_zip_path = f'{destination_str[:-len(ext) - 1]}.zip'
             if os.path.exists(if_was_zip_path):
-                log(Severity.CRITICAL, 'zipUtils.zip_file', f'Trying to overwrite file which should not be overwritten!: {if_was_zip_path}')
+                log(Severity.CRITICAL, 'zipUtils.zip_file',
+                    f'Trying to overwrite file which should not be overwritten!: {if_was_zip_path}')
                 sys.exit()
             else:
                 log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {if_was_zip_path}')

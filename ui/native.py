@@ -4,8 +4,8 @@ Native UI utilities that do not depend on PySide or another GUI framework.
 This module provides lightweight, platform-specific UI functionality using facilities available on the operating system,
 such as native Windows APIs, AppleScript on macOS, and common dialog tools on Linux.
 
-It primarily serves as the non-PySide backend for ``uiUtils`` when a Qt application context is unavailable or undesirable.
-For Qt/PySide-based UI functionality, use ``pySideUtils`` instead.
+It primarily serves as the native backend for ``commonUtils.ui`` when a Qt application context is unavailable or
+undesirable. For Qt/PySide-based UI functionality, use ``commonUtils.ui.pyside`` instead.
 """
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -21,14 +21,12 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
-from .debugUtils import *
 import ctypes
-from .osUtils import *
-import subprocess
 import shutil
+import subprocess
 
-# Blue Hole
-from .wrappers import cmdShellWrapper
+from ..osUtils import OS, get_os
+from ..wrappers import cmdShellWrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -63,7 +61,6 @@ def _get_windows_owner_hwnd() -> int:
     """
     Try to get a sensible owner window handle for native Windows message boxes.
 
-
     Prefer the foreground window, then the active window, then fall back to 0.
     """
     try:
@@ -78,7 +75,7 @@ def _get_windows_owner_hwnd() -> int:
             return hwnd
 
     except Exception as ex:
-        log(Severity.WARNING, 'UI Utils', f'Could not get Windows owner hwnd: {ex}')
+        print(f'Could not get Windows owner hwnd: {ex}')
 
     return 0
 
@@ -141,10 +138,8 @@ def _display_msg_box_ok_linux(title: str, message: str) -> bool:
         input(f"{title}\n{message}\nPress Enter to continue...")
         return True
     except Exception:
-        pass
-
-    log(Severity.CRITICAL, 'uiUtils: Could not popup message', f"{title}\n{message}")
-    return False
+        print(f'Could not display native UI message:\n{title}\n{message}')
+        return False
 
 
 def _display_msg_box_ok_cancel_windows(title: str, message: str) -> bool:
@@ -199,12 +194,8 @@ def _display_msg_box_ok_cancel_linux(title: str, message: str) -> bool:
         return result == 0
 
     try:
-        response = input(
-            f"{title}\n{message}\nType 'ok' to continue, anything else to cancel: "
-        ).strip().lower()
-
+        response = input(f"{title}\n{message}\nType 'ok' to continue, anything else to cancel: ").strip().lower()
         return response in ("ok", "o", "yes", "y")
-
     except Exception:
         return False
 
@@ -253,7 +244,6 @@ def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     :rtype: bool
     """
     print('Showing dialog box.')
-
     message = _normalize_message(message)
 
     match get_os():

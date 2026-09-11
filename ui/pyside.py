@@ -1,3 +1,13 @@
+"""
+PySide6 UI utilities and reusable Qt-based interface components.
+
+This module provides the PySide-specific UI implementation for ``commonUtils.ui``, including message boxes, windows,
+widgets, layouts, progress indicators, styling helpers, and other Qt-related utilities.
+
+Generic UI operations that do not require direct access to PySide should normally be called through ``commonUtils.ui``.
+Use this module directly through ``ui.pyside`` when working with Qt-specific classes or functionality.
+"""
+
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -16,8 +26,8 @@ import os
 import ctypes
 
 # Common utilities
-from . import logUtils, fileUtils, debugUtils, steamUtils
-from .osUtils import *
+from .. import logUtils, fileUtils, debugUtils, steamUtils
+from ..osUtils import *
 
 # PySide6 (Qt) modules
 from PySide6.QtCore import *
@@ -25,7 +35,7 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 
 
-tool_name = 'pySide6 Wrapper'
+tool_name = 'PySide6 Wrapper'
 rog_ally = False
 
 
@@ -70,7 +80,6 @@ class ProgressBar(QWidget):
 
 
 def set_font(q_thing):
-
     if rog_ally:
         modifier = 6
     else:
@@ -84,7 +93,7 @@ def set_font(q_thing):
         case OS.LINUX:
             font_size = 10 + modifier
         case _:
-            debugUtils.log(debugUtils.Severity, 'Set Font', 'Unsupported OS!')
+            debugUtils.log(debugUtils.Severity.ERROR, 'Set Font', 'Unsupported OS!')
             return
 
     q_thing.setFont(QFont('Arial', font_size))
@@ -144,25 +153,24 @@ class Palette:
 
 
 def initialize_q_app():
-
     # Create QApplication, which is the PySide6 UI Application. One per project!
     q_app = QApplication([])
     q_app.setStyle('Fusion')
 
     # If on Windows, set to dark mode always with a palette (if not, it doesn't handle it properly)
     match get_os():
-        case OS.WIN:  # Windows
+        case OS.WIN:
             os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
             # palette_cls = Palette()
             # palette_cls.set_dark()
             # q_app.setPalette(palette_cls.palette)
+
         case OS.LINUX:
             if steamUtils.is_linux_steam_big_picture():
                 palette_cls = Palette()
                 palette_cls.set_navy()
                 q_app.setPalette(palette_cls.palette)
-            else:
-                pass
+
         case _:
             pass
 
@@ -231,6 +239,7 @@ class Window:
             dialog_cls = QDialog()
         else:
             dialog_cls = QMainWindow()
+
         self.dlg = dialog_cls
 
     def setup_ui(self):
@@ -257,13 +266,16 @@ class Window:
         if isinstance(self.dlg, QDialog):
             # For QDialog, use exec()
             self.dlg.exec()
+
         elif isinstance(self.dlg, QMainWindow):
             # For QMainWindow, use show() and ensure app.exec() is called
             self.dlg.show()
+
             if self.maximized:
                 self.dlg.showMaximized()
+
         else:
-            exit_msg('Wrong type for Window.dlg')
+            logUtils.exit_msg('Wrong type for Window.dlg')
 
 
 def button_open_win(text: str, target: QWidget, rect: QRect, window):
@@ -281,18 +293,20 @@ def button_open_win(text: str, target: QWidget, rect: QRect, window):
 def create_scroll_area(target, rect, rect_content):
     """
     Creates a scroll area (scroll bar appears only if not everything can be seen).
+
     :param target: Target UI Element to draw the scroll area in
-    :type target: PySide2.QtWidgets.QObject
-    :param rect: UiRect Object (Physical location and size of the scroll area on screen)
-    :type rect: UiRect
-    :param rect_content: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
-    :type rect_content: UiSize
-    :rtype: PySide2.QtWidgets.QWidget
+    :type target: PySide6.QtWidgets.QObject
+    :param rect: QRect Object
+    :type rect: QRect
+    :param rect_content: QSize Object
+    :type rect_content: QSize
+    :rtype: PySide6.QtWidgets.QWidget
     """
     scroll_area = QScrollArea(target)
     scroll_area.setGeometry(rect)
     scroll_area.setWidgetResizable(True)
     scroll_area.setObjectName('scroll_area')
+
     scroll_area_widget_contents = QWidget()
     scroll_area_widget_contents.setGeometry(rect)
     scroll_area_widget_contents.setMinimumSize(rect_content)
@@ -315,15 +329,17 @@ def create_scroll_area(target, rect, rect_content):
 def create_grid(target, rect: QRect):
     """
     Create a grid that can later be filled.
+
     :param target: Target UI Element to draw the grid in
-    :type target: PySide2.QtWidgets.QObject
+    :type target: PySide6.QtWidgets.QObject
     :param rect: QRect Object
     :type rect: QRect
-    :rtype PySide2.QtWidgets.QGridLayout
+    :rtype: PySide6.QtWidgets.QGridLayout
     """
     grid_layout_widget = QWidget(target)
     grid_layout_widget.setGeometry(rect)
     grid_layout_widget.setObjectName('grid_layout_widget')
+
     grid_layout = QGridLayout(grid_layout_widget)
     grid_layout.setContentsMargins(0, 0, 0, 0)
     grid_layout.setObjectName('grid_layout')
@@ -333,19 +349,21 @@ def create_grid(target, rect: QRect):
 def create_scroll_area_grid(target, rect, rect_content):
     """
     Creates a scrollable area which contains a grid that can be filled later on.
-    :param rect: UiRect Object (Physical location and size of the scroll area on screen)
-    :type rect: UiRect
-    :param rect_content: UiSize Object (Size of the contents of the scroll area; Usually larger than size on screen)
-    :type rect_content: UiSize
+
+    :param rect: QRect Object
+    :type rect: QRect
+    :param rect_content: QSize Object
+    :type rect_content: QSize
     :param target: Target UI Element to draw the scroll area in
-    :type target: PySide2.QtWidgets.QObject
-    :return: PySide2.QtWidgets.QGridLayout
+    :type target: PySide6.QtWidgets.QObject
+    :return: PySide6.QtWidgets.QGridLayout
     """
     # Create scroll area widget contents
     scroll_area_widget_contents = create_scroll_area(target, rect, rect_content)
+
     # Make size for grid
-    grid_ui_rect_cls = QRect(0, 0, 0, 0)
     grid_ui_rect_cls = QRect(0, 0, rect_content.width(), rect_content.height())
+
     # Create grid layout
     grid_layout = create_grid(scroll_area_widget_contents, grid_ui_rect_cls)
     return scroll_area_widget_contents, grid_layout
@@ -353,8 +371,9 @@ def create_scroll_area_grid(target, rect, rect_content):
 
 def create_size(size_x, size_y):
     """
-    This function is used to create a PySide2.QtCore.QSize object that will scale properly in all scenarios
-    :rtype: PySide2.QtCore.QSize
+    This function is used to create a PySide6.QtCore.QSize object that will scale properly in all scenarios.
+
+    :rtype: PySide6.QtCore.QSize
     """
     def size_x_scaled():
         return size_x * get_scale_multiplier()
@@ -377,18 +396,19 @@ def create_frame(target: QDialog, rect: QRect):
 def create_checkbox(target: QWidget, rect: QRect, default_state: bool = False):
     """
     Create a checkbox which can be ticked or not by user.
-    :param rect: UiRect Object
-    :type rect: UiRect
+
+    :param rect: QRect Object
+    :type rect: QRect
     :param target: Target UI Element to draw the checkbox in
-    :type target: PySide2.QtWidgets.QObject
-    :rtype: PySide2.QtWidgets.QCheckBox
+    :type target: PySide6.QtWidgets.QObject
     :param default_state: Default state for the checkbox. Default is unchecked.
     :type default_state: bool
-    :rtype: PySide2.QtWidgets.QCheckBox
+    :rtype: PySide6.QtWidgets.QCheckBox
     """
     checkbox = QCheckBox(target)
     checkbox.setGeometry(rect)
     checkbox.setObjectName('checkbox')
+
     if default_state:
         checkbox.setChecked(default_state)
 
@@ -397,7 +417,7 @@ def create_checkbox(target: QWidget, rect: QRect, default_state: bool = False):
 
 class MessageBox(QMessageBox):
     def __init__(self):
-        super(MessageBox, self).__init__()
+        super().__init__()
 
 
 def create_msg_box_base(title, message, icon='default', width=300, height=400,
@@ -405,13 +425,14 @@ def create_msg_box_base(title, message, icon='default', width=300, height=400,
                         b_02_str=None, b_02_fn=None,
                         b_03_str=None, b_03_fn=None):
     """
-    Creates message box of various types
+    Creates message box of various types.
+
     :param title: Title in the header of the message box
     :type title: str
     :param message: Message within the message box
     :type message: str
-    :param icon: Icon in the message box to display (dependent of severity of message)
-    :type icon: str, from a few predefined options (see API doc.)
+    :param icon: Icon in the message box to display
+    :type icon: str
     :param width: Width of the window
     :type width: int
     :param height: Height of the window
@@ -431,17 +452,16 @@ def create_msg_box_base(title, message, icon='default', width=300, height=400,
     """
 
     def button_pressed(info):
-        # Execute button pressed function.
         def exec_fn_if_not_none(b_fn):
-            # If function isn't None, execute
             if b_fn is not None:
                 b_fn()
 
-        # Find out which button was pressed and run its fn (if not set to None)
         if info.text() == b_01_str:
             exec_fn_if_not_none(b_01_fn)
+
         if info.text() == b_02_str:
             exec_fn_if_not_none(b_02_fn)
+
         if info.text() == b_03_str:
             exec_fn_if_not_none(b_03_fn)
 
@@ -455,17 +475,19 @@ def create_msg_box_base(title, message, icon='default', width=300, height=400,
     # Set Icon
     if icon.lower() == 'critical':
         msg_box.setIcon(QMessageBox.Icon.Critical)
+
     elif icon.lower() == 'warning':
         msg_box.setIcon(QMessageBox.Icon.Warning)
+
     elif icon.lower() == 'information':
         msg_box.setIcon(QMessageBox.Icon.Information)
+
     elif icon.lower() == 'question':
         msg_box.setIcon(QMessageBox.Icon.Question)
 
     # Connect button to functions
     msg_box.buttonClicked.connect(button_pressed)
 
-    # Return created message box
     return msg_box
 
 
@@ -517,9 +539,9 @@ def display_msg_box_yes_no(title, message, fn_yes=None, fn_no=None, icon='questi
 
 def display_msg_box_ok_help(title, message, fn_help=None, icon='warning', width=300, height=400):
     """
-    Displays a message box with Ok and Help buttons.
+    Displays a message box with OK and Help buttons.
     """
-    msg_box = create_msg_box_base(title, message, icon, width, height, 'Ok', None, 'Help', fn_help)
+    msg_box = create_msg_box_base(title, message, icon, width, height, 'OK', None, 'Help', fn_help)
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Help)
     msg_box.exec()
     return True
@@ -535,7 +557,7 @@ class ProgressBarWindow(Window):
         # Set dimensions
         self.width = 300
         self.height = 50
-        self.dlg.resize(int(self.width), int(self.height))  # Explicitly set the window size
+        self.dlg.resize(int(self.width), int(self.height))
         self.dlg.setWindowTitle(title)
         self.dlg.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.CustomizeWindowHint | Qt.WindowType.WindowTitleHint)
 
@@ -550,29 +572,25 @@ class ProgressBarWindow(Window):
         layout.addWidget(self.progress_bar)
 
         # Attach layout to dialog
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.dlg.setLayout(layout)  # Set layout for QDialog
-
-        _translate = QCoreApplication.translate  # Keep this as it is
+        self.dlg.setLayout(layout)
 
     def update_progress(self, value):
-        """Update the progress bar"""
+        """Update the progress bar."""
         self.progress_bar.setValue(value)
-        QApplication.processEvents()  # Keep UI responsive
+        QApplication.processEvents()
 
 
 def display_progress_bar(title: str):
     progress_window = ProgressBarWindow(title)
-    progress_window.dlg.show()  # Show the window but don't block execution
+    progress_window.dlg.show()
     return progress_window
 
 
 def hide_console_window():
-    """Hides the console window on Windows if not in debug mode."""
+    """Hide the console window on Windows."""
     match get_os():
-        case "Windows":
+        case OS.WIN:
             ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+
         case _:
-            # TODO: Make Window Hide-able on Other OS
-            debugUtils.log(debugUtils.Severity.WARNING, 'Main', 'Could Not Hide CMD Window!')
+            debugUtils.log(debugUtils.Severity.WARNING, 'Main', 'Could not hide console window!')
