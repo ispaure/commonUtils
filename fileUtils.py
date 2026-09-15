@@ -25,8 +25,6 @@ from .wrappers import cmdShellWrapper
 
 
 match get_os():
-    case OS.WIN:
-        from . import junctionUtils
     case OS.LINUX:
         import pwd
 
@@ -273,117 +271,6 @@ def move_file(src: Path, dest: Path) -> bool:
 
 def has_subdirectories(path: Path) -> bool:
     return any(item.is_dir() for item in path.iterdir())
-
-
-def delete_symbolic_link(dir_path):
-    try:
-        os.unlink(dir_path)
-    except:
-        try:
-            os.remove(dir_path)
-        except:
-            pass
-
-
-def create_symbolic_link(source_dir, destination_dir):
-    """
-    Creates a symbolic link from the source dir to the destination dir
-    """
-    tool_name = 'Create Symbolic Link'
-
-    # Resolve source dir (avoiding potential issues when creating a link)
-    if isinstance(source_dir, Path):
-        source_dir_resolved = source_dir.resolve()
-    elif isinstance(source_dir, str):
-        source_dir_path = Path(source_dir)
-        source_dir_resolved = source_dir_path.resolve()
-    else:
-        log(Severity.ERROR, tool_name, 'Source Dir Input is not a Path or string!')
-        return
-
-    # If there is no directory within where the symbolic link is supposed to be created, there will be an error.
-    # Create directory if required
-    if isinstance(destination_dir, Path):
-        destination_dir_parent = destination_dir.parent
-    elif isinstance(destination_dir, str):
-        destination_dir_path = Path(destination_dir)
-        destination_dir_parent = destination_dir_path.parent
-    else:
-        log(Severity.ERROR, tool_name, 'Destination Dir Input is not a Path or string!')
-        return
-    if not os.path.isdir(destination_dir_parent):
-        make_dir(destination_dir_parent)
-
-    os.symlink(source_dir_resolved, destination_dir)
-
-
-def update_symbolic_link(source: Path, destination: Path, allow_destination_deletion=False):
-    """
-    Creates a symbolic link (allowing directory deletion if a directory exists at source when specified only)
-    If a link already exists, see if it points to the right folder, else updates it.
-    """
-
-    # Tool Name
-    tool_name = f'Symbolic Link (Update)'
-    # Log Message
-    msg = f'Source: "{source}"\nDestination: "{destination}"'
-
-    # If source for symbolic link does not exist, abort right now!
-    if not os.path.exists(source):
-        msg += f'\nSource does not exist; Aborting!'
-        log(Severity.ERROR, tool_name, msg)
-        return
-
-    # If there is something there other than a symbolic link, wipe it (if authorized)
-    if os.path.exists(destination) and not is_symbolic_link(destination):
-        if not allow_destination_deletion:
-            msg += '\nDestination already exists (And "allow_destination_deletion" is not enabled); Aborting!'
-            log(Severity.ERROR, tool_name, msg)
-            return
-        else:
-            if is_junction(destination):
-                msg += '\nDestination is junction; unsure how to delete as of yet; Aborting!'
-                log(Severity.ERROR, tool_name, msg)
-                return
-            # elif is_hard_link(destination):
-            #     print(f'{tool_name}: Destination is hard link, unsure how to delete as of yet!')
-            elif os.path.isfile(destination):
-                msg += '\nDestination is a file, not expected for Symbolic Link creation. Aborting!'
-                log(Severity.ERROR, tool_name, msg)
-                return
-            elif is_mount_point(destination):
-                msg += '\nDestination is a mount point, unsure how to delete as of yet!'
-                # delete_symbolic_link(destination)
-                log(Severity.ERROR, tool_name, msg)
-                return
-            elif is_dir(destination):
-                msg += '\nDestination is a directory! Deleting...'
-                from .dirUtils import Directory
-                Directory(destination).delete()
-            else:
-                msg += '\nDestination is unknown type, unsure how to delete as of yet!'
-                log(Severity.ERROR, tool_name, msg)
-                return
-
-    # If it's a symbolic link, see if path matches expected
-    if is_symbolic_link(destination):
-        destination_link_path = os.path.realpath(destination)
-        if str(Path(destination_link_path)) != str(source):
-            msg += '\nSymbolic Link exists at destination, but doesn\'t match expected destination. Updating...'
-            # Delete existing link
-            delete_symbolic_link(destination)
-            # Make a link to the folder
-            create_symbolic_link(source, destination)
-            log(Severity.DEBUG, tool_name, msg)
-        else:
-            msg += '\nSymbolic Link Already Up to Date!'
-            log(Severity.DEBUG, tool_name, msg)
-    else:
-        # Create new symbolic link
-        msg += '\nSymbolic Link doesn\'t exist at location. Creating...'
-        # Make a link to the folder
-        create_symbolic_link(source, destination)
-        log(Severity.DEBUG, tool_name, msg)
 
 
 def get_split_character():
