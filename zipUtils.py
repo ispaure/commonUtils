@@ -29,27 +29,6 @@ from . import fileUtils
 from .debugUtils import *
 
 
-class ZIPFile(fileUtils.File):
-    """
-    Deprecated, redirect to fileTypes.zipType.ZIPFile instead.
-    """
-    def __init__(self, path: Path):
-        # Call the parent (File) initializer
-        super().__init__(path)
-
-    def extract(self, dest_path: Path, show_progress: bool = False) -> bool:
-        """Extract the ZIP File"""
-        return unzip_file(self.path, dest_path, show_progress=show_progress)
-
-    def get_root_file_lst(self) -> List[str]:
-        try:
-            with zipfile.ZipFile(self.path, 'r') as zip_ref:
-                # list of all entries at root (no '/')
-                return [Path(f).name for f in zip_ref.namelist() if '/' not in f]
-        except zipfile.BadZipFile:
-            log(Severity.CRITICAL, "CBZFile", f"Invalid ZIP structure in {self.path}")
-
-
 def unzip_file(source_file: Union[str, Path],
                destination_dir: Union[str, Path],
                pwd: Optional[str] = None,
