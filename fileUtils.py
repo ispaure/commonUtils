@@ -386,61 +386,6 @@ def update_symbolic_link(source: Path, destination: Path, allow_destination_dele
         log(Severity.DEBUG, tool_name, msg)
 
 
-def is_junction(path: Union[str, Path]):
-    if get_os() == OS.WIN:
-        return junctionUtils.is_junction(path)
-    else:
-        return False
-
-
-def is_symbolic_link(path: Union[str, Path]):
-    if os.path.islink(path):
-        return True
-    else:
-        return False
-
-
-def is_mount_point(path: Union[str, Path]):
-    if get_os() != OS.WIN:
-        return False
-
-    # Convert type
-    if isinstance(path, str):
-        path_str = path
-    elif isinstance(path, Path):
-        path_str = str(path)
-    else:
-        print('Wrong type!')
-        return None
-
-    # FSUTIL QUERY
-    output_lines = cmdShellWrapper.exec_cmd(f'fsutil reparsepoint query "{path_str}"')
-    for line in output_lines:
-        if line == 'Tag value: Mount Point':
-            return True
-    return False
-
-
-def is_dir(path: Union[str, Path]):
-    """
-    Returns whether a path is a directory.
-    More accurate than os.path.isdir as it will return False if the target is a junction, symbolic link or hard link
-    """
-
-    if not os.path.isdir(path):
-        return False
-    # elif is_hard_link(path):
-    #     return False
-    elif is_junction(path):
-        return False
-    elif is_mount_point(path):
-        return False
-    elif is_symbolic_link(path):
-        return False
-    else:
-        return True
-
-
 def get_split_character():
     match get_os():
         case OS.WIN:
