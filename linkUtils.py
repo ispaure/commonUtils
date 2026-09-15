@@ -11,9 +11,37 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
+import os
+import stat
 from pathlib import Path
 from typing import Union
 from .debugUtils import *
+from .osUtils import *
+
+
+def is_junction(path: Union[str, Path]) -> bool:
+    """
+    Returns whether a path is a Windows junction.
+
+    Python 3.12+ uses Path.is_junction().
+    Python 3.10/3.11 uses the Windows reparse tag as a fallback.
+    Junctions do not exist on non-Windows platforms.
+    """
+    path = Path(path)
+
+    # Junctions are Windows-specific
+    if get_os() != OS.WIN:
+        return False
+
+    # Path.is_junction() was added in Python 3.12
+    if hasattr(path, 'is_junction'):
+        return path.is_junction()
+
+    # Python 3.10/3.11 Windows fallback
+    try:
+        return os.lstat(path).st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT
+    except (FileNotFoundError, AttributeError):
+        return False
 
 
 def delete_symbolic_link(path: Union[str, Path]) -> bool:
@@ -126,7 +154,7 @@ def update_symbolic_link(source: Union[str, Path], destination: Union[str, Path]
         log(Severity.CRITICAL, tool_name, f'{msg}\nDestination already exists and "allow_destination_deletion" is not enabled; Aborting!')
 
     # Junctions must be removed directly so their targets are never deleted
-    if destination.is_junction():
+    if is_junction(destination):
         msg += '\nDestination is a junction. Removing junction...'
 
         try:
@@ -134,7 +162,7 @@ def update_symbolic_link(source: Union[str, Path], destination: Union[str, Path]
         except Exception as e:
             log(Severity.CRITICAL, tool_name, f'{msg}\nCould not remove junction\n{type(e).__name__}: {e}')
 
-        if destination.exists() or destination.is_junction():
+        if destination.exists() or is_junction(destination):
             log(Severity.CRITICAL, tool_name, f'{msg}\nJunction still exists after deletion attempt: "{destination}"')
 
     elif destination.is_file():
