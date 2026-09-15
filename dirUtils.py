@@ -58,9 +58,14 @@ class Directory:
 
             if full_path.is_dir():
                 if recursive:
-                    all_files += Directory(full_path).list_files(recursive=recursive, filter_extension=filter_extension)
+                    all_files += Directory(full_path).list_files(
+                        recursive=recursive,
+                        filter_extension=filter_extension
+                    )
             elif full_path.suffix.lower() == '.txt':
                 all_files.append(fileUtils.TXTFile(full_path))
+            elif full_path.suffix.lower() == '.csv':
+                all_files.append(fileUtils.CSVFile(full_path))
             else:
                 all_files.append(fileUtils.File(full_path))
 

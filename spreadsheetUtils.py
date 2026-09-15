@@ -11,8 +11,7 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
-from pathlib import Path
-from typing import *
+from typing import List
 
 # Common utilities
 from . import fileUtils, logUtils
@@ -21,9 +20,6 @@ from . import fileUtils, logUtils
 class Cell:
     def __init__(self, txt: str):
         self.txt = txt
-
-    def get_csv_cell(self):
-        return self.txt.replace(',', '<comma>')
 
 
 class Row:
@@ -49,14 +45,6 @@ class Row:
     def get_cells(self):
         return self.__cell_lst
 
-    def get_csv_line(self):
-        cell_str_lst = []
-
-        for cell in self.__cell_lst:
-            cell_str_lst.append(cell.get_csv_cell())
-
-        return ','.join(cell_str_lst)
-
 
 class Spreadsheet:
     def __init__(self, name: str):
@@ -75,10 +63,10 @@ class Spreadsheet:
         csv_data: List[List[str]] = []
 
         for row in self.__row_lst:
-            csv_row: List[str] = []
-
-            for cell in row.get_cells():
-                csv_row.append(cell.txt)
+            csv_row = [
+                cell.txt
+                for cell in row.get_cells()
+            ]
 
             csv_data.append(csv_row)
 
