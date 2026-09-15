@@ -84,29 +84,14 @@ additional behavior.
 
 Current types include:
 
-  -----------------------------------------------------------------------
-  Class                   Module                  Purpose
-  ----------------------- ----------------------- -----------------------
-  `TXTFile`               `txtType`               Read/write text as
-                                                  lines and open it in
-                                                  the default editor
-
-  `CSVFile`               `csvType`               Read/write CSV data
-                                                  using Python's CSV
-                                                  handling
-
-  `XMLFile`               `xmlType`               XML-oriented text file
-                                                  type
-
-  `ZIPFile`               `zipType`               ZIP extraction and
-                                                  root-entry inspection
-
-  `DMGFile`               `dmgType`               macOS DMG mounting and
-                                                  directory extraction
-
-  `AppImageFile`          `appimageType`          AppImage file
-                                                  representation
-  -----------------------------------------------------------------------
+| Class | Module | Purpose |
+| --- | --- | --- |
+| `TXTFile` | `txtType` | Read/write text as lines and open it in the default editor |
+| `CSVFile` | `csvType` | Read/write CSV data using Python's CSV handling |
+| `XMLFile` | `xmlType` | XML-oriented text file type |
+| `ZIPFile` | `zipType` | ZIP extraction and root-entry inspection |
+| `DMGFile` | `dmgType` | macOS DMG mounting and directory extraction |
+| `AppImageFile` | `appimageType` | AppImage file representation |
 
 Example:
 
