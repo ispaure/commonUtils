@@ -11,9 +11,8 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
-from typing import *
 from pathlib import Path
-import os
+from typing import *
 
 # Common utilities
 from . import fileUtils, logUtils
@@ -38,8 +37,10 @@ class Row:
         if idx + 1 > len(self.__cell_lst):
             msg = 'Index out of range in cells: '
             cell_txt_lst = []
+
             for cell in self.__cell_lst:
                 cell_txt_lst.append(cell.txt)
+
             msg += ', '.join(cell_txt_lst)
             logUtils.log_msg(msg)
         else:
@@ -50,13 +51,16 @@ class Row:
 
     def get_csv_line(self):
         cell_str_lst = []
+
         for cell in self.__cell_lst:
             cell_str_lst.append(cell.get_csv_cell())
-        return ','.join(cell_str_lst) + '\n'
+
+        return ','.join(cell_str_lst)
 
 
 class Spreadsheet:
     def __init__(self, name: str):
+        self.name = name
         self.__row_lst: List[Row] = []
 
     def append_row(self, row: Row):
@@ -65,33 +69,33 @@ class Spreadsheet:
     def get_rows(self):
         return self.__row_lst
 
-    def export_file(self, path: Path):
-        logUtils.log_msg(f'Exporting Spreadsheet to {path}')
-        csv_output_str: str = ''
+    def export_file(self, file: fileUtils.CSVFile):
+        logUtils.log_msg(f'Exporting Spreadsheet to {file.path}')
+
+        csv_data: List[List[str]] = []
 
         for row in self.__row_lst:
-            csv_output_str += row.get_csv_line
+            csv_row: List[str] = []
 
-        if csv_output_str.endswith('\n'):
-            csv_output_str = csv_output_str.rstrip('\n')
+            for cell in row.get_cells():
+                csv_row.append(cell.txt)
 
-        if not os.path.isdir(path.parent):
-            fileUtils.make_dir(path.parent)
+            csv_data.append(csv_row)
 
-        with open(str(path), 'w') as out:
-            out.write(csv_output_str)
+        file.write_csv(csv_data)
 
-    def import_file(self, path: Union[str, Path]):
-        logUtils.log_msg(f'Importing spreadsheet from {path}')
-        if isinstance(path, str):
-            path = Path(path)
+    def import_file(self, file: fileUtils.CSVFile):
+        logUtils.log_msg(f'Importing spreadsheet from {file.path}')
 
-        if path.exists():
-            with open(path, 'r') as input:
-                line_lst = input.readlines()
-            for line in line_lst:
-                cell_lst = line.split(',')
-                row = Row()
-                for cell in cell_lst:
-                    row.append_cell(Cell(cell.replace('\n', '')))
-                self.append_row(row)
+        if not file.path.exists():
+            return
+
+        csv_data = file.read_csv()
+
+        for csv_row in csv_data:
+            row = Row()
+
+            for cell_txt in csv_row:
+                row.append_cell(Cell(cell_txt))
+
+            self.append_row(row)

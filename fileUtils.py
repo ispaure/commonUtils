@@ -185,6 +185,47 @@ class TXTFile(File):
                 subprocess.run(["xdg-open", path_str])
 
 
+class CSVFile(TXTFile):
+    def __init__(self, path: Path):
+        super().__init__(path)
+
+    def read_csv(self) -> List[List[str]]:
+        """
+        Reads the CSV file and returns its contents as a list of rows,
+        where each row is a list of cell values.
+        """
+        csv_data: List[List[str]] = []
+
+        for line in self.read_lines():
+            cell_lst = [
+                cell.replace('<comma>', ',')
+                for cell in line.split(',')
+            ]
+
+            csv_data.append(cell_lst)
+
+        return csv_data
+
+    def write_csv(self, csv_data: List[List[str]]):
+        """
+        Writes a list of rows to the CSV file.
+
+        Each row must be a list of cell values.
+        Commas contained within cells are encoded as <comma>.
+        """
+        self.line_lst = []
+
+        for row in csv_data:
+            cell_lst = [
+                str(cell).replace(',', '<comma>')
+                for cell in row
+            ]
+
+            self.line_lst.append(','.join(cell_lst))
+
+        self.write_lines()
+
+
 def move_file(src: Path, dest: Path) -> bool:
     """
     Moves a file from src to dest, overwriting if it already exists.
@@ -215,20 +256,6 @@ def move_file(src: Path, dest: Path) -> bool:
     except Exception as e:
         log(Severity.CRITICAL, 'fileUtils.move_file', f'Error moving file from \"{src}\" to \"{dest}\": {e}')
         return False
-
-
-def create_n_wipe_dir(path: Path):
-    """
-    Creates directory at path if it does not exist, also wipes contents and double-check it's fully empty.
-    """
-    if not os.path.isdir(path):
-        make_dir(path)
-    if not is_dir_empty(path):
-        from .dirUtils import Directory
-        Directory(path).delete_contents()
-        # Double-Check that it is empty now
-        if not is_dir_empty(path):
-            log(Severity.CRITICAL, 'fileUtils.create_n_wipe_dir', f'Could not delete dir contents in {path}')
 
 
 def has_subdirectories(path: Path) -> bool:
@@ -472,14 +499,12 @@ def copy_file(source: Union[str, Path], destination: Union[str, Path]) -> bool:
 def make_dir(directory):
     """
     Creates directory at location (if it doesn't exist)
+    DEPRECATED: Fix any usage by swapping to Directory.make_dir() instead.
     """
+    log(Severity.WARNING, 'fileUtils.make_dir', 'This function is deprecated! Use dirUtils.Directory.make_dir instead.')
     if not os.path.exists(directory):
         log(Severity.DEBUG, 'fileUtils.make_dir', f'Creating Directory at "{directory}"')
         Path(directory).mkdir(parents=True, exist_ok=True)
-
-
-def is_dir_empty(path: Path) -> bool:
-    return not any(path.iterdir())
 
 
 def get_current_working_dir() -> Path:

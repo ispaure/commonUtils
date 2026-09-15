@@ -125,3 +125,17 @@ class Directory:
 
         dir_lst.sort(key=lambda directory: directory.name.lower())
         return dir_lst
+
+    def is_dir(self) -> bool:
+        return self.path.is_dir()
+
+    def is_dir_empty(self) -> bool:
+        return not any(self.path.iterdir())
+
+    def make_dir(self):
+        """
+        Creates directory at location (if it doesn't exist)
+        """
+        if not self.is_dir():
+            log(Severity.DEBUG, 'Directory.make_dir', f'Creating directory at location "{self.path}"')
+            self.path.mkdir(parents=True, exist_ok=True)
