@@ -64,10 +64,16 @@ class File:
         except FileNotFoundError:
             return None
 
-    def delete_file(self) -> bool:
+    def delete_file(self, make_writable: bool = False) -> bool:
         """
         Deletes the file on disk.
-        Returns True if successfully deleted, False otherwise.
+
+        By default, file permissions are not modified before deletion.
+        If make_writable is True and deletion fails due to permissions,
+        the file is made writable and deletion is attempted again.
+
+        Returns True if successfully deleted.
+        Raises a CRITICAL error if deletion fails.
 
         macOS AppleDouble files starting with "._" are treated as successfully deleted
         if they disappear before the delete operation completes.
@@ -77,16 +83,30 @@ class File:
 
         try:
             os.remove(self.path)
-            return not self.path.exists()
+
         except FileNotFoundError as e:
             if self.path.name.startswith('._'):
                 return True
 
-            log(Severity.ERROR, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
-            return False
+            log(Severity.CRITICAL, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
+
+        except PermissionError as e:
+            if not make_writable:
+                log(Severity.CRITICAL, 'Delete File', f'Could not delete "{self.path}" due to permissions\n{type(e).__name__}: {e}')
+
+            try:
+                self.make_writable()
+                os.remove(self.path)
+            except Exception as retry_error:
+                log(Severity.CRITICAL, 'Delete File', f'Could not delete "{self.path}" after making it writable\n{type(retry_error).__name__}: {retry_error}')
+
         except Exception as e:
-            log(Severity.ERROR, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
-            return False
+            log(Severity.CRITICAL, 'Delete File', f'Could not delete "{self.path}"\n{type(e).__name__}: {e}')
+
+        if self.path.exists():
+            log(Severity.CRITICAL, 'Delete File', f'File still exists after deletion attempt: "{self.path}"')
+
+        return True
 
     def make_writable(self) -> bool:
         """
