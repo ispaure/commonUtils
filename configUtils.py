@@ -23,6 +23,7 @@ import configparser
 # Common utilities
 from . import fileUtils
 from .debugUtils import *
+from .fileTypes import txtType
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -131,7 +132,7 @@ def _bypass_scan_ini(
 
     # Prefer your existing fileUtils if you want; otherwise read directly.
     try:
-        txt = fileUtils.TXTFile(path)
+        txt = txtType.TXTFile(path)
         txt.read_lines()
         lines = txt.line_lst
     except Exception:
@@ -190,7 +191,7 @@ def config_add_variable(cfg_file_path: Union[str, Path], section: str, variable:
     """
     path = Path(cfg_file_path)
 
-    file_cls = fileUtils.TXTFile(path)
+    file_cls = txtType.TXTFile(path)
     file_cls.read_lines()
 
     # Normalize to "no trailing newline" per element
@@ -244,7 +245,7 @@ def config_set_variable(cfg_file_path: Union[str, Path], section: str, variable:
     """
     path = Path(cfg_file_path)
 
-    cfg_file = fileUtils.TXTFile(path)
+    cfg_file = txtType.TXTFile(path)
     cfg_file.read_lines()
 
     lines_lst = [ln.rstrip("\n") for ln in cfg_file.line_lst]
@@ -305,7 +306,7 @@ def config_remove_section(cfg_file_path, section):
     Remove a section from a config file
     """
     tool_name = 'config_remove_section'
-    cfg_txt_file = fileUtils.TXTFile(cfg_file_path)
+    cfg_txt_file = txtType.TXTFile(cfg_file_path)
     cfg_txt_file.read_lines()
     new_line_lst = []
     section_str = f'[{section}]'

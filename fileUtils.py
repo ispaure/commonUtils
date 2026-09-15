@@ -145,8 +145,10 @@ class File:
         log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{self.path}"')
         cmdShellWrapper.exec_cmd(f'chmod +x "{self.path}"')
 
-
 class TXTFile(File):
+    """
+    Deprecated; point to fileTypes.txtType instead.
+    """
     def __init__(self, path: Path):
         super().__init__(path)
         self.line_lst = []
@@ -202,39 +204,6 @@ class TXTFile(File):
                     subprocess.Popen(["open", "-a", "TextEdit", path_str])
             case OS.LINUX:
                 subprocess.run(["xdg-open", path_str])
-
-
-class CSVFile(File):
-    def __init__(self, path: Path):
-        super().__init__(path)
-
-    def read_csv(self) -> List[List[str]]:
-        """
-        Reads the CSV file and returns its contents as a list of rows,
-        where each row is a list of cell values.
-        """
-        csv_data: List[List[str]] = []
-
-        with open(self.path, 'r', encoding='utf-8-sig', newline='') as file:
-            reader = csv.reader(file)
-
-            for row in reader:
-                csv_data.append(row)
-
-        return csv_data
-
-    def write_csv(self, csv_data: List[List[str]]):
-        """
-        Writes a list of rows to the CSV file using standard CSV formatting.
-        """
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.make_writable()
-
-        with open(self.path, 'w', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file)
-
-            for row in csv_data:
-                writer.writerow(row)
 
 
 def move_file(src: Path, dest: Path) -> bool:

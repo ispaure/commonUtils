@@ -1,7 +1,3 @@
-"""
-TO BE DEPRECATED, FORWARD CALLS FROM HERE TO fileTypes.dmgType
-"""
-
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -21,9 +17,9 @@ import shutil
 import subprocess
 
 # Common utilities
-from . import fileUtils
-from .osUtils import *
-from .debugUtils import *
+from .. import fileUtils
+from ..osUtils import *
+from ..debugUtils import *
 
 
 class DMGFile(fileUtils.File):

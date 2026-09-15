@@ -30,6 +30,9 @@ from .debugUtils import *
 
 
 class ZIPFile(fileUtils.File):
+    """
+    Deprecated, redirect to fileTypes.zipType.ZIPFile instead.
+    """
     def __init__(self, path: Path):
         # Call the parent (File) initializer
         super().__init__(path)

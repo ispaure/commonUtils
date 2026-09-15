@@ -1,7 +1,3 @@
-"""
-TO BE DEPRECATED, FORWARD CALLS FROM HERE TO fileTypes.appimageType
-"""
-
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -15,13 +11,13 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
+from typing import *
 from pathlib import Path
 
 # Common utilities
-from . import fileUtils
+from .txtType import TXTFile
 
 
-class AppImageFile(fileUtils.File):
+class XMLFile(TXTFile):
     def __init__(self, path: Path):
-        # Call the parent (File) initializer
         super().__init__(path)

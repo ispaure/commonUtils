@@ -14,7 +14,8 @@ __status__ = 'Production'
 from typing import List
 
 # Common utilities
-from . import fileUtils, logUtils
+from . import logUtils
+from .fileTypes import csvType
 
 
 class Cell:
@@ -57,7 +58,7 @@ class Spreadsheet:
     def get_rows(self):
         return self.__row_lst
 
-    def export_file(self, file: fileUtils.CSVFile):
+    def export_file(self, file: csvType.CSVFile):
         logUtils.log_msg(f'Exporting Spreadsheet to {file.path}')
 
         csv_data: List[List[str]] = []
@@ -72,7 +73,7 @@ class Spreadsheet:
 
         file.write_csv(csv_data)
 
-    def import_file(self, file: fileUtils.CSVFile):
+    def import_file(self, file: csvType.CSVFile):
         logUtils.log_msg(f'Importing spreadsheet from {file.path}')
 
         if not file.path.exists():
