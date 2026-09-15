@@ -16,6 +16,7 @@ import stat
 import subprocess
 from pathlib import Path
 from shutil import rmtree, copyfile, move
+import csv
 
 # Common utilities
 from .osUtils import *
@@ -185,7 +186,7 @@ class TXTFile(File):
                 subprocess.run(["xdg-open", path_str])
 
 
-class CSVFile(TXTFile):
+class CSVFile(File):
     def __init__(self, path: Path):
         super().__init__(path)
 
@@ -196,34 +197,26 @@ class CSVFile(TXTFile):
         """
         csv_data: List[List[str]] = []
 
-        for line in self.read_lines():
-            cell_lst = [
-                cell.replace('<comma>', ',')
-                for cell in line.split(',')
-            ]
+        with open(self.path, 'r', encoding='utf-8-sig', newline='') as file:
+            reader = csv.reader(file)
 
-            csv_data.append(cell_lst)
+            for row in reader:
+                csv_data.append(row)
 
         return csv_data
 
     def write_csv(self, csv_data: List[List[str]]):
         """
-        Writes a list of rows to the CSV file.
-
-        Each row must be a list of cell values.
-        Commas contained within cells are encoded as <comma>.
+        Writes a list of rows to the CSV file using standard CSV formatting.
         """
-        self.line_lst = []
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.make_writable()
 
-        for row in csv_data:
-            cell_lst = [
-                str(cell).replace(',', '<comma>')
-                for cell in row
-            ]
+        with open(self.path, 'w', encoding='utf-8', newline='') as file:
+            writer = csv.writer(file)
 
-            self.line_lst.append(','.join(cell_lst))
-
-        self.write_lines()
+            for row in csv_data:
+                writer.writerow(row)
 
 
 def move_file(src: Path, dest: Path) -> bool:
