@@ -13,7 +13,7 @@ __status__ = 'Production'
 
 from pathlib import Path
 from .debugUtils import *
-from . import fileUtils
+from . import fileUtils, linkUtils
 import os, subprocess, sys
 from typing import List, Optional, Set, Union
 
@@ -40,24 +40,20 @@ class Directory:
             return fileUtils.File(path)
 
     @staticmethod
-    def __is_link(path: Path) -> bool:
-        return path.is_symlink() or path.is_junction()
+    def __delete_junction(path: Path):
+        """
+        Deletes a junction without deleting the directory it points to.
+        """
+        if not path.is_junction():
+            log(Severity.CRITICAL, 'Directory.__delete_junction', f'Path is not a junction: "{path}"')
 
-    @staticmethod
-    def __delete_link(path: Path):
-        """
-        Deletes a symbolic link or junction without deleting the target it points to.
-        """
         try:
-            if path.is_symlink():
-                path.unlink()
-            elif path.is_junction():
-                path.rmdir()
+            path.rmdir()
         except Exception as e:
-            log(Severity.CRITICAL, 'Directory.__delete_link', f'Could not delete link "{path}"\n{type(e).__name__}: {e}')
+            log(Severity.CRITICAL, 'Directory.__delete_junction', f'Could not delete junction "{path}"\n{type(e).__name__}: {e}')
 
-        if path.exists() or path.is_symlink():
-            log(Severity.CRITICAL, 'Directory.__delete_link', f'Link still exists after deletion attempt: "{path}"')
+        if path.exists() or path.is_junction():
+            log(Severity.CRITICAL, 'Directory.__delete_junction', f'Junction still exists after deletion attempt: "{path}"')
 
     def open(self):
         path_str = str(self.path)
@@ -124,9 +120,14 @@ class Directory:
         else:
             log(Severity.DEBUG, 'Directory.delete', f'Deleting directory: "{self.path}"')
 
-        # Delete the link itself rather than the directory it points to
-        if self.__is_link(self.path):
-            self.__delete_link(self.path)
+        # Delete symbolic links without touching their targets
+        if self.path.is_symlink():
+            linkUtils.delete_symbolic_link(self.path)
+            return True
+
+        # Delete junctions without touching their targets
+        if self.path.is_junction():
+            self.__delete_junction(self.path)
             return True
 
         # Delete contents first, then the directory itself
@@ -146,7 +147,7 @@ class Directory:
         """
         Deletes the files and folders within the directory, but not the directory itself.
 
-        Symbolic links and junctions found inside the directory are unlinked without deleting their targets.
+        Symbolic links and junctions found inside the directory are deleted without deleting their targets.
         If this Directory itself is a symbolic link or junction, deletion is refused with a CRITICAL error unless
         follow_root_link is True.
 
@@ -154,7 +155,7 @@ class Directory:
         If make_writable is True, files that cannot be deleted due to permissions may be made writable and retried.
         """
         # Do not follow a linked root for destructive operations unless explicitly requested
-        if self.__is_link(self.path):
+        if self.path.is_symlink() or self.path.is_junction():
             if not follow_root_link:
                 log(Severity.CRITICAL, 'Directory.delete_contents', f'Unable to delete contents of linked directory "{self.path}" without follow_root_link=True')
 
@@ -164,9 +165,13 @@ class Directory:
 
         # Delete directory contents
         for path in list(self.path.iterdir()):
-            # Delete symbolic links and junctions without touching their targets
-            if self.__is_link(path):
-                self.__delete_link(path)
+            # Delete symbolic links without touching their targets
+            if path.is_symlink():
+                linkUtils.delete_symbolic_link(path)
+
+            # Delete junctions without touching their targets
+            elif path.is_junction():
+                self.__delete_junction(path)
 
             # Delete real subdirectories recursively
             elif path.is_dir():
