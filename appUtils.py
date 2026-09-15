@@ -116,12 +116,14 @@ class DiskApp(App):
         quoted_path = shlex.quote(path_macos_str)
 
         if path_macos_str.lower().endswith(('.command', '.sh')):
+            ensure_executable(path_macos)
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
 
         elif open_console:
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
 
         elif fully_detached:
+            ensure_executable(path_macos)
             subprocess.Popen(
                 [path_macos_str],
                 cwd=str(cwd),
@@ -134,6 +136,7 @@ class DiskApp(App):
             )
 
         else:
+            ensure_executable(path_macos)
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, cwd=cwd)
 
     def __launch_linux(self, fully_detached: bool = False, open_console: bool = False):
@@ -147,12 +150,15 @@ class DiskApp(App):
         quoted_path = shlex.quote(path_linux_str)
 
         if path_linux_str.lower().endswith('.sh'):
+            ensure_executable(path_linux)
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
 
         elif open_console:
+            ensure_executable(path_linux)
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, in_new_window=True, cwd=cwd)
 
         elif fully_detached:
+            ensure_executable(path_linux)
             subprocess.Popen(
                 [path_linux_str],
                 cwd=str(cwd),
@@ -165,6 +171,7 @@ class DiskApp(App):
             )
 
         else:
+            ensure_executable(path_linux)
             cmdShellWrapper.exec_cmd(quoted_path, wait_for_output=False, cwd=cwd)
 
 
