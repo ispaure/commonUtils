@@ -45,7 +45,7 @@ class Directory:
         """
         Deletes a junction without deleting the directory it points to.
         """
-        if not path.is_junction():
+        if not linkUtils.is_junction(path):
             log(Severity.CRITICAL, 'Directory.__delete_junction', f'Path is not a junction: "{path}"')
 
         try:
@@ -53,7 +53,7 @@ class Directory:
         except Exception as e:
             log(Severity.CRITICAL, 'Directory.__delete_junction', f'Could not delete junction "{path}"\n{type(e).__name__}: {e}')
 
-        if path.exists() or path.is_junction():
+        if path.exists() or linkUtils.is_junction(path):
             log(Severity.CRITICAL, 'Directory.__delete_junction', f'Junction still exists after deletion attempt: "{path}"')
 
     def open(self):
@@ -127,7 +127,7 @@ class Directory:
             return True
 
         # Delete junctions without touching their targets
-        if self.path.is_junction():
+        if linkUtils.is_junction(self.path):
             self.__delete_junction(self.path)
             return True
 
@@ -156,7 +156,7 @@ class Directory:
         If make_writable is True, files that cannot be deleted due to permissions may be made writable and retried.
         """
         # Do not follow a linked root for destructive operations unless explicitly requested
-        if self.path.is_symlink() or self.path.is_junction():
+        if self.path.is_symlink() or linkUtils.is_junction(self.path):
             if not follow_root_link:
                 log(Severity.CRITICAL, 'Directory.delete_contents', f'Unable to delete contents of linked directory "{self.path}" without follow_root_link=True')
 
@@ -171,7 +171,7 @@ class Directory:
                 linkUtils.delete_symbolic_link(path)
 
             # Delete junctions without touching their targets
-            elif path.is_junction():
+            elif linkUtils.is_junction(path):
                 self.__delete_junction(path)
 
             # Delete real subdirectories recursively
