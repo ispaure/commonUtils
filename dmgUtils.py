@@ -1,3 +1,7 @@
+"""
+TO BE DEPRECATED, FORWARD CALLS FROM HERE TO fileTypes.dmgType
+"""
+
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 

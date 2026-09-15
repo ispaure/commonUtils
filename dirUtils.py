@@ -14,6 +14,7 @@ __status__ = 'Production'
 from pathlib import Path
 from .debugUtils import *
 from . import fileUtils, linkUtils
+from .fileTypes import txtType, csvType
 import os, subprocess, sys
 from typing import List, Optional, Set, Union
 
@@ -33,9 +34,9 @@ class Directory:
     @staticmethod
     def __get_file_from_path(path: Path) -> fileUtils.File:
         if path.suffix.lower() == '.txt':
-            return fileUtils.TXTFile(path)
+            return txtType.TXTFile(path)
         elif path.suffix.lower() == '.csv':
-            return fileUtils.CSVFile(path)
+            return csvType.CSVFile(path)
         else:
             return fileUtils.File(path)
 
