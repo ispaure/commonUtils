@@ -1,4 +1,16 @@
+<div align="center">
+
 # commonUtils
+
+**A cross-platform Python helper library for reusable tools and workflows.**
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+</div>
+
+---
 
 `commonUtils` is a cross-platform Python helper library maintained by
 Marc-André Voyer. It collects reusable functionality shared across tools
@@ -6,7 +18,7 @@ and projects, with a focus on filesystem operations, application/process
 launching, platform abstraction, command execution, lightweight UI,
 configuration files, archives, and common file types.
 
-The library is designed as a shared dependency for other
+The library is designed primarily as a shared dependency for other
 Python tools rather than as a standalone application.
 
 ## Requirements
@@ -18,7 +30,7 @@ Python 3.10 is the minimum supported version because the codebase uses
 structural pattern matching (`match` / `case`) and modern type
 annotation syntax.
 
-Most of commonUtils can be used without installing any third-party dependencies. Certain optional features require additional packages when used. These are identified here:
+Some modules have additional dependencies:
 
 -   `PySide6` --- optional PySide UI backend
 -   `pyzipper` --- encrypted ZIP support
@@ -31,7 +43,7 @@ macOS.
 
 ## Core Modules
 
-### `fileUtils`
+### 📄 `fileUtils.py`
 
 Provides the base `File` abstraction and general file/path helpers.
 
@@ -52,7 +64,7 @@ print(file.name)
 print(file.ext)
 ```
 
-### `dirUtils`
+### 📄 `dirUtils.py`
 
 Provides the `Directory` abstraction for directory traversal, creation,
 opening, and deletion.
@@ -77,7 +89,7 @@ directories and links. Deleting a `Directory` that represents a symbolic
 link or Windows junction removes the link itself rather than deleting
 the target directory.
 
-### `fileTypes`
+### 📁 `fileTypes`
 
 Contains specialized `File` subclasses for formats that require
 additional behavior.
@@ -92,6 +104,7 @@ Current types include:
 | `ZIPFile` | `zipType` | ZIP extraction and root-entry inspection |
 | `DMGFile` | `dmgType` | macOS DMG mounting and directory extraction |
 | `AppImageFile` | `appimageType` | AppImage file representation |
+
 
 Example:
 
@@ -108,7 +121,7 @@ At present, `Directory.list_files()` automatically resolves TXT and CSV
 files to their specialized classes; other specialized file types can be
 instantiated directly.
 
-### `linkUtils`
+### 📄 `linkUtils.py`
 
 Provides symbolic-link management and Windows junction detection.
 
@@ -133,7 +146,7 @@ Python versions that provide `Path.is_junction()` use the native
 implementation; older supported Python versions use a Windows
 reparse-tag fallback.
 
-### `osUtils`
+### 📄 `osUtils.py`
 
 Provides normalized operating-system and architecture detection.
 
@@ -157,7 +170,7 @@ print(get_arch())
 `get_os_path()` can also select a platform-specific value from Windows,
 macOS, and Linux alternatives.
 
-### `debugUtils`
+### 📄 `debugUtils.py`
 
 Provides the primary structured debug logger.
 
@@ -183,7 +196,7 @@ coloring, and popup messages.
 displays the error and raises `DebugException`, halting the current
 operation unless explicitly handled by the caller.
 
-### `appUtils`
+### 📄 `appUtils.py`
 
 Provides abstractions and helpers for launching applications across
 Windows, macOS, and Linux.
@@ -199,7 +212,7 @@ The module includes:
 `DiskApp` supports normal launches, detached launches, and visible
 console/terminal launches depending on the platform.
 
-### `wrappers.cmdShellWrapper`
+### 📁 `wrappers/cmdShellWrapper`
 
 Cross-platform command execution used by higher-level utilities.
 
@@ -226,11 +239,11 @@ The `time_out` argument is an **idle-output timeout**, not a maximum
 command runtime. A command may continue running as long as it continues
 producing output.
 
-### `wrappers.powerShellWrapper`
+### 📄 `wrappers/powerShellWrapper.py`
 
 Provides PowerShell command execution for Windows-specific workflows.
 
-### `ui`
+### 📁 `ui`
 
 Provides generic UI functions with lazy backend selection.
 
@@ -254,18 +267,18 @@ ui.pyside
 Lazy loading keeps optional PySide dependencies from being imported
 unless needed.
 
-### `configUtils`
+### 📄 `configUtils.py`
 
 Provides helpers for reading and modifying INI-style configuration files
 using `configparser`, including section mapping and variable/section
 modification.
 
-### `spreadsheetUtils`
+### 📄 `spreadsheetUtils.py`
 
 Provides lightweight `Spreadsheet`, `Row`, and `Cell` abstractions
 backed by `CSVFile` for import and export.
 
-### `zipUtils`
+### 📄 `zipUtils.py`
 
 Provides ZIP and RAR archive helpers.
 
@@ -275,11 +288,11 @@ ZIP archives through `pyzipper`.
 
 ### Other Utilities
 
-`webUtils` contains URL-opening helpers.
+📄 `webUtils.py` contains URL-opening helpers.
 
-`steamUtils` contains Steam-specific environment detection.
+📄 `steamUtils.py` contains Steam-specific environment detection.
 
-`marcUtils` contains maintainer-specific helpers and is not intended to
+📄 `marcUtils.py` contains maintainer-specific helpers and is not intended to
 represent general-purpose cross-platform functionality.
 
 ## Filesystem Safety
