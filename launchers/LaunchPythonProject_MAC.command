@@ -336,7 +336,7 @@ status=$?
 
 echo
 if [[ $status -eq 0 ]]; then
-    echo "Script execution complete."
+    echo "Process has ended."
 else
     echo "ERROR: Python launch file exited with code $status: $LAUNCH_PATH" >&2
 fi
