@@ -191,7 +191,7 @@ popd
 
 echo.
 if "%LAUNCH_STATUS%"=="0" (
-    echo Script execution complete.
+    echo Process has ended.
 ) else (
     echo ERROR: Python launch file exited with code %LAUNCH_STATUS%:
     echo   %LAUNCH_PATH%
