@@ -7,6 +7,11 @@ CONFIG_FILE="${2:-}"
 UV_INSTALL_DIR_DEFAULT="${HOME:-}/.local/bin"
 UV_INSTALL_URL="https://astral.sh/uv/install.sh"
 
+# Include the user-local binary directory where uv is installed.
+if [[ -n "$UV_INSTALL_DIR_DEFAULT" ]]; then
+    export PATH="$UV_INSTALL_DIR_DEFAULT:$PATH"
+fi
+
 pause_if_interactive() {
     if [[ -t 0 ]]; then
         echo
