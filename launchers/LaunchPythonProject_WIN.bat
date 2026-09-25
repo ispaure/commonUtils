@@ -3,6 +3,29 @@ setlocal EnableExtensions DisableDelayedExpansion
 
 set "PROJECT_ROOT=%~1"
 set "CONFIG_FILE=%~2"
+set "PAUSE_ON_EXIT=%~3"
+if not defined PAUSE_ON_EXIT set "PAUSE_ON_EXIT=false"
+
+if /I "%PAUSE_ON_EXIT%"=="true" (
+    set "PAUSE_ON_EXIT=true"
+) else if "%PAUSE_ON_EXIT%"=="1" (
+    set "PAUSE_ON_EXIT=true"
+) else if /I "%PAUSE_ON_EXIT%"=="yes" (
+    set "PAUSE_ON_EXIT=true"
+) else if /I "%PAUSE_ON_EXIT%"=="on" (
+    set "PAUSE_ON_EXIT=true"
+) else if /I "%PAUSE_ON_EXIT%"=="false" (
+    set "PAUSE_ON_EXIT=false"
+) else if "%PAUSE_ON_EXIT%"=="0" (
+    set "PAUSE_ON_EXIT=false"
+) else if /I "%PAUSE_ON_EXIT%"=="no" (
+    set "PAUSE_ON_EXIT=false"
+) else if /I "%PAUSE_ON_EXIT%"=="off" (
+    set "PAUSE_ON_EXIT=false"
+) else (
+    echo ERROR: pause_on_exit must be true or false ^(received: %PAUSE_ON_EXIT%^).
+    exit /b 1
+)
 set "UV_INSTALL_URL=https://astral.sh/uv/install.ps1"
 
 if not defined PROJECT_ROOT (
@@ -484,5 +507,5 @@ if exist "%CONFIG_OUTPUT%" del /q "%CONFIG_OUTPUT%" >nul 2>&1
 exit /b 0
 
 :Pause
-if not defined COMMONUTILS_NO_PAUSE pause
+if /I "%PAUSE_ON_EXIT%"=="true" pause
 exit /b 0
