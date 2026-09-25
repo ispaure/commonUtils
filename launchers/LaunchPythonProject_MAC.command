@@ -4,6 +4,13 @@ set -o pipefail
 
 PROJECT_ROOT="${1:-}"
 CONFIG_FILE="${2:-}"
+PAUSE_ON_EXIT="${3:-false}"
+
+case "${PAUSE_ON_EXIT,,}" in
+    true|1|yes|on) PAUSE_ON_EXIT=true ;;
+    false|0|no|off|"") PAUSE_ON_EXIT=false ;;
+    *) echo "ERROR: pause_on_exit must be true or false (received: $PAUSE_ON_EXIT)." >&2; exit 1 ;;
+esac
 UV_INSTALL_DIR_DEFAULT="${HOME:-}/.local/bin"
 UV_INSTALL_URL="https://astral.sh/uv/install.sh"
 
@@ -12,8 +19,8 @@ if [[ -n "$UV_INSTALL_DIR_DEFAULT" ]]; then
     export PATH="$UV_INSTALL_DIR_DEFAULT:$PATH"
 fi
 
-pause_if_interactive() {
-    if [[ -t 0 ]]; then
+pause_if_requested() {
+    if [[ "$PAUSE_ON_EXIT" == true && -t 0 ]]; then
         echo
         read -r -p "Press Enter to close..." _ || true
     fi
@@ -23,7 +30,7 @@ fail() {
     local message="$1"
     local code="${2:-1}"
     echo "ERROR: $message" >&2
-    pause_if_interactive
+    pause_if_requested
     exit "$code"
 }
 
@@ -346,5 +353,5 @@ else
     echo "ERROR: Python launch file exited with code $status: $LAUNCH_PATH" >&2
 fi
 
-pause_if_interactive
+pause_if_requested
 exit "$status"
