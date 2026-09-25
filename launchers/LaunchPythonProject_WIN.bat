@@ -285,12 +285,30 @@ if defined UV_EXE (
 )
 
 if not defined LOCALAPPDATA (
-    echo ERROR: uv is not installed and LOCALAPPDATA is not set, so a per-user uv installation directory cannot be determined.
+    echo ERROR: uv was not found on PATH and LOCALAPPDATA is not set, so the commonUtils uv installation directory cannot be checked.
     call :Pause
     exit /b 1
 )
 
 set "UV_INSTALL_DIR=%LOCALAPPDATA%\commonUtils\uv"
+set "UV_EXE=%UV_INSTALL_DIR%\uv.exe"
+
+rem uv is intentionally installed without modifying PATH. Check the persistent
+rem commonUtils install location before deciding that uv needs to be installed.
+if exist "%UV_EXE%" (
+    "%UV_EXE%" --version >nul 2>&1
+    if errorlevel 1 (
+        echo ERROR: uv exists in the commonUtils installation directory but could not run successfully:
+        echo   %UV_EXE%
+        call :Pause
+        exit /b 1
+    )
+    echo Using uv at:
+    echo   %UV_EXE%
+    "%UV_EXE%" --version
+    exit /b 0
+)
+
 set "UV_INSTALLER_FILE=%TEMP%\uv-installer_%RANDOM%_%RANDOM%.ps1"
 
 if not exist "%UV_INSTALL_DIR%\." (
@@ -408,7 +426,9 @@ exit /b 0
 
 :EnsurePython
 set "PYTHON_REQUEST="
-for /f "usebackq delims=" %%V in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p=Join-Path $env:SOURCE_DIR '.python-version'; $v=Get-Content -LiteralPath $p ^| ForEach-Object { $_.Trim() } ^| Where-Object { $_ -and -not $_.StartsWith('#') } ^| Select-Object -First 1; if($null -ne $v){ [Console]::Out.Write($v) }"`) do set "PYTHON_REQUEST=%%V"
+for /f "usebackq tokens=* delims=" %%V in ("%SOURCE_DIR%\.python-version") do (
+    if not defined PYTHON_REQUEST set "PYTHON_REQUEST=%%V"
+)
 if not defined PYTHON_REQUEST (
     echo ERROR: .python-version does not contain a Python version request:
     echo   %SOURCE_DIR%\.python-version
