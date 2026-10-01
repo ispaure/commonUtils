@@ -186,19 +186,58 @@ class Directory:
         if any(self.path.iterdir()):
             log(Severity.CRITICAL, 'Directory.delete_contents', f'Could not delete every item from directory "{self.path}"')
 
-    def list_directories(self) -> List['Directory']:
+    def list_directories(self, depth: Optional[int] = 0) -> List['Directory']:
         """
         Returns a sorted list of Directory objects within this directory.
-
         Symbolic links and junctions resolving to directories are included as Directory objects.
+
+        depth=0 returns only immediate child directories.
+        Positive values include that many additional directory levels.
+        depth=None recursively collects directories without a depth limit.
+
+        Recursive directory links are detected and reported as a CRITICAL error.
         """
+        if depth is not None and depth < 0:
+            raise ValueError('Directory.list_directories depth must be >= 0 or None')
+
+        ancestor_paths: Set[Path] = {self.path.resolve()}
+        return self.__list_directories(
+            depth=depth,
+            ancestor_paths=ancestor_paths
+        )
+
+    def __list_directories(
+            self,
+            depth: Optional[int],
+            ancestor_paths: Set[Path]
+    ) -> List['Directory']:
         dir_lst: List[Directory] = []
 
-        for item_path in self.path.iterdir():
-            if item_path.is_dir():
-                dir_lst.append(Directory(item_path))
+        for item_path in sorted(self.path.iterdir(), key=lambda path: path.name.lower()):
+            if not item_path.is_dir():
+                continue
 
-        dir_lst.sort(key=lambda directory: directory.name.lower())
+            directory = Directory(item_path)
+            dir_lst.append(directory)
+
+            if depth is None or depth > 0:
+                resolved_path = item_path.resolve()
+
+                if resolved_path in ancestor_paths:
+                    log(
+                        Severity.CRITICAL,
+                        'Directory.list_directories',
+                        f'Recursive directory link detected at "{item_path}" resolving to "{resolved_path}"'
+                    )
+
+                child_ancestor_paths = ancestor_paths | {resolved_path}
+                child_depth = None if depth is None else depth - 1
+
+                dir_lst += directory.__list_directories(
+                    depth=child_depth,
+                    ancestor_paths=child_ancestor_paths
+                )
+
         return dir_lst
 
     def is_dir(self) -> bool:

@@ -300,3 +300,32 @@ def set_app_executable_permissions(app_path: Path):
     # For each exec file, apply permissions
     for exec_file in exec_file_lst:
         exec_file.set_executable_permission()
+
+
+def open_uri(uri: str):
+    """
+    Open a URI using the operating system's registered protocol handler.
+    """
+
+    match get_os():
+        case OS.WIN:
+            os.startfile(uri)
+
+        case OS.MAC:
+            subprocess.Popen(
+                ['open', uri],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        case OS.LINUX:
+            subprocess.Popen(
+                ['xdg-open', uri],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        case _:
+            log(Severity.ERROR, 'App Launcher', f'Unable to open URI on unsupported operating system: "{uri}"')
