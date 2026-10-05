@@ -37,7 +37,7 @@ def unzip_file(source_file: Union[str, Path],
     Extracts zip file to desired location.
     Returns True iff all entries extract & CRC-verify; otherwise False.
 
-    NOTE: Encrypted-archive handling is intentionally unchanged.
+    All member paths must remain within the destination directory.
     """
     tool_name = 'Extract ZIP File'
 
@@ -85,9 +85,15 @@ def unzip_file(source_file: Union[str, Path],
 
                 try:
                     for info in file_info_lst:
+                        # Validate files and directories before creating either.
+                        target_path = dest / info.filename
+                        if not _is_within(dest, target_path):
+                            log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
+                            return False
+
                         # Directories
                         if info.is_dir():
-                            (dest / info.filename).mkdir(parents=True, exist_ok=True)
+                            target_path.mkdir(parents=True, exist_ok=True)
                             continue
 
                         # Optional: skip Unix symlinks for safety
@@ -97,14 +103,6 @@ def unzip_file(source_file: Union[str, Path],
                         if is_unix_symlink:
                             log(Severity.WARNING, tool_name, f"Skipping symlink entry: {info.filename}")
                             continue
-
-                        # Destination path for this member
-                        target_path = dest / info.filename
-
-                        # Path traversal guard
-                        if not _is_within(dest, target_path):
-                            log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
-                            return False
 
                         target_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -159,7 +157,7 @@ def unzip_file(source_file: Union[str, Path],
             log(Severity.ERROR, tool_name, f"[ZIP FAIL] {src}: {e}")
             return False
 
-    # ---- Encrypted (left as-is by request) -----------------------------------
+    # ---- Encrypted ----------------------------------------------------------
     else:
         log(Severity.DEBUG, tool_name, f'Extracting password-protected archive from "{source_file_str}" to "{destination_dir_str}"')
 
@@ -167,10 +165,15 @@ def unzip_file(source_file: Union[str, Path],
         # with zipfile.ZipFile(source_file_str, 'r') as zip_ref:
         #     zip_ref.extractall(path=destination_dir_str, members=None, pwd=pwd.encode())
 
-        # AES/ZIP 2.0 via pyzipper (UNCHANGED BEHAVIOR)
+        # AES/ZIP 2.0 via pyzipper, with the same containment guard.
         with pyzipper.AESZipFile(source_file_str, 'r',
                                  compression=pyzipper.ZIP_DEFLATED,
                                  encryption=pyzipper.WZ_AES) as extracted_zip:
+            dest = Path(destination_dir_str)
+            for info in extracted_zip.infolist():
+                if not _is_within(dest, dest / info.filename):
+                    log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
+                    return False
             extracted_zip.extractall(path=destination_dir_str, pwd=str.encode(pwd))
         return True
 
