@@ -146,7 +146,14 @@ layout.addWidget(browser)
 
 List, Tiles and Columns are selected using exclusive palette-aware icon buttons.
 Tile cells divide the viewport width evenly, adjusting cover size before adding
-columns; the layout updates on resize without reserving a large trailing gap.
+columns. Resize, navigation and filesystem updates lay out items immediately.
+Folder-only directories use compact square cells; in mixed directories, folder
+icons occupy half the cover width by default. The tile-only **Size** menu adjusts
+folder icons from 25% to 100%; this preference stays with the browser widget.
+Tiles reserve a scrollbar gutter so scrolling cannot change the column count.
+Column view uses small chevrons, stops at files and leaves unused space in the
+current palette's window color. Preview content belongs to the adjacent panels,
+without an extra empty file column.
 
 Create a QApplication before the widget. Project-specific controls, such as a
 library dropdown, belong outside this widget. `set_directory(Directory_or_Path)`
