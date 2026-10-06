@@ -8,6 +8,7 @@ The `commonUtils.fileTypes` package contains specialized `File` subclasses for c
 | --- | --- | --- |
 | `TXTFile` | `txtType.py` | Read, write, and open text files |
 | `CSVFile` | `csvType.py` | Read and write CSV data |
+| `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
 | `XMLFile` | `xmlType.py` | XML file representation built on `TXTFile` |
 | `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection |
 | `DMGFile` | `dmgType.py` | Mount and extract directories from macOS DMG files |
@@ -53,6 +54,27 @@ data = file.read_csv()
 ```
 
 Files are read using UTF-8 with BOM support and written using standard Python CSV formatting.
+
+### 📄 `jsonType.py`
+
+`JSONFile` extends `File` directly, because JSON is structured data rather than
+an editable list of text lines. `read_json()` accepts UTF-8 with optional BOM and
+returns any JSON value. Missing and malformed files raise standard Python errors
+so applications can decide how to recover.
+
+```python
+from commonUtils.fileTypes.jsonType import JSONFile
+
+file = JSONFile("settings.json")
+file.write_json({"enabled": True, "names": ["Été"]}, compact=True, sort_keys=True)
+settings = file.read_json()
+```
+
+Writes serialize before touching the destination, create parent directories,
+stage UTF-8 text next to the target, flush it, and replace atomically. Existing
+permissions are preserved; temporary files are cleaned up on failure. Non-finite
+numbers are rejected. Formatting is indented by default; `compact=True` removes
+extra whitespace. `ensure_ascii` and `sort_keys` are optional serialization settings.
 
 ### 📄 `xmlType.py`
 
