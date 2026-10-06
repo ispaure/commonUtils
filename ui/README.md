@@ -242,3 +242,25 @@ Close owners safely: `stop()` cancels queued work and returns whether workers ar
 still finishing. If True, hide/defer owner destruction until the `idle` signal;
 otherwise close normally. `shutdown()` waits for workers during application exit.
 Do not delete a browser while a panel/thumbnail operation is running.
+
+
+### File browser organization
+
+| Module | Responsibility |
+| --- | --- |
+| `file_browser/__init__.py` | Browser integration, context actions, panel loading and worker lifecycle. |
+| `file_browser/model.py` | Qt filesystem indexes resolved to registered File/Directory objects. |
+| `file_browser/views.py` | Selection and location shared across views; thumbnail worker scheduling. |
+| `file_browser/tiles.py` | Immediate grid layout, compact folder cells and folder-icon sizing. |
+| `file_browser/columns.py` | Column trails, small chevrons and preview-column compatibility. |
+| `file_browser/thumbnails.py` | Bounded thumbnail cache, invalidation and physical-pixel requirements. |
+| `file_browser/controls.py` | View icons, folder-size menu and navigation buttons. |
+| `file_browser/navigation.py` | Root-bounded breadcrumbs and Back/Forward history. |
+| `file_browser/details.py` | Aligned, selectable information fields. |
+| `file_browser/operations.py` | Background operations and completion signals. |
+
+Tile sizing uses logical pixels for layout and physical pixels for rendering.
+The folder-size control changes system folder icons without shrinking covers in
+mixed directories. Folder-only directories also use tighter cells and rows.
+Constructing or changing a view never reads file contents; registered thumbnail
+and panel hooks do that work in background operations.

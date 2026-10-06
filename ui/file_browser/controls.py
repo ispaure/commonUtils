@@ -85,6 +85,37 @@ class ViewModeSelector(qt.QWidget):
             self.currentIndexChanged.emit(index)
 
 
+class FolderSizeControl(qt.QToolButton):
+    """Tile-only size menu; the owner connects slider.valueChanged to its view."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setText('Size')
+        self.setAccessibleName('Folder icon size')
+        self.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = qt.QMenu(self)
+        widget = qt.QWidget()
+        layout = qt.QVBoxLayout(widget)
+        self.label = qt.QLabel()
+        layout.addWidget(self.label)
+        self.slider = qt.QSlider(qt.Qt.Orientation.Horizontal)
+        self.slider.setRange(25, 100)
+        self.slider.setValue(50)
+        self.slider.setAccessibleName('Folder icon size percentage')
+        self.slider.valueChanged.connect(self._update_label)
+        layout.addWidget(self.slider)
+        action = qt.QWidgetAction(menu)
+        action.setDefaultWidget(widget)
+        menu.addAction(action)
+        self.setMenu(menu)
+        self._update_label(50)
+
+    def _update_label(self, percent):
+        text = f'Folder icon size: {percent}%'
+        self.label.setText(text)
+        self.setToolTip(text)
+
+
 def navigation_button(parent, name, icon):
     button = qt.QToolButton(parent)
     button.setIcon(parent.style().standardIcon(icon))
