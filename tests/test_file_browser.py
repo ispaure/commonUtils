@@ -214,6 +214,60 @@ class BrowserTests(unittest.TestCase):
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
             self.assertEqual(tiles.iconSize().width(), max(32, tiles.gridSize().width() - 28))
 
+    def test_column_files_end_the_trail_without_an_extra_preview(self):
+        from commonUtils.ui.file_browser.views import ColumnDelegate
+        self.browser.view_selector.setCurrentIndex(2)
+        columns = self.browser.views.columns
+        index = self.browser.model.index(str(self.path))
+        columns.selectionModel().setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.ClearAndSelect)
+        self.wait()
+        if hasattr(columns, 'isPreviewColumnVisible'):
+            self.assertFalse(columns.isPreviewColumnVisible())
+        else:
+            host = columns.previewWidget().parentWidget().parentWidget()
+            self.assertEqual(host.width(), 0)
+            self.assertEqual(host.maximumWidth(), 0)
+        self.assertEqual(columns.viewport().backgroundRole(), qt.QPalette.ColorRole.Window)
+        children = [view for view in columns.findChildren(qt.QListView) if view.isVisible()]
+        self.assertTrue(children)
+        self.assertTrue(all(isinstance(view.itemDelegate(), ColumnDelegate) for view in children))
+        self.assertEqual(self.browser.selected_objects()[0].path, self.path)
+
+    def test_folder_grid_is_small_adjustable_and_immediate_in_nested_folders(self):
+        folder = self.root / 'folders'
+        folder.mkdir()
+        for row in range(60):
+            (folder / f'folder-{row:02d}').mkdir()
+        tiles = self.browser.views.tiles
+        self.browser.view_selector.setCurrentIndex(1)
+        mixed_size = tiles.iconSize().width()
+        self.browser.navigate(folder)
+        deadline = time.monotonic() + 5
+        while tiles.model().rowCount(tiles.rootIndex()) < 60 and time.monotonic() < deadline:
+            self.app.processEvents()
+            time.sleep(.01)
+        self.assertEqual(tiles.model().rowCount(tiles.rootIndex()), 60)
+        self.assertTrue(tiles.folders_only)
+        self.assertEqual(self.browser.folder_size_slider.value(), 50)
+        self.assertLess(tiles.iconSize().width(), mixed_size * .65)
+        for width in (430, 610, 810):
+            self.browser.resize(width + 500, 800)
+            self.app.processEvents()
+            root = tiles.rootIndex()
+            usable = tiles.viewport().width() - 2
+            columns = max(1, usable // 99)
+            self.assertLess(usable - columns * tiles.gridSize().width(), columns)
+            first_row = [tiles.visualRect(tiles.model().index(row, 0, root)) for row in range(columns)]
+            self.assertTrue(all(rect.top() == first_row[0].top() for rect in first_row))
+            next_row = tiles.visualRect(tiles.model().index(columns, 0, root))
+            self.assertGreater(next_row.top(), first_row[0].top())
+        small = tiles.iconSize().width()
+        self.browser.folder_size_slider.setValue(100)
+        self.assertGreater(tiles.iconSize().width(), small * 1.5)
+        self.assertTrue(self.browser.folder_size_button.isVisible())
+        self.browser.view_selector.setCurrentIndex(0)
+        self.assertFalse(self.browser.folder_size_button.isVisible())
+
     def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
         covers = self.browser.views.covers
         path = str(self.path)
