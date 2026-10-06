@@ -192,3 +192,47 @@ class BrowserTests(unittest.TestCase):
         self.assertGreater(values[0].heightForWidth(100), values[0].heightForWidth(400))
         self.assertTrue(values[0].textInteractionFlags() & qt.Qt.TextInteractionFlag.TextSelectableByMouse)
         self.assertLessEqual(self.browser.cover.maximumHeight(), 120)
+
+    def test_icon_view_switches_and_responsive_grid_fills_the_viewport(self):
+        selector = self.browser.view_selector
+        self.assertFalse(isinstance(selector, qt.QComboBox))
+        self.assertEqual(list(selector.buttons), [1, 0, 2])
+        for mode in (1, 2, 0):
+            selector.buttons[mode].click()
+            self.assertEqual(self.browser.views.currentIndex(), mode)
+            self.assertEqual(selector.currentIndex(), mode)
+            self.assertTrue(selector.buttons[mode].isChecked())
+            self.assertFalse(selector.buttons[mode].icon().isNull())
+        tiles = self.browser.views.tiles
+        self.browser.views.set_mode(1)
+        for width in (640, 820, 1060):
+            self.browser.resize(width + 500, 800)
+            self.app.processEvents()
+            tiles.fit_grid()
+            usable = tiles.viewport().width() - 2
+            columns = max(1, usable // 170)
+            self.assertLess(usable - columns * tiles.gridSize().width(), columns)
+            self.assertEqual(tiles.iconSize().width(), max(32, tiles.gridSize().width() - 28))
+
+    def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
+        covers = self.browser.views.covers
+        path = str(self.path)
+        small = qt.QPixmap(120, 165)
+        small.fill(qt.QColor('orange'))
+        buffer = qt.QBuffer()
+        buffer.open(qt.QIODevice.OpenModeFlag.WriteOnly)
+        small.save(buffer, 'PNG')
+        covers.requested.add(path)
+        covers.complete(path, bytes(buffer.data()))
+        covers.set_resolution(qt.QSize(180, 248), 2.0)
+        self.assertEqual(covers.render_size, (360, 496))
+        self.assertNotIn(path, covers.icons)
+        self.assertNotIn(path, covers.requested)
+        large = qt.QPixmap(360, 496)
+        large.fill(qt.QColor('orange'))
+        buffer = qt.QBuffer()
+        buffer.open(qt.QIODevice.OpenModeFlag.WriteOnly)
+        large.save(buffer, 'PNG')
+        covers.complete(path, bytes(buffer.data()), 2.0, (360, 496))
+        self.assertEqual(covers.resolutions[path], (360, 496))
+        self.assertFalse(covers.icons[path].isNull())

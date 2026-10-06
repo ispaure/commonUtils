@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from .. import pyside as qt
+from .controls import navigation_button
 
 
 class BreadcrumbBar(qt.QWidget):
@@ -88,9 +89,9 @@ class NavigationBar(qt.QWidget):
         self.position = -1
         layout = qt.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.back = qt.QPushButton('Back')
-        self.forward = qt.QPushButton('Forward')
-        self.up = qt.QPushButton('Up')
+        self.back = navigation_button(self, 'Back', qt.QStyle.StandardPixmap.SP_ArrowBack)
+        self.forward = navigation_button(self, 'Forward', qt.QStyle.StandardPixmap.SP_ArrowForward)
+        self.up = navigation_button(self, 'Up one folder', qt.QStyle.StandardPixmap.SP_ArrowUp)
         self.breadcrumbs = BreadcrumbBar(self)
         for button in (self.back, self.forward, self.up):
             layout.addWidget(button)
