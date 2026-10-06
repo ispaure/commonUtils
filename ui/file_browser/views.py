@@ -2,9 +2,38 @@
 
 from collections import deque, OrderedDict
 from pathlib import Path
+import math
 from ...dirUtils import Directory
 from .. import pyside as qt
 from .operations import Operation
+
+
+class ResponsiveTileView(qt.QListView):
+    metrics_changed = qt.Signal(object, float)
+
+    def __init__(self):
+        super().__init__()
+        self.setSpacing(0)
+        self.viewport().installEventFilter(self)
+        self.timer = qt.QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.fit_grid)
+
+    def eventFilter(self, watched, event):
+        if event.type() in (qt.QEvent.Type.Resize, qt.QEvent.Type.Show, qt.QEvent.Type.ScreenChangeInternal, qt.QEvent.Type.DevicePixelRatioChange):
+            self.timer.start()
+        return super().eventFilter(watched, event)
+
+    def fit_grid(self):
+        width = max(1, self.viewport().width() - 2)
+        columns = max(1, width // 170)
+        cell = width // columns
+        icon_width = max(32, cell - 28)
+        icon_height = round(icon_width * 1.375)
+        self.setIconSize(qt.QSize(icon_width, icon_height))
+        self.setGridSize(qt.QSize(cell, icon_height + 44))
+        self.metrics_changed.emit(self.iconSize(), self.devicePixelRatioF())
 
 
 class CoverModel(qt.QIdentityProxyModel):
@@ -16,6 +45,9 @@ class CoverModel(qt.QIdentityProxyModel):
         self.icons = OrderedDict()
         self.requested = set()
         self.revisions = {}
+        self.render_size = (120, 165)
+        self.device_ratio = 1.0
+        self.resolutions = {}
 
     def data(self, index, role=qt.Qt.ItemDataRole.DisplayRole):
         if role == qt.Qt.ItemDataRole.DecorationRole and index.column() == 0:
@@ -36,10 +68,12 @@ class CoverModel(qt.QIdentityProxyModel):
             return qt.QApplication.style().standardIcon(kind)
         return value
 
-    def complete(self, path, data):
+    def complete(self, path, data, ratio=1.0, resolution=None):
         source = self.sourceModel().index(path)
         pixmap = qt.QPixmap()
         pixmap.loadFromData(data)
+        pixmap.setDevicePixelRatio(ratio)
+        self.resolutions[path] = resolution or self.render_size
         icon = qt.QIcon(pixmap) if not pixmap.isNull() else self.sourceModel().data(source, qt.Qt.ItemDataRole.DecorationRole)
         if icon is None or icon.isNull():
             icon = qt.QApplication.style().standardIcon(qt.QStyle.StandardPixmap.SP_FileIcon)
@@ -48,6 +82,7 @@ class CoverModel(qt.QIdentityProxyModel):
         while len(self.icons) > 128:
             evicted, _ = self.icons.popitem(last=False)
             self.requested.discard(evicted)
+            self.resolutions.pop(evicted, None)
         index = self.mapFromSource(source)
         if index.isValid():
             self.dataChanged.emit(index, index, [qt.Qt.ItemDataRole.DecorationRole])
@@ -56,10 +91,24 @@ class CoverModel(qt.QIdentityProxyModel):
         path = str(path)
         self.revisions[path] = self.revisions.get(path, 0) + 1
         self.icons.pop(path, None)
+        self.resolutions.pop(path, None)
         self.requested.discard(path)
         index = self.mapFromSource(self.sourceModel().index(path))
         if index.isValid():
             self.dataChanged.emit(index, index, [qt.Qt.ItemDataRole.DecorationRole])
+
+
+    def set_resolution(self, logical_size, ratio):
+        size = (math.ceil(logical_size.width() * ratio), math.ceil(logical_size.height() * ratio))
+        changed = size != self.render_size or ratio != self.device_ratio
+        self.render_size = size
+        self.device_ratio = ratio
+        if changed:
+            for path in list(self.requested):
+                previous = self.resolutions.get(path, (0, 0))
+                if previous[0] < size[0] or previous[1] < size[1]:
+                    self.invalidate(path)
+        return changed
 
 
 class FileViews(qt.QStackedWidget):
@@ -74,7 +123,7 @@ class FileViews(qt.QStackedWidget):
         self.model = model
         self.tree = tree
         self.covers = CoverModel(model, self)
-        self.tiles = qt.QListView()
+        self.tiles = ResponsiveTileView()
         self.tiles.setModel(self.covers)
         self.tiles.setViewMode(qt.QListView.ViewMode.IconMode)
         self.tiles.setResizeMode(qt.QListView.ResizeMode.Adjust)
@@ -89,6 +138,7 @@ class FileViews(qt.QStackedWidget):
         self.cover_busy = False
         self.closing = False
         self.cover_path = None
+        self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
         for view in (tree, self.tiles, self.columns):
             self.addWidget(view)
@@ -162,6 +212,11 @@ class FileViews(qt.QStackedWidget):
         self.directory_changed.emit(self.browsing_directory())
         self.selection_changed.emit()
 
+    def _tile_metrics(self, size, ratio):
+        if self.covers.set_resolution(size, ratio):
+            self.cover_queue.clear()
+            self.tiles.viewport().update()
+
     def _request_cover(self, path):
         if self.closing:
             return
@@ -175,7 +230,8 @@ class FileViews(qt.QStackedWidget):
         if self.closing or not self._visible_cover(path):
             self.covers.requested.discard(path)
             return
-        self.cover_queue.append(path)
+        if path not in self.cover_queue:
+            self.cover_queue.append(path)
         self._next_cover()
 
     def _next_cover(self):
@@ -189,15 +245,16 @@ class FileViews(qt.QStackedWidget):
             return
         self.cover_busy = True
         item = self.model.item(self.model.index(path))
-        self.operation = Operation(lambda: item.browser_thumbnail((120, 165)), self)
+        size, ratio = self.covers.render_size, self.covers.device_ratio
+        self.operation = Operation(lambda: item.browser_thumbnail(size), self)
         revision = self.covers.revisions.get(path, 0)
-        self.operation.completed.connect(lambda data, error: self._cover_loaded(path, revision, data or b''))
+        self.operation.completed.connect(lambda data, error: self._cover_loaded(path, revision, data or b'', ratio, size))
         self.operation.finished.connect(self._cover_finished)
         self.operation.start()
 
-    def _cover_loaded(self, path, revision, data):
+    def _cover_loaded(self, path, revision, data, ratio=1.0, size=None):
         if revision == self.covers.revisions.get(path, 0):
-            self.covers.complete(path, data)
+            self.covers.complete(path, data, ratio, size)
         else:
             self.covers.requested.discard(path)
             self.tiles.viewport().update()

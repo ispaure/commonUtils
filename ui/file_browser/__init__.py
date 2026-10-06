@@ -8,6 +8,7 @@ from ...dirUtils import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel
 from .details import DetailsPanel
+from .controls import ViewModeSelector
 from .navigation import NavigationBar
 from .operations import Operation
 from .views import FileViews
@@ -61,8 +62,7 @@ class FileBrowser(qt.QWidget):
         self.navigation.requested.connect(self.navigate)
         controls = qt.QHBoxLayout()
         controls.addWidget(self.navigation, 1)
-        self.view_selector = qt.QComboBox()
-        self.view_selector.addItems(['List', 'Tiles', 'Columns'])
+        self.view_selector = ViewModeSelector(self)
         self.view_selector.setAccessibleName('Browser view')
         controls.addWidget(self.view_selector)
         self.refresh_button = qt.QPushButton('Refresh')
@@ -314,8 +314,7 @@ class FileBrowser(qt.QWidget):
         if not self.cover_pixmap.isNull():
             self.cover.setMinimumSize(180, 200)
             self.cover.setMaximumHeight(500)
-            self.cover.setPixmap(self.cover_pixmap.scaled(320, 440, qt.Qt.AspectRatioMode.KeepAspectRatio,
-                                                        qt.Qt.TransformationMode.SmoothTransformation))
+            self._scale_cover()
         else:
             self.cover.setMinimumSize(96, 96)
             self.cover.setMaximumHeight(120)
@@ -329,6 +328,22 @@ class FileBrowser(qt.QWidget):
                 pixmap = self.style().standardIcon(standard).pixmap(96, 96)
             self.cover.setPixmap(pixmap)
         self.details_loaded.emit(result)
+
+    def _scale_cover(self):
+        ratio = self.devicePixelRatioF()
+        preview = self.cover_pixmap.scaled(round(320 * ratio), round(440 * ratio),
+                                          qt.Qt.AspectRatioMode.KeepAspectRatio,
+                                          qt.Qt.TransformationMode.SmoothTransformation)
+        preview.setDevicePixelRatio(ratio)
+        self.cover.setPixmap(preview)
+
+    def event(self, event):
+        handled = super().event(event)
+        if event.type() in (qt.QEvent.Type.ScreenChangeInternal, qt.QEvent.Type.DevicePixelRatioChange):
+            pixmap = getattr(self, 'cover_pixmap', None)
+            if pixmap is not None and not pixmap.isNull():
+                self._scale_cover()
+        return handled
 
     def _finished(self):
         self.busy = False

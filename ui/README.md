@@ -144,11 +144,17 @@ browser = FileBrowser(Directory(Path('/path/to/library')), parent=window)
 layout.addWidget(browser)
 ```
 
+List, Tiles and Columns are selected using exclusive palette-aware icon buttons.
+Tile cells divide the viewport width evenly, adjusting cover size before adding
+columns; the layout updates on resize without reserving a large trailing gap.
+
 Create a QApplication before the widget. Project-specific controls, such as a
 library dropdown, belong outside this widget. `set_directory(Directory_or_Path)`
 sets its navigation boundary; `navigate(path)` moves within that root. The path
 bar starts with that root and includes only descendant folders, never selected
-files. Each folder is clickable. The root stays pinned at the left; longer paths
+files. Each folder is clickable. Compact native arrow buttons provide Back,
+Forward and Up, with tooltips and accessible names; existing navigation shortcuts
+remain available. The root stays pinned at the left; longer paths
 scroll their descendants while Back, Forward and Up remain available. The right
 panel remains visible and always provides **File Information** for a selected
 file/folder: path, name, extension/size where applicable, modification time,
@@ -204,7 +210,10 @@ Return True from activation when the type handles double-clicks; False uses the
 default application. Implement `browser_has_thumbnail = True` and
 `browser_thumbnail(size) -> bytes` to provide tile images without a format-specific
 branch in the browser. Thumbnail hooks run off the GUI thread and use a bounded
-128-item cache. Constructors and detection rules should stay cheap and avoid
+128-item cache. The size argument is a physical-pixel bounding box, including the
+display scale; return enough pixels within that box for sharp high-DPI rendering.
+Cached covers are regenerated when larger cells or a higher display scale require
+more pixels. Selected-panel thumbnails likewise retain physical resolution. Constructors and detection rules should stay cheap and avoid
 loading full metadata until requested.
 
 File context menus provide default-application opening and OS-specific Reveal.
