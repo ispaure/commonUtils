@@ -130,7 +130,7 @@ Because the backends are lazily imported, accessing the native UI does not unnec
 
 `commonUtils.ui.file_browser.FileBrowser` is an embeddable PySide widget for
 folder/file browsing, selection, list/tile/column views, Back/Forward/Up navigation,
-a parent-path selector, information tabs, thumbnails and context menus. It uses
+a clickable folder breadcrumb bar, information tabs, thumbnails and context menus. It uses
 `File`/`Directory` objects resolved by the shared process-wide file registry.
 `QFileSystemModel` supplies filesystem watching and Qt indexes; its browser adapter
 exposes `item(index)` and `object_for_path(path)` as the data-object interface.
@@ -146,10 +146,17 @@ layout.addWidget(browser)
 
 Create a QApplication before the widget. Project-specific controls, such as a
 library dropdown, belong outside this widget. `set_directory(Directory_or_Path)`
-sets its navigation boundary; `navigate(path)` moves within that root. The right
+sets its navigation boundary; `navigate(path)` moves within that root. The path
+bar starts with that root and includes only descendant folders, never selected
+files. Each folder is clickable. The root stays pinned at the left; longer paths
+scroll their descendants while Back, Forward and Up remain available. The right
 panel remains visible and always provides **File Information** for a selected
 file/folder: path, name, extension/size where applicable, modification time,
 creation time when the filesystem exposes one, readability, and link targets.
+Details use compact aligned label/value rows, muted labels, selectable plain-text
+values and wrapping for long paths/descriptions. Information tabs scroll vertically.
+Preview icons come from the same per-path system icon provider as the file listing;
+folder previews use a compact icon area instead of reserving cover-image space.
 Unix change time is not mislabeled as creation time. Folder totals/counts are
 calculated asynchronously without reading file contents or following links.
 Refresh recalculates them; totals and thumbnails remain in memory.
@@ -200,7 +207,9 @@ branch in the browser. Thumbnail hooks run off the GUI thread and use a bounded
 128-item cache. Constructors and detection rules should stay cheap and avoid
 loading full metadata until requested.
 
-Generic context menus provide default-application opening and OS-specific Reveal.
+File context menus provide default-application opening and OS-specific Reveal.
+Directory menus provide Reveal and contributed actions, without an Open in Default
+App entry; double-clicking a folder navigates into it.
 An optional `action_providers=(provider,)` argument allows application-level actions
 for Directory objects or mixed selections; providers receive `(item, context)` and
 return BrowserAction descriptors. `folder_fields(directory, stats)` may contribute

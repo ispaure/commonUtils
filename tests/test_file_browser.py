@@ -121,6 +121,10 @@ class BrowserTests(unittest.TestCase):
         self.assertIn('Total size: 6 B', self.browser.preview.toPlainText())
         self.assertIn('Files: 1', self.browser.preview.toPlainText())
         self.assertEqual(self.browser.model.data(index.siblingAtColumn(1)), '6 B')
+        menu = self.browser.context_menu_for(index)
+        self.assertEqual(len(menu.actions()), 1)
+        self.assertTrue(menu.actions()[0].text().startswith('Reveal in '))
+        menu.deleteLater()
         self.browser._activate(index)
         self.assertEqual(self.browser.views.root, folder)
         self.browser.navigation.up.click()
@@ -141,3 +145,50 @@ class BrowserTests(unittest.TestCase):
         with patch('commonUtils.ui.desktop_actions.open_default') as opened:
             self.browser._activate(index)
             opened.assert_called_once_with(self.root / 'other.bin')
+
+    def test_breadcrumbs_contain_only_root_and_folders_and_navigate_ancestors(self):
+        folder = self.root / 'series' / 'volume'
+        folder.mkdir(parents=True)
+        comic = folder / 'nested.project'
+        comic.write_text('test')
+        self.browser.navigate(folder)
+        self.select(comic)
+        navigation = self.browser.navigation
+        self.assertEqual(navigation.breadcrumbs.paths, [self.root, folder.parent, folder])
+        self.assertEqual([button.text() for button in navigation.breadcrumbs.buttons],
+                         [self.root.name, 'series', 'volume'])
+        self.assertNotIn(comic, navigation.breadcrumbs.paths)
+        navigation.breadcrumbs.buttons[1].click()
+        self.assertEqual(self.browser.views.root, folder.parent)
+        navigation.back.click()
+        self.assertEqual(self.browser.views.root, folder)
+        navigation.forward.click()
+        self.assertEqual(self.browser.views.root, folder.parent)
+        navigation.breadcrumbs.buttons[0].click()
+        self.assertEqual(self.browser.views.root, self.root)
+        self.assertFalse(navigation.up.isEnabled())
+        navigation.set_directory(comic)
+        self.assertEqual(navigation.directory, self.root)
+        self.assertEqual(navigation.breadcrumbs.paths, [self.root])
+
+    def test_structured_fields_are_selectable_plain_text_and_use_model_folder_icon(self):
+        folder = self.root / 'custom folder'
+        folder.mkdir()
+        icon = qt.QPixmap(96, 96)
+        icon.fill(qt.QColor('#d98c31'))
+        with patch.object(self.browser.model, 'fileIcon', return_value=qt.QIcon(icon)) as provider:
+            self.select(folder)
+            self.assertTrue(provider.called)
+            actual = self.browser.cover.pixmap().toImage().pixelColor(20, 20)
+            self.assertEqual(actual, qt.QColor('#d98c31'))
+        panel = self.browser.preview
+        from commonUtils.ui.file_browser.details import DetailsPanel
+        self.assertIsInstance(panel, DetailsPanel)
+        values = [label for label in panel.findChildren(qt.QLabel) if label.accessibleName() == 'Path']
+        self.assertEqual(len(values), 1)
+        self.assertEqual(values[0].text(), str(folder))
+        self.assertEqual(values[0].textFormat(), qt.Qt.TextFormat.PlainText)
+        self.assertTrue(values[0].hasHeightForWidth())
+        self.assertGreater(values[0].heightForWidth(100), values[0].heightForWidth(400))
+        self.assertTrue(values[0].textInteractionFlags() & qt.Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.assertLessEqual(self.browser.cover.maximumHeight(), 120)

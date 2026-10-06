@@ -7,6 +7,7 @@ from .. import desktop_actions
 from ...dirUtils import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel
+from .details import DetailsPanel
 from .navigation import NavigationBar
 from .operations import Operation
 from .views import FileViews
@@ -118,6 +119,7 @@ class FileBrowser(qt.QWidget):
         self.cover.setMaximumHeight(500)
         panel_layout.addWidget(self.cover)
         self.tabs = qt.QTabWidget()
+        self.tabs.setDocumentMode(True)
         panel_layout.addWidget(self.tabs, 1)
         self._empty_preview = qt.QPlainTextEdit()
         self._empty_preview.setReadOnly(True)
@@ -166,8 +168,9 @@ class FileBrowser(qt.QWidget):
             return None
         context = self.context(item)
         menu = qt.QMenu(self)
-        default = menu.addAction('Open in Default App')
-        default.triggered.connect(lambda: self._run(lambda: desktop_actions.open_default(item.path)))
+        if not isinstance(item, Directory):
+            default = menu.addAction('Open in Default App')
+            default.triggered.connect(lambda: self._run(lambda: desktop_actions.open_default(item.path)))
         reveal = menu.addAction(desktop_actions.reveal_label())
         reveal.triggered.connect(lambda: self._run(lambda: desktop_actions.reveal(item.path)))
         actions = list(item.browser_actions(context))
@@ -300,9 +303,7 @@ class FileBrowser(qt.QWidget):
         self.message.setText(error)
         self.last_details = result
         for panel, details, issue in result or ():
-            editor = qt.QPlainTextEdit()
-            editor.setReadOnly(True)
-            editor.setPlainText('\n\n'.join(f'{label}: {value}' for label, value in details.fields) if not issue else f'Cannot load information: {issue}')
+            editor = DetailsPanel(details.fields, issue)
             self.tabs.addTab(editor, panel.title)
             if details.thumbnail:
                 self.cover_pixmap.loadFromData(details.thumbnail)
@@ -311,11 +312,22 @@ class FileBrowser(qt.QWidget):
         if self.tabs.count():
             self.tabs.setCurrentIndex(self.tabs.count() - 1)
         if not self.cover_pixmap.isNull():
+            self.cover.setMinimumSize(180, 200)
+            self.cover.setMaximumHeight(500)
             self.cover.setPixmap(self.cover_pixmap.scaled(320, 440, qt.Qt.AspectRatioMode.KeepAspectRatio,
                                                         qt.Qt.TransformationMode.SmoothTransformation))
         else:
-            standard = qt.QStyle.StandardPixmap.SP_DirIcon if isinstance(self.selected_object, Directory) else qt.QStyle.StandardPixmap.SP_FileIcon
-            self.cover.setPixmap(self.style().standardIcon(standard).pixmap(96, 96))
+            self.cover.setMinimumSize(96, 96)
+            self.cover.setMaximumHeight(120)
+            index = self.model.index(str(self.selected_object.path))
+            icon = self.model.fileIcon(index)
+            if icon.isNull():
+                icon = self.model.iconProvider().icon(qt.QFileInfo(str(self.selected_object.path)))
+            pixmap = icon.pixmap(96, 96)
+            if pixmap.isNull():
+                standard = qt.QStyle.StandardPixmap.SP_DirIcon if isinstance(self.selected_object, Directory) else qt.QStyle.StandardPixmap.SP_FileIcon
+                pixmap = self.style().standardIcon(standard).pixmap(96, 96)
+            self.cover.setPixmap(pixmap)
         self.details_loaded.emit(result)
 
     def _finished(self):
