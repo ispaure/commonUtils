@@ -34,7 +34,10 @@ match get_os():
 delete_debug_prompt: bool = False
 
 
-class File:
+from .filesystem import FilesystemObject
+
+
+class File(FilesystemObject):
     def __init__(self, path: Path):
         self.path = path
         self.file_name = self.__get_file_name()

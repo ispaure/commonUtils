@@ -51,3 +51,7 @@ class CSVFile(File):
 
             for row in csv_data:
                 writer.writerow(row)
+
+
+from .registry import register_file_type
+register_file_type(CSVFile, 'csv', priority=-100)

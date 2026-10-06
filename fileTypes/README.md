@@ -122,7 +122,7 @@ For example:
 
 ```python
 file.path
-file.name
+file.file_name
 file.ext
 file.size
 file.delete_file()
@@ -133,6 +133,41 @@ Individual file types add only the behavior specific to their format.
 
 ## File Type Resolution
 
-`Directory.list_files()` currently automatically resolves TXT and CSV files to `TXTFile` and `CSVFile` instances.
+`Directory.list_files()` resolves files through a **process-wide registry**. Built-in
+TXT, CSV, JSON, XML, ZIP, DMG and AppImage modules register their own classes lazily.
+Unknown formats remain `File`. Existing directory ordering, recursive traversal and
+extension filters are unchanged; listing does not read file contents.
 
-Other specialized file types can currently be instantiated directly when needed.
+Projects own domain-specific types and can register them without changing commonUtils:
+
+```python
+from commonUtils.fileUtils import File
+from commonUtils.fileTypes.registry import register_file_type, file_from_path
+
+class ProjectArchive(File):
+    pass
+
+register_file_type(ProjectArchive, '.myarchive')
+file = file_from_path('example.myarchive')
+```
+
+Registration is global within the current Python process. Every subsequent
+`Directory.list_files()` call and `file_from_path()` call uses it, including calls
+from other project modules and Directory objects created before registration.
+Already-created File objects keep their class. Separate processes must register
+independently. Direct `File(path)` construction intentionally remains generic.
+
+**Startup guideline:** register built-ins and project-specific types during project
+initialization, before the first commonUtils directory listing, resolution or browser
+use. This is recommended, not enforced; late registration affects subsequent
+resolutions too. Importing commonUtils before registration is fine.
+
+`register_file_type(MyFile, ('foo', 'bar'), detector=rule, priority=10)` supports
+case-insensitive extensions, compound suffixes and optional `rule(Path) -> bool`.
+An extension plus detector requires both to match; a detector alone can recognize
+extensionless files. Higher priority wins, with the most recent registration
+breaking ties. Built-ins use priority -100 so project registrations normally win.
+Identical registrations are idempotent. Detector failures propagate, allowing
+callers to decide how to handle them. Keep detectors cheap and read-only because
+they run during listing. `file_types.unregister(registration)` removes a rule;
+`FileTypeRegistry` also supports isolated registries for specialized callers/tests.

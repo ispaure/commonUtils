@@ -22,3 +22,7 @@ class AppImageFile(fileUtils.File):
     def __init__(self, path: Path):
         # Call the parent (File) initializer
         super().__init__(path)
+
+
+from .registry import register_file_type
+register_file_type(AppImageFile, 'appimage', priority=-100)

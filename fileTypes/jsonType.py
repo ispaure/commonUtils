@@ -49,3 +49,7 @@ class JSONFile(File):
             if staged is not None:
                 staged.unlink(missing_ok=True)
         self.size = self.path.stat().st_size
+
+
+from .registry import register_file_type
+register_file_type(JSONFile, 'json', priority=-100)

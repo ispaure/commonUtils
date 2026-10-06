@@ -79,3 +79,7 @@ class TXTFile(File):
                     subprocess.Popen(["open", "-a", "TextEdit", path_str])
             case OS.LINUX:
                 subprocess.run(["xdg-open", path_str])
+
+
+from .registry import register_file_type
+register_file_type(TXTFile, 'txt', priority=-100)
