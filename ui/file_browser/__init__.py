@@ -8,7 +8,7 @@ from ...dirUtils import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel
 from .details import DetailsPanel
-from .controls import ViewModeSelector
+from .controls import ViewModeSelector, FolderSizeControl
 from .navigation import NavigationBar
 from .operations import Operation
 from .views import FileViews
@@ -58,6 +58,15 @@ class FileBrowser(qt.QWidget):
         self.cover_pixmap = qt.QPixmap()
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(self._create_navigation_controls())
+        self._create_views()
+        layout.addWidget(self.splitter, 1)
+        self._create_preview_panel()
+        qt.QApplication.instance().aboutToQuit.connect(self.shutdown)
+        if directory is not None:
+            self.set_directory(directory)
+
+    def _create_navigation_controls(self):
         self.navigation = NavigationBar(self)
         self.navigation.requested.connect(self.navigate)
         controls = qt.QHBoxLayout()
@@ -65,30 +74,16 @@ class FileBrowser(qt.QWidget):
         self.view_selector = ViewModeSelector(self)
         self.view_selector.setAccessibleName('Browser view')
         controls.addWidget(self.view_selector)
-        self.folder_size_button = qt.QToolButton()
-        self.folder_size_button.setText('Size')
-        self.folder_size_button.setToolTip('Folder icon size')
-        self.folder_size_button.setAccessibleName('Folder icon size')
-        self.folder_size_button.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
-        size_menu = qt.QMenu(self.folder_size_button)
-        size_widget = qt.QWidget()
-        size_layout = qt.QVBoxLayout(size_widget)
-        size_layout.addWidget(qt.QLabel('Folder icon size'))
-        self.folder_size_slider = qt.QSlider(qt.Qt.Orientation.Horizontal)
-        self.folder_size_slider.setRange(25, 100)
-        self.folder_size_slider.setValue(50)
-        self.folder_size_slider.setAccessibleName('Folder icon size percentage')
-        size_layout.addWidget(self.folder_size_slider)
-        size_action = qt.QWidgetAction(size_menu)
-        size_action.setDefaultWidget(size_widget)
-        size_menu.addAction(size_action)
-        self.folder_size_button.setMenu(size_menu)
+        self.folder_size_button = FolderSizeControl(self)
+        self.folder_size_slider = self.folder_size_button.slider
         self.folder_size_button.setVisible(False)
         controls.addWidget(self.folder_size_button)
         self.refresh_button = qt.QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_button)
-        layout.addLayout(controls)
+        return controls
+
+    def _create_views(self):
         self.model = BrowserFileSystemModel(self)
         self.model.setReadOnly(True)
         self.model.setFilter(qt.QDir.Filter.AllDirs | qt.QDir.Filter.Files | qt.QDir.Filter.NoDotAndDotDot)
@@ -115,7 +110,8 @@ class FileBrowser(qt.QWidget):
         self.splitter = qt.QSplitter()
         self.splitter.setChildrenCollapsible(False)
         self.splitter.addWidget(self.views)
-        layout.addWidget(self.splitter, 1)
+
+    def _create_preview_panel(self):
         self.preview_panel = qt.QWidget()
         self.preview_panel.setMinimumWidth(280)
         panel_layout = qt.QVBoxLayout(self.preview_panel)
@@ -147,9 +143,6 @@ class FileBrowser(qt.QWidget):
         self._empty_preview.setReadOnly(True)
         self.splitter.addWidget(self.preview_panel)
         self.splitter.setSizes([700, 500])
-        qt.QApplication.instance().aboutToQuit.connect(self.shutdown)
-        if directory is not None:
-            self.set_directory(directory)
 
     @property
     def preview(self):
