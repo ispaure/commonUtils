@@ -124,3 +124,96 @@ PySide6
 ```
 
 Because the backends are lazily imported, accessing the native UI does not unnecessarily import PySide.
+
+
+## Reusable file browser
+
+`commonUtils.ui.file_browser.FileBrowser` is an embeddable PySide widget for
+folder/file browsing, selection, list/tile/column views, Back/Forward/Up navigation,
+a parent-path selector, information tabs, thumbnails and context menus. It uses
+`File`/`Directory` objects resolved by the shared process-wide file registry.
+`QFileSystemModel` supplies filesystem watching and Qt indexes; its browser adapter
+exposes `item(index)` and `object_for_path(path)` as the data-object interface.
+
+```python
+from pathlib import Path
+from commonUtils.dirUtils import Directory
+from commonUtils.ui.file_browser import FileBrowser
+
+browser = FileBrowser(Directory(Path('/path/to/library')), parent=window)
+layout.addWidget(browser)
+```
+
+Create a QApplication before the widget. Project-specific controls, such as a
+library dropdown, belong outside this widget. `set_directory(Directory_or_Path)`
+sets its navigation boundary; `navigate(path)` moves within that root. The right
+panel remains visible and always provides **File Information** for a selected
+file/folder: path, name, extension/size where applicable, modification time,
+creation time when the filesystem exposes one, readability, and link targets.
+Unix change time is not mislabeled as creation time. Folder totals/counts are
+calculated asynchronously without reading file contents or following links.
+Refresh recalculates them; totals and thumbnails remain in memory.
+
+Specialized File subclasses contribute behavior through GUI-independent hooks:
+
+```python
+from commonUtils.fileUtils import File
+from commonUtils.filesystem import BrowserPanel, BrowserDetails, BrowserAction
+from commonUtils.fileTypes.registry import register_file_type
+
+class ProjectFile(File):
+    def browser_panels(self):
+        return (BrowserPanel('project.details', 'Project Information', self.load_details),)
+
+    def load_details(self):
+        return BrowserDetails(fields=(('Title', 'Example'),))
+
+    def browser_actions(self, context):
+        return (BrowserAction('project.edit', 'Edit Project Data',
+                              lambda ctx: ctx.invoke('project.edit', ctx.selection)),)
+
+register_file_type(ProjectFile, 'project')
+browser = FileBrowser(Path('/path/to/library'),
+    services={'project.edit': edit_selected_project_files})
+```
+
+Register types during application startup, before the first listing/browser use.
+This is a guideline, not enforced. The registration remains available throughout
+that process to every subsequent resolver and `Directory.list_files()` call.
+Existing File instances retain their class; the browser re-resolves cached objects
+when the registry revision changes. Domain classes live in the consuming project.
+
+Panel loaders return `BrowserDetails(fields, thumbnail, message, payload)` and run
+on a worker thread; do not access widgets from them. Generic information stays
+available even if a contributed panel fails. `BrowserPanel.default_enabled` sets
+initial visibility; the **Panels** menu lets users show/hide contributed tabs.
+The generic tab cannot be hidden. Optional `payload` lets the application retain
+its loaded domain document through the `details_loaded` signal.
+
+Action callbacks and `browser_activate(context)` run on the GUI thread.
+`BrowserContext.selection` contains File/Directory objects; `context.widget` is the
+browser, and `context.invoke(name, *args)` calls an application-supplied service.
+Return True from activation when the type handles double-clicks; False uses the
+default application. Implement `browser_has_thumbnail = True` and
+`browser_thumbnail(size) -> bytes` to provide tile images without a format-specific
+branch in the browser. Thumbnail hooks run off the GUI thread and use a bounded
+128-item cache. Constructors and detection rules should stay cheap and avoid
+loading full metadata until requested.
+
+Generic context menus provide default-application opening and OS-specific Reveal.
+An optional `action_providers=(provider,)` argument allows application-level actions
+for Directory objects or mixed selections; providers receive `(item, context)` and
+return BrowserAction descriptors. `folder_fields(directory, stats)` may contribute
+additional count fields using `stats.extension_counts`, without hardcoding project
+formats into shared folder scanning.
+
+Useful integration methods/signals: `selected_objects()`, `context_menu_for(index)`,
+`refresh()`, `refresh_item(path)`, `selection_changed(objects)`, `details_loaded(result)`
+and `refreshed()`. Actions should call refresh_item after saving their data.
+Panel preferences are local to the widget. Neither selections nor file metadata
+are persisted by the shared browser.
+
+Close owners safely: `stop()` cancels queued work and returns whether workers are
+still finishing. If True, hide/defer owner destruction until the `idle` signal;
+otherwise close normally. `shutdown()` waits for workers during application exit.
+Do not delete a browser while a panel/thumbnail operation is running.
