@@ -105,3 +105,7 @@ class XMLFile(TXTFile):
         data = serialized.replace(b'\r', b'&#13;')
         ElementTree.fromstring(data)  # Reject illegal XML text before a file is touched.
         return data
+
+
+from .registry import register_file_type
+register_file_type(XMLFile, 'xml', priority=-100)

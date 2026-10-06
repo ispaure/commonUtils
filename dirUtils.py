@@ -14,12 +14,15 @@ __status__ = 'Production'
 from pathlib import Path
 from .debugUtils import *
 from . import fileUtils, linkUtils
-from .fileTypes import txtType, csvType
+from .fileTypes.registry import file_from_path
 import os, subprocess, sys
 from typing import List, Optional, Set, Union
 
 
-class Directory:
+from .filesystem import FilesystemObject
+
+
+class Directory(FilesystemObject):
     def __init__(self, path: Path):
         if not isinstance(path, Path):
             log(Severity.CRITICAL, 'Directory.__init__', f'Expected Path when creating {type(self).__name__}, got {type(path).__name__}: {path!r}')
@@ -33,12 +36,7 @@ class Directory:
 
     @staticmethod
     def __get_file_from_path(path: Path) -> fileUtils.File:
-        if path.suffix.lower() == '.txt':
-            return txtType.TXTFile(path)
-        elif path.suffix.lower() == '.csv':
-            return csvType.CSVFile(path)
-        else:
-            return fileUtils.File(path)
+        return file_from_path(path)
 
     @staticmethod
     def __delete_junction(path: Path):
@@ -71,7 +69,8 @@ class Directory:
     def list_files(self, recursive: bool = True, filter_extension: Optional[Union[str, List[str]]] = None) -> List[fileUtils.File]:
         """
         Returns a list of File objects under this directory.
-        Uses the appropriate File subclass based on the file extension.
+        Uses the process-wide file-type registry. Types registered by the project
+        remain available to every subsequent listing, including existing Directory objects.
         Follows symbolic links and junctions to directories, but raises a CRITICAL error if recursive traversal is detected.
         Keeps the same ordering/behavior as deprecated get_file_list_from_path.
         """

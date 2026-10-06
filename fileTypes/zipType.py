@@ -35,3 +35,7 @@ class ZIPFile(fileUtils.File):
                 return [Path(f).name for f in zip_ref.namelist() if '/' not in f]
         except zipfile.BadZipFile:
             log(Severity.CRITICAL, "CBZFile", f"Invalid ZIP structure in {self.path}")
+
+
+from .registry import register_file_type
+register_file_type(ZIPFile, 'zip', priority=-100)

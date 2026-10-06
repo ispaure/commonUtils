@@ -71,3 +71,7 @@ class DMGFile(fileUtils.File):
         finally:
             # Step 4: Unmount the DMG
             subprocess.call(["hdiutil", "detach", mount_point])
+
+
+from .registry import register_file_type
+register_file_type(DMGFile, 'dmg', priority=-100)
