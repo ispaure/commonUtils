@@ -138,6 +138,10 @@ TXT, CSV, JSON, XML, ZIP, DMG and AppImage modules register their own classes la
 Unknown formats remain `File`. Existing directory ordering, recursive traversal and
 extension filters are unchanged; listing does not read file contents.
 
+For new feature integrations, [Adding a feature](../FEATURES.md) uses one
+`Feature(file_types=[FileType(...)], browser=BrowserExtension(...))` declaration for
+types and browser capabilities. The direct registration API below remains supported.
+
 Projects own domain-specific types and can register them without changing commonUtils:
 
 ```python
@@ -171,3 +175,16 @@ Identical registrations are idempotent. Detector failures propagate, allowing
 callers to decide how to handle them. Keep detectors cheap and read-only because
 they run during listing. `file_types.unregister(registration)` removes a rule;
 `FileTypeRegistry` also supports isolated registries for specialized callers/tests.
+
+
+### Owned, toggleable registrations
+
+Plugin hosts may pass `owner='feature_name'` to `register_file_type` or register
+inside `file_types.owner_scope('feature_name')`. `file_types.set_owner_enabled(owner,
+False)` removes that owner's rules from resolution without altering other owners or
+built-in fallbacks. `True` restores them with their original precedence. Changes
+increment `revision`, letting browser models re-resolve cached objects. Registering
+new owned rules while disabled does not activate them. The ledger remains intact;
+`unregister(handle)` still permanently removes an individual rule. Scope ownership
+is restored after exceptions and is local to the calling context. Existing File
+instances and running operations are retained; future resolutions use the new state.

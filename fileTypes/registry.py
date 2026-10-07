@@ -1,11 +1,15 @@
 """Process-wide, extensible file resolution without GUI or project dependencies."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Callable
 
 from ..fileUtils import File
+
+_registration_owner = ContextVar('file_type_registration_owner', default=None)
 
 
 @dataclass(frozen=True)
@@ -14,6 +18,7 @@ class FileTypeRegistration:
     extensions: tuple[str, ...]
     detector: Callable[[Path], bool] | None = None
     priority: int = 0
+    owner: str | None = None
 
 
 class FileTypeRegistry:
@@ -23,8 +28,9 @@ class FileTypeRegistry:
         self._registrations = []
         self._lock = RLock()
         self.revision = 0
+        self._disabled_owners = set()
 
-    def register(self, file_class, extensions=(), *, detector=None, priority=0):
+    def register(self, file_class, extensions=(), *, detector=None, priority=0, owner=None):
         if not isinstance(file_class, type) or not issubclass(file_class, File):
             raise TypeError('Registered types must derive from File')
         if isinstance(extensions, str):
@@ -36,7 +42,8 @@ class FileTypeRegistry:
             raise TypeError('A file detector must be callable')
         if not normalized and detector is None:
             raise ValueError('Supply extensions or a detection rule')
-        registration = FileTypeRegistration(file_class, normalized, detector, priority)
+        owner = owner if owner is not None else _registration_owner.get()
+        registration = FileTypeRegistration(file_class, normalized, detector, priority, owner)
         with self._lock:
             if registration in self._registrations:
                 return registration
@@ -49,10 +56,31 @@ class FileTypeRegistry:
             self._registrations.remove(registration)
             self.revision += 1
 
+    @contextmanager
+    def owner_scope(self, owner):
+        """Attribute registrations made by a plugin hook to that owner."""
+        token = _registration_owner.set(owner)
+        try:
+            yield
+        finally:
+            _registration_owner.reset(token)
+
+    def set_owner_enabled(self, owner, enabled):
+        """Toggle resolution without losing rules or changing their priority order."""
+        with self._lock:
+            if (owner not in self._disabled_owners) == enabled:
+                return
+            if enabled:
+                self._disabled_owners.discard(owner)
+            else:
+                self._disabled_owners.add(owner)
+            self.revision += 1
+
     def resolve(self, path):
         path = Path(path)
         with self._lock:
-            registrations = tuple(self._registrations)
+            registrations = tuple(entry for entry in self._registrations
+                                  if entry.owner not in self._disabled_owners)
         candidates = sorted(enumerate(registrations), key=lambda item: (item[1].priority, item[0]), reverse=True)
         name = path.name.lower()
         for _, entry in candidates:
@@ -72,9 +100,9 @@ _defaults_lock = RLock()
 _defaults_loaded = False
 
 
-def register_file_type(file_class, extensions=(), *, detector=None, priority=0):
+def register_file_type(file_class, extensions=(), *, detector=None, priority=0, owner=None):
     """Register for all future resolutions in this process, not just one directory."""
-    return file_types.register(file_class, extensions, detector=detector, priority=priority)
+    return file_types.register(file_class, extensions, detector=detector, priority=priority, owner=owner)
 
 
 def register_builtin_file_types():

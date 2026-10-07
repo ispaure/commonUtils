@@ -29,6 +29,7 @@ class BrowserAction:
     key: str
     title: str
     run: Callable
+    source: str = 'Extensions'
 
 
 class FilesystemObject:

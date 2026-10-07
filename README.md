@@ -41,6 +41,12 @@ Platform-specific functionality may also depend on software provided by
 the operating system, such as PowerShell on Windows or `hdiutil` on
 macOS.
 
+## Extending applications
+
+[Adding a feature](FEATURES.md) is the recommended entry point for declaring owned
+file types, browser actions, activation, folder fields and per-window controllers
+in one place. It includes installation and live enable/disable examples.
+
 ## Core Modules
 
 ### 📄 `fileUtils.py`

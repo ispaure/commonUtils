@@ -110,6 +110,53 @@ class BrowserTests(unittest.TestCase):
         self.assertIn('Optional: enabled', self.browser.preview.toPlainText())
         menu.deleteLater()
 
+    def test_mixed_selection_groups_and_deduplicates_feature_actions(self):
+        registration = register_file_type(CustomFile, 'project')
+        self.addCleanup(file_types.unregister, registration)
+        self.browser.action_providers = (lambda item, context: (
+            BrowserAction('example.action', 'Duplicate', lambda ctx: None, source='Example'),
+            BrowserAction('example.second', 'Second Action', lambda ctx: None, source='Example')),)
+        self.select(self.path)
+        other = self.browser.model.index(str(self.root / 'other.bin'))
+        self.browser.tree.selectionModel().select(other,
+            qt.QItemSelectionModel.SelectionFlag.Select | qt.QItemSelectionModel.SelectionFlag.Rows)
+        menu = self.browser.context_menu_for(other)
+        labels = [action.text() for action in menu.actions()]
+        self.assertEqual(labels.count('Project Action'), 1)
+        self.assertNotIn('Duplicate', labels)
+        self.assertEqual(labels.count('Second Action'), 1)
+        self.assertIn('Extensions', labels)
+        self.assertIn('Example', labels)
+        project = next(action for action in menu.actions() if action.text() == 'Project Action')
+        project.trigger()
+        self.assertEqual({item.path for item in self.calls[-1]}, {self.path, self.root / 'other.bin'})
+        self.assertEqual(project.property('source'), 'Extensions')
+        menu.deleteLater()
+
+    def test_extension_layers_are_reversible_and_restore_previous_handlers(self):
+        called = []
+        first = lambda: called.append('first')
+        second = lambda: called.append('second')
+        self.browser.install_extension('first', services={'shared': first})
+        self.browser.install_extension('second', services={'shared': second},
+            action_providers=(lambda item, context: (BrowserAction('second.action', 'Second',
+                lambda ctx: ctx.invoke('shared'), source='Second'),),))
+        self.browser.services['shared']()
+        self.assertEqual(called, ['second'])
+        self.browser.set_extension_enabled('second', False)
+        self.browser.services['shared']()
+        self.assertEqual(called[-1], 'first')
+        self.assertNotIn('Second', [action.text() for action in self.browser.context_menu_for(
+            self.browser.model.index(str(self.path))).actions()])
+        self.browser.set_extension_enabled('second', True)
+        self.browser.services['shared']()
+        self.assertEqual(called[-1], 'second')
+        self.browser.remove_extension('second')
+        self.browser.remove_extension('first')
+        self.assertNotIn('shared', self.browser.services)
+        self.assertIn('example.action', self.browser.services)
+        self.wait()
+
     def test_folder_generic_information_counts_and_directory_objects(self):
         folder = self.root / 'nested'
         folder.mkdir()

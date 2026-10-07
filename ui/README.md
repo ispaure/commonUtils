@@ -128,6 +128,11 @@ Because the backends are lazily imported, accessing the native UI does not unnec
 
 ## Reusable file browser
 
+**Start here for new extensions:** [Adding a feature](../FEATURES.md) documents the
+unified `register() -> Feature(...)` API, including complete action/type wiring,
+handler context, per-window controllers and enable/disable behavior. The APIs below
+also describe the lower-level hooks retained for existing integrations.
+
 `commonUtils.ui.file_browser.FileBrowser` is an embeddable PySide widget for
 folder/file browsing, selection, list/tile/column views, Back/Forward/Up navigation,
 a clickable folder breadcrumb bar, information tabs, thumbnails and context menus. It uses
@@ -190,12 +195,31 @@ class ProjectFile(File):
 
     def browser_actions(self, context):
         return (BrowserAction('project.edit', 'Edit Project Data',
-                              lambda ctx: ctx.invoke('project.edit', ctx.selection)),)
+                              lambda ctx: ctx.invoke('project.edit', ctx.selection),
+                              source='Project'),)
 
 register_file_type(ProjectFile, 'project')
 browser = FileBrowser(Path('/path/to/library'),
     services={'project.edit': edit_selected_project_files})
 ```
+
+Context menus put built-in Open/Reveal actions first, then group contributed actions
+under their `BrowserAction.source` feature name. Supply a user-facing name such as
+`Comics` or `Project`; older descriptors without a source appear under `Extensions`.
+Actions also expose the source through a tooltip and QAction property. Contributions
+are collected from every selected object and each action provider, deduplicated by
+key, and retain provider order within each feature group. Right-clicking an item
+outside the selection uses only that item. Action callbacks receive the captured
+selection; features decide which selected objects they support.
+
+Applications can install reversible browser extensions with
+`browser.install_extension(owner, services={...}, action_providers=(...), folder_fields=...)`.
+`set_extension_enabled(owner, False)` removes that layer's handlers/providers/fields;
+`True` restores it. `remove_extension(owner)` removes its registration permanently.
+Layers preserve install order and restore underlying handlers after disabling a
+later overlapping layer. The browser refreshes previews and totals after changes.
+These APIs manage browser capabilities, not controller/worker lifetimes; the host
+retains those objects until existing jobs and windows finish.
 
 Register types during application startup, before the first listing/browser use.
 This is a guideline, not enforced. The registration remains available throughout
