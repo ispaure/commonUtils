@@ -106,8 +106,9 @@ Current types include:
 | --- | --- | --- |
 | `TXTFile` | `txtType` | Read/write text as lines and open it in the default editor |
 | `CSVFile` | `csvType` | Read/write CSV data using Python's CSV handling |
+| `JSONFile` | `jsonType` | JSON documents with atomic UTF-8 writes |
 | `XMLFile` | `xmlType` | XML-oriented text file type |
-| `ZIPFile` | `zipType` | ZIP extraction and root-entry inspection |
+| `ZIPFile` | `zipType` | Plain/encrypted ZIP access, validated extraction and root-entry inspection |
 | `DMGFile` | `dmgType` | macOS DMG mounting and directory extraction |
 | `AppImageFile` | `appimageType` | AppImage file representation |
 
@@ -123,9 +124,11 @@ file.line_lst = ["First line", "Second line"]
 file.write_lines()
 ```
 
-At present, `Directory.list_files()` automatically resolves TXT and CSV
-files to their specialized classes; other specialized file types can be
-instantiated directly.
+`Directory.list_files()` uses the process-wide file-type registry, with built-in
+TXT, CSV, JSON, XML, ZIP, DMG and AppImage rules. Applications add owned extension
+or detector rules through `Feature.file_types`; disabling a feature disables its
+rules. Existing objects keep their class; browser refreshes resolve against the
+current registry. See [feature declarations](FEATURES.md).
 
 ### 📄 `linkUtils.py`
 
@@ -273,6 +276,20 @@ ui.pyside
 Lazy loading keeps optional PySide dependencies from being imported
 unless needed.
 
+### 📁 `ui/file_browser`
+
+The reusable `FileBrowser` widget supplies filesystem navigation, file information,
+previews, selection actions and background work. File types provide format-specific
+panels/thumbnails; feature declarations add labeled menu sections, activation,
+folder fields and optional controllers. `register() -> Feature(...)` is the unified
+entry point, documented with examples in [FEATURES.md](FEATURES.md).
+
+Applications install each declaration into their browser windows. A feature-wide
+toggle updates owned type rules and all live bindings; a binding-only toggle affects
+one window. Controllers and operation state belong to individual windows. The host
+owns feature discovery, dependency policy and application UI. Expensive handlers
+must explicitly use workers; action declarations are not automatically asynchronous.
+
 ### 📄 `configUtils.py`
 
 Provides helpers for reading and modifying INI-style configuration files
@@ -286,11 +303,33 @@ backed by `CSVFile` for import and export.
 
 ### 📄 `zipUtils.py`
 
-Provides ZIP and RAR archive helpers.
+Compatibility ZIP helpers delegate to `zip_access`; RAR extraction retains its
+external extractor integration.
 
-ZIP extraction includes path-traversal protection, CRC-aware extraction,
-temporary partial files, optional progress UI, and support for encrypted
-ZIP archives through `pyzipper`.
+### 📄 `zip_access.py`
+
+Reads ordinary ZIP, legacy ZipCrypto and WinZip AES; password-protected writes
+always use AES-256. Validated streaming extraction uses the same entry layout for
+plain and encrypted archives, rejecting traversal, symlinks and ambiguous names.
+`create_archive` deduplicates selections, retains selected folder roots and empty
+directories, verifies decrypted content and publishes a separate ZIP without
+replacing sources or an existing destination.
+
+```python
+from commonUtils.zip_access import open_archive, extract_archive, create_archive
+
+with open_archive("comic.cbz", password=password) as archive:
+    metadata = archive.read("ComicInfo.xml")
+extract_archive("comic.cbz", workspace, password=password)
+create_archive([folder, other_file], "selection.zip", password=password)
+```
+
+These primitives accept explicit passwords; configuration lookup, password dialogs,
+session caches, batch progress and cancellation policy belong to consuming
+applications. ZIP filenames remain visible. Extraction is staged per file rather
+than transactional for the whole archive; use disposable workspaces for rewrites.
+See [ZIP_ARCHIVES.md](ZIP_ARCHIVES.md) for verification, authentication and failure
+semantics, plus the `ZIPFile` wrappers.
 
 ### Other Utilities
 
@@ -387,6 +426,3 @@ This project is licensed under the MIT License. See `LICENSE.md` for the
 full license text.
 
 Copyright © 2020-2026 Marc-André Voyer.
-
-ZIP reading, AES-256 writing, validated extraction and verified selection archives
-are documented in [ZIP_ARCHIVES.md](ZIP_ARCHIVES.md).
