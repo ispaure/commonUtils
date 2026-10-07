@@ -13,14 +13,9 @@ __status__ = 'Production'
 
 from typing import *
 from pathlib import Path
-import stat
-import shutil
 from shutil import make_archive
-import zlib
-from tempfile import NamedTemporaryFile
 
 # Compression utilities
-import pyzipper
 import patoolib
 import zipfile
 
@@ -33,149 +28,26 @@ def unzip_file(source_file: Union[str, Path],
                destination_dir: Union[str, Path],
                pwd: Optional[str] = None,
                show_progress: bool = False) -> bool:
+    """Compatibility wrapper: validated streaming extraction for plain/AES ZIPs.
+
+    Passwords are explicit; this utility never prompts. Failure returns False,
+    incomplete entries are removed, and callers retain ownership of the workspace.
     """
-    Extracts zip file to desired location.
-    Returns True iff all entries extract & CRC-verify; otherwise False.
-
-    All member paths must remain within the destination directory.
-    """
-    tool_name = 'Extract ZIP File'
-
-    # Normalize inputs
-    if isinstance(source_file, (str, Path)):
-        source_file_str = str(source_file)
-    else:
-        log(Severity.ERROR, tool_name, 'Wrong Input type for Source File')
-        return False
-
-    if isinstance(destination_dir, (str, Path)):
-        destination_dir_str = str(destination_dir)
-    else:
-        log(Severity.ERROR, tool_name, 'Wrong Input type for Destination Directory')
-        return False
-
-    # Helper: robust "is inside" check (prevents Zip Slip)
-    def _is_within(base: Path, target: Path) -> bool:
-        try:
-            base_resolved = base.resolve()
-            target_resolved = target.resolve()
-            return os.path.commonpath([str(base_resolved), str(target_resolved)]) == str(base_resolved)
-        except Exception:
-            return False
-
-    # ---- Unencrypted ---------------------------------------------------------
-    if pwd is None:
-        log(Severity.DEBUG, tool_name, f'Extracting archive from "{source_file_str}" to "{destination_dir_str}"')
-
-        src = Path(source_file_str)
-        dest = Path(destination_dir_str)
-        progress_window = None
-
-        try:
-            dest.mkdir(parents=True, exist_ok=True)
-
-            with zipfile.ZipFile(src, 'r') as zf:
-                file_info_lst = zf.infolist()
-                total_size = sum(info.file_size for info in file_info_lst if not info.is_dir())
-                extracted_size = 0
-
-                if show_progress:
-                    from . import ui
-                    progress_window = ui.pyside.display_progress_bar(f'Extracting {src.name}')
-
-                try:
-                    for info in file_info_lst:
-                        # Validate files and directories before creating either.
-                        target_path = dest / info.filename
-                        if not _is_within(dest, target_path):
-                            log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
-                            return False
-
-                        # Directories
-                        if info.is_dir():
-                            target_path.mkdir(parents=True, exist_ok=True)
-                            continue
-
-                        # Optional: skip Unix symlinks for safety
-                        is_unix_symlink = (info.create_system == 3) and (
-                            stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK
-                        )
-                        if is_unix_symlink:
-                            log(Severity.WARNING, tool_name, f"Skipping symlink entry: {info.filename}")
-                            continue
-
-                        target_path.parent.mkdir(parents=True, exist_ok=True)
-
-                        # Stream to a temp file; CRC enforced by fully consuming the stream
-                        with NamedTemporaryFile(delete=False, dir=target_path.parent, prefix=".part_") as tmp:
-                            tmp_name = tmp.name
-                            try:
-                                with zf.open(info, 'r') as src_f:
-                                    while True:
-                                        chunk = src_f.read(1024 * 1024)  # 1 MiB chunks
-                                        if not chunk:
-                                            break
-
-                                        tmp.write(chunk)
-
-                                        if progress_window is not None and total_size > 0:
-                                            extracted_size += len(chunk)
-                                            progress = int((extracted_size / total_size) * 100)
-                                            progress_window.update_progress(progress)
-
-                            except (zipfile.BadZipFile, zlib.error, OSError, RuntimeError) as e:
-                                # Clean up partial
-                                try:
-                                    os.unlink(tmp_name)
-                                except OSError:
-                                    pass
-                                log(Severity.ERROR, tool_name, f"[CRC/READ FAIL] {info.filename}: {e}")
-                                return False
-
-                        # Atomic move into place only if read (and CRC) succeeded
-                        os.replace(tmp_name, target_path)
-
-                        # (Optional) Preserve mtime from ZIP entry
-                        try:
-                            import datetime, time
-                            dt = datetime.datetime(*info.date_time)  # local time tuple
-                            ts = int(time.mktime(dt.timetuple()))
-                            os.utime(target_path, (ts, ts))
-                        except Exception:
-                            pass
-
-                    if progress_window is not None:
-                        progress_window.update_progress(100)
-
-                    return True
-
-                finally:
-                    if progress_window is not None:
-                        progress_window.dlg.close()
-
-        except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError, RuntimeError) as e:
-            log(Severity.ERROR, tool_name, f"[ZIP FAIL] {src}: {e}")
-            return False
-
-    # ---- Encrypted ----------------------------------------------------------
-    else:
-        log(Severity.DEBUG, tool_name, f'Extracting password-protected archive from "{source_file_str}" to "{destination_dir_str}"')
-
-        # # Legacy ZIP 2.0 only (left commented on purpose)
-        # with zipfile.ZipFile(source_file_str, 'r') as zip_ref:
-        #     zip_ref.extractall(path=destination_dir_str, members=None, pwd=pwd.encode())
-
-        # AES/ZIP 2.0 via pyzipper, with the same containment guard.
-        with pyzipper.AESZipFile(source_file_str, 'r',
-                                 compression=pyzipper.ZIP_DEFLATED,
-                                 encryption=pyzipper.WZ_AES) as extracted_zip:
-            dest = Path(destination_dir_str)
-            for info in extracted_zip.infolist():
-                if not _is_within(dest, dest / info.filename):
-                    log(Severity.ERROR, tool_name, f"[SECURITY] Skipping suspicious path: {info.filename}")
-                    return False
-            extracted_zip.extractall(path=destination_dir_str, pwd=str.encode(pwd))
+    from .zip_access import extract_archive
+    progress_window = None
+    try:
+        if show_progress:
+            from . import ui
+            progress_window = ui.pyside.display_progress_bar(f'Extracting {Path(source_file).name}')
+        extract_archive(source_file, destination_dir, password=pwd,
+                        progress=progress_window.update_progress if progress_window else None)
         return True
+    except Exception as error:
+        log(Severity.ERROR, 'Extract ZIP File', f'Could not extract "{source_file}": {error}')
+        return False
+    finally:
+        if progress_window is not None:
+            progress_window.dlg.close()
 
 
 def unrar_file(source_file, destination_dir, unrar_sw_path: str = None):
@@ -200,7 +72,7 @@ def unrar_file(source_file, destination_dir, unrar_sw_path: str = None):
     # TODO: Or alternate solution is interfacing with Keka through Commandline perhaps?: https://github.com/aonez/Keka/wiki/Terminal-support
 
 
-def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=True):
+def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=True, *, password=None):
     """
     Create a zip file from the source to the destination.
     :param source: Source path to compress
@@ -210,6 +82,10 @@ def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=
     :param keep_root: When source is a dir, keeps the dir as part of the archive as a root folder (Default true)
     :type keep_root: bool
     """
+
+    if password is not None:
+        from .zip_access import write_directory
+        return write_directory(source, destination, password=password, keep_root=keep_root)
 
     def make_zipfile_keep_root(output_filename, source_dir):
         relroot = os.path.abspath(os.path.join(source_dir, os.pardir))

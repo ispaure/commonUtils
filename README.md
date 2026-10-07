@@ -387,3 +387,6 @@ This project is licensed under the MIT License. See `LICENSE.md` for the
 full license text.
 
 Copyright © 2020-2026 Marc-André Voyer.
+
+ZIP reading, AES-256 writing, validated extraction and verified selection archives
+are documented in [ZIP_ARCHIVES.md](ZIP_ARCHIVES.md).
