@@ -300,7 +300,8 @@ def create_archive(sources, destination, *, password=None):
         for path, before in signatures.items():
             if path.is_symlink() or signature(path.stat()) != signature(before):
                 raise RuntimeError(f'Source changed while archiving: {path}')
-        with staged.open('rb') as stream:
+        # Windows _commit requires a writable descriptor, even after ZIP close.
+        with staged.open('r+b') as stream:
             os.fsync(stream.fileno())
         # Exclusive link prevents replacing an output created by another operation.
         os.link(staged, destination)
