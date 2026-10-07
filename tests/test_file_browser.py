@@ -236,7 +236,8 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(values[0].text(), str(folder))
         self.assertEqual(values[0].textFormat(), qt.Qt.TextFormat.PlainText)
         self.assertTrue(values[0].hasHeightForWidth())
-        self.assertGreater(values[0].heightForWidth(100), values[0].heightForWidth(400))
+        wide = values[0].fontMetrics().horizontalAdvance(values[0].text()) + 20
+        self.assertGreater(values[0].heightForWidth(100), values[0].heightForWidth(wide))
         self.assertTrue(values[0].textInteractionFlags() & qt.Qt.TextInteractionFlag.TextSelectableByMouse)
         self.assertLessEqual(self.browser.cover.maximumHeight(), 120)
 
