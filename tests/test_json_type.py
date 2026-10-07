@@ -32,6 +32,7 @@ class JSONFileTests(unittest.TestCase):
         file = JSONFile(self.path)
         file.write_json({'old': True})
         self.path.chmod(0o640)
+        expected_mode = self.path.stat().st_mode & 0o777
         before = self.path.read_bytes()
         with self.assertRaises(TypeError):
             file.write_json({'invalid': object()})
@@ -43,7 +44,7 @@ class JSONFileTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)
         self.assertFalse(list(self.path.parent.glob('*.tmp')))
         file.write_json({'new': True})
-        self.assertEqual(self.path.stat().st_mode & 0o777, 0o640)
+        self.assertEqual(self.path.stat().st_mode & 0o777, expected_mode)
 
     def test_missing_and_malformed_errors_are_available_to_callers(self):
         with self.assertRaises(FileNotFoundError):
