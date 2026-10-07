@@ -54,3 +54,27 @@ class RegistryTests(unittest.TestCase):
         for args in [(object, 'bad'), (File, ''), (File, 'dir/bad')]:
             with self.assertRaises((TypeError, ValueError)):
                 registry.register(*args)
+
+    def test_owner_toggles_preserve_fallback_priority_and_scoped_registration(self):
+        registry = FileTypeRegistry()
+        base = registry.register(File, 'owned')
+        with registry.owner_scope('feature'):
+            custom = registry.register(ProjectFile, 'owned', priority=10)
+        self.assertEqual(custom.owner, 'feature')
+        self.assertIs(registry.resolve('file.owned'), ProjectFile)
+        revision = registry.revision
+        registry.set_owner_enabled('feature', False)
+        self.assertGreater(registry.revision, revision)
+        self.assertIs(registry.resolve('file.owned'), File)
+        self.assertEqual(registry.register(ProjectFile, 'owned', priority=10, owner='feature'), custom)
+        self.assertIs(registry.resolve('file.owned'), File)
+        registry.set_owner_enabled('feature', True)
+        self.assertIs(registry.resolve('file.owned'), ProjectFile)
+        self.assertIsNone(base.owner)
+
+    def test_owner_scope_restores_after_exception(self):
+        registry = FileTypeRegistry()
+        with self.assertRaises(ValueError):
+            with registry.owner_scope('feature'):
+                raise ValueError('failed hook')
+        self.assertIsNone(registry.register(File, 'other').owner)

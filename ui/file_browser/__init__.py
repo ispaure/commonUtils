@@ -47,6 +47,11 @@ class FileBrowser(qt.QWidget):
         self.services = services or {}
         self.action_providers = tuple(action_providers)
         self.folder_fields = folder_fields
+        self._base_services = dict(self.services)
+        self._base_action_providers = self.action_providers
+        self._base_folder_fields = folder_fields
+        self._extensions = {}
+        self.activation_handlers = ()
         self.busy = False
         self.folder_busy = False
         self.folder_pending = False
@@ -148,6 +153,43 @@ class FileBrowser(qt.QWidget):
     def preview(self):
         return self.tabs.currentWidget() or self._empty_preview
 
+    def install_extension(self, owner, *, services=None, action_providers=(), folder_fields=None, activation_handlers=(), enabled=True):
+        """Install a reversible, owner-scoped layer of browser capabilities."""
+        self._extensions[owner] = (dict(services or {}), tuple(action_providers), folder_fields, tuple(activation_handlers), enabled)
+        self._rebuild_extensions()
+
+    def set_extension_enabled(self, owner, enabled):
+        if owner not in self._extensions:
+            return
+        services, providers, fields, activation, previous = self._extensions[owner]
+        if previous == enabled:
+            return
+        self._extensions[owner] = (services, providers, fields, activation, enabled)
+        self._rebuild_extensions()
+
+    def remove_extension(self, owner):
+        if self._extensions.pop(owner, None) is not None:
+            self._rebuild_extensions()
+
+    def _rebuild_extensions(self):
+        self.services = dict(self._base_services)
+        providers = list(self._base_action_providers)
+        fields = [self._base_folder_fields] if self._base_folder_fields else []
+        activation = []
+        for services, actions, folder_fields, handlers, enabled in self._extensions.values():
+            if enabled:
+                self.services.update(services)
+                providers.extend(actions)
+                activation.extend(handlers)
+                if folder_fields is not None:
+                    fields.append(folder_fields)
+        self.action_providers = tuple(providers)
+        self.activation_handlers = tuple(activation)
+        self.folder_fields = (lambda item, stats: tuple(value for provider in fields
+                             for value in provider(item, stats))) if fields else None
+        if self.navigation.library is not None and not self.stopping:
+            self.refresh()
+
     def selected_objects(self):
         return tuple(self.model.item(index) for index in self.views.selected_rows())
 
@@ -188,18 +230,25 @@ class FileBrowser(qt.QWidget):
             default.triggered.connect(lambda: self._run(lambda: desktop_actions.open_default(item.path)))
         reveal = menu.addAction(desktop_actions.reveal_label())
         reveal.triggered.connect(lambda: self._run(lambda: desktop_actions.reveal(item.path)))
-        actions = list(item.browser_actions(context))
-        for provider in self.action_providers:
-            actions.extend(provider(item, context))
+        # Discover actions across the whole selection, including mixed file types.
+        groups = {}
         seen = set()
-        if actions:
-            menu.addSeparator()
-        for contribution in actions:
-            if contribution.key in seen:
-                continue
-            seen.add(contribution.key)
-            action = menu.addAction(contribution.title)
-            action.triggered.connect(lambda checked=False, entry=contribution: self._run(lambda: entry.run(context)))
+        for selected in context.selection:
+            contributions = list(selected.browser_actions(context))
+            for provider in self.action_providers:
+                contributions.extend(provider(selected, context))
+            for contribution in contributions:
+                if contribution.key in seen:
+                    continue
+                seen.add(contribution.key)
+                groups.setdefault(contribution.source or 'Extensions', []).append(contribution)
+        for source, contributions in groups.items():
+            menu.addSection(source)
+            for contribution in contributions:
+                action = menu.addAction(contribution.title)
+                action.setToolTip(f'Provided by {source}')
+                action.setProperty('source', source)
+                action.triggered.connect(lambda checked=False, entry=contribution: self._run(lambda: entry.run(context)))
         return menu
 
     def _context_menu(self, index):
@@ -220,7 +269,10 @@ class FileBrowser(qt.QWidget):
             self.navigate(item.path)
         else:
             def activate():
-                if not item.browser_activate(self.context(item)):
+                context = self.context(item)
+                if any(handler(item, context) for handler in self.activation_handlers):
+                    return
+                if not item.browser_activate(context):
                     desktop_actions.open_default(item.path)
             self._run(activate)
 
