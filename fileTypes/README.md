@@ -188,3 +188,7 @@ new owned rules while disabled does not activate them. The ledger remains intact
 `unregister(handle)` still permanently removes an individual rule. Scope ownership
 is restored after exceptions and is local to the calling context. Existing File
 instances and running operations are retained; future resolutions use the new state.
+
+`ZIPFile` supports explicit-password reading/extraction and encryption detection;
+see [ZIP archive APIs](../ZIP_ARCHIVES.md). Configuration and prompts belong to the
+host application rather than the file-type registry.

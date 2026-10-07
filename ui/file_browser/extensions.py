@@ -26,7 +26,8 @@ class InstalledFeature(qt.QObject):
             idle.connect(self.idle.emit)
         self.enabled = feature.enabled
         browser.install_extension(feature.id, action_providers=(self._actions_for,),
-            activation_handlers=(self._activate,), folder_fields=extension.folder_fields, enabled=self.enabled)
+            activation_handlers=(self._activate,) if self._activation else (),
+            folder_fields=extension.folder_fields, enabled=self.enabled)
         self.destroyed.connect(lambda: feature._bindings.discard(self))
 
     def _context(self, selection):
