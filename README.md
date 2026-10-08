@@ -52,6 +52,7 @@ missing/malformed reads raise exceptions for the application to handle.
 | Run work off the GUI thread, show progress and cancel safely | [Background-operation recipes](RECIPES.md#run-a-cancellable-job-in-a-qt-dialog) |
 | Finish the current item before cancelling a batch | [Batch recipe](RECIPES.md#finish-the-current-item-before-cancelling-a-batch) |
 | Copy/hash streams or provision a pinned download | [Stream and download recipes](RECIPES.md) |
+| Plan and batch-rename files/folders with rollback and undo | [Rename engine](RENAME.md) |
 | Read/edit Markdown, navigate headings and save documents | [Markdown reader](ui/README.md#markdown-reader) |
 | Embed a browser, manage navigation and close workers safely | [UI guide](ui/README.md#reusable-file-browser) |
 | Query/edit nested XML with namespaces and save atomically | [XML documents](XML.md) |
@@ -67,6 +68,8 @@ can declare type rules, actions, activation and controller ownership together.
 
 | Module/package | Provides |
 | --- | --- |
+| `traversal` | Filtered scans, natural path ordering and cooperative cancellation without link traversal |
+| `renameUtils` | Filename rules, rename plans, no-overwrite batches, cancellation and undo receipts |
 | `fileUtils` | `File`, path metadata, copy/move/rename and user/application-data paths |
 | `dirUtils` | `Directory`, traversal, creation, opening and deletion |
 | `filesystem` | Shared object abstraction, browser action/panel/details descriptors and folder totals |

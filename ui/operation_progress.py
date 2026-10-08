@@ -34,10 +34,12 @@ class OperationProgress(qt.QWidget):
         self.progress_changed.connect(self._progress)
         self.hide()
 
-    def start(self, work, *, message='Working…', cancel_text='Cancel', cancel_message='Cancelling safely…'):
+    def start(self, work, *, message='Working…', cancel_text='Cancel', cancel_message='Cancelling safely…',
+              show_progress=True):
+        """Start a job; show_progress=False keeps automatic background work out of the layout."""
         if self.busy:
             raise RuntimeError('An operation is already running')
-        self.show()
+        self.setVisible(show_progress)
         self.busy = True
         self.cancelled.clear()
         self.cancel_message = cancel_message
