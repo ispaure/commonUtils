@@ -126,6 +126,14 @@ PySide6
 Because the backends are lazily imported, accessing the native UI does not unnecessarily import PySide.
 
 
+## Background work and downloads
+
+Use [the workflow recipes](../RECIPES.md) for complete examples of
+`OperationProgress`, safe dialog closing, per-item batch cancellation, stream
+progress and verified download prompts. The synchronous legacy progress widgets
+only display progress; callbacks must use an explicit worker to avoid blocking Qt.
+The generic worker lives at `commonUtils.ui.operations.Operation`.
+
 ## Reusable file browser
 
 **Start here for new extensions:** [Adding a feature](../FEATURES.md) documents the

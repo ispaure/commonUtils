@@ -5,6 +5,74 @@ owned file types, browser actions, double-click activation, folder fields, optio
 controller construction and initialization metadata. Declarations do not create Qt
 widgets or register formats during discovery.
 
+## Runnable example: add a menu action to a browser
+
+Save this as `project_browser.py` in your consuming project and run
+`python project_browser.py /path/to/folder`, with commonUtils on the import path
+and PySide6 installed. It adds **Project → Show selected paths**, including for
+ordinary files and folders, without needing a custom file type. The same handler
+works for mixed selections.
+
+```python
+from pathlib import Path
+import sys
+from commonUtils.features import Feature, BrowserExtension, SelectionAction
+from commonUtils.fileUtils import File
+from commonUtils.dirUtils import Directory
+from commonUtils.ui import pyside as qt
+from commonUtils.ui.file_browser import FileBrowser
+
+def show_paths(context):
+    context.host.statusBar().showMessage(
+        ' | '.join(str(path) for path in context.paths))
+
+feature = Feature(
+    id='project', label='Project',
+    browser=BrowserExtension(actions=(SelectionAction(
+        id='show_paths', label='Show selected paths',
+        accepts=(File, Directory), handler=show_paths,
+    ),)),
+)
+
+class BrowserWindow(qt.QMainWindow):
+    def __init__(self, root):
+        super().__init__()
+        self.setWindowTitle('Project Browser')
+        feature.register_types()  # Before the first listing.
+        self.browser = FileBrowser(root, parent=self)
+        self.setCentralWidget(self.browser)
+        self.binding = feature.install_browser(self.browser, host=self)
+        self.browser.idle.connect(self.close)
+        self.resize(1000, 700)
+
+    def closeEvent(self, event):
+        # This example has no controller jobs; wait for browser workers.
+        if self.browser.stop():
+            event.ignore()
+        else:
+            super().closeEvent(event)
+
+if __name__ == '__main__':
+    app = qt.initialize_q_app()
+    root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
+    window = BrowserWindow(root)
+    window.show()
+    sys.exit(app.exec())
+```
+
+The handler runs on the GUI thread. Use
+[OperationProgress](RECIPES.md#run-a-cancellable-job-in-a-qt-dialog) when an action
+needs expensive filesystem work. Register your declarations once and retain the
+bindings/controllers while their windows are alive. If you add a controller,
+close handling must also wait for its jobs (see below).
+
+## Add a format, preview panel and double-click handler
+
+This declaration can replace the `feature` above using `feature = register()`.
+Create an `example.project` file to see its panel and actions. In a real project,
+replace the sample details/editor with domain-specific loading and UI. Keep file
+constructors and detection rules cheap; panel loaders run off the GUI thread.
+
 ```python
 from commonUtils.features import (
     Feature, FileType, BrowserExtension, SelectionAction, FileActivation,
@@ -90,6 +158,23 @@ menu entry. Selection expansion into a folder's descendants remains the handler'
 responsibility; the framework does not automatically recurse or change files.
 After saving, call `context.browser.refresh_item(path)` or `refresh()` as appropriate.
 
+## Hide an action when its prerequisites are missing
+
+`SelectionAction.is_available(context)` is optional. It is evaluated against one
+accepted item while building the context menu, so it must be cheap and must not
+prompt, download software or modify files:
+
+```python
+SelectionAction(
+    id='edit', label='Edit Project Data', accepts=ProjectFile,
+    handler=edit, is_available=lambda context: context.path.is_file(),
+)
+```
+
+A menu entry can still represent several accepted selected objects. Availability
+does not replace handler validation: recheck all selected paths and prerequisites
+when executing, since files and configuration may have changed after the menu opened.
+
 ## Application installation and toggles
 
 The host creates QApplication/windows and consumes the feature declaration:
@@ -140,3 +225,34 @@ The lower-level `register_file_type`, `install_extension`, services/providers an
 file-type action hooks remain supported. They are useful for existing integrations
 and special cases. New features should use a single declaration to avoid splitting
 ownership, menu labels, accepted types and handler wiring across those APIs.
+
+## Add thumbnails or keep per-window state
+
+A format class can set `browser_has_thumbnail = True` and implement
+`browser_thumbnail(size) -> bytes | None`. `size` is a physical-pixel bounding box;
+return encoded image bytes sized for it. The browser decodes those bytes and keeps
+a bounded memory cache. Loaders must not create or access Qt widgets, and a missing
+thumbnail can return `None`. [The UI guide](ui/README.md#reusable-file-browser)
+describes cache invalidation, panels and refresh signals.
+
+Use `BrowserExtension(create_controller=factory)` when handlers need per-window
+state. The factory receives the host and runs once for that window binding:
+
+```python
+def create_controller(host):
+    return ProjectController(host)  # Your editor/job owner.
+
+extension = BrowserExtension(
+    create_controller=create_controller,
+    actions=(SelectionAction('edit', 'Edit Project Data', ProjectFile,
+        lambda context: context.controller.open_editor(context.paths)),),
+)
+```
+
+The host owns shutdown. Check `binding.prepare_close()` and `browser.stop()`;
+if the controller is busy, listen for `binding.idle` and retry, and if browser
+workers are busy, retry on `browser.idle`. A controller's prepare_close should
+request its chosen cancellation policy and return false until its jobs stop.
+The browser's stop returns true while its own workers are still finishing.
+Disabling a feature removes capabilities but does not destroy controllers or
+cancel their existing jobs.
