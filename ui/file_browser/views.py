@@ -39,10 +39,11 @@ class FileViews(qt.QStackedWidget):
         self.cover_path = None
         self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
+        self.columns.column_context_requested.connect(self._context)
         for view in (tree, self.tiles, self.columns):
             self.addWidget(view)
             view.setSelectionMode(qt.QAbstractItemView.SelectionMode.ExtendedSelection)
-            view.setEditTriggers(qt.QAbstractItemView.EditTrigger.NoEditTriggers)
+            view.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
             view.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             view.customContextMenuRequested.connect(lambda point, target=view: self._context(target, point))
             view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
@@ -77,9 +78,22 @@ class FileViews(qt.QStackedWidget):
             self.selection_changed.emit()
 
     def _context(self, view, point):
-        if view is self.currentWidget():
+        if view is self.currentWidget() or (self.currentWidget() is self.columns and self.columns.isAncestorOf(view)):
+            self.context_directory = Path(self.model.filePath(self.source_index(view.rootIndex())))
             self.context_position = view.viewport().mapToGlobal(point)
             self.context_requested.emit(self.source_index(view.indexAt(point)))
+
+    def edit_name(self, source):
+        source = self.source_index(source).siblingAtColumn(0)
+        view = self.currentWidget()
+        index = self.covers.mapFromSource(source) if view is self.tiles else source
+        if view is self.columns:
+            view = next((child for child in self.columns.findChildren(qt.QListView)
+                         if child.isVisible() and child.rootIndex() == source.parent()), self.columns)
+        view.selectionModel().setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.ClearAndSelect |
+                                              qt.QItemSelectionModel.SelectionFlag.Rows)
+        view.setFocus()
+        view.edit(index)
 
     def set_root(self, path):
         self.root = Path(path)

@@ -271,9 +271,19 @@ Cached covers are regenerated when a larger icon size or higher display scale re
 more pixels. Selected-panel thumbnails likewise retain physical resolution. Constructors and detection rules should stay cheap and avoid
 loading full metadata until requested.
 
-File context menus provide default-application opening and OS-specific Reveal.
-Directory menus provide Reveal and contributed actions, without an Open in Default
-App entry; double-clicking a folder navigates into it.
+Every browser enables Cut, Copy, Paste and inline Rename by default, with native
+clipboard shortcuts and F2. A slow second click edits the selected filename;
+the basename is selected without its extension. Paste appears on folders and empty
+view backgrounds, targeting that folder; it is omitted for individual files.
+Transfers run in the background, preserve links, and use numbered copy names for
+collisions instead of overwriting. Cut entries leave the clipboard only after
+successful moves. Cancellation stops between items.
+
+Menus order opening, clipboard actions, Rename, contributed tools and OS-specific
+Reveal. `BrowserAction(category='rename')` places a command beside Rename;
+`order` (default 100) orders commands and their feature groups. Directory menus
+include Open; file menus offer default-application opening. Double-clicking a folder
+navigates into it.
 An optional `action_providers=(provider,)` argument allows application-level actions
 for Directory objects or mixed selections; providers receive `(item, context)` and
 return BrowserAction descriptors. `folder_fields(directory, stats)` may contribute

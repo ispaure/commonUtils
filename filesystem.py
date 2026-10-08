@@ -29,6 +29,8 @@ class BrowserAction:
     title: str
     run: Callable
     source: str = 'Extensions'
+    category: str = 'tools'
+    order: int = 100
 
 
 class FilesystemObject:

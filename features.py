@@ -93,6 +93,8 @@ class SelectionAction:
     accepts: tuple[type | str, ...] | type | str
     handler: Callable
     is_available: Callable | None = None
+    category: str = 'tools'
+    order: int = 100
 
     def __post_init__(self):
         if not self.id or not self.label:

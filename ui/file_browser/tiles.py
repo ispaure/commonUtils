@@ -2,6 +2,7 @@
 
 from ...dirUtils import Directory
 from .. import pyside as qt
+from .editing import FilenameEditorMixin
 
 COVER_WIDTH = 142
 COVER_ASPECT_RATIO = 1.375
@@ -9,7 +10,7 @@ CELL_PADDING = 28
 CAPTION_HEIGHT = 44
 
 
-class TileDelegate(qt.QStyledItemDelegate):
+class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         view = self.parent()

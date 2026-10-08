@@ -35,7 +35,8 @@ class InstalledFeature(qt.QObject):
 
     def _actions_for(self, item, context):
         return tuple(BrowserAction(f'{self.feature.id}.{action.id}', action.label,
-            lambda ctx, action=action, accepts=accepts: self._invoke(action, accepts, ctx), source=self.feature.label)
+            lambda ctx, action=action, accepts=accepts: self._invoke(action, accepts, ctx), source=self.feature.label,
+            category=action.category, order=action.order)
             for action, accepts in self._actions if isinstance(item, accepts)
             and (action.is_available is None or action.is_available(self._context((item,)))))
 
