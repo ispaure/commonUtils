@@ -10,7 +10,7 @@ The `commonUtils.fileTypes` package contains specialized `File` subclasses for c
 | `CSVFile` | `csvType.py` | Read and write CSV data |
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
 | `MarkdownFile` | `markdownType.py` | Text-file operations and activation in the shared Markdown reader |
-| `XMLFile` | `xmlType.py` | Lossless no-op XML DOM access and text-child editing, plus inherited line operations |
+| `XMLFile` | `xmlType.py` | DOM queries, namespace-aware editing and atomic saving, plus inherited line operations |
 | `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection |
 | `DMGFile` | `dmgType.py` | Mount and extract directories from macOS DMG files |
 | `AppImageFile` | `appimageType.py` | AppImage file representation |
@@ -102,8 +102,10 @@ text removes the field. Duplicate matching children and nested element content
 raise errors rather than selecting an ambiguous value. Unknown extensions,
 comments, processing instructions and namespace declarations survive other edits.
 
-`to_bytes()` validates serialization; the application owns staging and saving.
-There is no automatic atomic XML writer. Structured edits can change formatting;
+`to_bytes()` validates serialization and returns bytes; `write_xml(path=None)`
+adds atomic file saving. Nested/repeated elements, namespace-aware attributes and
+explicit element creation/removal use the methods in the [XML guide](../XML.md).
+Attribute whitespace survives round-trips. Structured edits can change formatting;
 unchanged serialization returns the original bytes. Inherited `read_lines()` and
 `write_lines()` continue to operate independently.
 

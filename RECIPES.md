@@ -240,3 +240,8 @@ atomic staging/replacement; text/CSV helpers retain their existing write semanti
 TXT entries must not contain embedded newlines. JSON rejects non-finite numbers;
 use `compact=True` to omit formatting whitespace. Missing/malformed reads should be
 handled at the application boundary. See [file-type details](fileTypes/README.md).
+
+
+For nested XML, repeated elements, namespace-aware attributes and atomic XML
+saving, see [XML document examples](XML.md). Existing simple-field editing remains
+compatible with direct-child formats such as ComicInfo.
