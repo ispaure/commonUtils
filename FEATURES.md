@@ -68,7 +68,8 @@ close handling must also wait for its jobs (see below).
 
 ## Add a format, preview panel and double-click handler
 
-This declaration can replace the `feature` above using `feature = register()`.
+Replace the first example’s `feature = Feature(...)` block with the code below.
+Place it before `BrowserWindow`, so the declaration exists when the window is built.
 Create an `example.project` file to see its panel and actions. In a real project,
 replace the sample details/editor with domain-specific loading and UI. Keep file
 constructors and detection rules cheap; panel loaders run off the GUI thread.
@@ -114,6 +115,8 @@ def register():
             folder_fields=counts,
         ),
     )
+
+feature = register()
 ```
 
 There is no separate action-service string to wire up. The framework makes the menu
@@ -191,8 +194,8 @@ feature.set_enabled(True)         # Restore rules, priority and browser capabili
 ```
 
 The host enforces dependency rules and calls `initialize` before presenting the UI.
-commonUtils does not discover application plugins, create an application Features
-page, or implement dependency policy. Logistics provides those pieces.
+Feature discovery, an application Features page and dependency policy belong to
+the consuming application. A host such as Logistics supplies them.
 
 Repeated installation of the same declaration in the same browser returns its
 existing binding. Each different window gets its own controller. Type registration

@@ -18,13 +18,18 @@ Currently available generic functions:
 ```python
 from commonUtils import ui
 
+ui.use_pyside = False  # This standalone example has no QApplication.
 ui.display_msg_box_ok("Example", "Operation completed")
 
 if ui.display_msg_box_ok_cancel("Example", "Continue?"):
     print("Continuing")
 ```
 
-Set `ui.use_pyside` to control whether supported generic functions should attempt to use PySide first.
+Set `ui.use_pyside` to control whether supported generic functions should attempt
+to use PySide first. Its default is True. When PySide is installed, create a
+QApplication before calling a generic dialog, or use the native backend as above.
+Qt may abort the process if a widget is created without an application; Python
+exception fallback does not make that safe.
 
 The individual backends are also lazily available as:
 
@@ -49,7 +54,15 @@ The native backend currently provides OK and OK/Cancel dialogs.
 
 Provides the more complete PySide6 UI toolkit used for building application interfaces.
 
-This backend requires the optional `PySide6` dependency.
+This backend requires the optional `PySide6` dependency and an existing
+QApplication before creating any widget or showing a message box. The PySide
+snippets below assume the application has performed the setup shown next.
+
+```python
+from commonUtils.ui import pyside
+
+q_app = pyside.initialize_q_app()  # Once per process; retain this object.
+```
 
 Available helpers include:
 
@@ -105,15 +118,11 @@ The progress-bar implementation supports updating progress and displaying status
 
 ## PySide Application Setup
 
-A PySide application should initialize a `QApplication` once per project:
-
-```python
-from commonUtils.ui import pyside
-
-q_app = pyside.initialize_q_app()
-```
-
-`initialize_q_app()` configures the Fusion style and applies platform-specific setup where required.
+Create one QApplication per process, as shown above. In an existing Qt application,
+reuse its application rather than call `initialize_q_app()` again. The helper
+configures Fusion style and applies platform-specific setup where required.
+Standalone windows also need an event loop (`q_app.exec()`); see the complete
+[browser example](../FEATURES.md#runnable-example-add-a-menu-action-to-a-browser).
 
 ## Dependency
 
@@ -289,7 +298,7 @@ Do not delete a browser while a panel/thumbnail operation is running.
 | `file_browser/controls.py` | View icons, folder-size menu and navigation buttons. |
 | `file_browser/navigation.py` | Root-bounded breadcrumbs and Back/Forward history. |
 | `file_browser/details.py` | Aligned, selectable information fields. |
-| `operations.py` | Generic background callbacks and completion signals, shared by browser and non-browser UI. |
+| `ui/operations.py` | Generic background callbacks and completion signals, shared by browser and non-browser UI. |
 
 Tile sizing uses logical pixels for layout and physical pixels for rendering.
 The folder-size control changes system folder icons without shrinking covers in
