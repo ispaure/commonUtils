@@ -52,7 +52,7 @@ missing/malformed reads raise exceptions for the application to handle.
 | Run work off the GUI thread, show progress and cancel safely | [Background-operation recipes](RECIPES.md#run-a-cancellable-job-in-a-qt-dialog) |
 | Finish the current item before cancelling a batch | [Batch recipe](RECIPES.md#finish-the-current-item-before-cancelling-a-batch) |
 | Copy/hash streams or provision a pinned download | [Stream and download recipes](RECIPES.md) |
-| Display Markdown, follow local document links and navigate history | [Markdown reader](ui/README.md#markdown-reader) |
+| Read/edit Markdown, navigate headings and save documents | [Markdown reader](ui/README.md#markdown-reader) |
 | Embed a browser, manage navigation and close workers safely | [UI guide](ui/README.md#reusable-file-browser) |
 | Query/edit nested XML with namespaces and save atomically | [XML documents](XML.md) |
 | Read/write text, CSV, JSON or register a domain format | [File types](fileTypes/README.md) |
@@ -70,7 +70,7 @@ can declare type rules, actions, activation and controller ownership together.
 | `fileUtils` | `File`, path metadata, copy/move/rename and user/application-data paths |
 | `dirUtils` | `Directory`, traversal, creation, opening and deletion |
 | `filesystem` | Shared object abstraction, browser action/panel/details descriptors and folder totals |
-| `fileTypes` | TXT, CSV, JSON, XML, Markdown, ZIP, DMG and AppImage classes; process-wide type registry |
+| `fileTypes` | Explicit subclass overrides ([example](fileTypes/README.md#replace-an-existing-type-with-your-subclass)); TXT, CSV, JSON, XML, Markdown, ZIP, DMG and AppImage classes; process-wide type registry |
 | `linkUtils` | Symbolic links and Windows junction-aware operations |
 | `osUtils` | `OS`, architecture detection and platform-specific path selection |
 | `appUtils` | Disk, Store, Flatpak and AppImage application launch helpers |

@@ -34,11 +34,27 @@ class FileTypeRegistration:
     owner: str | None = None
 
 
+def _validate_override_classes(base_class, file_class):
+    if not isinstance(base_class, type) or not issubclass(base_class, File):
+        raise TypeError('The overridden type must derive from File')
+    if not isinstance(file_class, type) or file_class is base_class or not issubclass(file_class, base_class):
+        raise TypeError('A replacement must be a subclass of the overridden type')
+
+
+@dataclass(frozen=True)
+class FileTypeOverrideRegistration:
+    base_class: type[File]
+    file_class: type[File]
+    priority: int = 0
+    owner: str | None = None
+
+
 class FileTypeRegistry:
     """Higher priority wins; the most recent registration breaks equal-priority ties."""
 
     def __init__(self):
         self._registrations = []
+        self._overrides = []
         self._lock = RLock()
         self.revision = 0
         self._disabled_owners = set()
@@ -56,9 +72,22 @@ class FileTypeRegistry:
             self.revision += 1
         return registration
 
+    def register_override(self, base_class, file_class, *, priority=0, owner=None):
+        """Replace an exact resolved type with its subclass, independently of suffix rules."""
+        _validate_override_classes(base_class, file_class)
+        owner = owner if owner is not None else _registration_owner.get()
+        registration = FileTypeOverrideRegistration(base_class, file_class, priority, owner)
+        with self._lock:
+            if registration in self._overrides:
+                return registration
+            self._overrides.append(registration)
+            self.revision += 1
+        return registration
+
     def unregister(self, registration):
         with self._lock:
-            self._registrations.remove(registration)
+            entries = self._overrides if isinstance(registration, FileTypeOverrideRegistration) else self._registrations
+            entries.remove(registration)
             self.revision += 1
 
     @contextmanager
@@ -86,16 +115,27 @@ class FileTypeRegistry:
         with self._lock:
             registrations = tuple(entry for entry in self._registrations
                                   if entry.owner not in self._disabled_owners)
+            overrides = tuple(entry for entry in self._overrides
+                              if entry.owner not in self._disabled_owners)
         # Reversing before the stable sort retains newest-first priority ties.
         candidates = sorted(reversed(registrations), key=lambda entry: entry.priority, reverse=True)
         name = path.name.lower()
+        selected = File
         for entry in candidates:
             if entry.extensions and not any(name.endswith('.' + extension) for extension in entry.extensions):
                 continue
             if entry.detector is not None and not entry.detector(path):
                 continue
-            return entry.file_class
-        return File
+            selected = entry.file_class
+            break
+        # Override exact classes only: TXT replacements must not erase CSV/JSON/
+        # Markdown specialization. Strict subclass validation makes chains acyclic.
+        replacements = sorted(reversed(overrides), key=lambda entry: entry.priority, reverse=True)
+        while True:
+            replacement = next((entry.file_class for entry in replacements if entry.base_class is selected), None)
+            if replacement is None:
+                return selected
+            selected = replacement
 
     def create(self, path):
         return self.resolve(path)(Path(path))
@@ -109,6 +149,16 @@ _defaults_loaded = False
 def register_file_type(file_class, extensions=(), *, detector=None, priority=0, owner=None):
     """Register for all future resolutions in this process, not just one directory."""
     return file_types.register(file_class, extensions, detector=detector, priority=priority, owner=owner)
+
+
+def override_file_type(base_class, file_class, *, priority=0, owner=None):
+    """Declare a subclass replacement separately from extension/detector registration.
+
+    Applies to future registry resolution, including existing Directory objects;
+    direct constructors and already-created objects retain their original class.
+    """
+    register_builtin_file_types()
+    return file_types.register_override(base_class, file_class, priority=priority, owner=owner)
 
 
 def register_builtin_file_types():

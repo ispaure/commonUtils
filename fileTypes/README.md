@@ -213,6 +213,73 @@ they run during listing. `file_types.unregister(registration)` removes a rule;
 `FileTypeRegistry` also supports isolated registries for specialized callers/tests.
 
 
+### Replace an existing type with your subclass
+
+Use **`override_file_type`** to declare replacements separately from extension
+registration. The replacement must be a strict subclass of the type it replaces;
+an unrelated `File` subclass (or the base class itself) is rejected.
+
+```python
+from commonUtils.fileTypes.txtType import TXTFile
+from commonUtils.fileTypes.registry import override_file_type, file_from_path, file_types
+
+class ProjectTXTFile(TXTFile):
+    def contains_text(self, needle):
+        self.read_lines()
+        return any(needle in line for line in self.line_lst)
+
+# Declare replacements explicitly during application startup.
+text_override = override_file_type(TXTFile, ProjectTXTFile)
+text = file_from_path('notes.txt')
+assert isinstance(text, ProjectTXTFile)
+assert isinstance(text, TXTFile)  # Inherited text/file operations remain available.
+
+# Restore the previous resolution when the integration is no longer needed.
+file_types.unregister(text_override)
+```
+
+Resolution first chooses a class using the normal suffix/detector rules, then
+applies overrides of that **exact class**. Replacing TXTFile does not replace
+MarkdownFile, CSVFile, JSONFile or other specialized classes, even if they inherit
+from TXTFile. Declare a separate subclass override for each specialized type you
+want to replace. This also avoids losing format-specific functionality.
+
+No extension list is required: the replacement follows every rule that resolves
+to the overridden class, including later registrations. `priority` chooses between
+overrides of the same base; newest wins ties. Identical declarations are idempotent.
+Strict subclass chains are supported: TXTFile → ProjectTXTFile → MoreSpecificTXTFile.
+This preserves inheritance; overriding inherited methods can still change behavior,
+so keep compatible constructors accepting a path and call `super()` when needed.
+
+Overrides apply to future `file_from_path`, `object_from_path`, directory listings
+and browser resolutions. Existing instances and direct `TXTFile(path)` construction
+retain their original class. `owner=` and `owner_scope` work as with extension rules;
+disabling an owner restores the next active replacement or the original class.
+Every change updates registry revision. Isolated registries provide the equivalent
+`registry.register_override(TXTFile, ProjectTXTFile)` method.
+
+For the feature declaration API, use the separate **`file_type_overrides`** field:
+
+```python
+from commonUtils.features import Feature, FileTypeOverride
+from commonUtils.fileTypes.txtType import TXTFile
+
+class ProjectTXTFile(TXTFile):
+    pass
+
+text_feature = Feature(
+    id='project_text',
+    file_type_overrides=[FileTypeOverride(TXTFile, ProjectTXTFile)],
+)
+handles = text_feature.register_types()
+# text_feature.set_enabled(False) temporarily disables this feature's override.
+```
+
+Declarations may also use `package.module:Class` references, resolved and checked
+for inheritance when `register_types()` runs. Ordinary `Feature.file_types` remains
+for extension/detector registrations; `file_type_overrides` makes replacements
+explicit and keeps their subclass requirement visible.
+
 ### Owned, toggleable registrations
 
 Plugin hosts may pass `owner='feature_name'` to `register_file_type` or register

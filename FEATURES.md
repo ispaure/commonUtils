@@ -127,6 +127,7 @@ handler with the supported selection. Action ids must be unique within a feature
 
 | Declaration/hook | Responsibility |
 | --- | --- |
+| `Feature.file_type_overrides` | Explicit subclass replacements of existing file types; [example](fileTypes/README.md#replace-an-existing-type-with-your-subclass). |
 | `Feature.file_types` | Resolve extensions/detectors to your File classes, with feature ownership and priority. |
 | `File.browser_panels()` | Load format-specific information. Generic File Information remains available. |
 | `File.browser_has_thumbnail` / `browser_thumbnail(size)` | Produce format-specific thumbnails, with physical-pixel sizing. |
