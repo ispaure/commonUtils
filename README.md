@@ -426,3 +426,17 @@ This project is licensed under the MIT License. See `LICENSE.md` for the
 full license text.
 
 Copyright © 2020-2026 Marc-André Voyer.
+
+## Verified software downloads
+
+`downloads.DownloadSpec` accepts a project's pinned name/version, HTTPS URL,
+download SHA-256, installed-file SHA-256, optional exact ZIP member, and executable
+flag. `downloads.provision` stages beside the destination, verifies both hashes,
+and atomically promotes one file. Errors and cancellation retain the existing file;
+ZIP entries other than the named member are never extracted. `is_ready` checks the
+installed hash. Projects own URLs, platform selection and installation paths.
+
+`ui.download.ensure_download` adds a confirmation prompt and cancellable background
+progress dialog. It returns a verified path or `None` on decline/cancel/failure.
+`install=True` also confirms opening an already-downloaded installer; the caller
+owns launching it and any privileged installation flow.
