@@ -1,8 +1,8 @@
 """Internal source-editing actions and safe file operations for MarkdownViewer."""
 from pathlib import Path
 
-from . import pyside as qt
-from .markdown_io import _encode_markdown, _write_markdown
+from .. import pyside as qt
+from .io import _encode_markdown, _write_markdown
 
 
 class MarkdownEditingMixin:
@@ -42,7 +42,7 @@ class MarkdownEditingMixin:
         self.copy_action = self._action('Copy', lambda: (self.active_editor() if self.edit_button.isChecked() else self.browser).copy(), key.Copy)
         self.paste_action = self._action('Paste', lambda: self.active_editor().paste(), key.Paste)
         self.select_all_action = self._action('Select All', lambda: (self.active_editor() if self.edit_button.isChecked() else self.browser).selectAll(), key.SelectAll)
-        self.find_action = self._action('Find / Replace…', self.show_find, key.Find, ('Ctrl+F',))
+        self.find_action = self._action('Find / Replace…' if self.allow_edit else 'Find…', self.show_find, key.Find, ('Ctrl+F',))
         self.bold_action = self._action('Bold', lambda: self.wrap_selection('**', 'text'), key.Bold, ('Ctrl+B',))
         self.italic_action = self._action('Italic', lambda: self.wrap_selection('*', 'text'), key.Italic, ('Ctrl+I',))
         self.code_action = self._action('Inline code', lambda: self.wrap_selection('`', 'code'))
@@ -62,6 +62,7 @@ class MarkdownEditingMixin:
         self.editor_toolbar.addWidget(heading)
         self.editor_toolbar.addAction('Bullet list', lambda: self.prefix_lines('- '))
         self.editor_toolbar.addAction('Quote', lambda: self.prefix_lines('> '))
+        self._build_table_actions()
         layout.insertWidget(1, self.editor_toolbar)
         self.editor_toolbar.hide()
         self.find_bar = qt.QWidget()
@@ -72,11 +73,15 @@ class MarkdownEditingMixin:
         self.replace_text = qt.QLineEdit()
         self.replace_text.setPlaceholderText('Replace with')
         row.addWidget(self.find_text, 1)
+        self.replace_text.setVisible(self.allow_edit)
         row.addWidget(self.replace_text, 1)
         for title, callback in (('Next', self.find_next), ('Replace', self.replace_match),
                                 ('Replace all', self.replace_all), ('Close', self.find_bar.hide)):
             button = qt.QPushButton(title)
             button.clicked.connect(lambda checked=False, callback=callback: callback())
+            if title in ('Replace', 'Replace all'):
+                button.setVisible(self.allow_edit)
+                button.setEnabled(self.allow_edit)
             row.addWidget(button)
         self.find_text.returnPressed.connect(self.find_next)
         layout.addWidget(self.find_bar)
@@ -84,7 +89,17 @@ class MarkdownEditingMixin:
         for action in (self.cut_action, self.paste_action, self.bold_action, self.italic_action, self.code_action, self.link_action):
             action.setEnabled(False)
 
+        for action in (self.new_action, self.save_action, self.save_as_action,
+                       self.undo_action, self.redo_action, self.cut_action, self.paste_action,
+                       self.bold_action, self.italic_action, self.code_action, self.link_action):
+            action.setVisible(self.allow_edit)
+        for action in (self.new_action, self.save_action, self.save_as_action):
+            action.setEnabled(self.allow_edit)
+
     def set_editing(self, enabled):
+        if enabled and not self.allow_edit:
+            self.edit_button.setChecked(False)
+            return
         if self.edit_button.isChecked() != enabled:
             self.edit_button.setChecked(enabled)
             return
@@ -117,7 +132,7 @@ class MarkdownEditingMixin:
 
     def new_document(self):
         """Start an untitled document after resolving unsaved changes."""
-        if not self._confirm_leave():
+        if not self.allow_edit or not self._confirm_leave():
             return False
         self.history.clear()
         self.history_index = -1
@@ -148,12 +163,16 @@ class MarkdownEditingMixin:
         return False
 
     def save_as_dialog(self):
+        if not self.allow_edit:
+            return False
         path, _ = qt.QFileDialog.getSaveFileName(self, 'Save Markdown As',
                                                str(self.current_path) if self.current_path else 'document.md',
                                                'Markdown (*.md *.markdown)')
         return self.save_document(path) if path else False
 
     def save_document(self, path=None):
+        if not self.allow_edit:
+            return False
         destination = Path(path).expanduser().absolute() if path is not None else self.current_path
         if destination is None:
             return self.save_as_dialog()
@@ -195,6 +214,8 @@ class MarkdownEditingMixin:
         self.active_editor().setFocus()
 
     def prefix_lines(self, prefix):
+        if not self.edit_button.isChecked():
+            return
         if self.active_editor() is self.formatted_editor:
             self.format_blocks(prefix)
             return
@@ -217,6 +238,8 @@ class MarkdownEditingMixin:
         self.active_editor().setFocus()
 
     def insert_link(self):
+        if not self.edit_button.isChecked():
+            return
         url, accepted = qt.QInputDialog.getText(self, 'Insert link', 'URL or relative Markdown path:')
         if accepted and url:
             if self.active_editor() is self.formatted_editor:

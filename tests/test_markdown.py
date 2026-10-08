@@ -26,7 +26,8 @@ class MarkdownTests(unittest.TestCase):
                               '| Name | Value |\n| --- | --- |\n| One | Two |\n\n'
                               '```python\nprint("example")\n```\n', encoding='utf-8')
         self.second.write_text('# Second\n\n## Details\n\nText\n\n## Details\n\nMore\n', encoding='utf-8')
-        self.viewer = MarkdownViewer(self.first)
+        self.viewer = MarkdownViewer(self.first, allow_edit=True)
+        self.viewer.set_editing(False)
         self.viewer.set_edit_mode('source')
         self.viewer.resize(600, 400)
         self.viewer.show()
@@ -163,7 +164,7 @@ class MarkdownTests(unittest.TestCase):
         cursor = self.viewer.editor.textCursor()
         cursor.movePosition(qt.QTextCursor.MoveOperation.End)
         cursor.insertText('Extra')
-        with patch('commonUtils.ui.markdown_io.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.ui.markdown.io.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertEqual(self.first.read_bytes(), source)
         self.assertTrue(self.viewer.is_modified)
@@ -209,7 +210,7 @@ class MarkdownTests(unittest.TestCase):
         self.assertNotIn('Unsaved', self.first.read_text())
 
     def test_save_and_open_actions_shortcuts_and_window_close_cancel(self):
-        window = open_markdown(self.first)
+        window = open_markdown(self.first, allow_edit=True)
         self.addCleanup(window.deleteLater)
         viewer = window.viewer
         viewer.set_edit_mode('source')
@@ -273,7 +274,7 @@ class MarkdownTests(unittest.TestCase):
         self.assertFalse(self.viewer.is_modified)
 
     def test_formatted_edit_default_rendering_noop_save_preserves_exact_source(self):
-        window = open_markdown(self.first)
+        window = open_markdown(self.first, allow_edit=True)
         viewer = window.viewer
         self.addCleanup(window.deleteLater)
         original = self.first.read_bytes()
@@ -352,7 +353,7 @@ class MarkdownTests(unittest.TestCase):
         with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel):
             self.assertFalse(self.viewer.open_document(self.second))
         self.assertIn('Unsaved rich text', self.viewer.formatted_editor.toPlainText())
-        with patch('commonUtils.ui.markdown_io.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.ui.markdown.io.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertTrue(self.viewer.is_modified)
         self.assertEqual(self.first.read_bytes(), original)
@@ -383,15 +384,139 @@ class MarkdownTests(unittest.TestCase):
         self.viewer.show_contents()
         listing = self.viewer.toc_popup.findChild(qt.QListWidget)
         self.viewer._select_heading(listing.item(2))
-        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), 'Foo-1')
+        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), '## Foo-1')
         self.viewer._scroll_formatted_heading('foo-2')
-        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), 'Foo')
+        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), '## Foo')
         self.assertGreater(self.viewer.formatted_editor.textCursor().position(), 10)
+
+    def test_live_typed_markup_saves_with_yaml_and_updates_contents(self):
+        from PySide6.QtTest import QTest
+        self.first.write_text('---\ntitle: Preserved\n---\n\nParagraph\n', encoding='utf-8')
+        self.viewer.open_document(self.first)
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        widget = self.viewer.formatted_editor
+        cursor = widget.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        cursor.insertBlock()
+        widget.setTextCursor(cursor)
+        QTest.keyClicks(widget, '## Typed heading')
+        QTest.keyClick(widget, qt.Qt.Key.Key_Return)
+        QTest.keyClicks(widget, 'A **bold** word')
+        self.assertEqual(widget.textCursor().block().blockFormat().headingLevel(), 0)
+        self.assertTrue(self.viewer.is_modified)
+        self.viewer.show_contents()
+        self.assertIn('Typed heading', [title for _, title, _ in self.viewer.headings])
+        self.assertTrue(self.viewer.save_document())
+        saved = self.first.read_text()
+        self.assertTrue(saved.startswith('---\ntitle: Preserved\n---\n'))
+        self.assertIn('## Typed heading', saved)
+        self.assertIn('**bold**', saved)
+        self.assertFalse(self.viewer.is_modified)
+
+    def test_live_preview_navigation_is_noop_and_fenced_code_save_preserves_yaml(self):
+        from PySide6.QtTest import QTest
+        self.first.write_text('---\ntitle: Kept\n---\n\nBefore **obsidian** after\n', encoding='utf-8')
+        viewer = MarkdownViewer(self.first, allow_edit=True)
+        self.addCleanup(viewer.deleteLater)
+        original = self.first.read_bytes()
+        cursor = viewer.formatted_editor.document().find('obsidian')
+        cursor.setPosition(cursor.selectionStart() + 3)
+        viewer.formatted_editor.setTextCursor(cursor)
+        self.assertFalse(viewer.is_modified)
+        self.assertTrue(viewer.save_document())
+        self.assertEqual(self.first.read_bytes(), original)
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        cursor.insertBlock()
+        viewer.formatted_editor.setTextCursor(cursor)
+        QTest.keyClicks(viewer.formatted_editor, '```python')
+        QTest.keyClick(viewer.formatted_editor, qt.Qt.Key.Key_Return)
+        QTest.keyClicks(viewer.formatted_editor, 'print("hello")')
+        QTest.keyClick(viewer.formatted_editor, qt.Qt.Key.Key_Return)
+        QTest.keyClicks(viewer.formatted_editor, '```')
+        self.assertTrue(viewer.save_document())
+        self.assertTrue(self.first.read_text().startswith('---\ntitle: Kept\n---\n'))
+        self.assertIn('```python\nprint("hello")\n```', self.first.read_text())
+
+    def test_default_preview_has_no_editing_controls_or_write_actions(self):
+        window = open_markdown(self.first)
+        self.addCleanup(window.deleteLater)
+        viewer = window.viewer
+        self.assertFalse(viewer.allow_edit)
+        self.assertTrue(viewer.edit_button.isHidden())
+        self.assertFalse(viewer.edit_button.isEnabled())
+        self.assertTrue(viewer.editor.isReadOnly())
+        self.assertTrue(viewer.formatted_editor.isReadOnly())
+        visible_file = [action.text() for action in window._file_menu.actions() if action.isVisible()]
+        self.assertNotIn('New', visible_file)
+        self.assertNotIn('Save', visible_file)
+        self.assertNotIn('Save As…', visible_file)
+        self.assertNotIn('Edit / Read', [action.text() for action in window._view_menu.actions()])
+        self.assertEqual(viewer.find_action.text(), 'Find…')
+        viewer.show_find()
+        self.assertTrue(viewer.replace_text.isHidden())
+        for action in (viewer.new_action, viewer.save_action, viewer.save_as_action):
+            self.assertFalse(action.isEnabled())
+        viewer.set_editing(True)
+        viewer.edit_button.setChecked(True)
+        self.assertFalse(viewer.edit_button.isChecked())
+        self.assertIs(viewer.pages.currentWidget(), viewer.browser)
+        original = self.first.read_bytes()
+        destination = self.root / 'copy.md'
+        self.assertFalse(viewer.new_document())
+        self.assertFalse(viewer.save_document())
+        self.assertFalse(viewer.save_document(destination))
+        with patch.object(qt.QFileDialog, 'getSaveFileName') as dialog:
+            self.assertFalse(viewer.save_as_dialog())
+        dialog.assert_not_called()
+        self.assertEqual(self.first.read_bytes(), original)
+        self.assertFalse(destination.exists())
+
+    def test_default_preview_navigation_preserves_reading_only_mode(self):
+        viewer = MarkdownViewer(self.first)
+        self.addCleanup(viewer.deleteLater)
+        viewer.follow_link(qt.QUrl('second%20page.MD#details'))
+        self.assertEqual(viewer.current_path, self.second.resolve())
+        viewer.back()
+        self.assertEqual(viewer.current_path, self.first.resolve())
+        viewer.forward()
+        self.assertEqual(viewer.current_path, self.second.resolve())
+        self.assertFalse(viewer.allow_edit)
+        self.assertTrue(viewer.edit_button.isHidden())
+        viewer.find_text.setText('Details')
+        self.assertTrue(viewer.find_next())
+        self.assertFalse(viewer.is_modified)
+
+    def test_editable_widget_defaults_active_and_keeps_open_failures_visible(self):
+        viewer = MarkdownViewer(allow_edit=True)
+        self.addCleanup(viewer.deleteLater)
+        self.assertTrue(viewer.edit_button.isChecked())
+        self.assertIs(viewer.pages.currentWidget(), viewer.formatted_editor)
+        self.assertFalse(viewer.is_modified)
+        failed = MarkdownViewer(self.root / 'missing.md', allow_edit=True)
+        self.addCleanup(failed.deleteLater)
+        self.assertTrue(failed.edit_button.isChecked())
+        self.assertIn('Cannot open', failed.status.text())
+
+    def test_explicit_edit_permission_survives_link_navigation(self):
+        window = open_markdown(self.first, allow_edit=True)
+        self.addCleanup(window.deleteLater)
+        viewer = window.viewer
+        self.assertTrue(viewer.allow_edit)
+        self.assertFalse(viewer.edit_button.isHidden())
+        self.assertTrue(viewer.edit_button.isChecked())
+        self.assertIs(viewer.pages.currentWidget(), viewer.formatted_editor)
+        viewer.follow_link(qt.QUrl('second%20page.MD'))
+        viewer.set_edit_mode('source')
+        viewer.set_editing(True)
+        viewer.editor.appendPlainText('Explicitly edited')
+        self.assertTrue(viewer.save_document())
+        self.assertIn('Explicitly edited', self.second.read_text())
 
     def test_window_lifetime_and_browser_markdown_activation(self):
         self.assertIsInstance(file_from_path(self.second), MarkdownFile)
         self.assertIsInstance(file_from_path('missing.markdown'), MarkdownFile)
-        window = open_markdown(self.first)
+        window = open_markdown(self.first, allow_edit=True)
         self.assertIn(window, _windows)
         window.close()
         self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
@@ -407,4 +532,4 @@ class MarkdownTests(unittest.TestCase):
         self.assertTrue(index.isValid())
         with patch('commonUtils.ui.markdown.open_markdown') as opened:
             browser._activate(index)
-        opened.assert_called_once_with(self.second, parent=browser.window())
+        opened.assert_called_once_with(self.second, parent=browser.window(), allow_edit=True)

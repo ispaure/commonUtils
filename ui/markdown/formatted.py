@@ -1,7 +1,8 @@
 """Internal same-pane rich Markdown editing and source synchronization."""
-from . import pyside as qt
-from ..markdownUtils import split_frontmatter
-from .markdown_headings import _iter_headings
+from .. import pyside as qt
+from ...markdownUtils import split_frontmatter
+from .headings import _iter_headings
+from .syntax import HEADING
 
 
 class MarkdownFormattedMixin:
@@ -73,6 +74,7 @@ class MarkdownFormattedMixin:
     def _update_edit_actions(self):
         if not hasattr(self, 'undo_action'):
             return
+        self._update_table_actions()
         enabled = self.edit_button.isChecked()
         document = self.active_editor().document()
         self.undo_action.setEnabled(enabled and document.isUndoAvailable())
@@ -82,7 +84,7 @@ class MarkdownFormattedMixin:
             action.setEnabled(enabled)
 
     def _scroll_formatted_heading(self, anchor):
-        for _, _, candidate, block in _iter_headings(self.formatted_editor.document()):
+        for _, _, candidate, block in _iter_headings(self.formatted_editor.document(), strip_syntax=True):
             if candidate == anchor:
                 self.formatted_editor.setTextCursor(qt.QTextCursor(block))
                 self.formatted_editor.ensureCursorVisible()
@@ -90,21 +92,7 @@ class MarkdownFormattedMixin:
                 return
 
     def format_inline(self, marker):
-        cursor = self.formatted_editor.textCursor()
-        fmt = qt.QTextCharFormat()
-        current = cursor.charFormat()
-        if marker == '**':
-            fmt.setFontWeight(qt.QFont.Weight.Normal if current.fontWeight() >= qt.QFont.Weight.Bold else qt.QFont.Weight.Bold)
-        elif marker == '*':
-            fmt.setFontItalic(not current.fontItalic())
-        else:
-            code = not current.fontFixedPitch()
-            fmt.setFontFixedPitch(code)
-            fmt.setFontFamilies(['monospace'] if code else [self.formatted_editor.font().family()])
-        if cursor.hasSelection():
-            cursor.mergeCharFormat(fmt)
-        else:
-            self.formatted_editor.mergeCurrentCharFormat(fmt)
+        self.formatted_editor.apply_inline_format(marker)
         self.formatted_editor.setFocus()
 
     def format_blocks(self, prefix):
@@ -122,6 +110,12 @@ class MarkdownFormattedMixin:
                 fmt = block.blockFormat()
                 if prefix.startswith('#') or not prefix:
                     level = len(prefix.strip())
+                    heading = HEADING.match(block.text())
+                    prefix_cursor = qt.QTextCursor(block)
+                    if heading:
+                        prefix_cursor.movePosition(qt.QTextCursor.MoveOperation.NextCharacter,
+                                                   qt.QTextCursor.MoveMode.KeepAnchor, heading.end())
+                    prefix_cursor.insertText('#' * level + ' ' if level else '', qt.QTextCharFormat())
                     fmt.setHeadingLevel(level)
                     cursor.setBlockFormat(fmt)
                     chars = qt.QTextCharFormat()
@@ -142,13 +136,9 @@ class MarkdownFormattedMixin:
 
     def format_link(self, url):
         cursor = self.formatted_editor.textCursor()
-        fmt = qt.QTextCharFormat()
-        fmt.setAnchor(True)
-        fmt.setAnchorHref(url)
-        fmt.setForeground(self.palette().color(qt.QPalette.ColorRole.Link))
-        fmt.setFontUnderline(True)
-        if cursor.hasSelection():
-            cursor.mergeCharFormat(fmt)
-        else:
-            cursor.insertText('link text', fmt)
+        label = cursor.selectedText().replace('\u2029', ' ') if cursor.hasSelection() else 'link text'
+        cursor.beginEditBlock()
+        cursor.insertText(f'[{label}](<{url}>)', qt.QTextCharFormat())
+        cursor.endEditBlock()
+        self.formatted_editor.setTextCursor(cursor)
         self.formatted_editor.setFocus()
