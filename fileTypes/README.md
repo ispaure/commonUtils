@@ -9,6 +9,7 @@ The `commonUtils.fileTypes` package contains specialized `File` subclasses for c
 | `TXTFile` | `txtType.py` | Read, write, and open text files |
 | `CSVFile` | `csvType.py` | Read and write CSV data |
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
+| `MarkdownFile` | `markdownType.py` | Text-file operations and activation in the shared Markdown reader |
 | `XMLFile` | `xmlType.py` | Lossless no-op XML DOM access and text-child editing, plus inherited line operations |
 | `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection |
 | `DMGFile` | `dmgType.py` | Mount and extract directories from macOS DMG files |
@@ -167,7 +168,7 @@ Individual file types add only the behavior specific to their format.
 ## File Type Resolution
 
 `Directory.list_files()` resolves files through a **process-wide registry**. Built-in
-TXT, CSV, JSON, XML, ZIP, DMG and AppImage modules register their own classes lazily.
+TXT, CSV, JSON, XML, Markdown, ZIP, DMG and AppImage modules register their own classes lazily.
 Unknown formats remain `File`. Existing directory ordering, recursive traversal and
 extension filters are unchanged; listing does not read file contents.
 
@@ -225,3 +226,12 @@ instances and running operations are retained; future resolutions use the new st
 `ZIPFile` supports explicit-password reading/extraction and encryption detection;
 see [ZIP archive APIs](../ZIP_ARCHIVES.md). Configuration and prompts belong to the
 host application rather than the file-type registry.
+
+
+### Markdown activation
+
+`file_from_path()` resolves `.md` and `.markdown` (case-insensitively) as
+`MarkdownFile`, a `TXTFile` subclass. Double-click activation in FileBrowser opens
+the shared [Markdown reader](../ui/README.md#markdown-reader). Resolution and text
+operations do not import Qt; only activation requires an existing QApplication.
+Feature-installed activation handlers still take precedence over the file's hook.
