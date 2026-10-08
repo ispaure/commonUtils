@@ -3,7 +3,14 @@
 These examples use the public commonUtils helpers. The consuming project supplies
 its data, configuration, destination paths and UI policy. For browser extensions,
 start with [FEATURES.md](FEATURES.md); for archive layout and verification, use
-[ZIP_ARCHIVES.md](ZIP_ARCHIVES.md).
+[ZIP_ARCHIVES.md](ZIP_ARCHIVES.md). The Qt examples require PySide6 and one
+QApplication; the standalone examples initialize it themselves.
+
+- [Cancellable Qt dialog](#run-a-cancellable-job-in-a-qt-dialog)
+- [Cancellation between batch items](#finish-the-current-item-before-cancelling-a-batch)
+- [Bounded stream copying and hashing](#copy-and-hash-bounded-streams)
+- [Verified software provisioning](#provision-a-pinned-executable-or-installer)
+- [JSON, CSV and text](#read-and-write-application-data)
 
 ## Run a cancellable job in a Qt dialog
 
@@ -164,7 +171,7 @@ JSON object with the `DownloadSpec` fields and an additional relative `path`:
 ```python
 import json
 from pathlib import Path
-from commonUtils.downloads import DownloadSpec, is_ready, provision
+from commonUtils.downloads import DownloadSpec, provision
 
 # Example field names: name, version, url, sha256, installed_sha256,
 # archive_member (optional), executable (optional), path.
@@ -172,8 +179,7 @@ entry = json.loads(Path('tool_release.json').read_text(encoding='utf-8'))
 relative_path = Path(entry.pop('path'))
 spec = DownloadSpec(**entry)
 destination = Path('Software') / relative_path
-if not is_ready(spec, destination):
-    installed = provision(spec, destination)
+installed = provision(spec, destination)  # Reuses a matching installed file.
 ```
 
 Use an HTTPS URL and lowercase 64-character SHA-256 digests. `sha256` verifies the
@@ -199,7 +205,10 @@ if path is not None:
 ```
 
 `ensure_download` returns a verified Path, or `None` on decline, cancellation or
-failure. Genuine failures remain visible even if Cancel was also requested. With
+download-worker failure. Genuine worker failures remain visible even if Cancel was
+also requested. Configuration validation and local filesystem errors outside the
+download worker can still raise; the application should handle those at its UI
+boundary. With
 `install=True`, it also asks before returning an already-downloaded installer for
 launch; it does not perform system installation. Download versions and destinations
 are entirely project policy.

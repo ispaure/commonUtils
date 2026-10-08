@@ -123,13 +123,17 @@ print(get_arch())
 
 The generic UI lazily selects its backend; applications needing Qt objects should
 explicitly import `commonUtils.ui.pyside` and initialize QApplication once.
-Native UI access does not itself import PySide.
+Native UI access does not itself import PySide. The default `ui.use_pyside=True`
+assumes a QApplication already exists when PySide is available; fallback cannot
+recover from Qt aborting because no application exists. For standalone scripts,
+select the native backend explicitly:
 
 ```python
 from commonUtils import ui
 from commonUtils.debugUtils import log, Severity
 
 log(Severity.INFO, 'Example', 'Operation completed')
+ui.use_pyside = False  # Standalone script without a QApplication.
 ui.display_msg_box_ok('Example', 'Operation completed')
 ```
 
