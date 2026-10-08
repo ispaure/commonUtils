@@ -89,6 +89,19 @@ class BindingTests(unittest.TestCase):
             self.wait(browser)
         self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
 
+    def test_action_availability_is_evaluated_for_each_menu(self):
+        available = Mock(return_value=False)
+        self.feature.browser = BrowserExtension(actions=[SelectionAction(
+            'edit', 'Edit selection', ProjectFile, self.calls.append, is_available=available)])
+        browser = self.browser()
+        index = browser.model.index(str(self.path))
+        menu = browser.context_menu_for(index)
+        self.assertNotIn('Edit selection', [action.text() for action in menu.actions()])
+        available.return_value = True
+        menu = browser.context_menu_for(index)
+        self.assertIn('Edit selection', [action.text() for action in menu.actions()])
+        self.assertEqual(available.call_args.args[0].paths, (self.path,))
+
     def test_actions_filter_selection_group_by_feature_and_have_no_services(self):
         browser = self.browser()
         for path in (self.path, self.other):
