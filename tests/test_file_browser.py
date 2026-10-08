@@ -338,3 +338,25 @@ class BrowserTests(unittest.TestCase):
         covers.complete(path, bytes(buffer.data()), 2.0, (360, 496))
         self.assertEqual(covers.resolutions[path], (360, 496))
         self.assertFalse(covers.icons[path].isNull())
+
+    def test_disabling_folder_totals_cancels_scan_and_discards_late_results(self):
+        from threading import Event
+        from commonUtils.filesystem import FolderStats
+        entered, release = Event(), Event()
+        self.browser.set_folder_sizes_enabled(False)
+        def scan(root, cancelled):
+            entered.set()
+            release.wait(5)
+            return {root: FolderStats(files=999)}
+        with patch('commonUtils.ui.file_browser.scan_folders', side_effect=scan):
+            try:
+                self.browser.set_folder_sizes_enabled(True)
+                self.assertTrue(entered.wait(2))
+                self.browser.set_folder_sizes_enabled(False)
+                self.assertTrue(self.browser.folder_operation.isInterruptionRequested())
+            finally:
+                release.set()
+                self.wait()
+        self.assertEqual(self.browser.model.folder_totals, {})
+        details = self.browser._generic_details(Directory(self.root), None)
+        self.assertIn(('Total size', 'Not calculated'), details.fields)
