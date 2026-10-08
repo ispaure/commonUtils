@@ -54,6 +54,7 @@ missing/malformed reads raise exceptions for the application to handle.
 | Copy/hash streams or provision a pinned download | [Stream and download recipes](RECIPES.md) |
 | Display Markdown, follow local document links and navigate history | [Markdown reader](ui/README.md#markdown-reader) |
 | Embed a browser, manage navigation and close workers safely | [UI guide](ui/README.md#reusable-file-browser) |
+| Query/edit nested XML with namespaces and save atomically | [XML documents](XML.md) |
 | Read/write text, CSV, JSON or register a domain format | [File types](fileTypes/README.md) |
 | Read, extract, create or verify ZIPs | [Archive guide](ZIP_ARCHIVES.md) |
 | Execute commands and understand timeout/platform behavior | [Command wrapper](wrappers/cmdShellWrapper/README.md) |
