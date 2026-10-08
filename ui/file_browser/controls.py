@@ -91,7 +91,7 @@ class FolderSizeControl(qt.QToolButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setText('Size')
-        self.setAccessibleName('Folder icon size')
+        self.setAccessibleName('Icon size')
         self.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = qt.QMenu(self)
         widget = qt.QWidget()
@@ -101,7 +101,7 @@ class FolderSizeControl(qt.QToolButton):
         self.slider = qt.QSlider(qt.Qt.Orientation.Horizontal)
         self.slider.setRange(25, 100)
         self.slider.setValue(50)
-        self.slider.setAccessibleName('Folder icon size percentage')
+        self.slider.setAccessibleName('Icon size percentage')
         self.slider.valueChanged.connect(self._update_label)
         layout.addWidget(self.slider)
         action = qt.QWidgetAction(menu)
@@ -111,7 +111,7 @@ class FolderSizeControl(qt.QToolButton):
         self._update_label(50)
 
     def _update_label(self, percent):
-        text = f'Folder icon size: {percent}%'
+        text = f'Icon size: {percent}%'
         self.label.setText(text)
         self.setToolTip(text)
 
