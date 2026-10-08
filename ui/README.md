@@ -305,3 +305,41 @@ The folder-size control changes system folder icons without shrinking covers in
 mixed directories. Folder-only directories also use tighter cells and rows.
 Constructing or changing a view never reads file contents; registered thumbnail
 and panel hooks do that work in background operations.
+
+
+## Markdown reader
+
+`commonUtils.ui.markdown` uses Qt's Markdown/rich-text renderer for headings, lists,
+tables, fenced code, local images and links, without a web-engine dependency.
+It is a reader: source files are never edited. Requires PySide6 and an existing
+QApplication, as described above.
+
+```python
+from commonUtils.ui.markdown import MarkdownViewer, open_markdown
+
+# Separate window; the helper retains it until closed.
+window = open_markdown('docs/index.md', parent=application_window)
+
+# Or embed the widget in an existing layout.
+viewer = MarkdownViewer('docs/index.md', parent=application_window)
+layout.addWidget(viewer)
+```
+
+`open_document(path, fragment='')` returns whether navigation succeeded.
+`current_path` provides the displayed document path; `path_changed(Path)` signals
+successful loads. Relative file links resolve from the current document, including
+encoded spaces and `#heading-fragments`. Headings receive GitHub-style anchors,
+with duplicate headings suffixed `-1`, `-2`, and so on. Back/Forward (Alt+Left /
+Alt+Right) restore document history and scroll positions. Navigating after going
+Back discards the abandoned forward branch.
+
+HTTP/HTTPS and mail links open through the operating system's default application.
+Local navigation accepts UTF-8 (optionally BOM-prefixed) `.md` and `.markdown`
+files. Missing, unreadable, invalid-text or unsupported linked files show an inline
+error while retaining the current page and history. Local non-Markdown files and
+other URL schemes are not launched by this reader. Rendering is Qt Markdown;
+full web-page HTML/CSS, JavaScript and Mermaid diagrams are not supported.
+
+FileBrowser automatically uses this window for registered MarkdownFile activation;
+applications may still supply a higher-priority activation handler. Keep feature
+user documentation in the consuming application, not the shared library.
