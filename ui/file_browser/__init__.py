@@ -12,6 +12,8 @@ from .controls import ViewModeSelector, FolderSizeControl
 from .navigation import NavigationBar
 from ..operations import Operation
 from .views import FileViews
+from .editing import FilenameDelegate
+from .file_actions import FileActions, clipboard_files
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class FileBrowser(qt.QWidget):
         self._create_views()
         layout.addWidget(self.splitter, 1)
         self._create_preview_panel()
+        self.file_actions = FileActions(self)
         qt.QApplication.instance().aboutToQuit.connect(self.shutdown)
         if directory is not None:
             self.set_directory(directory)
@@ -90,10 +93,12 @@ class FileBrowser(qt.QWidget):
 
     def _create_views(self):
         self.model = BrowserFileSystemModel(self)
-        self.model.setReadOnly(True)
+        self.model.setReadOnly(False)
         self.model.setFilter(qt.QDir.Filter.AllDirs | qt.QDir.Filter.Files | qt.QDir.Filter.NoDotAndDotDot)
         self.tree = qt.QTreeView()
         self.tree.setModel(self.model)
+        self.tree.setItemDelegate(FilenameDelegate(self.tree))
+        self.tree.setSelectionBehavior(qt.QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree.setAlternatingRowColors(True)
         self.tree.setUniformRowHeights(True)
         self.tree.setSortingEnabled(True)
@@ -211,42 +216,82 @@ class FileBrowser(qt.QWidget):
             selection = (clicked,)
         return BrowserContext(self, selection)
 
-    def context_menu_for(self, index):
-        if not index.isValid():
+    def context_menu_for(self, index, *, directory=None):
+        index = self.views.source_index(index).siblingAtColumn(0) if index.isValid() else index
+        item = self.model.item(index) if index.isValid() else None
+        if item is not None and not (item.path.exists() or item.path.is_symlink()):
             return None
-        item = self.model.item(index)
-        if not item.path.exists():
-            return None
-        context = self.context(item)
+        persistent = qt.QPersistentModelIndex(index)
+        context = self.context(item) if item is not None else BrowserContext(self, ())
+        destination = (item.path if isinstance(item, Directory) else None) if item else (
+            Path(directory) if directory is not None else self.views.browsing_directory())
         menu = qt.QMenu(self)
-        if not isinstance(item, Directory):
-            default = menu.addAction('Open in Default App')
-            default.triggered.connect(lambda: self._run(lambda: desktop_actions.open_default(item.path)))
-        reveal = menu.addAction(desktop_actions.reveal_label())
-        reveal.triggered.connect(lambda: self._run(lambda: desktop_actions.reveal(item.path)))
-        # Discover actions across the whole selection, including mixed file types.
-        groups = {}
-        seen = set()
+        mutating = not self.file_actions.busy and not self.stopping
+        def standard(title, callback, *, enabled=True, key=None):
+            action = menu.addAction(title)
+            action.setEnabled(enabled)
+            if key is not None:
+                action.setShortcut(qt.QKeySequence(key))
+            action.triggered.connect(lambda checked=False: self._run(callback))
+            return action
+        if item is not None:
+            single = len(context.selection) == 1
+            if isinstance(item, Directory) or self.activation_handlers:
+                standard('Open', lambda: self._activate(qt.QModelIndex(persistent)), enabled=single)
+            if not isinstance(item, Directory):
+                standard('Open in Default App', lambda: [desktop_actions.open_default(selected.path)
+                         for selected in context.selection],
+                         enabled=all(not isinstance(selected, Directory) for selected in context.selection))
+            menu.addSeparator()
+            standard('Cut', lambda: self.file_actions.copy(context.selection, move=True), enabled=mutating,
+                     key=qt.QKeySequence.StandardKey.Cut)
+            standard('Copy', lambda: self.file_actions.copy(context.selection), key=qt.QKeySequence.StandardKey.Copy)
+        if destination is not None:
+            standard('Paste', lambda: self.file_actions.paste(destination),
+                     enabled=mutating and bool(clipboard_files()[0]) and destination.is_dir(),
+                     key=qt.QKeySequence.StandardKey.Paste)
+        if item is None:
+            menu.addSeparator()
+            standard('Refresh', self.refresh)
+            standard(desktop_actions.reveal_label(), lambda: desktop_actions.reveal(destination),
+                     enabled=destination is not None)
+            return menu
+        menu.addSeparator()
+        standard('Rename', lambda: self.file_actions.rename(persistent), enabled=mutating and single,
+                 key=qt.Qt.Key.Key_F2)
+        # Capture the full selection, deduplicate, and keep ordering independent of
+        # filesystem row order or feature discovery order.
+        contributions = {}
         for selected in context.selection:
-            contributions = list(selected.browser_actions(context))
+            entries = list(selected.browser_actions(context))
             for provider in self.action_providers:
-                contributions.extend(provider(selected, context))
-            for contribution in contributions:
-                if contribution.key in seen:
-                    continue
-                seen.add(contribution.key)
-                groups.setdefault(contribution.source or 'Extensions', []).append(contribution)
-        for source, contributions in groups.items():
+                entries.extend(provider(selected, context))
+            for entry in entries:
+                contributions.setdefault(entry.key, entry)
+        def contributed(entry):
+            action = menu.addAction(entry.title)
+            action.setEnabled(mutating)
+            source = entry.source or 'Extensions'
+            action.setToolTip(f'Provided by {source}')
+            action.setProperty('source', source)
+            action.triggered.connect(lambda checked=False: self._run(lambda: entry.run(context)))
+        for entry in sorted((entry for entry in contributions.values() if entry.category == 'rename'),
+                            key=lambda entry: (entry.order, entry.title.casefold())):
+            contributed(entry)
+        groups = {}
+        for entry in contributions.values():
+            if entry.category != 'rename':
+                groups.setdefault(entry.source or 'Extensions', []).append(entry)
+        for source, entries in sorted(groups.items(), key=lambda group: (min(entry.order for entry in group[1]), group[0].casefold())):
             menu.addSection(source)
-            for contribution in contributions:
-                action = menu.addAction(contribution.title)
-                action.setToolTip(f'Provided by {source}')
-                action.setProperty('source', source)
-                action.triggered.connect(lambda checked=False, entry=contribution: self._run(lambda: entry.run(context)))
+            for entry in sorted(entries, key=lambda entry: (entry.order, entry.title.casefold())):
+                contributed(entry)
+        menu.addSeparator()
+        standard(desktop_actions.reveal_label(), lambda: desktop_actions.reveal(item.path))
         return menu
 
     def _context_menu(self, index):
-        menu = self.context_menu_for(index)
+        menu = self.context_menu_for(index, directory=getattr(self.views, 'context_directory', None))
         if menu is not None:
             menu.exec(self.views.context_position)
             menu.deleteLater()
@@ -255,9 +300,11 @@ class FileBrowser(qt.QWidget):
         try:
             callback()
         except Exception as error:
-            qt.QMessageBox.warning(self, 'Cannot open item', str(error))
+            qt.QMessageBox.warning(self, 'Cannot complete action', str(error))
 
     def _activate(self, index):
+        if not index.isValid():
+            return
         item = self.model.item(index)
         if isinstance(item, Directory):
             self.navigate(item.path)
@@ -464,16 +511,18 @@ class FileBrowser(qt.QWidget):
     def stop(self):
         self.stopping = True
         self.views.stop()
+        self.file_actions.stop()
         if self.folder_busy:
             self.folder_operation.requestInterruption()
-        return self.busy or self.folder_busy or self.views.cover_busy
+        return self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy
 
     def _maybe_idle(self):
-        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy):
+        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy):
             self.idle.emit()
 
     def shutdown(self):
         self.stop()
+        self.file_actions.wait()
         for name in ('operation', 'folder_operation'):
             operation = getattr(self, name, None)
             if operation is not None:

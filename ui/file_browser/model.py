@@ -6,9 +6,11 @@ from .. import pyside as qt
 from ...dirUtils import Directory
 from ...fileTypes.registry import file_types, object_from_path
 from ...filesystem import format_size
+from ...file_operations import validate_name
 
 
 class BrowserFileSystemModel(qt.QFileSystemModel):
+    edit_failed = qt.Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.folder_totals = {}
@@ -51,6 +53,28 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             if isinstance(self.item(index), Directory):
                 return 'Recursive file size; symbolic links are excluded.'
         return super().data(index, role)
+
+    def setData(self, index, value, role=qt.Qt.ItemDataRole.EditRole):
+        if role != qt.Qt.ItemDataRole.EditRole or index.column() != 0:
+            return super().setData(index, value, role)
+        try:
+            if self.isReadOnly():
+                return False
+            validate_name(value)
+            source = Path(self.filePath(index))
+            target = source.with_name(value)
+            if source == target:
+                return True
+            # Directory entries distinguish a real collision from a case-only rename
+            # on a case-insensitive volume. Qt's rename also refuses racing collisions.
+            if (target.exists() or target.is_symlink()) and value in {entry.name for entry in source.parent.iterdir()}:
+                raise FileExistsError(f'A file or folder named "{value}" already exists.')
+            if not super().setData(index, value, role):
+                raise OSError('Could not rename this item. Check its name and write permissions.')
+            return True
+        except Exception as error:
+            self.edit_failed.emit(str(error))
+            return False
 
     def set_folder_totals(self, totals):
         previous = self.folder_totals

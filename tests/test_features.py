@@ -108,9 +108,9 @@ class BindingTests(unittest.TestCase):
             browser.tree.selectionModel().select(browser.model.index(str(path)),
                 qt.QItemSelectionModel.SelectionFlag.Select | qt.QItemSelectionModel.SelectionFlag.Rows)
         menu = browser.context_menu_for(browser.model.index(str(self.other)))
-        self.assertEqual([action.text() for action in menu.actions()][2:], ['Unified', 'Edit selection'])
+        self.assertEqual([action.text() for action in menu.actions() if action.property('source') == 'Unified'], ['Edit selection'])
         self.assertFalse(browser.services)
-        menu.actions()[-1].trigger()
+        next(action for action in menu.actions() if action.text() == 'Edit selection').trigger()
         self.assertEqual(self.calls[-1].paths, (self.path,))
         self.assertIs(self.calls[-1].browser, browser)
         menu.deleteLater()

@@ -1,9 +1,10 @@
 """Folder-only column trails with compact, theme-aware chevrons."""
 
 from .. import pyside as qt
+from .editing import FilenameEditorMixin
 
 
-class ColumnDelegate(qt.QStyledItemDelegate):
+class ColumnDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
     arrow_size = 8
 
     def paint(self, painter, option, index):
@@ -33,6 +34,7 @@ class ColumnDelegate(qt.QStyledItemDelegate):
 
 
 class FolderColumnView(qt.QColumnView):
+    column_context_requested = qt.Signal(object, object)
     def __init__(self):
         super().__init__()
         self.viewport().setBackgroundRole(qt.QPalette.ColorRole.Window)
@@ -52,6 +54,9 @@ class FolderColumnView(qt.QColumnView):
     def createColumn(self, index):
         column = super().createColumn(index)
         column.setItemDelegate(ColumnDelegate(column))
+        column.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
+        column.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
+        column.customContextMenuRequested.connect(lambda point, target=column: self.column_context_requested.emit(target, point))
         column.setIconSize(qt.QSize(16, 16))
         column.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         return column
