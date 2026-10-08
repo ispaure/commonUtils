@@ -45,3 +45,11 @@ class TextEditorTests(unittest.TestCase):
         with patch.object(qt.QMessageBox, 'question', return_value=qt.QMessageBox.StandardButton.Save):
             self.assertTrue(self.editor.can_close())
         self.assertIn(b'other=new', self.path.read_bytes())
+
+    def test_discard_restores_text_even_if_the_host_stays_open(self):
+        original = self.editor.text.toPlainText()
+        self.edit()
+        with patch.object(qt.QMessageBox, 'question', return_value=qt.QMessageBox.StandardButton.Discard):
+            self.assertTrue(self.editor.can_close())
+        self.assertFalse(self.editor.is_modified)
+        self.assertEqual(self.editor.text.toPlainText(), original)

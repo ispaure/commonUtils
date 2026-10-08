@@ -106,6 +106,5 @@ class TextFileEditor(qt.QWidget):
         if choice == qt.QMessageBox.StandardButton.Save:
             return self.save()
         if choice == qt.QMessageBox.StandardButton.Discard:
-            self.text.document().setModified(False)
-            return True
+            return self.reload(initial=True)
         return False
