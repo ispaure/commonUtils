@@ -8,7 +8,7 @@ from unittest.mock import patch
 from commonUtils.markdownUtils import split_frontmatter, parse_properties, replace_property, replace_frontmatter
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer
-from commonUtils.ui.markdown_properties import typed_value, property_type
+from commonUtils.ui.markdown.properties import typed_value, property_type
 
 
 HEADER = ('---\n# Important metadata comment\ntitle: "A: title"\n'
@@ -85,7 +85,8 @@ class FrontmatterWidgetTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'note.md'
         self.path.write_text(HEADER + '# Body\n\nA paragraph.\n', encoding='utf-8')
-        self.viewer = MarkdownViewer(self.path)
+        self.viewer = MarkdownViewer(self.path, allow_edit=True)
+        self.viewer.set_editing(False)
         self.viewer.show()
         self.addCleanup(self.viewer.deleteLater)
         self.app.processEvents()

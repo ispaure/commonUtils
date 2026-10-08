@@ -1,22 +1,26 @@
 """Reusable Markdown reading/editing, heading navigation and document history."""
 from pathlib import Path
 
-from . import pyside as qt
-from .file_browser.controls import navigation_button
-from .markdown_editing import MarkdownEditingMixin
-from .markdown_formatted import MarkdownFormattedMixin
-from .markdown_properties import MarkdownProperties
-from .markdown_headings import _iter_headings
-from ..markdownUtils import split_frontmatter
+from .. import pyside as qt
+from ..file_browser.controls import navigation_button
+from .editing import MarkdownEditingMixin
+from .formatted import MarkdownFormattedMixin
+from .properties import MarkdownProperties
+from .headings import _iter_headings
+from .links import render_links
+from .tables import MarkdownTablesMixin
+from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
+from ...markdownUtils import split_frontmatter
 
 
-class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
-    """Embeddable Markdown viewer/editor; opens read-only and protects unsaved edits."""
+class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTablesMixin, qt.QWidget):
+    """Preview-only by default; allow_edit=True enables optional Markdown editing."""
     path_changed = qt.Signal(object)
     modified_changed = qt.Signal(bool)
 
-    def __init__(self, path=None, parent=None):
+    def __init__(self, path=None, parent=None, *, allow_edit=False):
         super().__init__(parent)
+        self.allow_edit = bool(allow_edit)
         self.history = []
         self.history_index = -1
         self._source_bytes = None
@@ -42,6 +46,8 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
         self.edit_button.setCheckable(True)
         self.edit_button.setToolTip('Switch between reading and editing Markdown')
         self.edit_button.toggled.connect(self.set_editing)
+        self.edit_button.setVisible(self.allow_edit)
+        self.edit_button.setEnabled(self.allow_edit)
         toolbar.addWidget(self.edit_button)
         self.edit_mode = qt.QComboBox()
         self.edit_mode.addItem('Formatted', 'formatted')
@@ -61,11 +67,14 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
         self.browser.setOpenExternalLinks(False)
         self.browser.setAccessibleName('Markdown document')
         self.browser.anchorClicked.connect(self.follow_link)
-        self.editor = qt.QPlainTextEdit()
+        self.editor = SourceMarkdownEdit()
+        self.editor.setReadOnly(not self.allow_edit)
         self.editor.setAccessibleName('Markdown source')
         self.editor.setFont(qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont))
         self.editor.document().modificationChanged.connect(self._modified_changed)
-        self.formatted_editor = qt.QTextEdit()
+        self.formatted_editor = FormattedMarkdownEdit()
+        self.formatted_editor.linkActivated.connect(self.follow_link)
+        self.formatted_editor.setReadOnly(not self.allow_edit)
         self.formatted_editor.setAccessibleName('Formatted Markdown editor')
         self.formatted_editor.document().contentsChanged.connect(self._formatted_changed)
         self.formatted_editor.undoAvailable.connect(lambda available: self._update_edit_actions())
@@ -99,6 +108,11 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
         self._update_buttons()
         if path is not None:
             self.open_document(path)
+        if self.allow_edit:
+            error = self.status.text()
+            self.set_editing(True)
+            if error:
+                self.status.setText(error)
 
     def show_contents(self):
         self._render_source(self.markdown_text())
@@ -194,7 +208,7 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
                                          if self._loaded_path else qt.QUrl())
         self.properties.refresh(text)
         parts = split_frontmatter(text)
-        self.browser.setMarkdown(parts.body)
+        self.browser.setMarkdown(render_links(parts.body))
         # Qt renders headings but does not supply GitHub-style fragment names.
         self.headings = []
         for level, title, anchor, block in _iter_headings(self.browser.document()):
@@ -208,6 +222,8 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
         self.browser.verticalScrollBar().setValue(scroll)
 
     def _apply_properties(self, updated):
+        if not self.allow_edit:
+            return
         # Property edits must not replace an unsynchronized, freshly edited body.
         current = self.markdown_text()
         prefix = split_frontmatter(updated).prefix
@@ -288,52 +304,3 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, qt.QWidget):
 
     def forward(self):
         self._navigate_history(1)
-
-
-class MarkdownWindow(qt.QMainWindow):
-    def __init__(self, path, parent=None):
-        super().__init__(parent)
-        self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
-        self.viewer = MarkdownViewer(parent=self)
-        self.setCentralWidget(self.viewer)
-        self.viewer.path_changed.connect(lambda path: self._update_title())
-        self.viewer.modified_changed.connect(lambda modified: self._update_title())
-        file_menu = self.menuBar().addMenu('File')
-        for action in (self.viewer.new_action, self.viewer.open_action, self.viewer.save_action, self.viewer.save_as_action):
-            file_menu.addAction(action)
-        file_menu.addSeparator()
-        file_menu.addAction('Close', self.close, qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
-        edit_menu = self.menuBar().addMenu('Edit')
-        for action in (self.viewer.undo_action, self.viewer.redo_action, self.viewer.cut_action,
-                       self.viewer.copy_action, self.viewer.paste_action, self.viewer.select_all_action,
-                       self.viewer.find_action):
-            edit_menu.addAction(action)
-        view_menu = self.menuBar().addMenu('View')
-        view_menu.addAction('Edit / Read', self.viewer.edit_button.click)
-        view_menu.addAction('Table of contents', self.viewer.show_contents)
-        self.setWindowTitle('Documentation')
-        self.resize(900, 700)
-        self.viewer.open_document(path)
-
-    def _update_title(self):
-        path = self.viewer.current_path
-        title = path.name if path else 'Markdown'
-        self.setWindowTitle(f'{title}{" *" if self.viewer.is_modified else ""} — Markdown')
-
-    def closeEvent(self, event):
-        if self.viewer.can_close():
-            super().closeEvent(event)
-        else:
-            event.ignore()
-
-
-_windows = set()
-
-
-def open_markdown(path, *, parent=None):
-    """Show and retain an independent viewer window until it closes; requires Qt app."""
-    window = MarkdownWindow(path, parent)
-    _windows.add(window)
-    window.destroyed.connect(lambda: _windows.discard(window))
-    window.show()
-    return window

@@ -2,7 +2,7 @@
 import re
 
 
-def _iter_headings(document):
+def _iter_headings(document, *, strip_syntax=False):
     """Yield level/title/unique anchor/block without mutating the document."""
     used = set()
     counters = {}
@@ -11,6 +11,8 @@ def _iter_headings(document):
         level = block.blockFormat().headingLevel()
         if level:
             title = block.text()
+            if strip_syntax:
+                title = re.sub(r'^#{1,6} ', '', title, count=1)
             slug = re.sub(r'[^\w\- ]', '', title.lower()).replace(' ', '-')
             count = counters.get(slug, 0)
             anchor = f'{slug}-{count}' if count else slug
