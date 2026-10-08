@@ -27,6 +27,7 @@ class MarkdownTests(unittest.TestCase):
                               '```python\nprint("example")\n```\n', encoding='utf-8')
         self.second.write_text('# Second\n\n## Details\n\nText\n\n## Details\n\nMore\n', encoding='utf-8')
         self.viewer = MarkdownViewer(self.first)
+        self.viewer.set_edit_mode('source')
         self.viewer.resize(600, 400)
         self.viewer.show()
         self.addCleanup(self.viewer.deleteLater)
@@ -112,6 +113,280 @@ class MarkdownTests(unittest.TestCase):
         self.viewer.back()
         self.assertEqual(self.viewer.browser.verticalScrollBar().value(), original_scroll)
         self.assertTrue(all(path == current for path, current in observed))
+
+    def test_native_navigation_and_contents_include_nested_duplicate_headings(self):
+        self.assertIsInstance(self.viewer.back_button, qt.QToolButton)
+        self.assertFalse(self.viewer.back_button.icon().isNull())
+        self.viewer.open_document(self.second)
+        self.viewer.show_contents()
+        popup = self.viewer.toc_popup
+        self.assertTrue(popup.windowFlags() & qt.Qt.WindowType.Popup)
+        listing = popup.findChild(qt.QListWidget)
+        self.assertEqual([listing.item(i).text() for i in range(listing.count())],
+                         ['Second', '    Details', '    Details'])
+        self.assertEqual(listing.item(2).data(qt.Qt.ItemDataRole.UserRole), 'details-1')
+        from PySide6.QtTest import QTest
+        QTest.keyClick(listing, qt.Qt.Key.Key_Escape)
+        self.assertFalse(popup.isVisible())
+        self.viewer.show_contents()
+        popup = self.viewer.toc_popup
+        listing = popup.findChild(qt.QListWidget)
+        self.viewer._select_heading(listing.item(2))
+        self.assertFalse(popup.isVisible())
+        self.assertEqual(self.viewer.current_path, self.second.resolve())
+
+    def test_edit_preview_and_heading_navigation_preserve_unsaved_source(self):
+        self.viewer.set_editing(True)
+        self.viewer.editor.appendPlainText('## Unsaved heading\n\nNew text')
+        source = self.viewer.editor.toPlainText()
+        original = self.first.read_bytes()
+        self.assertTrue(self.viewer.is_modified)
+        self.viewer.set_editing(False)
+        self.assertIn('Unsaved heading', self.viewer.browser.toPlainText())
+        self.viewer.show_contents()
+        listing = self.viewer.toc_popup.findChild(qt.QListWidget)
+        self.viewer._select_heading(listing.item(listing.count() - 1))
+        with patch.object(qt.QMessageBox, 'warning') as warning:
+            self.viewer.follow_link(qt.QUrl('#unsaved-heading'))
+            self.viewer.back()
+            warning.assert_not_called()
+        self.viewer.set_editing(True)
+        self.assertEqual(self.viewer.editor.toPlainText(), source)
+        self.assertTrue(self.viewer.is_modified)
+        self.assertEqual(self.first.read_bytes(), original)
+
+    def test_save_preserves_bom_crlf_and_failed_replace_keeps_original(self):
+        source = b'\xef\xbb\xbf# First\r\n\r\nOriginal\r\n'
+        self.first.write_bytes(source)
+        self.viewer.open_document(self.first)
+        self.viewer.set_editing(True)
+        cursor = self.viewer.editor.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        cursor.insertText('Extra')
+        with patch('commonUtils.ui.markdown_io.os.replace', side_effect=OSError('blocked')):
+            self.assertFalse(self.viewer.save_document())
+        self.assertEqual(self.first.read_bytes(), source)
+        self.assertTrue(self.viewer.is_modified)
+        self.assertEqual(list(self.root.glob('.first.md-*.tmp')), [])
+        self.assertTrue(self.viewer.save_document())
+        saved = self.first.read_bytes()
+        self.assertTrue(saved.startswith(b'\xef\xbb\xbf'))
+        self.assertNotIn(b'\n', saved.replace(b'\r\n', b''))
+        self.assertIn(b'Extra', saved)
+        self.assertFalse(self.viewer.is_modified)
+
+    def test_disk_conflict_refuses_overwrite_and_save_as_changes_link_base(self):
+        self.viewer.set_editing(True)
+        self.viewer.editor.appendPlainText('My changes')
+        self.first.write_text('External changes', encoding='utf-8')
+        self.assertFalse(self.viewer.save_document())
+        self.assertEqual(self.first.read_text(), 'External changes')
+        self.assertTrue(self.viewer.is_modified)
+        directory = self.root / 'new'
+        directory.mkdir()
+        destination = directory / 'saved.md'
+        self.assertTrue(self.viewer.save_document(destination))
+        self.assertEqual(self.viewer.current_path, destination)
+        self.assertEqual(self.viewer.browser.document().baseUrl().toLocalFile(), str(directory) + '/')
+        self.assertIn('My changes', destination.read_text())
+
+    def test_unsaved_navigation_cancel_discard_and_failed_save(self):
+        self.viewer.set_editing(True)
+        self.viewer.editor.appendPlainText('Unsaved')
+        before = self.viewer.editor.toPlainText()
+        buttons = qt.QMessageBox.StandardButton
+        with patch.object(qt.QMessageBox, 'warning', return_value=buttons.Cancel):
+            self.assertFalse(self.viewer.open_document(self.second))
+        self.assertEqual(self.viewer.current_path, self.first.resolve())
+        self.assertEqual(self.viewer.editor.toPlainText(), before)
+        with patch.object(qt.QMessageBox, 'warning', return_value=buttons.Save), \
+                patch.object(self.viewer, 'save_document', return_value=False):
+            self.assertFalse(self.viewer.open_document(self.second))
+        self.assertEqual(self.viewer.editor.toPlainText(), before)
+        with patch.object(qt.QMessageBox, 'warning', return_value=buttons.Discard):
+            self.assertTrue(self.viewer.open_document(self.second))
+        self.assertFalse(self.viewer.is_modified)
+        self.assertNotIn('Unsaved', self.first.read_text())
+
+    def test_save_and_open_actions_shortcuts_and_window_close_cancel(self):
+        window = open_markdown(self.first)
+        self.addCleanup(window.deleteLater)
+        viewer = window.viewer
+        viewer.set_edit_mode('source')
+        self.assertFalse(viewer.location.isVisible())
+        self.assertEqual([action.text() for action in window.menuBar().actions()], ['File', 'Edit', 'View'])
+        self.assertIn('Ctrl+S', [key.toString() for key in viewer.save_action.shortcuts()])
+        self.assertIn('Ctrl+O', [key.toString() for key in viewer.open_action.shortcuts()])
+        viewer.set_editing(True)
+        viewer.editor.appendPlainText('Saved by action')
+        viewer.save_action.trigger()
+        self.assertIn('Saved by action', self.first.read_text())
+        with patch.object(qt.QFileDialog, 'getOpenFileName', return_value=(str(self.second), '')):
+            viewer.open_action.trigger()
+        self.assertEqual(viewer.current_path, self.second.resolve())
+        viewer.editor.appendPlainText('Unsaved close')
+        with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel):
+            self.assertFalse(window.close())
+        self.assertTrue(window.isVisible())
+        with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Discard):
+            window.close()
+
+    def test_formatting_replace_all_and_undo_are_source_operations(self):
+        self.viewer.set_editing(True)
+        self.viewer.editor.setPlainText('one one')
+        self.viewer.editor.selectAll()
+        self.viewer.wrap_selection('**', 'text')
+        self.assertEqual(self.viewer.editor.toPlainText(), '**one one**')
+        self.viewer.undo_action.trigger()
+        self.assertEqual(self.viewer.editor.toPlainText(), 'one one')
+        self.viewer.find_text.setText('one')
+        self.viewer.replace_text.setText('one plus')
+        self.viewer.replace_all()
+        self.assertEqual(self.viewer.editor.toPlainText(), 'one plus one plus')
+        self.viewer.undo_action.trigger()
+        self.assertEqual(self.viewer.editor.toPlainText(), 'one one')
+        self.viewer.set_editing(False)
+        self.assertFalse(self.viewer.undo_action.isEnabled())
+        self.viewer.replace_all()
+        self.assertEqual(self.viewer.editor.toPlainText(), 'one one')
+
+    def test_new_document_save_dialog_and_keyboard_save(self):
+        from PySide6.QtTest import QTest
+        self.viewer.new_action.trigger()
+        self.assertIsNone(self.viewer.current_path)
+        self.assertTrue(self.viewer.edit_button.isChecked())
+        self.viewer.editor.insertPlainText('# New document\n\nText')
+        self.viewer.set_editing(False)
+        self.assertIn('New document', self.viewer.browser.toPlainText())
+        path = self.root / 'created.md'
+        with patch.object(qt.QFileDialog, 'getSaveFileName', return_value=(str(path), '')):
+            self.viewer.save_action.trigger()
+        self.assertEqual(path.read_text(), '# New document\n\nText')
+        self.viewer.set_editing(True)
+        self.viewer.editor.appendPlainText('Shortcut saved')
+        self.viewer.activateWindow()
+        self.viewer.editor.setFocus()
+        self.app.processEvents()
+        QTest.keyClick(self.viewer.editor, qt.Qt.Key.Key_S, qt.Qt.KeyboardModifier.ControlModifier)
+        self.app.processEvents()
+        self.assertIn('Shortcut saved', path.read_text())
+        self.assertFalse(self.viewer.is_modified)
+
+    def test_formatted_edit_default_rendering_noop_save_preserves_exact_source(self):
+        window = open_markdown(self.first)
+        viewer = window.viewer
+        self.addCleanup(window.deleteLater)
+        original = self.first.read_bytes()
+        viewer.set_editing(True)
+        self.assertIs(viewer.pages.currentWidget(), viewer.formatted_editor)
+        self.assertEqual(viewer.formatted_editor.document().begin().blockFormat().headingLevel(), 1)
+        self.assertIn('<table', viewer.formatted_editor.document().toHtml())
+        self.assertFalse(viewer.is_modified)
+        viewer.set_edit_mode('source')
+        self.assertEqual(viewer.editor.toPlainText(), original.decode())
+        viewer.set_edit_mode('formatted')
+        self.assertTrue(viewer.save_document())
+        self.assertEqual(self.first.read_bytes(), original)
+        window.close()
+
+    def test_formatted_text_edit_save_and_source_mode_switch(self):
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        cursor = self.viewer.formatted_editor.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        cursor.insertText('Formatted new text')
+        self.assertTrue(self.viewer.is_modified)
+        self.viewer.set_edit_mode('source')
+        self.assertIn('Formatted new text', self.viewer.editor.toPlainText())
+        self.assertTrue(self.viewer.is_modified)
+        self.viewer.editor.appendPlainText('## Source heading')
+        self.viewer.set_edit_mode('formatted')
+        self.assertIn('Source heading', self.viewer.formatted_editor.toPlainText())
+        self.assertTrue(self.viewer.save_document())
+        self.assertIn('Formatted new text', self.first.read_text())
+        self.assertIn('## Source heading', self.first.read_text())
+        self.assertFalse(self.viewer.is_modified)
+
+    def test_formatted_undo_to_original_keeps_exact_bytes(self):
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        original = self.first.read_bytes()
+        self.viewer.formatted_editor.insertPlainText('Changed')
+        self.assertTrue(self.viewer.is_modified)
+        self.viewer.undo_action.trigger()
+        self.assertFalse(self.viewer.is_modified)
+        self.assertTrue(self.viewer.save_document())
+        self.assertEqual(self.first.read_bytes(), original)
+
+    def test_formatted_formatting_lists_links_and_tables_save_as_markdown(self):
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        widget = self.viewer.formatted_editor
+        widget.setMarkdown('Paragraph\n\n| A | B |\n| --- | --- |\n| One | Two |\n')
+        cursor = widget.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.Start)
+        cursor.movePosition(qt.QTextCursor.MoveOperation.EndOfBlock, qt.QTextCursor.MoveMode.KeepAnchor)
+        widget.setTextCursor(cursor)
+        self.viewer.bold_action.trigger()
+        self.assertIn('**Paragraph**', widget.document().toMarkdown())
+        self.viewer.prefix_lines('## ')
+        self.assertEqual(widget.document().begin().blockFormat().headingLevel(), 2)
+        self.viewer.prefix_lines('> ')
+        with patch.object(qt.QInputDialog, 'getText', return_value=('second%20page.MD', True)):
+            self.viewer.insert_link()
+        self.assertIn('second%20page.MD', widget.document().toMarkdown())
+        self.viewer.find_text.setText('One')
+        self.viewer.replace_text.setText('Edited cell')
+        self.viewer.replace_all()
+        self.assertIn('Edited cell', widget.toPlainText())
+        self.assertTrue(self.viewer.save_document())
+        self.assertIn('|', self.first.read_text())
+        self.assertIn('Edited cell', self.first.read_text())
+        self.assertIn('## ', self.first.read_text())
+
+    def test_formatted_cancel_and_failed_save_keep_edits(self):
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        self.viewer.formatted_editor.insertPlainText('Unsaved rich text')
+        original = self.first.read_bytes()
+        with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel):
+            self.assertFalse(self.viewer.open_document(self.second))
+        self.assertIn('Unsaved rich text', self.viewer.formatted_editor.toPlainText())
+        with patch('commonUtils.ui.markdown_io.os.replace', side_effect=OSError('blocked')):
+            self.assertFalse(self.viewer.save_document())
+        self.assertTrue(self.viewer.is_modified)
+        self.assertEqual(self.first.read_bytes(), original)
+        self.viewer.set_editing(False)
+        self.assertIn('Unsaved rich text', self.viewer.browser.toPlainText())
+
+    def test_formatted_contents_jump_keeps_edit_mode_and_unsaved_changes(self):
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        self.viewer.formatted_editor.insertPlainText('Edited ')
+        self.viewer.show_contents()
+        listing = self.viewer.toc_popup.findChild(qt.QListWidget)
+        self.viewer._select_heading(listing.item(0))
+        self.assertTrue(self.viewer.edit_button.isChecked())
+        self.assertIs(self.viewer.pages.currentWidget(), self.viewer.formatted_editor)
+        self.assertTrue(self.viewer.is_modified)
+        self.assertEqual(self.viewer.formatted_editor.textCursor().block().blockFormat().headingLevel(), 1)
+        self.viewer.prefix_lines('')
+        self.assertEqual(self.viewer.formatted_editor.document().begin().blockFormat().headingLevel(), 0)
+
+    def test_heading_anchors_avoid_literal_suffix_collisions_in_both_views(self):
+        self.first.write_text('# Foo\n\n## Foo\n\n## Foo-1\n\n## Foo\n', encoding='utf-8')
+        self.viewer.open_document(self.first)
+        self.assertEqual([anchor for _, _, anchor in self.viewer.headings],
+                         ['foo', 'foo-1', 'foo-1-1', 'foo-2'])
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        self.viewer.show_contents()
+        listing = self.viewer.toc_popup.findChild(qt.QListWidget)
+        self.viewer._select_heading(listing.item(2))
+        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), 'Foo-1')
+        self.viewer._scroll_formatted_heading('foo-2')
+        self.assertEqual(self.viewer.formatted_editor.textCursor().block().text(), 'Foo')
+        self.assertGreater(self.viewer.formatted_editor.textCursor().position(), 10)
 
     def test_window_lifetime_and_browser_markdown_activation(self):
         self.assertIsInstance(file_from_path(self.second), MarkdownFile)
