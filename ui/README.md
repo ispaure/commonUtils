@@ -318,3 +318,13 @@ The [Markdown viewer/editor guide](markdown/README.md) covers preview-only defau
 explicit editing opt-in, typed Markdown formatting, properties, navigation and saving.
 Public imports remain `from commonUtils.ui.markdown import MarkdownViewer, open_markdown`.
 FileBrowser opts into editing; documentation callers get preview-only windows by default.
+
+## Plain-text files
+
+`from commonUtils.ui.text_editor import TextFileEditor` provides an embeddable UTF-8
+file editor (`TextFileEditor(path, parent=None)`). Its `save()`, `reload()` and
+`can_close()` methods support explicit atomic saving and unsaved-change prompts.
+It preserves BOM/newline conventions and refuses to overwrite external changes.
+Hosts should call `can_close()` before destroying it. The `saved(path)` signal
+allows consumers to refresh configuration. It renders text directly without
+interpreting INI sections or keys.
