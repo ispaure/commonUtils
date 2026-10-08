@@ -1,5 +1,8 @@
 # ZIP access
 
+See the [module index](README.md), [worker/cancellation recipes](RECIPES.md) and
+[file-type wrappers](fileTypes/README.md) for related APIs.
+
 `commonUtils.zip_access` owns archive mechanics. It has no application configuration,
 password dialogs, session cache or feature dependencies. It reads ordinary ZIP,
 legacy ZipCrypto and WinZip AES, and always uses AES-256 for password-protected writes.
@@ -39,7 +42,8 @@ replacement. Rewrites reject mixed encrypted/plain file entries; directory heade
 may be plain. Authentication errors use `ArchivePasswordError` and never include
 the supplied password. An authentication failure may also indicate damaged data.
 
-Dependencies: `pyzipper` for encrypted ZIPs; standard `zipfile` for ordinary ZIPs.
+Dependencies: this module imports `pyzipper`, so it is required even for plain
+operations. Standard `zipfile` handles ordinary ZIP data.
 WinZip AES requires a compatible external reader. No filename/header encryption
 or 7z support is provided here. Applications own configuration lookup, interactive
 prompts, cache policy and the lifetime of plaintext temporary extraction files.
@@ -62,3 +66,32 @@ Checks occur between chunks and before final publication. `streams.stream_signat
 `stream_signature` for callers that keep their ZIP imports together. Existing callers
 that omit callbacks retain their synchronous, non-cancellable behavior; in
 particular, a comic rebuild is allowed to finish and verify its current transaction.
+
+
+## Create an archive in a managed worker
+
+Pass the worker's progress and cancellation callbacks directly to ZIP creation:
+
+```python
+from commonUtils.zip_access import create_archive
+from commonUtils.operations import OperationCancelled
+
+def create_zip_job(sources, destination, password):
+    sources = tuple(sources)  # Capture selections before starting work.
+    def work(report, cancelled):
+        try:
+            return create_archive(sources, destination, password=password,
+                                  progress=report, cancelled=cancelled)
+        except OperationCancelled:
+            return None
+    return work
+
+# With an OperationProgress widget and already-collected input/password:
+# task.start(create_zip_job(paths, output_path, password), message='Assessing…')
+```
+
+Handle a `None` result as cancellation and a nonempty worker error as failure.
+Ask for passwords on the GUI thread before starting. Cancellation before publication
+removes staged work; once publication completes, the output is a success even if a
+late request arrives. This policy suits separate ZIP creation. A batch of in-place
+rewrites may instead use `run_batch` and let each current archive finish.

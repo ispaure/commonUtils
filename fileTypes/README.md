@@ -9,7 +9,7 @@ The `commonUtils.fileTypes` package contains specialized `File` subclasses for c
 | `TXTFile` | `txtType.py` | Read, write, and open text files |
 | `CSVFile` | `csvType.py` | Read and write CSV data |
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
-| `XMLFile` | `xmlType.py` | XML file representation built on `TXTFile` |
+| `XMLFile` | `xmlType.py` | Lossless no-op XML DOM access and text-child editing, plus inherited line operations |
 | `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection |
 | `DMGFile` | `dmgType.py` | Mount and extract directories from macOS DMG files |
 | `AppImageFile` | `appimageType.py` | AppImage file representation |
@@ -78,9 +78,33 @@ extra whitespace. `ensure_ascii` and `sort_keys` are optional serialization sett
 
 ### 📄 `xmlType.py`
 
-Provides `XMLFile`, which currently extends `TXTFile`.
+`XMLFile` retains inherited TXT line operations and also provides a separate DOM
+API for structured editing. Do not mix DOM and `line_lst` edits expecting them to
+synchronize automatically.
 
-This gives XML files the standard text-file functionality such as line-based reading and writing while providing a distinct file type for XML-specific use.
+```python
+from commonUtils.fileTypes.xmlType import XMLFile
+
+original = b'<Project><!--keep--><Title>Old</Title><Extension flag="x"/></Project>'
+document = XMLFile.from_bytes(original)
+assert document.to_bytes() == original  # No-op output retains the original bytes.
+assert document.get_text('Title') == 'Old'
+document.set_text('Title', 'New')
+updated = document.to_bytes()           # Returns bytes; does not write a file.
+assert b'<!--keep-->' in updated
+```
+
+`XMLFile(path).read_xml()` loads the file and returns `xml_root`;
+`from_bytes()` creates an in-memory document. `get_text`/`set_text` address direct
+children in the root namespace. Missing fields read as empty text; setting empty
+text removes the field. Duplicate matching children and nested element content
+raise errors rather than selecting an ambiguous value. Unknown extensions,
+comments, processing instructions and namespace declarations survive other edits.
+
+`to_bytes()` validates serialization; the application owns staging and saving.
+There is no automatic atomic XML writer. Structured edits can change formatting;
+unchanged serialization returns the original bytes. Inherited `read_lines()` and
+`write_lines()` continue to operate independently.
 
 ### 📄 `zipType.py`
 
@@ -113,6 +137,15 @@ This operation is macOS-specific.
 Provides `AppImageFile`, a distinct `File` subclass representing Linux AppImage files.
 
 It currently inherits the standard `File` functionality without adding additional operations, allowing AppImages to be represented as their own file type for application and platform-specific workflows.
+
+## Usage examples and UI integration
+
+[Workflow recipes](../RECIPES.md#read-and-write-application-data) show text, CSV and
+JSON together, including their different write guarantees. The
+[feature guide](../FEATURES.md#runnable-example-add-a-menu-action-to-a-browser)
+starts with a runnable browser and then adds a custom type, panel and activation.
+File-format classes should remain independent of application configuration and UI
+windows; browser panel loaders may read metadata asynchronously.
 
 ## Base File Functionality
 

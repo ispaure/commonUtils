@@ -1,481 +1,196 @@
-<div align="center">
-
 # commonUtils
 
-**A cross-platform Python helper library for reusable tools and workflows.**
+commonUtils is a shared Python tools library for filesystem work, file formats,
+configuration, processes, platform integration and desktop UI. Applications own
+their domain logic, credentials and software policy; this library supplies reusable
+mechanics. It is imported by other projects rather than launched on its own.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
-![License](https://img.shields.io/badge/License-MIT-green)
+## Use it in a project
 
-</div>
+Python **3.10+** is required. The repository itself is the `commonUtils` package;
+there is currently no `pyproject.toml` or `setup.py` for installing it as a wheel.
+Place it beneath a directory on your Python import path, often as a Git submodule:
 
----
-
-`commonUtils` is a cross-platform Python helper library maintained by
-Marc-André Voyer. It collects reusable functionality shared across tools
-and projects, with a focus on filesystem operations, application/process
-launching, platform abstraction, command execution, lightweight UI,
-configuration files, archives, and common file types.
-
-The library is designed primarily as a shared dependency for other
-Python tools rather than as a standalone application.
-
-## Requirements
-
--   **Python 3.10+**
--   Windows, macOS, or Linux
-
-Python 3.10 is the minimum supported version because the codebase uses
-structural pattern matching (`match` / `case`) and modern type
-annotation syntax.
-
-Some modules have additional dependencies:
-
--   `PySide6` --- optional PySide UI backend
--   `pyzipper` --- encrypted ZIP support
--   `patool` / `patoolib` --- archive extraction support, including RAR
-    workflows
-
-Platform-specific functionality may also depend on software provided by
-the operating system, such as PowerShell on Windows or `hdiutil` on
-macOS.
-
-## Extending applications
-
-[Adding a feature](FEATURES.md) is the recommended entry point for declaring owned
-file types, browser actions, activation, folder fields and per-window controllers
-in one place. It includes installation and live enable/disable examples.
-
-## Core Modules
-
-### 📄 `fileUtils.py`
-
-Provides the base `File` abstraction and general file/path helpers.
-
-`File` stores commonly needed information such as the path, filename,
-extension, name without extension, and file size. It also provides
-operations such as safe deletion, making files writable, and setting
-executable permissions.
-
-General helpers include file copying, moving and renaming, as well as
-common user and application-data paths.
-
-``` python
-from pathlib import Path
-from commonUtils.fileUtils import File
-
-file = File(Path("/path/to/file.txt"))
-print(file.name)
-print(file.ext)
+```text
+my_project/
+└── Python/                 # Add this directory to PYTHONPATH.
+    ├── launch.py
+    └── commonUtils/
 ```
 
-### 📄 `dirUtils.py`
+```sh
+# Run from my_project (macOS / Linux).
+PYTHONPATH=Python python Python/launch.py
+```
 
-Provides the `Directory` abstraction for directory traversal, creation,
-opening, and deletion.
+On PowerShell, set `$env:PYTHONPATH = "Python"` before running your interpreter.
+For submodule checkouts, initialize with `git submodule update --init --recursive`.
 
-`Directory.list_files()` is recursive by default and can filter by
-extension. Directory traversal follows symbolic links and junctions that
-resolve to directories while detecting recursive directory-link loops.
+Import only the tools you need:
 
-``` python
+```python
 from pathlib import Path
 from commonUtils.dirUtils import Directory
+from commonUtils.fileTypes.jsonType import JSONFile
 
-directory = Directory(Path("/path/to/data"))
-
-files = directory.list_files()
-txt_files = directory.list_files(filter_extension="txt")
-subdirectories = directory.list_directories()
+# Use an existing input directory.
+files = Directory(Path('data')).list_files(filter_extension='txt')
+settings = JSONFile('settings.json')
+settings.write_json({'enabled': True}, sort_keys=True)
+print(settings.read_json())
 ```
 
-Destructive directory operations deliberately distinguish between real
-directories and links. Deleting a `Directory` that represents a symbolic
-link or Windows junction removes the link itself rather than deleting
-the target directory.
+Directory listing is recursive by default and resolves registered file types
+without reading their contents. JSON writes stage and replace atomically;
+missing/malformed reads raise exceptions for the application to handle.
 
-### 📁 `fileTypes`
+## Guides and examples
 
-Contains specialized `File` subclasses for formats that require
-additional behavior.
+| Task | Guide |
+| --- | --- |
+| Add a right-click action, custom file type, preview panel or double-click handler | [File-browser feature guide](FEATURES.md) |
+| Run work off the GUI thread, show progress and cancel safely | [Background-operation recipes](RECIPES.md#run-a-cancellable-job-in-a-qt-dialog) |
+| Finish the current item before cancelling a batch | [Batch recipe](RECIPES.md#finish-the-current-item-before-cancelling-a-batch) |
+| Copy/hash streams or provision a pinned download | [Stream and download recipes](RECIPES.md) |
+| Embed a browser, manage navigation and close workers safely | [UI guide](ui/README.md#reusable-file-browser) |
+| Read/write text, CSV, JSON or register a domain format | [File types](fileTypes/README.md) |
+| Read, extract, create or verify ZIPs | [Archive guide](ZIP_ARCHIVES.md) |
+| Execute commands and understand timeout/platform behavior | [Command wrapper](wrappers/cmdShellWrapper/README.md) |
 
-Current types include:
+The feature guide includes a complete runnable browser example. Lower-level browser
+services and providers remain supported for existing integrations, but new features
+can declare type rules, actions, activation and controller ownership together.
 
-| Class | Module | Purpose |
-| --- | --- | --- |
-| `TXTFile` | `txtType` | Read/write text as lines and open it in the default editor |
-| `CSVFile` | `csvType` | Read/write CSV data using Python's CSV handling |
-| `JSONFile` | `jsonType` | JSON documents with atomic UTF-8 writes |
-| `XMLFile` | `xmlType` | XML-oriented text file type |
-| `ZIPFile` | `zipType` | Plain/encrypted ZIP access, validated extraction and root-entry inspection |
-| `DMGFile` | `dmgType` | macOS DMG mounting and directory extraction |
-| `AppImageFile` | `appimageType` | AppImage file representation |
+## Module map
 
+| Module/package | Provides |
+| --- | --- |
+| `fileUtils` | `File`, path metadata, copy/move/rename and user/application-data paths |
+| `dirUtils` | `Directory`, traversal, creation, opening and deletion |
+| `filesystem` | Shared object abstraction, browser action/panel/details descriptors and folder totals |
+| `fileTypes` | TXT, CSV, JSON, XML, ZIP, DMG and AppImage classes; process-wide type registry |
+| `linkUtils` | Symbolic links and Windows junction-aware operations |
+| `osUtils` | `OS`, architecture detection and platform-specific path selection |
+| `appUtils` | Disk, Store, Flatpak and AppImage application launch helpers |
+| `wrappers/cmdShellWrapper` | Captured commands, terminals, idle-output timeouts and process termination |
+| `wrappers/powerShellWrapper` | Windows PowerShell workflows |
+| `configUtils` | INI section mapping and configuration updates |
+| `debugUtils` / `logUtils` | Diagnostics, severity handling and log helpers |
+| `streams` | Bounded reading, copying and SHA-256 with cooperative cancellation |
+| `operations` | Cancellation exception/checks and per-item batch results |
+| `downloads` | Verified staging and atomic provisioning of a file or named ZIP member |
+| `features` | Qt-independent declarations for owned types and browser capabilities |
+| `ui` | Lazy native/PySide backends, dialogs, widgets and file browser |
+| `ui/operations` | Background Qt callback worker, without browser dependencies |
+| `ui/operation_progress` | Queued progress, cancellation and completion after worker shutdown |
+| `ui/download` | Confirmed provisioning with background progress |
+| `zip_access` | Plain, ZipCrypto and AES archive access, verification and safe creation |
+| `zipUtils` | Compatibility ZIP helpers and external RAR extraction |
+| `spreadsheetUtils` | Lightweight CSV-backed Spreadsheet, Row and Cell objects |
+| `webUtils` / `steamUtils` | URL opening and Steam environment helpers |
+| `marcUtils` | Maintainer-specific helpers |
 
-Example:
+`Directory.list_files()` and `file_from_path()` use process-wide registration.
+Direct `File(path)` construction stays generic. Higher-priority rules win, with
+newer registrations breaking ties; owned feature rules can be disabled. Existing
+objects keep their class, while browsers re-resolve after registry changes.
+See [registration examples](fileTypes/README.md#file-type-resolution).
 
-``` python
-from pathlib import Path
-from commonUtils.fileTypes.txtType import TXTFile
+## Optional dependencies and platforms
 
-file = TXTFile(Path("notes.txt"))
-file.line_lst = ["First line", "Second line"]
-file.write_lines()
-```
+The consuming application manages dependencies. Importing a module may require
+its own extras; this repository does not supply one exhaustive install command.
 
-`Directory.list_files()` uses the process-wide file-type registry, with built-in
-TXT, CSV, JSON, XML, ZIP, DMG and AppImage rules. Applications add owned extension
-or detector rules through `Feature.file_types`; disabling a feature disables its
-rules. Existing objects keep their class; browser refreshes resolve against the
-current registry. See [feature declarations](FEATURES.md).
+| Capability | Requirements |
+| --- | --- |
+| Qt browser, workers and PySide UI | `PySide6`; create one QApplication before widgets |
+| Shared ZIP APIs | `pyzipper` is required on import; ordinary ZIP data uses `zipfile` |
+| External archive/RAR extraction | `patool` (`patoolib` import) and format-specific system extractors |
+| EXIF wrapper | `piexif` |
+| Platform workflows | Relevant system tools, such as PowerShell, `hdiutil` or Flatpak |
 
-### 📄 `linkUtils.py`
+Windows, macOS and Linux are supported at the library level; individual operations
+can remain platform-specific. Route platform choices through `osUtils` and consult
+the relevant module before relying on an external tool.
 
-Provides symbolic-link management and Windows junction detection.
-
-The module can create, delete, and update symbolic links while
-protecting link targets during destructive operations.
-
-``` python
-from pathlib import Path
-from commonUtils import linkUtils
-
-linkUtils.update_symbolic_link(
-    Path("/path/to/source"),
-    Path("/path/to/link")
-)
-```
-
-`update_symbolic_link()` refuses to replace a real destination object
-unless `allow_destination_deletion=True` is explicitly provided.
-
-Windows junction detection supports the library's Python 3.10+ target.
-Python versions that provide `Path.is_junction()` use the native
-implementation; older supported Python versions use a Windows
-reparse-tag fallback.
-
-### 📄 `osUtils.py`
-
-Provides normalized operating-system and architecture detection.
-
-Supported operating systems:
-
--   `OS.WIN`
--   `OS.MAC`
--   `OS.LINUX`
-
-Supported architecture categories include x86/x86-64 and ARM/ARM64.
-
-``` python
+```python
 from commonUtils.osUtils import get_os, get_arch, OS
 
 if get_os() == OS.WIN:
-    print("Running on Windows")
-
+    print('Windows-specific workflow')
 print(get_arch())
 ```
 
-`get_os_path()` can also select a platform-specific value from Windows,
-macOS, and Linux alternatives.
-
-### 📄 `debugUtils.py`
-
-Provides the primary structured debug logger.
-
-Available severities are:
-
--   `Severity.DEBUG`
--   `Severity.INFO`
--   `Severity.WARNING`
--   `Severity.ERROR`
--   `Severity.CRITICAL`
-
-``` python
-from commonUtils.debugUtils import log, Severity
-
-log(Severity.INFO, "Example", "Operation completed")
-```
-
-Logging supports optional timestamps, elapsed-time display, verbose
-debug filtering, project prefixes, log-file output, ANSI console
-coloring, and popup messages.
-
-**Important:** `Severity.CRITICAL` is terminal by design. A critical log
-displays the error and raises `DebugException`, halting the current
-operation unless explicitly handled by the caller.
-
-### 📄 `appUtils.py`
-
-Provides abstractions and helpers for launching applications across
-Windows, macOS, and Linux.
-
-The module includes:
-
--   `DiskApp` for applications stored on disk
--   `StoreApp` for Windows Store applications
--   `Flatpak` for Flatpak applications
--   `AppImage` for Linux AppImages
--   executable validation and permission helpers
-
-`DiskApp` supports normal launches, detached launches, and visible
-console/terminal launches depending on the platform.
-
-### 📁 `wrappers/cmdShellWrapper`
-
-Cross-platform command execution used by higher-level utilities.
-
-``` python
-from commonUtils.wrappers import cmdShellWrapper
-
-output = cmdShellWrapper.exec_cmd(
-    "python --version",
-    wait_for_output=True
-)
-```
-
-The wrapper supports:
-
--   captured command output
--   commands launched without waiting
--   configurable working directories
--   idle-output timeouts
--   process-tree termination
--   new terminal windows
--   Windows, macOS, and Linux terminal behavior
-
-The `time_out` argument is an **idle-output timeout**, not a maximum
-command runtime. A command may continue running as long as it continues
-producing output.
-
-### 📄 `wrappers/powerShellWrapper.py`
-
-Provides PowerShell command execution for Windows-specific workflows.
-
-### 📁 `ui`
-
-Provides generic UI functions with lazy backend selection.
-
-``` python
-from commonUtils import ui
-
-ui.display_msg_box_ok("commonUtils", "Operation completed")
-```
-
-When enabled, the generic UI first attempts to use the PySide backend.
-If PySide is unavailable or the operation fails, it falls back to the
-native platform backend.
-
-The backends are also available explicitly as:
-
-``` python
-ui.native
-ui.pyside
-```
-
-Lazy loading keeps optional PySide dependencies from being imported
-unless needed.
-
-### 📁 `ui/file_browser`
-
-The reusable `FileBrowser` widget supplies filesystem navigation, file information,
-previews, selection actions and background work. File types provide format-specific
-panels/thumbnails; feature declarations add labeled menu sections, activation,
-folder fields and optional controllers. `register() -> Feature(...)` is the unified
-entry point, documented with examples in [FEATURES.md](FEATURES.md).
-
-Applications install each declaration into their browser windows. A feature-wide
-toggle updates owned type rules and all live bindings; a binding-only toggle affects
-one window. Controllers and operation state belong to individual windows. The host
-owns feature discovery, dependency policy and application UI. Expensive handlers
-must explicitly use workers; action declarations are not automatically asynchronous.
-
-### 📄 `configUtils.py`
-
-Provides helpers for reading and modifying INI-style configuration files
-using `configparser`, including section mapping and variable/section
-modification.
-
-### 📄 `spreadsheetUtils.py`
-
-Provides lightweight `Spreadsheet`, `Row`, and `Cell` abstractions
-backed by `CSVFile` for import and export.
-
-### 📄 `zipUtils.py`
-
-Compatibility ZIP helpers delegate to `zip_access`; RAR extraction retains its
-external extractor integration.
-
-### 📄 `zip_access.py`
-
-Reads ordinary ZIP, legacy ZipCrypto and WinZip AES; password-protected writes
-always use AES-256. Validated streaming extraction uses the same entry layout for
-plain and encrypted archives, rejecting traversal, symlinks and ambiguous names.
-`create_archive` deduplicates selections, retains selected folder roots and empty
-directories, verifies decrypted content and publishes a separate ZIP without
-replacing sources or an existing destination.
+The generic UI lazily selects its backend; applications needing Qt objects should
+explicitly import `commonUtils.ui.pyside` and initialize QApplication once.
+Native UI access does not itself import PySide.
 
 ```python
-from commonUtils.zip_access import open_archive, extract_archive, create_archive
-
-with open_archive("comic.cbz", password=password) as archive:
-    metadata = archive.read("ComicInfo.xml")
-extract_archive("comic.cbz", workspace, password=password)
-create_archive([folder, other_file], "selection.zip", password=password)
-```
-
-These primitives accept explicit passwords; configuration lookup, password dialogs,
-session caches, batch progress and cancellation policy belong to consuming
-applications. ZIP filenames remain visible. Extraction is staged per file rather
-than transactional for the whole archive; use disposable workspaces for rewrites.
-See [ZIP_ARCHIVES.md](ZIP_ARCHIVES.md) for verification, authentication and failure
-semantics, plus the `ZIPFile` wrappers.
-
-### Other Utilities
-
-📄 `webUtils.py` contains URL-opening helpers.
-
-📄 `steamUtils.py` contains Steam-specific environment detection.
-
-📄 `marcUtils.py` contains maintainer-specific helpers and is not intended to
-represent general-purpose cross-platform functionality.
-
-## Filesystem Safety
-
-Filesystem helpers intentionally take a conservative approach to
-destructive operations.
-
-A symbolic link or Windows junction is treated as a filesystem object
-separate from the directory it targets. Operations that remove links are
-designed to remove the link without recursively deleting the target.
-
-For `Directory.delete_contents()`, a linked root directory is refused by
-default. Following the root link for content deletion requires
-explicitly passing:
-
-``` python
-directory.delete_contents(follow_root_link=True)
-```
-
-Similarly, symbolic-link replacement refuses to delete an existing real
-destination unless explicitly authorized:
-
-``` python
-linkUtils.update_symbolic_link(
-    source,
-    destination,
-    allow_destination_deletion=True
-)
-```
-
-These options should only be enabled when deleting the existing
-destination or operating on the resolved target is intentional.
-
-## Cross-Platform Design
-
-Platform-specific behavior should generally be routed through `osUtils`
-rather than being duplicated by consuming projects.
-
-The library currently contains implementations for Windows, macOS, and
-Linux, although individual operations may remain platform-specific.
-Examples include Windows Store applications, PowerShell, macOS DMG
-handling, Linux AppImages, and Flatpak applications.
-
-## Using commonUtils in Another Project
-
-The repository currently contains the Python package directly and does
-not include packaging metadata such as `pyproject.toml` or `setup.py`.
-
-Make the parent directory of `commonUtils` available on `PYTHONPATH` or
-otherwise include the package in the consuming project's Python
-environment, then import the required modules normally:
-
-``` python
-from commonUtils import fileUtils, dirUtils, linkUtils
-from commonUtils.osUtils import get_os, OS
+from commonUtils import ui
 from commonUtils.debugUtils import log, Severity
+
+log(Severity.INFO, 'Example', 'Operation completed')
+ui.display_msg_box_ok('Example', 'Operation completed')
 ```
 
-Keep project-specific behavior in the consuming project when possible.
-`commonUtils` should contain functionality that is reusable across
-multiple tools or projects.
+`Severity.CRITICAL` raises `DebugException`. Shared Qt workers use
+`noninteractive_logging` so failures cannot open dialogs from the worker thread;
+GUI owners receive and present the error. Callbacks must not prompt or touch widgets.
 
-## Development Guidelines
+## Filesystem and operation contracts
 
-The codebase is used as a shared dependency, so changes to established
-public functions, argument names, module names, and behavior should be
-made carefully to avoid breaking consuming projects.
+- Directory traversal follows directory links while detecting recursive loops.
+  Deleting a Directory that represents a symbolic link or junction removes the
+  link itself, retaining its target.
+- `Directory.delete_contents()` refuses a linked root unless
+  `follow_root_link=True` explicitly permits target-content deletion.
+- `linkUtils.update_symbolic_link()` refuses to replace a real destination unless
+  `allow_destination_deletion=True` is supplied.
+- Cancellation is cooperative. Stream helpers check between chunks; a blocking
+  read must return before cancellation can be observed. The caller owns staging
+  and transaction boundaries.
+- `OperationProgress.completed(result, error)` arrives after worker shutdown.
+  Keep the owner alive until then and route close/Escape to cancellation during work.
+- `run_batch` finishes each item before observing cancellation. Its result records
+  completed items, per-item failures and the unprocessed remainder. An error-free
+  Qt callback can still return a batch containing individual failures.
+- Downloads verify both release and installed hashes before promotion. Applications
+  supply URLs, versions, platform choice and destination; commonUtils does not
+  automatically choose software or install drivers.
+- ZIP creation preserves sources and existing destinations, verifies decrypted
+  content and checks cancellation before publication. Extraction is staged per
+  file, rather than a transaction across the whole archive. See the archive guide.
+- `cmdShellWrapper.exec_cmd(time_out=...)` uses an **idle-output timeout**, not a
+  maximum runtime; ongoing output can keep the command alive.
 
-Prefer:
+These contracts are operation-specific. A shared stream copy alone does not make
+a file replacement atomic, and using a progress widget does not make arbitrary
+callbacks cancellable.
 
--   reusable functionality over project-specific behavior
--   `pathlib.Path` for filesystem paths
--   `osUtils` for platform branching
--   `debugUtils.log()` for structured diagnostics
--   `File` and `Directory` abstractions for filesystem operations
--   `linkUtils` for symbolic links and junction handling
--   specialized classes under `fileTypes` for format-specific file
-    behavior
+## Development and validation
 
-Destructive filesystem operations should remain explicit and
-conservative, especially when symbolic links or junctions are involved.
+Keep domain-specific file classes, application configuration and platform software
+manifests in the consuming project. Reusable code should preserve established
+public names, arguments and fields so dependent projects can update safely.
+
+From the package's parent directory, run its tests with the project interpreter:
+
+```sh
+QT_QPA_PLATFORM=offscreen python -m unittest discover -s commonUtils/tests -v
+```
+
+For a checkout beneath `Python/`, run from the application's root:
+
+```sh
+QT_QPA_PLATFORM=offscreen PYTHONPATH=Python python -m unittest discover -s Python/commonUtils/tests -v
+```
+
+On PowerShell, set `$env:QT_QPA_PLATFORM = "offscreen"` and the appropriate
+`$env:PYTHONPATH` first. Optional test dependencies must be available. Tests use
+fixtures and mocked integrations; native dialogs, external applications and system
+installation/mount behavior need separate platform validation. Test consumers
+before updating their submodule references.
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE.md` for the
-full license text.
-
-Copyright © 2020-2026 Marc-André Voyer.
-
-## Verified software downloads
-
-`downloads.DownloadSpec` accepts a project's pinned name/version, HTTPS URL,
-download SHA-256, installed-file SHA-256, optional exact ZIP member, and executable
-flag. `downloads.provision` stages beside the destination, verifies both hashes,
-and atomically promotes one file. Errors and cancellation retain the existing file;
-ZIP entries other than the named member are never extracted. `is_ready` checks the
-installed hash. Projects own URLs, platform selection and installation paths.
-
-`ui.download.ensure_download` adds a confirmation prompt and cancellable background
-progress dialog. It returns a verified path or `None` on decline/cancel/failure.
-`install=True` also confirms opening an already-downloaded installer; the caller
-owns launching it and any privileged installation flow.
-
-## Background operations and cancellation
-
-`ui.operation_progress.OperationProgress` is a reusable Qt widget with status,
-progress and a cancellation button. `start(work)` runs `work(report, cancelled)`
-on a worker; `report(done, total, message)` uses queued signals and throttles
-updates. `total=0` shows indeterminate progress. `completed(result, error)` arrives
-on the GUI thread only after the worker has stopped. Owners must keep the widget
-alive during work and route close/Escape to `request_cancel()` rather than destroy
-it. Cancellation is cooperative: callbacks own their transaction boundaries.
-
-`operations.run_batch` finishes each item before observing cancellation, continues
-past individual errors by default, and returns completed/failed/remaining items.
-Use `stop_on_error=True` for workflows that must retain the unprocessed remainder.
-`OperationCancelled` and `check_cancelled` support finer-grained operations.
-
-Shared `ui.operations.Operation` workers use `debugUtils.noninteractive_logging`: critical logs
-still raise, but never open dialogs from worker threads. Owners present failures
-on the GUI thread. Callbacks must not access Qt widgets or prompt users directly.
-
-`zip_access.create_archive` accepts optional `progress` and `cancelled` callbacks.
-It checks cancellation during assessment, hashing, streaming writes, verification
-and before atomic publication. Defaults preserve existing callers, including comic
-rebuilds that deliberately finish their current archive before cancelling a batch.
-
-## Stream primitives
-
-`streams.iter_chunks`, `copy_stream`, `stream_signature` and `file_sha256` share
-bounded reading and cancellation checks. ZIP creation/verification and software
-downloads use these primitives. Byte-progress callbacks receive each chunk's size;
-UI wrappers translate that into their own phases and totals. The caller owns
-staging and publication so a cancelled copy never promotes partially written data.
-`downloads.DownloadCancelled` names the same exception as `operations.OperationCancelled`.
-
-The download dialog now composes `OperationProgress`, sharing queued reporting,
-cooperative cancellation and completion-after-worker-shutdown with other tools.
-Feature declarations and file-type registrations validate resolution rules through
-`fileTypes.registry.validate_resolution_rule` so their suffix/detector rules stay
-consistent.
+MIT. See [LICENSE.md](LICENSE.md). Copyright © 2020–2026 Marc-André Voyer.
