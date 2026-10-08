@@ -4,7 +4,7 @@ from collections import deque
 from pathlib import Path
 from ...dirUtils import Directory
 from .. import pyside as qt
-from .operations import Operation
+from ..operations import Operation
 from .tiles import ResponsiveTileView
 from .columns import FolderColumnView, ColumnDelegate
 from .thumbnails import CoverModel

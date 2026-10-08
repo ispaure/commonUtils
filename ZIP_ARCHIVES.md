@@ -57,7 +57,8 @@ container bytes. Directory-only ZIPs carry no encrypted file payload.
 `report(done, total, message)` across hashing, creation and verification; directory
 assessment is indeterminate. Cancellation raises `operations.OperationCancelled`
 and cleans up staged output without deleting sources or replacing destinations.
-Checks occur between chunks and before final publication. `stream_signature` and
-`archive_manifest` also accept optional cancellation callbacks. Existing callers
+Checks occur between chunks and before final publication. `streams.stream_signature` and
+`archive_manifest` also accept optional cancellation callbacks. ZIP access re-exports
+`stream_signature` for callers that keep their ZIP imports together. Existing callers
 that omit callbacks retain their synchronous, non-cancellable behavior; in
 particular, a comic rebuild is allowed to finish and verify its current transaction.

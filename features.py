@@ -7,6 +7,7 @@ from weakref import WeakSet
 
 from .fileUtils import File
 from .filesystem import FilesystemObject
+from .fileTypes.registry import validate_resolution_rule
 
 
 def resolve_type(value):
@@ -65,14 +66,7 @@ class FileType:
     def __post_init__(self):
         if not _valid_type(self.file_class) or (isinstance(self.file_class, type) and not issubclass(self.file_class, File)):
             raise TypeError('file_class must derive from File')
-        extensions = (self.extensions,) if isinstance(self.extensions, str) else tuple(self.extensions)
-        extensions = tuple(dict.fromkeys(extension.lower().lstrip('.') for extension in extensions))
-        if any(not extension or '/' in extension or '\\' in extension for extension in extensions):
-            raise ValueError('Extensions must be non-empty suffixes without path separators')
-        if self.detector is not None and not callable(self.detector):
-            raise TypeError('detector must be callable')
-        if not extensions and self.detector is None:
-            raise ValueError('Supply extensions or a detector')
+        extensions = validate_resolution_rule(self.extensions, self.detector)
         object.__setattr__(self, 'extensions', extensions)
 
 

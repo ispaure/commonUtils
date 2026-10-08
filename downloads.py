@@ -8,15 +8,13 @@ import hashlib
 import os
 from pathlib import Path
 import re
-import shutil
 from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 import zipfile
 
-
-class DownloadCancelled(Exception):
-    pass
+from .operations import OperationCancelled as DownloadCancelled, check_cancelled
+from .streams import copy_stream, file_sha256, iter_chunks
 
 
 @dataclass(frozen=True)
@@ -37,11 +35,6 @@ class DownloadSpec:
                 raise ValueError('Expected a SHA-256 digest')
 
 
-def file_sha256(path):
-    with Path(path).open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
-
-
 def is_ready(spec, destination):
     try:
         return file_sha256(destination) == spec.installed_sha256
@@ -55,6 +48,7 @@ def provision(spec, destination, *, progress=lambda done, total: None, cancelled
     Cancellation or any error preserves the previous destination. ZIP members
     are streamed individually, without extracting arbitrary archive paths.
     """
+    check_cancelled(cancelled)
     destination = Path(destination)
     if is_ready(spec, destination):
         if spec.executable and os.name != 'nt':
@@ -64,18 +58,13 @@ def provision(spec, destination, *, progress=lambda done, total: None, cancelled
     with TemporaryDirectory(prefix='.download-', dir=destination.parent) as workspace:
         archive_path = Path(workspace) / 'download'
         digest = hashlib.sha256()
-        request = Request(spec.url, headers={'User-Agent': 'Logistics/0.1 (verified software download)'})
+        request = Request(spec.url, headers={'User-Agent': 'commonUtils (verified software download)'})
         with urlopen(request, timeout=30) as response, archive_path.open('wb') as output:
             if urlparse(response.geturl()).scheme != 'https':
                 raise ValueError('Software download redirected away from HTTPS')
             total = int(response.headers.get('Content-Length', '0'))
             done = 0
-            while True:
-                if cancelled():
-                    raise DownloadCancelled('Software download cancelled')
-                chunk = response.read(1024 * 1024)
-                if not chunk:
-                    break
+            for chunk in iter_chunks(response, cancelled=cancelled):
                 output.write(chunk)
                 digest.update(chunk)
                 done += len(chunk)
@@ -89,13 +78,12 @@ def provision(spec, destination, *, progress=lambda done, total: None, cancelled
                 if len(matches) != 1 or matches[0].is_dir():
                     raise ValueError('Release ZIP does not contain one expected executable')
                 with archive.open(matches[0]) as source, payload.open('wb') as output:
-                    shutil.copyfileobj(source, output)
+                    copy_stream(source, output, cancelled=cancelled)
         else:
             archive_path.rename(payload)
-        if file_sha256(payload) != spec.installed_sha256:
+        if file_sha256(payload, cancelled=cancelled) != spec.installed_sha256:
             raise ValueError(f'{spec.name} executable/installer failed SHA-256 verification')
-        if cancelled():
-            raise DownloadCancelled('Software download cancelled')
+        check_cancelled(cancelled)
         if spec.executable and os.name != 'nt':
             payload.chmod(0o755)
         os.replace(payload, destination)

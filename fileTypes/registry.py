@@ -12,6 +12,19 @@ from ..fileUtils import File
 _registration_owner = ContextVar('file_type_registration_owner', default=None)
 
 
+def validate_resolution_rule(extensions, detector):
+    """Normalize suffixes and validate the same rule for declarations and registration."""
+    extensions = (extensions,) if isinstance(extensions, str) else tuple(extensions)
+    normalized = tuple(dict.fromkeys(extension.lower().lstrip('.') for extension in extensions))
+    if any(not extension or '/' in extension or '\\' in extension for extension in normalized):
+        raise ValueError('Extensions must be non-empty suffixes without path separators')
+    if detector is not None and not callable(detector):
+        raise TypeError('A file detector must be callable')
+    if not normalized and detector is None:
+        raise ValueError('Supply extensions or a detection rule')
+    return normalized
+
+
 @dataclass(frozen=True)
 class FileTypeRegistration:
     file_class: type[File]
@@ -33,15 +46,7 @@ class FileTypeRegistry:
     def register(self, file_class, extensions=(), *, detector=None, priority=0, owner=None):
         if not isinstance(file_class, type) or not issubclass(file_class, File):
             raise TypeError('Registered types must derive from File')
-        if isinstance(extensions, str):
-            extensions = (extensions,)
-        normalized = tuple(dict.fromkeys(extension.lower().lstrip('.') for extension in extensions))
-        if any(not extension or '/' in extension or '\\' in extension for extension in normalized):
-            raise ValueError('Extensions must be non-empty suffixes without path separators')
-        if detector is not None and not callable(detector):
-            raise TypeError('A file detector must be callable')
-        if not normalized and detector is None:
-            raise ValueError('Supply extensions or a detection rule')
+        normalized = validate_resolution_rule(extensions, detector)
         owner = owner if owner is not None else _registration_owner.get()
         registration = FileTypeRegistration(file_class, normalized, detector, priority, owner)
         with self._lock:
@@ -81,9 +86,10 @@ class FileTypeRegistry:
         with self._lock:
             registrations = tuple(entry for entry in self._registrations
                                   if entry.owner not in self._disabled_owners)
-        candidates = sorted(enumerate(registrations), key=lambda item: (item[1].priority, item[0]), reverse=True)
+        # Reversing before the stable sort retains newest-first priority ties.
+        candidates = sorted(reversed(registrations), key=lambda entry: entry.priority, reverse=True)
         name = path.name.lower()
-        for _, entry in candidates:
+        for entry in candidates:
             if entry.extensions and not any(name.endswith('.' + extension) for extension in entry.extensions):
                 continue
             if entry.detector is not None and not entry.detector(path):

@@ -1,57 +1,44 @@
 """Ask before provisioning software and keep downloads off the GUI thread."""
-from threading import Event
 from . import pyside as qt
-from .file_browser.operations import Operation
-from ..downloads import is_ready, provision
+from .operation_progress import OperationProgress
+from ..downloads import is_ready, provision, DownloadCancelled
 
 
 class _DownloadDialog(qt.QDialog):
-    progress_changed = qt.Signal(int, int)
-
     def __init__(self, spec, destination, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f'Download {spec.name}')
-        self.cancelled = Event()
-        self.running = True
         self.result_path = None
         self.error = ''
+        self.task = OperationProgress(self)
+        self.task.completed.connect(self._completed)
         layout = qt.QVBoxLayout(self)
-        self.label = qt.QLabel(f'Downloading and verifying {spec.name} {spec.version}…')
-        layout.addWidget(self.label)
-        self.progress = qt.QProgressBar()
-        self.progress.setRange(0, 0)
-        layout.addWidget(self.progress)
-        self.cancel = qt.QPushButton('Cancel')
-        self.cancel.clicked.connect(self.reject)
-        layout.addWidget(self.cancel)
-        self.progress_changed.connect(self._progress)
-        self.operation = Operation(lambda: provision(spec, destination,
-            progress=self._notify_progress, cancelled=self.cancelled.is_set), self)
-        self.operation.completed.connect(self._completed)
-        self.operation.finished.connect(self._finished)
-        self.operation.start()
+        layout.addWidget(self.task)
+        message = f'Downloading and verifying {spec.name} {spec.version}…'
+        def download(report, cancelled):
+            try:
+                return provision(spec, destination,
+                                 progress=lambda done, total: report(done, total, message),
+                                 cancelled=cancelled)
+            except DownloadCancelled:
+                return None
+        self.task.start(download, message=message, cancel_message='Cancelling download…')
 
-    def _notify_progress(self, done, total):
-        # Qt int signals cannot carry very large download byte counts.
-        self.progress_changed.emit(int(100 * done / total) if total else 0, 100 if total else 0)
+    @property
+    def running(self):
+        return self.task.busy
 
-    def _progress(self, done, total):
-        self.progress.setRange(0, total)
-        self.progress.setValue(done)
+    @property
+    def cancelled(self):
+        return self.task.cancelled
 
     def _completed(self, path, error):
         self.result_path, self.error = path, error
-
-    def _finished(self):
-        self.running = False
-        self.operation.wait()
         self.accept()
 
     def reject(self):
         if self.running:
-            self.cancelled.set()
-            self.cancel.setEnabled(False)
-            self.label.setText('Cancelling download…')
+            self.task.request_cancel()
         else:
             super().reject()
 
@@ -79,7 +66,7 @@ def ensure_download(spec, destination, *, parent=None, install=False):
     dialog = _DownloadDialog(spec, destination, parent)
     try:
         dialog.exec()
-        if dialog.error and not dialog.cancelled.is_set():
+        if dialog.error:
             qt.display_msg_box_ok(f'{spec.name} Download Failed', dialog.error)
         return dialog.result_path
     finally:

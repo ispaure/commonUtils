@@ -6,7 +6,6 @@ writing a password always selects WinZip AES-256. Filenames remain visible.
 """
 
 from contextlib import contextmanager
-from hashlib import sha256
 import os
 from pathlib import Path, PurePosixPath
 import stat
@@ -17,8 +16,7 @@ import zlib
 
 import pyzipper
 from .operations import check_cancelled
-
-CHUNK_SIZE = 1024 * 1024
+from .streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
 
 
 class ArchivePasswordError(RuntimeError):
@@ -124,22 +122,8 @@ def authenticate(path, password, *, all_members=False, for_rewrite=False):
             names = names[:1]
         for name in names:
             with archive.open(name) as stream:
-                while stream.read(CHUNK_SIZE):
+                for _ in iter_chunks(stream):
                     pass
-
-
-def stream_signature(stream, *, cancelled=lambda: False, progress=None):
-    total, digest = 0, sha256()
-    while True:
-        check_cancelled(cancelled)
-        chunk = stream.read(CHUNK_SIZE)
-        if not chunk:
-            break
-        total += len(chunk)
-        digest.update(chunk)
-        if progress:
-            progress(len(chunk))
-    return total, digest.hexdigest()
 
 
 def archive_manifest(path, *, password=None, cancelled=lambda: False, progress=None):
@@ -330,13 +314,8 @@ def create_archive(sources, destination, *, password=None,
                     archive.writestr(info, b'')
                 else:
                     with path.open('rb') as incoming, archive.open(info, 'w', force_zip64=True) as output:
-                        while True:
-                            check_cancelled(cancelled)
-                            chunk = incoming.read(CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            output.write(chunk)
-                            advanced(len(chunk), f'Creating ZIP: {name}')
+                        copy_stream(incoming, output, cancelled=cancelled,
+                                    progress=lambda size: advanced(size, f'Creating ZIP: {name}'))
         progress(done, 3 * total_bytes, 'Verifying encrypted ZIP…')
         if archive_manifest(staged, password=password, cancelled=cancelled,
                             progress=lambda count, total, message: progress(2 * total_bytes + count,

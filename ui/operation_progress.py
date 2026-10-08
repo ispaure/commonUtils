@@ -7,7 +7,7 @@ on the GUI thread only after the worker has stopped, so owners can close safely.
 from threading import Event
 from time import monotonic
 from . import pyside as qt
-from .file_browser.operations import Operation
+from .operations import Operation
 
 
 class OperationProgress(qt.QWidget):
