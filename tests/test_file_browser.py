@@ -20,8 +20,8 @@ class CustomFile(File):
     def browser_panels(self):
         return (BrowserPanel('example', 'Example Information',
                              lambda: BrowserDetails((('Project value', 'Test value'),))),
-                BrowserPanel('hidden', 'Optional Information',
-                             lambda: BrowserDetails((('Optional', 'enabled'),)), False))
+                BrowserPanel('additional', 'Additional Information',
+                             lambda: BrowserDetails((('Additional', 'available'),))))
 
     def browser_actions(self, context):
         return (BrowserAction('example.action', 'Project Action',
@@ -93,8 +93,8 @@ class BrowserTests(unittest.TestCase):
         self.wait()
         self.assertIsInstance(self.browser.model.item(index), CustomFile)
         self.assertIsNot(self.browser.model.item(index), before)
-        self.assertEqual(self.browser.tabs.count(), 2)
-        self.assertIn('Project value: Test value', self.browser.preview.toPlainText())
+        self.assertEqual(self.browser.tabs.count(), 3)
+        self.assertIn('Project value: Test value', self.browser.tabs.widget(1).toPlainText())
         self.assertIn('Path:', self.browser.tabs.widget(0).toPlainText())
         menu = self.browser.context_menu_for(index)
         next(action for action in menu.actions() if action.text() == 'Project Action').trigger()
@@ -102,12 +102,13 @@ class BrowserTests(unittest.TestCase):
         self.assertIsInstance(self.calls[0][0], CustomFile)
         self.browser._activate(index)
         self.assertEqual(len(self.calls), 2)
-        optional = next(action for action in self.browser.panel_menu.actions() if action.text() == 'Optional Information')
-        self.assertFalse(optional.isChecked())
-        optional.setChecked(True)
+        self.assertEqual([self.browser.tabs.tabText(index) for index in range(self.browser.tabs.count())],
+                         ['File Information', 'Example Information', 'Additional Information'])
+        self.assertIn('Additional: available', self.browser.preview.toPlainText())
+        self.assertNotIn('Panels', [button.text() for button in self.browser.findChildren(qt.QToolButton)])
+        self.browser.refresh()
         self.wait()
         self.assertEqual(self.browser.tabs.count(), 3)
-        self.assertIn('Optional: enabled', self.browser.preview.toPlainText())
         menu.deleteLater()
 
     def test_mixed_selection_groups_and_deduplicates_feature_actions(self):
