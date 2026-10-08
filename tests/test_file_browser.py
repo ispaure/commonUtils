@@ -258,9 +258,9 @@ class BrowserTests(unittest.TestCase):
             self.app.processEvents()
             tiles.fit_grid()
             usable = tiles.viewport().width() - 2
-            columns = max(1, usable // 170)
+            columns = max(1, usable // 99)
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
-            self.assertEqual(tiles.iconSize().width(), max(32, tiles.gridSize().width() - 28))
+            self.assertEqual(tiles.iconSize().width(), min(71, max(16, tiles.gridSize().width() - 28)))
 
     def test_column_files_end_the_trail_without_an_extra_preview(self):
         from commonUtils.ui.file_browser.views import ColumnDelegate
@@ -297,7 +297,8 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(tiles.model().rowCount(tiles.rootIndex()), 60)
         self.assertTrue(tiles.folders_only)
         self.assertEqual(self.browser.folder_size_slider.value(), 50)
-        self.assertLess(tiles.iconSize().width(), mixed_size * .65)
+        self.assertEqual(tiles.iconSize().width(), mixed_size)
+        self.assertEqual(tiles.iconSize().height(), tiles.iconSize().width())
         for width in (430, 610, 810):
             self.browser.resize(width + 500, 800)
             self.app.processEvents()
@@ -315,6 +316,66 @@ class BrowserTests(unittest.TestCase):
         self.assertTrue(self.browser.folder_size_button.isVisible())
         self.browser.view_selector.setCurrentIndex(0)
         self.assertFalse(self.browser.folder_size_button.isVisible())
+
+    def test_size_control_scales_mixed_files_and_bounds_icons_in_narrow_views(self):
+        tiles = self.browser.views.tiles
+        self.browser.view_selector.setCurrentIndex(1)
+        self.assertFalse(tiles.folders_only)
+        sizes = []
+        for percent in (25, 50, 100):
+            self.browser.folder_size_slider.setValue(percent)
+            self.app.processEvents()
+            sizes.append(tiles.iconSize().width())
+            self.assertLessEqual(tiles.iconSize().width(), round(142 * percent / 100))
+        self.assertEqual(sizes, [36, 71, 142])
+        self.assertLessEqual(tiles.folder_icon_size.width(), tiles.iconSize().width())
+        tiles.resize(100, 300); tiles.fit_grid()
+        self.assertLessEqual(tiles.iconSize().width(), 142)
+
+    def test_cached_covers_and_oversized_app_icons_respect_size_and_retina_bounds(self):
+        class OversizedIconEngine(qt.QIconEngine):
+            def actualSize(self, size, mode, state):
+                return qt.QSize(512, 512)
+
+            def pixmap(self, size, mode, state):
+                pixmap = qt.QPixmap(512, 512)
+                pixmap.fill(qt.QColor('orange'))
+                return pixmap
+
+            def paint(self, painter, rect, mode, state):
+                painter.fillRect(rect, qt.QColor('orange'))
+
+        tiles = self.browser.views.tiles
+        self.browser.view_selector.setCurrentIndex(1)
+        covers = self.browser.views.covers
+        index = covers.mapFromSource(self.browser.model.index(str(self.path)))
+        cover = qt.QPixmap(600, 1200); cover.fill(qt.QColor('orange'))
+        fallback = qt.QPixmap(16, 16); fallback.fill(qt.QColor('orange'))
+        icons = [qt.QIcon(cover), qt.QIcon(OversizedIconEngine()), qt.QIcon(fallback)]
+        original = type(covers).data
+        for icon in icons:
+            def data(model, index, role=qt.Qt.ItemDataRole.DisplayRole):
+                return icon if role == qt.Qt.ItemDataRole.DecorationRole else original(model, index, role)
+            with patch.object(type(covers), 'data', data):
+                for ratio in (1.0, 2.0):
+                    with patch.object(tiles, 'devicePixelRatioF', return_value=ratio):
+                        for percent in (25, 50, 100):
+                            self.browser.folder_size_slider.setValue(percent)
+                            option = qt.QStyleOptionViewItem()
+                            option.decorationSize = tiles.iconSize()
+                            tiles.itemDelegate().initStyleOption(option, index)
+                            self.assertFalse(option.icon.isNull())
+                            self.assertLessEqual(option.decorationSize.width(), tiles.iconSize().width())
+                            self.assertLessEqual(option.decorationSize.height(), tiles.iconSize().height())
+                            pixmap = option.icon.pixmap(tiles.iconSize(), ratio)
+                            self.assertLessEqual(pixmap.width(), round(tiles.iconSize().width() * ratio))
+                            self.assertLessEqual(pixmap.height(), round(tiles.iconSize().height() * ratio))
+                            self.assertEqual(option.decorationSize, tiles.iconSize())
+                            self.assertAlmostEqual(max(pixmap.width() / (tiles.iconSize().width() * ratio),
+                                                       pixmap.height() / (tiles.iconSize().height() * ratio)),
+                                                   1.0, delta=.03)
+                            if icon is icons[0]:
+                                self.assertAlmostEqual(pixmap.width() / pixmap.height(), .5, delta=.03)
 
     def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
         covers = self.browser.views.covers

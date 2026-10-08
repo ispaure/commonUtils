@@ -265,7 +265,10 @@ default application. Implement `browser_has_thumbnail = True` and
 branch in the browser. Thumbnail hooks run off the GUI thread and use a bounded
 128-item cache. The size argument is a physical-pixel bounding box, including the
 display scale; return enough pixels within that box for sharp high-DPI rendering.
-Cached covers are regenerated when larger cells or a higher display scale require
+The tile **Size** control applies to folder icons, application icons and thumbnails.
+All render within the selected bounds, preserve their aspect ratio, and keep captions
+aligned. Extra viewport space widens the cells without enlarging the icons.
+Cached covers are regenerated when a larger icon size or higher display scale requires
 more pixels. Selected-panel thumbnails likewise retain physical resolution. Constructors and detection rules should stay cheap and avoid
 loading full metadata until requested.
 

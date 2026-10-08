@@ -1,4 +1,4 @@
-"""Immediate responsive tile layout with adjustable folder icons."""
+"""Responsive tile layout with bounded, adjustable icons and thumbnails."""
 
 from ...dirUtils import Directory
 from .. import pyside as qt
@@ -10,13 +10,24 @@ CAPTION_HEIGHT = 44
 
 
 class TileDelegate(qt.QStyledItemDelegate):
-    def paint(self, painter, option, index):
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
         view = self.parent()
         source = index.model().mapToSource(index)
-        if isinstance(source.model().item(source), Directory):
-            option = qt.QStyleOptionViewItem(option)
-            option.decorationSize = view.folder_icon_size
-        super().paint(painter, option, index)
+        size = (view.folder_icon_size if isinstance(source.model().item(source), Directory)
+                else view.iconSize())
+        # Native icon engines and cached covers can supply pixmaps larger than requested.
+        # Normalize after Qt initializes the option so its intrinsic size cannot override
+        # the browser's bounds. Work in physical pixels for Retina displays.
+        ratio = view.devicePixelRatioF()
+        pixmap = option.icon.pixmap(size, ratio)
+        bounds = qt.QSize(round(size.width() * ratio), round(size.height() * ratio))
+        pixmap = pixmap.scaled(bounds, qt.Qt.AspectRatioMode.KeepAspectRatio,
+                               qt.Qt.TransformationMode.SmoothTransformation)
+        pixmap.setDevicePixelRatio(ratio)
+        option.icon = qt.QIcon(pixmap)
+        # Reserve the same decoration area so captions line up across icon shapes.
+        option.decorationSize = view.iconSize()
 
 
 class ResponsiveTileView(qt.QListView):
@@ -51,7 +62,7 @@ class ResponsiveTileView(qt.QListView):
 
     def set_folder_scale(self, percent):
         if not 25 <= percent <= 100:
-            raise ValueError('Folder icon size must be between 25 and 100 percent')
+            raise ValueError('Icon size must be between 25 and 100 percent')
         self.folder_scale = percent / 100
         self.fit_grid()
         self.viewport().update()
@@ -87,12 +98,12 @@ class ResponsiveTileView(qt.QListView):
             if self.folders_only is None:
                 self.folders_only = self._contains_only_folders()
             width = max(1, self.viewport().width() - 2)
-            preferred_icon_width = round(COVER_WIDTH * self.folder_scale) if self.folders_only else COVER_WIDTH
+            preferred_icon_width = round(COVER_WIDTH * self.folder_scale)
             columns = max(1, width // (preferred_icon_width + CELL_PADDING))
             cell_width = width // columns
-            icon_width = max(16, cell_width - CELL_PADDING)
+            icon_width = min(preferred_icon_width, max(16, cell_width - CELL_PADDING))
             icon_height = icon_width if self.folders_only else round(icon_width * COVER_ASPECT_RATIO)
-            folder_width = icon_width if self.folders_only else round(icon_width * self.folder_scale)
+            folder_width = icon_width
             self.folder_icon_size = qt.QSize(folder_width, folder_width)
             icon_size = qt.QSize(icon_width, icon_height)
             grid_size = qt.QSize(cell_width, icon_height + CAPTION_HEIGHT)
