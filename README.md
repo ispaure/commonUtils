@@ -456,7 +456,7 @@ past individual errors by default, and returns completed/failed/remaining items.
 Use `stop_on_error=True` for workflows that must retain the unprocessed remainder.
 `OperationCancelled` and `check_cancelled` support finer-grained operations.
 
-Shared `Operation` workers use `debugUtils.noninteractive_logging`: critical logs
+Shared `ui.operations.Operation` workers use `debugUtils.noninteractive_logging`: critical logs
 still raise, but never open dialogs from worker threads. Owners present failures
 on the GUI thread. Callbacks must not access Qt widgets or prompt users directly.
 
@@ -464,3 +464,18 @@ on the GUI thread. Callbacks must not access Qt widgets or prompt users directly
 It checks cancellation during assessment, hashing, streaming writes, verification
 and before atomic publication. Defaults preserve existing callers, including comic
 rebuilds that deliberately finish their current archive before cancelling a batch.
+
+## Stream primitives
+
+`streams.iter_chunks`, `copy_stream`, `stream_signature` and `file_sha256` share
+bounded reading and cancellation checks. ZIP creation/verification and software
+downloads use these primitives. Byte-progress callbacks receive each chunk's size;
+UI wrappers translate that into their own phases and totals. The caller owns
+staging and publication so a cancelled copy never promotes partially written data.
+`downloads.DownloadCancelled` names the same exception as `operations.OperationCancelled`.
+
+The download dialog now composes `OperationProgress`, sharing queued reporting,
+cooperative cancellation and completion-after-worker-shutdown with other tools.
+Feature declarations and file-type registrations validate resolution rules through
+`fileTypes.registry.validate_resolution_rule` so their suffix/detector rules stay
+consistent.

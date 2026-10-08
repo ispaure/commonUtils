@@ -78,3 +78,27 @@ class DownloadTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'expected executable'):
                 provision(spec, self.path)
         self.assertFalse(self.path.exists())
+
+    def test_cancel_before_download_never_connects_or_creates_workspace(self):
+        with patch('commonUtils.downloads.urlopen') as fetch:
+            with self.assertRaises(DownloadCancelled):
+                provision(self.spec, self.path, cancelled=lambda: True)
+        fetch.assert_not_called()
+        self.assertFalse(self.path.parent.exists())
+
+    def test_cancel_during_payload_extraction_preserves_previous_executable(self):
+        from threading import Event
+        from commonUtils import downloads
+        cancelled = Event()
+        self.path.parent.mkdir()
+        self.path.write_bytes(b'previous executable')
+        real_copy = downloads.copy_stream
+        def copy(*args, **kwargs):
+            cancelled.set()
+            return real_copy(*args, **kwargs)
+        with patch('commonUtils.downloads.urlopen', return_value=Response(self.archive)), \
+                patch.object(downloads, 'copy_stream', side_effect=copy):
+            with self.assertRaises(DownloadCancelled):
+                provision(self.spec, self.path, cancelled=cancelled.is_set)
+        self.assertEqual(self.path.read_bytes(), b'previous executable')
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])

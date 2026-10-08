@@ -1,7 +1,7 @@
-"""Background file operations for filesystem widgets."""
+"""Background callbacks for Qt owners, without file-browser dependencies."""
 
-from .. import pyside as qt
-from ...debugUtils import noninteractive_logging
+from . import pyside as qt
+from ..debugUtils import noninteractive_logging
 
 
 class Operation(qt.QThread):

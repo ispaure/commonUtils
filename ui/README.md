@@ -281,7 +281,7 @@ Do not delete a browser while a panel/thumbnail operation is running.
 | `file_browser/controls.py` | View icons, folder-size menu and navigation buttons. |
 | `file_browser/navigation.py` | Root-bounded breadcrumbs and Back/Forward history. |
 | `file_browser/details.py` | Aligned, selectable information fields. |
-| `file_browser/operations.py` | Background operations and completion signals. |
+| `operations.py` | Generic background callbacks and completion signals, shared by browser and non-browser UI. |
 
 Tile sizing uses logical pixels for layout and physical pixels for rendering.
 The folder-size control changes system folder icons without shrinking covers in

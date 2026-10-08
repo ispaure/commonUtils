@@ -10,7 +10,7 @@ from .model import BrowserFileSystemModel
 from .details import DetailsPanel
 from .controls import ViewModeSelector, FolderSizeControl
 from .navigation import NavigationBar
-from .operations import Operation
+from ..operations import Operation
 from .views import FileViews
 
 
