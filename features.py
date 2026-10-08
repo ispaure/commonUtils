@@ -7,7 +7,7 @@ from weakref import WeakSet
 
 from .fileUtils import File
 from .filesystem import FilesystemObject
-from .fileTypes.registry import validate_resolution_rule
+from .fileTypes.registry import validate_resolution_rule, _validate_override_classes
 
 
 def resolve_type(value):
@@ -71,6 +71,21 @@ class FileType:
 
 
 @dataclass(frozen=True)
+class FileTypeOverride:
+    """Explicit subclass replacement, separate from extension-based FileType rules."""
+    base_class: type[File] | str
+    file_class: type[File] | str
+    priority: int = 0
+
+    def __post_init__(self):
+        for value in (self.base_class, self.file_class):
+            if not _valid_type(value) or (isinstance(value, type) and not issubclass(value, File)):
+                raise TypeError('Override declarations require File classes or module:Class references')
+        if isinstance(self.base_class, type) and isinstance(self.file_class, type):
+            _validate_override_classes(self.base_class, self.file_class)
+
+
+@dataclass(frozen=True)
 class SelectionAction:
     """handler(context) receives only accepted objects from the captured selection."""
     id: str
@@ -131,6 +146,7 @@ class Feature:
     requires: tuple[str, ...] = ()
     optional_requires: tuple[str, ...] = ()
     file_types: tuple[FileType, ...] = ()
+    file_type_overrides: tuple[FileTypeOverride, ...] = ()
     browser: BrowserExtension | None = None
     initialize: Callable | None = None
     _enabled: bool = field(default=True, init=False, repr=False)
@@ -153,6 +169,9 @@ class Feature:
         self.file_types = tuple(self.file_types)
         if any(not isinstance(spec, FileType) for spec in self.file_types):
             raise TypeError('file_types must contain FileType declarations')
+        self.file_type_overrides = tuple(self.file_type_overrides)
+        if any(not isinstance(spec, FileTypeOverride) for spec in self.file_type_overrides):
+            raise TypeError('file_type_overrides must contain FileTypeOverride declarations')
         if self.browser is not None and not isinstance(self.browser, BrowserExtension):
             raise TypeError('browser must be a BrowserExtension')
         if self.initialize is not None and not callable(self.initialize):
@@ -166,8 +185,15 @@ class Feature:
         """Idempotent, owned registration; never implicitly enable a disabled owner."""
         from .fileTypes.registry import file_types, register_builtin_file_types
         register_builtin_file_types()
-        return tuple(file_types.register(resolve_type(spec.file_class), spec.extensions, detector=spec.detector,
-                                         priority=spec.priority, owner=self.id) for spec in self.file_types)
+        overrides = [(resolve_type(spec.base_class), resolve_type(spec.file_class), spec.priority)
+                     for spec in self.file_type_overrides]
+        for base_class, file_class, _ in overrides:
+            _validate_override_classes(base_class, file_class)
+        registrations = tuple(file_types.register(resolve_type(spec.file_class), spec.extensions, detector=spec.detector,
+                                                  priority=spec.priority, owner=self.id) for spec in self.file_types)
+        return registrations + tuple(file_types.register_override(base_class, file_class, priority=priority, owner=self.id)
+                                     for base_class, file_class, priority in overrides)
+
 
     def install_browser(self, browser, *, host=None, controller=None):
         """Bind the declaration to a window, using an existing controller if supplied."""
