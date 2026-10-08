@@ -41,7 +41,7 @@ class FileBrowser(qt.QWidget):
     refreshed = qt.Signal()
     idle = qt.Signal()
 
-    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None):
+    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True):
         super().__init__(parent)
         self.idle.connect(self.close)
         self.services = services or {}
@@ -54,6 +54,7 @@ class FileBrowser(qt.QWidget):
         self.activation_handlers = ()
         self.busy = False
         self.folder_busy = False
+        self.calculate_folder_sizes = calculate_folder_sizes
         self.folder_pending = False
         self.refresh_pending = False
         self.stopping = False
@@ -312,7 +313,8 @@ class FileBrowser(qt.QWidget):
         fields = list(item.filesystem_information())
         if isinstance(item, Directory):
             if stats is None:
-                fields.append(('Total size', 'Calculating…' if self.folder_busy else 'Unavailable'))
+                fields.append(('Total size', 'Not calculated' if not self.calculate_folder_sizes else
+                               'Calculating…' if self.folder_busy else 'Unavailable'))
             else:
                 fields.extend([('Total size', format_size(stats.size)), ('Files', f'{stats.files:,}'),
                                ('Subfolders', f'{stats.folders:,}')])
@@ -435,7 +437,23 @@ class FileBrowser(qt.QWidget):
         self._selection_changed()
         self.refreshed.emit()
 
+    def set_folder_sizes_enabled(self, enabled):
+        """Enable recursive totals on demand; disable without blocking on a running scan."""
+        self.calculate_folder_sizes = bool(enabled)
+        if not enabled:
+            self.folder_pending = False
+            if self.folder_busy:
+                self.folder_operation.requestInterruption()
+            self.model.set_folder_totals({})
+        else:
+            self.refresh_folder_totals()
+        if isinstance(self.selected_object, Directory):
+            self._selection_changed()
+
     def refresh_folder_totals(self):
+        if not self.calculate_folder_sizes:
+            self.model.set_folder_totals({})
+            return
         if self.folder_busy:
             self.folder_pending = True
             self.folder_operation.requestInterruption()
@@ -452,7 +470,7 @@ class FileBrowser(qt.QWidget):
         self.folder_operation.start()
 
     def _folders_loaded(self, root, result):
-        if root == self.navigation.library and result is not None and not self.folder_pending and not self.stopping:
+        if self.calculate_folder_sizes and root == self.navigation.library and result is not None and not self.folder_pending and not self.stopping:
             self.model.set_folder_totals(result)
             if isinstance(self.selected_object, Directory):
                 self._selection_changed()

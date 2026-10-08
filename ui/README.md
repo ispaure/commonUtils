@@ -328,3 +328,8 @@ It preserves BOM/newline conventions and refuses to overwrite external changes.
 Hosts should call `can_close()` before destroying it. The `saved(path)` signal
 allows consumers to refresh configuration. It renders text directly without
 interpreting INI sections or keys.
+
+`FileBrowser(..., calculate_folder_sizes=False)` skips automatic recursive size/count
+scans for large roots. `set_folder_sizes_enabled(True)` starts totals on demand;
+disabling requests cancellation and drops cached totals. The default stays enabled
+for existing consumers. Directory listings and feature actions remain available.
