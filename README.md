@@ -440,3 +440,27 @@ installed hash. Projects own URLs, platform selection and installation paths.
 progress dialog. It returns a verified path or `None` on decline/cancel/failure.
 `install=True` also confirms opening an already-downloaded installer; the caller
 owns launching it and any privileged installation flow.
+
+## Background operations and cancellation
+
+`ui.operation_progress.OperationProgress` is a reusable Qt widget with status,
+progress and a cancellation button. `start(work)` runs `work(report, cancelled)`
+on a worker; `report(done, total, message)` uses queued signals and throttles
+updates. `total=0` shows indeterminate progress. `completed(result, error)` arrives
+on the GUI thread only after the worker has stopped. Owners must keep the widget
+alive during work and route close/Escape to `request_cancel()` rather than destroy
+it. Cancellation is cooperative: callbacks own their transaction boundaries.
+
+`operations.run_batch` finishes each item before observing cancellation, continues
+past individual errors by default, and returns completed/failed/remaining items.
+Use `stop_on_error=True` for workflows that must retain the unprocessed remainder.
+`OperationCancelled` and `check_cancelled` support finer-grained operations.
+
+Shared `Operation` workers use `debugUtils.noninteractive_logging`: critical logs
+still raise, but never open dialogs from worker threads. Owners present failures
+on the GUI thread. Callbacks must not access Qt widgets or prompt users directly.
+
+`zip_access.create_archive` accepts optional `progress` and `cancelled` callbacks.
+It checks cancellation during assessment, hashing, streaming writes, verification
+and before atomic publication. Defaults preserve existing callers, including comic
+rebuilds that deliberately finish their current archive before cancelling a batch.

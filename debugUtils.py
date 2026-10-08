@@ -15,6 +15,8 @@ import os
 import sys
 import enum
 from datetime import datetime
+from contextlib import contextmanager
+from contextvars import ContextVar
 from . import ui
 
 
@@ -42,6 +44,19 @@ if sys.platform.startswith("win"):
 def print_debug_msg(msg, show_verbose):
     if show_verbose:
         print(msg)
+
+
+_interactive_logging = ContextVar('interactive_logging', default=True)
+
+
+@contextmanager
+def noninteractive_logging():
+    """Workers log and raise failures; their owner presents errors on the GUI thread."""
+    token = _interactive_logging.set(False)
+    try:
+        yield
+    finally:
+        _interactive_logging.reset(token)
 
 
 class DebugException(Exception):
@@ -136,7 +151,7 @@ class DebugLogger:
             with open(self.log_file, "a") as log_item:
                 log_item.write(full_message_for_print + "\n")
 
-        if popup or severity == Severity.CRITICAL:
+        if (popup or severity == Severity.CRITICAL) and _interactive_logging.get():
             ui.display_msg_box_ok(title, message)
 
         if severity == Severity.CRITICAL:
