@@ -61,6 +61,28 @@ class OperationProgressTests(unittest.TestCase):
         self.wait()
         self.assertEqual(results, [('first', ''), ('second', '')])
 
+    def test_quiet_operation_keeps_cancellation_and_normal_visibility_default(self):
+        entered, release = Event(), Event()
+        result = []
+        def work(report, cancelled):
+            entered.set()
+            release.wait(5)
+            return cancelled()
+        self.progress.completed.connect(lambda value, error: result.append((value, error)))
+        self.progress.start(work, show_progress=False)
+        try:
+            self.assertTrue(entered.wait(2))
+            self.assertTrue(self.progress.isHidden())
+            self.progress.request_cancel()
+            self.assertTrue(self.progress.busy)
+        finally:
+            release.set()
+            self.wait()
+        self.assertEqual(result, [(True, '')])
+        self.progress.start(lambda report, cancelled: 'normal')
+        self.assertTrue(self.progress.isVisible())
+        self.wait()
+
     def test_worker_critical_log_reports_error_without_opening_a_dialog(self):
         result = []
         self.progress.completed.connect(lambda value, error: result.append((value, error)))

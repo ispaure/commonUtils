@@ -210,31 +210,19 @@ def get_split_character():
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
     """
     Renames a file on disk.
-    If `force` is True, and the destination exists, it will be deleted first.
+    Existing destinations are preserved unless `force` is True.
+    Forced replacement does not delete the destination before the rename.
     Returns True if successful, False otherwise.
     """
     original_name = Path(original_name)
     new_name = Path(new_name)
 
     try:
-        # If forced overwrite and destination exists on Windows
-        if force and sys.platform == 'win32' and new_name.exists():
-            File(new_name).delete_file()
-
-        # Ensure parent directory for new file exists
+        from .renameUtils import rename_path
         new_name.parent.mkdir(parents=True, exist_ok=True)
-
-        # Perform rename
         log(Severity.DEBUG, 'fileUtils.rename_file', f'Renaming file from "{original_name}" to "{new_name}"')
-        os.rename(original_name, new_name)
-
-        # Verify success
-        if new_name.exists() and not original_name.exists():
-            return True
-        else:
-            log(Severity.WARNING, 'fileUtils.rename_file',
-                f'Rename may have failed: original exists={original_name.exists()}, new exists={new_name.exists()}')
-            return False
+        rename_path(original_name, new_name, overwrite=force)
+        return True
 
     except Exception as e:
         log(Severity.ERROR, 'fileUtils.rename_file',

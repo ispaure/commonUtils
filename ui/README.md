@@ -143,6 +143,11 @@ progress and verified download prompts. The synchronous legacy progress widgets
 only display progress; callbacks must use an explicit worker to avoid blocking Qt.
 The generic worker lives at `commonUtils.ui.operations.Operation`.
 
+For automatic background work that should not change the layout, pass
+`show_progress=False` to `OperationProgress.start()`. Completion, progress reporting
+and `request_cancel()` still work; callers provide their own cancellation control.
+The default continues to show the progress widget.
+
 ## Reusable file browser
 
 **Start here for new extensions:** [Adding a feature](../FEATURES.md) documents the
