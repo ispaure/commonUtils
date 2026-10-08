@@ -1,6 +1,7 @@
 """Background file operations for filesystem widgets."""
 
 from .. import pyside as qt
+from ...debugUtils import noninteractive_logging
 
 
 class Operation(qt.QThread):
@@ -12,7 +13,9 @@ class Operation(qt.QThread):
 
     def run(self):
         try:
-            self.completed.emit(self.callback(), '')
+            with noninteractive_logging():
+                result = self.callback()
+            self.completed.emit(result, '')
         except Exception as error:
             self.completed.emit(None, str(error))
 

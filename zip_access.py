@@ -16,6 +16,7 @@ import zipfile
 import zlib
 
 import pyzipper
+from .operations import check_cancelled
 
 CHUNK_SIZE = 1024 * 1024
 
@@ -127,27 +128,41 @@ def authenticate(path, password, *, all_members=False, for_rewrite=False):
                     pass
 
 
-def stream_signature(stream):
+def stream_signature(stream, *, cancelled=lambda: False, progress=None):
     total, digest = 0, sha256()
-    while chunk := stream.read(CHUNK_SIZE):
+    while True:
+        check_cancelled(cancelled)
+        chunk = stream.read(CHUNK_SIZE)
+        if not chunk:
+            break
         total += len(chunk)
         digest.update(chunk)
+        if progress:
+            progress(len(chunk))
     return total, digest.hexdigest()
 
 
-def archive_manifest(path, *, password=None):
+def archive_manifest(path, *, password=None, cancelled=lambda: False, progress=None):
     """Authenticate every entry and compare decrypted bytes independently of CRCs."""
     with open_archive(path, password=password) as archive:
         validate_members(archive)
         result = {}
+        done = 0
+        total = sum(info.file_size for info in archive.infolist())
         for info in archive.infolist():
+            check_cancelled(cancelled)
+            def advanced(size):
+                nonlocal done
+                done += size
+                if progress:
+                    progress(done, total, f'Verifying {info.filename}')
             if info.is_dir():
                 with archive.open(info) as stream:
-                    stream_signature(stream)
+                    stream_signature(stream, cancelled=cancelled, progress=advanced)
                 result[info.filename] = None
             else:
                 with archive.open(info) as stream:
-                    result[info.filename] = stream_signature(stream)
+                    result[info.filename] = stream_signature(stream, cancelled=cancelled, progress=advanced)
         return result
 
 
@@ -213,7 +228,7 @@ def extract_archive(path, destination, *, password=None, progress=None):
             progress(100)
 
 
-def directory_entries(source, *, keep_root=True):
+def directory_entries(source, *, keep_root=True, cancelled=lambda: False):
     """Plan names without following links; preserve subfolders and empty folders."""
     source = Path(source)
     if source.is_symlink() or not source.is_dir():
@@ -222,6 +237,7 @@ def directory_entries(source, *, keep_root=True):
     def failed(error):
         raise error
     for root, directories, files in os.walk(source, followlinks=False, onerror=failed):
+        check_cancelled(cancelled)
         root = Path(root)
         for name in directories + files:
             if (root / name).is_symlink():
@@ -242,12 +258,15 @@ def write_directory(source, destination, *, password=None, keep_root=True):
             archive.write(str(path), name)
 
 
-def create_archive(sources, destination, *, password=None):
+def create_archive(sources, destination, *, password=None,
+                   progress=lambda done, total, message: None, cancelled=lambda: False):
     """Create a verified separate ZIP atomically; never delete or replace sources.
 
     Each selected folder keeps its root. Overlapping selections are deduplicated;
     colliding names, symlinks, unsafe entries and outputs inside sources fail.
     """
+    check_cancelled(cancelled)
+    progress(0, 0, 'Assessing selected files…')
     sources = tuple(dict.fromkeys(Path(os.path.abspath(path)) for path in sources))
     destination = Path(os.path.abspath(destination))
     if not sources:
@@ -256,6 +275,7 @@ def create_archive(sources, destination, *, password=None):
         raise FileExistsError(f'Output already exists: {destination}')
     roots = []
     for path in sources:
+        check_cancelled(cancelled)
         if path.is_symlink() or not path.exists():
             raise ValueError(f'Source must exist and cannot be a symbolic link: {path}')
         if destination.resolve() == path.resolve() or (path.is_dir() and destination.resolve().is_relative_to(path.resolve())):
@@ -264,8 +284,9 @@ def create_archive(sources, destination, *, password=None):
             roots.append(path)
     entries = []
     for root in roots:
+        check_cancelled(cancelled)
         if root.is_dir():
-            entries.extend(directory_entries(root))
+            entries.extend(directory_entries(root, cancelled=cancelled))
         elif root.is_file():
             entries.append((root, root.name))
         else:
@@ -273,7 +294,14 @@ def create_archive(sources, destination, *, password=None):
     names = set()
     signatures = {}
     expected = {}
+    total_bytes = sum(path.stat().st_size for path, name in entries if path.is_file())
+    done = 0
+    def advanced(size, message):
+        nonlocal done
+        done += size
+        progress(done, 3 * total_bytes, message)
     for path, name in entries:
+        check_cancelled(cancelled)
         key = _name_key(name)
         if key in names:
             raise ValueError(f'Selected sources have colliding archive names: {name}')
@@ -283,7 +311,8 @@ def create_archive(sources, destination, *, password=None):
             expected[name] = None
         else:
             with path.open('rb') as source:
-                expected[name] = stream_signature(source)
+                expected[name] = stream_signature(source, cancelled=cancelled,
+                                                  progress=lambda size: advanced(size, f'Checking {name}'))
     def signature(stat):
         return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -292,17 +321,36 @@ def create_archive(sources, destination, *, password=None):
         staged = Path(temp) / 'result.zip'
         with open_archive(staged, 'w', password=password) as archive:
             for path, name in entries:
+                check_cancelled(cancelled)
                 if path.is_symlink() or signature(path.stat()) != signature(signatures[path]):
                     raise RuntimeError(f'Source changed while archiving: {path}')
-                archive.write(str(path), name)
-        if archive_manifest(staged, password=password) != expected:
+                info = copy_member_info(zipfile.ZipInfo.from_file(path, name), archive)
+                info.compress_type = archive.compression
+                if path.is_dir():
+                    archive.writestr(info, b'')
+                else:
+                    with path.open('rb') as incoming, archive.open(info, 'w', force_zip64=True) as output:
+                        while True:
+                            check_cancelled(cancelled)
+                            chunk = incoming.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            output.write(chunk)
+                            advanced(len(chunk), f'Creating ZIP: {name}')
+        progress(done, 3 * total_bytes, 'Verifying encrypted ZIP…')
+        if archive_manifest(staged, password=password, cancelled=cancelled,
+                            progress=lambda count, total, message: progress(2 * total_bytes + count,
+                                                                           3 * total_bytes, message)) != expected:
             raise ValueError('Archive verification failed; no output was published')
         for path, before in signatures.items():
+            check_cancelled(cancelled)
             if path.is_symlink() or signature(path.stat()) != signature(before):
                 raise RuntimeError(f'Source changed while archiving: {path}')
         # Windows _commit requires a writable descriptor, even after ZIP close.
         with staged.open('r+b') as stream:
             os.fsync(stream.fileno())
         # Exclusive link prevents replacing an output created by another operation.
+        progress(3 * total_bytes, 3 * total_bytes, f'Publishing verified ZIP: {destination}')
+        check_cancelled(cancelled)
         os.link(staged, destination)
     return destination
