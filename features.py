@@ -83,12 +83,15 @@ class SelectionAction:
     label: str
     accepts: tuple[type | str, ...] | type | str
     handler: Callable
+    is_available: Callable | None = None
 
     def __post_init__(self):
         if not self.id or not self.label:
             raise ValueError('Actions need an id and label')
         if not callable(self.handler):
             raise TypeError('Action handler must be callable')
+        if self.is_available is not None and not callable(self.is_available):
+            raise TypeError('Action availability must be callable')
         object.__setattr__(self, 'accepts', _accepts(self.accepts))
 
 
