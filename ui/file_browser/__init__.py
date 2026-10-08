@@ -60,7 +60,6 @@ class FileBrowser(qt.QWidget):
         self.stopping = False
         self.selected_object = None
         self.last_details = None
-        self.panel_preferences = {}
         self.cover_pixmap = qt.QPixmap()
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -126,12 +125,6 @@ class FileBrowser(qt.QWidget):
         self.heading.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.heading.setWordWrap(True)
         header.addWidget(self.heading, 1)
-        self.panel_button = qt.QToolButton()
-        self.panel_button.setText('Panels')
-        self.panel_button.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.panel_menu = qt.QMenu(self.panel_button)
-        self.panel_button.setMenu(self.panel_menu)
-        header.addWidget(self.panel_button)
         panel_layout.addLayout(header)
         self.message = qt.QLabel('Select a file or folder.')
         self.message.setTextFormat(qt.Qt.TextFormat.PlainText)
@@ -287,8 +280,6 @@ class FileBrowser(qt.QWidget):
             widget = self.tabs.widget(0)
             self.tabs.removeTab(0)
             widget.deleteLater()
-        self.panel_menu.clear()
-        self.panel_button.setEnabled(False)
         self._empty_preview.clear()
 
     def _selection_changed(self):
@@ -335,20 +326,11 @@ class FileBrowser(qt.QWidget):
         stats = self.model.folder_totals.get(item.path)
         panels = [BrowserPanel('filesystem', 'File Information', lambda: self._generic_details(item, stats))]
         panels.extend(item.browser_panels())
-        self.panel_button.setEnabled(True)
-        for panel in panels:
-            action = self.panel_menu.addAction(panel.title)
-            action.setCheckable(True)
-            enabled = self.panel_preferences.get(panel.key, panel.default_enabled)
-            action.setChecked(enabled or panel.key == 'filesystem')
-            action.setEnabled(panel.key != 'filesystem')
-            action.toggled.connect(lambda checked, key=panel.key: self._toggle_panel(key, checked))
-        enabled = [panel for panel in panels if panel.key == 'filesystem' or self.panel_preferences.get(panel.key, panel.default_enabled)]
         self.busy = True
         self.refresh_pending = False
         def read():
             result = []
-            for panel in enabled:
+            for panel in panels:
                 try:
                     details = panel.load()
                     if not isinstance(details, BrowserDetails):
@@ -361,10 +343,6 @@ class FileBrowser(qt.QWidget):
         self.operation.completed.connect(self._loaded)
         self.operation.finished.connect(self._finished)
         self.operation.start()
-
-    def _toggle_panel(self, key, enabled):
-        self.panel_preferences[key] = enabled
-        self._selection_changed()
 
     def _loaded(self, result, error):
         if self.refresh_pending or self.stopping:

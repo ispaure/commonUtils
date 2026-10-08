@@ -251,9 +251,8 @@ when the registry revision changes. Domain classes live in the consuming project
 
 Panel loaders return `BrowserDetails(fields, thumbnail, message, payload)` and run
 on a worker thread; do not access widgets from them. Generic information stays
-available even if a contributed panel fails. `BrowserPanel.default_enabled` sets
-initial visibility; the **Panels** menu lets users show/hide contributed tabs.
-The generic tab cannot be hidden. Optional `payload` lets the application retain
+available even if a contributed panel fails. Every applicable contributed panel
+appears alongside File Information as a tab; panels cannot be interactively hidden. Optional `payload` lets the application retain
 its loaded domain document through the `details_loaded` signal.
 
 Action callbacks and `browser_activate(context)` run on the GUI thread.

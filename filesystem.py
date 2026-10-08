@@ -21,7 +21,6 @@ class BrowserPanel:
     key: str
     title: str
     load: Callable[[], BrowserDetails]
-    default_enabled: bool = True
 
 
 @dataclass(frozen=True)
