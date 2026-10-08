@@ -151,6 +151,60 @@ class FrontmatterWidgetTests(unittest.TestCase):
         self.assertTrue(self.viewer.properties.apply_property('tags', remove=True))
         self.assertNotIn('tags', parse_properties(split_frontmatter(self.viewer.markdown_text())))
 
+    def test_empty_properties_hide_and_corner_menu_can_create_first_property(self):
+        self.path.write_text('# Body\n\nA paragraph.\n')
+        self.viewer.open_document(self.path)
+        self.viewer.set_editing(True)
+        self.assertFalse(self.viewer.properties.isVisible())
+        self.assertTrue(self.viewer.properties_button.isVisible())
+        self.assertTrue(self.viewer.add_property_action.isEnabled())
+        with patch.object(self.viewer.properties, 'edit_property') as edit:
+            self.viewer.add_property_action.trigger()
+            edit.assert_called_once_with()
+        self.viewer.formatted_editor.insertPlainText('Unsaved body ')
+        self.assertTrue(self.viewer.properties.apply_property('title', 'New note'))
+        self.assertTrue(self.viewer.properties.isVisible())
+        self.assertIn('Unsaved body', split_frontmatter(self.viewer.markdown_text()).body)
+        table = self.viewer.properties.table
+        table.setCurrentItem(table.topLevelItem(0))
+        self.assertTrue(self.viewer.properties.remove_button.isEnabled())
+        self.viewer.properties.remove_button.click()
+        self.assertFalse(self.viewer.properties.isVisible())
+        self.assertEqual(parse_properties(split_frontmatter(self.viewer.markdown_text())), {})
+        self.assertIn('Unsaved body', split_frontmatter(self.viewer.markdown_text()).body)
+
+    def test_property_controls_follow_edit_permission_and_selection(self):
+        self.assertFalse(self.viewer.add_property_action.isEnabled())
+        self.viewer.set_editing(True)
+        self.assertTrue(self.viewer.add_property_action.isEnabled())
+        self.assertFalse(self.viewer.properties.remove_button.isEnabled())
+        self.viewer.properties.table.setCurrentItem(self.viewer.properties.table.topLevelItem(0))
+        self.assertTrue(self.viewer.properties.edit_button.isEnabled())
+        self.assertTrue(self.viewer.properties.remove_button.isEnabled())
+        self.viewer.set_edit_mode('source')
+        self.assertFalse(self.viewer.add_property_action.isEnabled())
+        self.assertFalse(self.viewer.edit_yaml_action.isEnabled())
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(False)
+        self.assertFalse(self.viewer.add_property_action.isEnabled())
+        preview = MarkdownViewer(self.path)
+        self.addCleanup(preview.deleteLater)
+        preview.show()
+        self.assertFalse(preview.properties_button.isVisible())
+        self.assertFalse(preview.properties.apply_property('title', 'Blocked'))
+
+    def test_empty_yaml_panel_hides_but_invalid_yaml_error_stays_visible(self):
+        self.path.write_text('---\n---\n# Body\n')
+        self.viewer.open_document(self.path)
+        self.viewer.set_editing(True)
+        self.assertFalse(self.viewer.properties.isVisible())
+        self.assertTrue(self.viewer.add_property_action.isEnabled())
+        self.path.write_text('---\ntags: [unfinished\n---\n# Body\n')
+        self.viewer.open_document(self.path)
+        self.assertTrue(self.viewer.properties.isVisible())
+        self.assertTrue(self.viewer.properties.error.isVisible())
+        self.assertIn('Invalid YAML', self.viewer.properties.error.text())
+
     def test_invalid_yaml_is_retained_during_body_edit_and_unclosed_uses_source(self):
         bad = '---\ntags: [unfinished\n---\n# Body\n'
         self.path.write_text(bad)

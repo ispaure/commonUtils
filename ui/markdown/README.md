@@ -57,8 +57,13 @@ A `---`-delimited YAML mapping at the very beginning of the document appears in 
 **Properties** panel above the body, following
 [Obsidian's frontmatter convention](https://obsidian.md/help/properties). Properties
 are excluded from body rendering and the table of contents. Reading shows values;
-formatted editing enables Add/Edit/Remove property, checkbox controls and **Edit
-YAML…**. Source mode still exposes the complete file.
+formatted editing enables **+ Add property**, double-click/**Edit**, **Remove**,
+checkbox controls and **… → Edit YAML…**. Right-click a row for the same property
+actions. Edit/Remove are enabled when a row is selected. Empty property panels
+stay hidden, including empty frontmatter; the toolbar's corner **… → Add YAML
+property…** creates the first field. Its **Edit YAML…** action also opens the raw
+header editor. These actions are enabled only in Formatted edit mode. Parse errors
+stay visible even when no rows can be displayed. Source mode still exposes the complete file.
 
 Supported property editors include text, lists/tags (one text item per line),
 numbers, booleans, ISO dates and date-times. Nested mappings, non-text list items

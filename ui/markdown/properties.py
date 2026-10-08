@@ -60,17 +60,37 @@ def typed_value(kind, text):
 
 class MarkdownProperties(qt.QGroupBox):
     changed = qt.Signal(str)
+    editable_changed = qt.Signal(bool)
 
     def __init__(self, parent=None):
-        super().__init__('Properties', parent)
+        super().__init__('', parent)
+        self.setFlat(True)
         self.source = ''
         self.data = {}
         self.editable = False
         self.syncing = False
         layout = qt.QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+        header = qt.QHBoxLayout()
+        title = qt.QLabel('Properties')
+        font = title.font()
+        font.setBold(True)
+        title.setFont(font)
+        header.addWidget(title)
+        header.addStretch()
+        layout.addLayout(header)
         self.table = qt.QTreeWidget()
         self.table.setHeaderLabels(['Property', 'Type', 'Value'])
         self.table.setRootIsDecorated(False)
+        self.table.setHeaderHidden(True)
+        self.table.setFrameShape(qt.QFrame.Shape.NoFrame)
+        self.table.setSelectionMode(qt.QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setUniformRowHeights(True)
+        self.table.setStyleSheet("QTreeView::item { padding: 4px 0; }")
+        self.table.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_property_menu)
+        self.table.itemSelectionChanged.connect(self._update_selection_actions)
         self.table.setMaximumHeight(170)
         self.table.setAccessibleName('YAML properties')
         self.table.itemDoubleClicked.connect(lambda item, column: self.edit_property(item))
@@ -80,19 +100,24 @@ class MarkdownProperties(qt.QGroupBox):
         self.error.setWordWrap(True)
         self.error.setTextFormat(qt.Qt.TextFormat.PlainText)
         layout.addWidget(self.error)
-        row = qt.QHBoxLayout()
-        self.add_button = qt.QPushButton('Add property')
-        self.edit_button = qt.QPushButton('Edit property')
-        self.remove_button = qt.QPushButton('Remove property')
-        self.yaml_button = qt.QPushButton('Edit YAML…')
+        self.add_button = qt.QPushButton('+ Add property')
+        self.edit_button = qt.QPushButton('Edit')
+        self.remove_button = qt.QPushButton('Remove')
+        self.yaml_button = qt.QPushButton('…')
         for button in (self.add_button, self.edit_button, self.remove_button, self.yaml_button):
-            row.addWidget(button)
-        row.addStretch()
-        layout.addLayout(row)
+            header.addWidget(button)
+        self.add_button.setToolTip('Add a YAML property')
+        self.edit_button.setToolTip('Edit the selected property (or double-click its row)')
+        self.remove_button.setToolTip('Remove the selected property')
+        self.yaml_button.setToolTip('More property options')
+        self.yaml_button.setAccessibleName('More property options')
+        self.yaml_button.setFixedWidth(30)
+        menu = qt.QMenu(self.yaml_button)
+        menu.addAction('Edit YAML…', self.edit_yaml)
+        self.yaml_button.setMenu(menu)
         self.add_button.clicked.connect(lambda: self.edit_property())
         self.edit_button.clicked.connect(lambda: self.edit_property(self.table.currentItem()))
         self.remove_button.clicked.connect(self.remove_selected)
-        self.yaml_button.clicked.connect(self.edit_yaml)
         self.set_editable(False)
 
     def set_editable(self, enabled):
@@ -100,11 +125,11 @@ class MarkdownProperties(qt.QGroupBox):
         for button in (self.add_button, self.edit_button, self.remove_button, self.yaml_button):
             button.setVisible(enabled)
         self.refresh(self.source)
+        self.editable_changed.emit(bool(enabled))
 
     def refresh(self, text):
         self.source = text
         parts = split_frontmatter(text)
-        self.setVisible(parts.present or self.editable)
         self.syncing = True
         self.table.clear()
         self.error.clear()
@@ -114,7 +139,9 @@ class MarkdownProperties(qt.QGroupBox):
                 kind = property_type(value, name)
                 item = qt.QTreeWidgetItem([name, kind, value_text(value).replace('\n', ', ')])
                 item.setToolTip(2, value_text(value))
+                item.setForeground(1, self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
                 if kind == 'Checkbox':
+                    item.setText(2, '')
                     if self.editable:
                         item.setFlags(item.flags() | qt.Qt.ItemFlag.ItemIsUserCheckable)
                     else:
@@ -128,7 +155,33 @@ class MarkdownProperties(qt.QGroupBox):
             self.error.setText(str(error))
         finally:
             self.syncing = False
-        self.table.setVisible(self.table.topLevelItemCount() > 0)
+        count = self.table.topLevelItemCount()
+        self.table.setVisible(count > 0)
+        height = self.table.sizeHintForRow(0) if count else 24
+        self.table.setFixedHeight(min(170, max(28, height * count + 4)))
+        self.error.setVisible(bool(self.error.text()))
+        self.setVisible(bool(count or self.error.text()))
+        self._update_selection_actions()
+
+    def _update_selection_actions(self):
+        selected = self.table.currentItem() is not None
+        self.edit_button.setEnabled(self.editable and selected)
+        self.remove_button.setEnabled(self.editable and selected)
+
+    def _show_property_menu(self, point):
+        if not self.editable:
+            return
+        item = self.table.itemAt(point)
+        if item is not None:
+            self.table.setCurrentItem(item)
+        menu = qt.QMenu(self.table)
+        menu.addAction('Add property…', lambda: self.edit_property())
+        if item is not None:
+            menu.addAction('Edit property…', lambda: self.edit_property(item))
+            menu.addAction('Remove property', self.remove_selected)
+        menu.addSeparator()
+        menu.addAction('Edit YAML…', self.edit_yaml)
+        menu.exec(self.table.viewport().mapToGlobal(point))
 
     def apply_property(self, name, value=None, *, remove=False):
         if not self.editable:
@@ -137,6 +190,8 @@ class MarkdownProperties(qt.QGroupBox):
             updated = replace_property(self.source, name, value, remove=remove)
         except ValueError as error:
             self.error.setText(str(error))
+            self.error.show()
+            self.show()
             return False
         if updated != self.source:
             self.changed.emit(updated)
@@ -156,6 +211,7 @@ class MarkdownProperties(qt.QGroupBox):
             return
         if item is not None and property_type(self.data[item.text(0)], item.text(0)) == 'YAML':
             self.error.setText('This complex value is kept as raw YAML. Use Edit YAML or Source mode.')
+            self.error.show()
             return
         dialog = qt.QDialog(self)
         dialog.setWindowTitle('Edit property' if item else 'Add property')
