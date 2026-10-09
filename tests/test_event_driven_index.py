@@ -74,6 +74,18 @@ class EventDrivenIndexTests(unittest.TestCase):
         with patch.object(self.browser, 'load', side_effect=AssertionError('Disabled preview was loaded')):
             self.browser._folders_progressed(self.root, totals)
 
+    def test_index_progress_does_not_replace_a_pending_selection_change(self):
+        from dataclasses import replace
+        self.browser.preview_toggle.setChecked(True)
+        self.browser.views.select_source(self.browser.model.index(str(self.child)))
+        self.wait(lambda: not self.browser.busy)
+        self.browser.refresh_pending = True
+        totals = dict(self.browser.model.folder_totals)
+        totals[self.child] = replace(totals[self.child], size=totals[self.child].size + 1)
+        with patch.object(self.browser, 'load', side_effect=AssertionError('Pending selection was replaced')):
+            self.browser._folders_progressed(self.root, totals)
+        self.browser.refresh_pending = False
+
 
     def test_partial_scan_stops_and_notifications_do_not_start_another_full_run(self):
         self.unwatch()

@@ -78,9 +78,11 @@ there is no standalone search dialog.
 Opening a search-result folder keeps the query and searches that folder's
 descendants. **Show in browser** explicitly exits search and locates the result.
 
-Navigation has its own toolbar row so left/right panes remain usable in smaller
-windows. The inline **Size** slider immediately precedes View and adjusts tiles,
-list icons and column icons. The workspace footer is outside the bordered view
+Navigation and controls share one toolbar row. The inline **Size** slider follows
+the breadcrumbs and immediately precedes View; it adjusts tiles, list icons and
+column icons. Overflowing breadcrumbs keep the current folder visible and compact
+the root shortcut. Layout-derived minimum sizes keep split panes from overlapping
+when the window shrinks. The workspace footer is outside the bordered view
 panes; cached-only reads do not show scan activity.
 
 Workspace tab dragging uses explicit left/right drop zones and a center tab-group
@@ -88,6 +90,8 @@ zone (`commonUtils.ui.workspace_drag`). Closing a worker-only browser tab remove
 it from the visible layout immediately; the workspace retains its hidden dock in
 `_retiring` until its owners report idle. A feature close refusal keeps the tab
 visible. Whole-window shutdown checks both visible and retired owners.
+Dragging an attached tab shows a full-pane image; detached headers retain Qt's
+native window movement and docking behavior.
 
 Storage refreshes carry a root/mode/index-revision identity. Repeated mode changes
 reuse loaded data and obsolete results are discarded. Immediate child reads and

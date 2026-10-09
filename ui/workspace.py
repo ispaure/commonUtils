@@ -44,6 +44,10 @@ class DockTabHeader(qt.QWidget):
         self._press = None
 
     def mousePressEvent(self, event):
+        if self.parentWidget().isFloating():
+            self._press = None
+            event.ignore()  # Let Qt move the actual detached window.
+            return
         if event.button() == qt.Qt.MouseButton.LeftButton:
             self._press = event.position().toPoint()
             event.accept()
@@ -61,7 +65,10 @@ class DockTabHeader(qt.QWidget):
 
     def mouseReleaseEvent(self, event):
         self._press = None
-        event.accept()
+        if self.parentWidget().isFloating():
+            event.ignore()
+        else:
+            event.accept()
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton:
