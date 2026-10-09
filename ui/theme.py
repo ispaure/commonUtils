@@ -54,7 +54,7 @@ def theme_stylesheet(c):
             background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; border-radius: 6px;
             selection-background-color: {c.accent}; selection-color: {c.selected_text};
         }}
-        QLineEdit {{ padding: 6px; min-height: 20px; }}
+        QLineEdit {{ padding: 2px 5px; }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {c.accent}; }}
         QAbstractItemView::item {{ padding: 4px; margin: 0px; border: none; }}
         QAbstractItemView::item:hover {{ background: {c.hover}; padding: 4px; margin: 0px; border: none; }}
@@ -62,11 +62,14 @@ def theme_stylesheet(c):
         QHeaderView::section {{ background: {c.window}; color: {c.text}; border: none;
             border-bottom: 1px solid {c.border}; padding: 7px; }}
         QPushButton, QComboBox {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border};
-            border-radius: 6px; padding: 6px 10px; min-height: 20px; }}
+            border-radius: 6px; padding: 2px 8px; }}
         QPushButton:hover, QComboBox:hover, QToolButton:hover {{ background: {c.hover}; }}
         QPushButton:pressed, QPushButton:checked {{ background: {c.accent}; color: {c.selected_text}; }}
         QPushButton:focus, QComboBox:focus, QToolButton:focus {{ border: 1px solid {c.accent}; }}
         QPushButton:disabled, QComboBox:disabled {{ color: {c.muted}; }}
+        QComboBox QLineEdit, QAbstractSpinBox QLineEdit,
+        QComboBox QLineEdit:focus, QAbstractSpinBox QLineEdit:focus {{
+            border: none; border-radius: 0px; padding: 0px; background: transparent; }}
         QToolButton {{ border: 1px solid transparent; border-radius: 4px; padding: 2px; }}
         QGroupBox {{ border: 1px solid {c.border}; border-radius: 6px; margin-top: 12px; padding-top: 8px; }}
         QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0px 4px; }}
