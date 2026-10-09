@@ -79,6 +79,8 @@ class BrowserTests(unittest.TestCase):
         folder = self.root / 'large'
         folder.mkdir()
         (folder / 'large.bin').write_bytes(b'x' * 1000)
+        self.browser.refresh()
+        self.wait()
         window = self.browser.open_storage()
         window.scan(True)
         deadline = time.monotonic() + 5
@@ -468,11 +470,12 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(covers.resolutions[path], (360, 496))
         self.assertFalse(covers.icons[path].isNull())
 
-    def test_disabling_folder_totals_cancels_scan_and_discards_late_results(self):
+    def test_pausing_indexing_preserves_cached_totals_and_discards_late_results(self):
         from threading import Event
         from commonUtils.filesystem import FolderStats
         entered, release = Event(), Event()
         self.browser.set_folder_sizes_enabled(False)
+        saved = dict(self.browser.model.folder_totals)
         def scan(root, cancelled, **kwargs):
             entered.set()
             release.wait(5)
@@ -486,6 +489,6 @@ class BrowserTests(unittest.TestCase):
             finally:
                 release.set()
                 self.wait()
-        self.assertEqual(self.browser.model.folder_totals, {})
+        self.assertEqual(self.browser.model.folder_totals, saved)
         details = self.browser._generic_details(Directory(self.root), None)
         self.assertIn(('Total size', 'Not calculated'), details.fields)

@@ -10,6 +10,16 @@ from commonUtils._directory_totals import store_folder_stats
 
 
 class IndexEfficiencyTests(unittest.TestCase):
+    def test_shared_parent_sort_chunks_preserve_exact_natural_order_keys(self):
+        import os
+        from commonUtils._directory_store import _sort_key, _encode_sort_parts
+        from commonUtils.traversal import natural_path_key
+        for folder in (Path('/Users/Example12/Comics'),Path('/Volumes/Drive2/Series300')):
+            parts=natural_path_key(str(folder)+os.sep)
+            prefix=_encode_sort_parts(parts[:-1]);tail=parts[-1]
+            for name in ('Page001.cbz','002.png','Résumé12.txt','file%_2'):
+                self.assertEqual(prefix+_sort_key(tail+name),_sort_key(folder/name))
+
     def test_resume_discovers_missing_branch_before_validating_old_files(self):
         with TemporaryDirectory() as folder:
             root=Path(folder)/'files';root.mkdir()

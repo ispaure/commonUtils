@@ -2,7 +2,8 @@
 from pathlib import Path
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
-from ...directory_index import directory_cache
+from ...directory_index import directory_cache, Snapshot
+from time import time
 from ...operations import OperationCancelled
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,6 +31,8 @@ class ScanDialog(qt.QDialog):
     def __init__(self, browser, title):
         super().__init__(browser)
         self.browser = browser
+        self.shared_index = hasattr(browser, 'index_updated')
+        self._reload_pending = False
         self.root = browser.navigation.directory
         self.setWindowTitle(title)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -57,6 +60,27 @@ class ScanDialog(qt.QDialog):
         self.clear_button.clicked.connect(self.clear_index)
         self.layout.addWidget(self.clear_button)
         self.layout.addWidget(self.task)
+        if self.shared_index:
+            self.clear_button.hide()
+            self.index_status = qt.QLabel(browser.index_status.text())
+            self.index_status.setWordWrap(True)
+            self.index_status.setTextFormat(qt.Qt.TextFormat.PlainText)
+            self.layout.insertWidget(1, self.index_status)
+            browser.index_progress.connect(self._index_progress_changed)
+            browser.index_updated.connect(self._index_changed)
+
+    def _index_progress_changed(self, message):
+        self.index_status.setText(message if self.browser.navigation.directory == self.root else
+                                  'Cached view of this folder. The browser is indexing another location.')
+
+    def _index_changed(self, root):
+        if self.closing or root != self.root: return
+        if self.busy:
+            self._reload_pending = True
+        elif hasattr(self, 'query'):
+            if self.query.text(): self.run_search()
+        else:
+            self.scan(True)
 
     @property
     def busy(self):
@@ -68,16 +92,19 @@ class ScanDialog(qt.QDialog):
         root = self.root
         self._clearing = False
         self.clear_button.setEnabled(False)
-        self.summary.setText('Scanning…')
+        self.summary.setText('Loading cached index…' if self.shared_index and not refresh else 'Scanning…')
         self.freshness.setText('Scan in progress; any displayed results belong to the previous snapshot.')
         def work(report, cancelled):
             try:
                 return self.collect(root, recursive, refresh, report, cancelled)
             except OperationCancelled:
                 return PausedScan(directory_cache.status(root, recursive))
-        self.task.start(work)
+        self.task.start(work, show_progress=not self.shared_index)
 
     def collect(self, root, recursive, refresh, report, cancelled):
+        if self.shared_index and not refresh:
+            return directory_cache.peek(root, recursive, cancelled=cancelled) or Snapshot(
+                root, recursive, (), (), time(), complete=False, metadata_checked=False)
         return directory_cache.get(root, recursive, refresh=refresh, report=report, cancelled=cancelled)
 
     def clear_index(self):
@@ -131,9 +158,14 @@ class ScanDialog(qt.QDialog):
                          ' Index saved on disk.' if result.complete else
                          ' Partial index: unreadable or changing folders remain. Run again to retry.')
                 self.freshness.setText(f'Snapshot scanned {stamp}.' + state)
+                if self.shared_index:
+                    self.freshness.setText(f'Cached snapshot from {stamp}. Updates follow the browser’s shared index.')
         if self.closing:
             self.close()
         self.idle.emit()
+        if self._reload_pending and not self.closing:
+            self._reload_pending = False
+            qt.QTimer.singleShot(0, lambda: self._index_changed(self.root))
 
     def show_snapshot(self):
         raise NotImplementedError
@@ -209,6 +241,9 @@ class SearchDialog(ScanDialog):
         paging.addWidget(self.next_button)
         self.layout.insertLayout(3, paging)
         self.summary.setText('Enter a name and search. Double-click a result to show it in the browser.')
+        if self.shared_index:
+            self.rescan_button.hide()
+            self.summary.setText('Search cached names. Results update as indexing progresses; double-click to show in the browser.')
 
     def run_search(self, checked=False, *, refresh=False):
         if self.busy:
@@ -239,8 +274,9 @@ class SearchDialog(ScanDialog):
         self.next_button.setEnabled(has_page and self._page_offset + len(self._matches) < self._match_count)
 
     def collect(self, root, recursive, refresh, report, cancelled):
-        snapshot = directory_cache.get(root, recursive, refresh=refresh, report=report,
-                                       cancelled=cancelled, validate_files=False)
+        snapshot = (super().collect(root, recursive, refresh, report, cancelled) if self.shared_index else
+                    directory_cache.get(root, recursive, refresh=refresh, report=report,
+                                        cancelled=cancelled, validate_files=False))
         report(0, 0, 'Searching saved index…')
         matches, total = snapshot.search_page(self._query, limit=self.PAGE_SIZE, cancelled=cancelled,
                                              sort=self._sort_key, descending=self._descending)

@@ -44,6 +44,8 @@ class FileBrowser(qt.QWidget):
     details_loaded = qt.Signal(object)
     refreshed = qt.Signal()
     idle = qt.Signal()
+    index_updated = qt.Signal(object)
+    index_progress = qt.Signal(str)
 
     def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True):
         super().__init__(parent)
@@ -79,6 +81,12 @@ class FileBrowser(qt.QWidget):
         self.index_status.setWordWrap(True)
         self.index_status.setTextFormat(qt.Qt.TextFormat.PlainText)
         layout.addWidget(self.index_status)
+        self.index_activity = qt.QProgressBar()
+        self.index_activity.setRange(0, 0)
+        self.index_activity.setTextVisible(False)
+        self.index_activity.setAccessibleName('Background indexing in progress')
+        self.index_activity.hide()
+        layout.addWidget(self.index_activity)
         self._create_views()
         layout.addWidget(self.splitter, 1)
         self._create_preview_panel()
@@ -566,10 +574,10 @@ class FileBrowser(qt.QWidget):
         self.calculate_folder_sizes = bool(enabled)
         if not enabled:
             self.folder_pending = False
+            self.index_activity.hide()
             if self.folder_busy:
                 self.folder_operation.requestInterruption()
-            self.model.set_folder_totals({})
-            self.index_status.setText('Background sizes paused.')
+            self._index_progressed('Indexing paused; cached results remain available.')
         else:
             self.refresh_folder_totals()
         if isinstance(self.selected_object, Directory):
@@ -577,7 +585,6 @@ class FileBrowser(qt.QWidget):
 
     def refresh_folder_totals(self):
         if not self.calculate_folder_sizes:
-            self.model.set_folder_totals({})
             return
         if self.folder_busy:
             self.folder_pending = True
@@ -587,11 +594,14 @@ class FileBrowser(qt.QWidget):
         if root is None or self.stopping:
             return
         self.folder_busy = True
+        self.index_activity.show()
         self.folder_pending = False
         self.folder_root = root
         self.index_status.setText('Checking saved sizes and indexing this location…')
         self.folder_operation = FolderOperation(root, scan_folders, self)
         self.folder_operation.updated.connect(self._folders_progressed)
+        self.folder_operation.progress.connect(lambda message: self._index_progressed(message)
+                                               if root == self.navigation.directory else None)
         self.folder_operation.watch_paths.connect(self._update_watch_paths)
         self.folder_operation.completed.connect(lambda result, error: self._folders_loaded(root, result, error))
         self.folder_operation.finished.connect(self._folders_finished)
@@ -601,24 +611,38 @@ class FileBrowser(qt.QWidget):
         if self.calculate_folder_sizes and root == self.navigation.directory and result and not self.folder_pending and not self.stopping:
             self.model.set_folder_totals(result)
             self.index_search.refresh()
-            self.index_status.setText('Cached or partial sizes available; background indexing continues…')
+            self.index_updated.emit(root)
+            if not self.folder_busy:
+                self.index_status.setText('Cached or partial sizes available.')
             if isinstance(self.selected_object, Directory):
                 self._selection_changed()
 
     def _folders_loaded(self, root, result, error=''):
         if error and root == self.navigation.directory and not self.stopping:
             self.index_status.setText(f'Index unavailable: {error}. Any cached sizes remain available.')
+            self.index_progress.emit(self.index_status.text())
         if self.calculate_folder_sizes and root == self.navigation.directory and result is not None and not self.folder_pending and not self.stopping:
             self.model.set_folder_totals(result)
             self.index_search.refresh()
             stats = result.get(root)
             self.index_status.setText('Index and sizes up to date.' if stats is None or stats.complete else
                                       'Index incomplete: some folders are unreadable or changed during scanning. Refresh to retry.')
+            self.index_updated.emit(root)
+            self.index_progress.emit(self.index_status.text())
             if isinstance(self.selected_object, Directory):
                 self._selection_changed()
 
+    def _index_progressed(self, message):
+        if not self.stopping and self.calculate_folder_sizes:
+            self.index_status.setText(message)
+            self.index_progress.emit(message)
+        elif message.startswith('Indexing paused'):
+            self.index_status.setText(message)
+            self.index_progress.emit(message)
+
     def _folders_finished(self):
         self.folder_busy = False
+        self.index_activity.hide()
         elapsed = monotonic() - self.folder_operation.started_at
         self.reconcile_timer.setInterval(max(60_000, min(300_000, int(elapsed * 10_000))))
         self.folder_operation.deleteLater()

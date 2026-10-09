@@ -129,6 +129,12 @@ class StorageDialog(ScanDialog):
         self.layout.insertWidget(2, splitter, 1)
         self.summary.setText('Analyze this folder, then double-click a folder to drill down. Symbolic links are excluded.')
         self.up_button.setEnabled(False)
+        if self.shared_index:
+            self.refresh_button.setText('Refresh view')
+            self.refresh_button.setToolTip('Reload saved sizes; indexing is controlled by the browser.')
+            self.rebuild_button.hide()
+            self.summary.setText('Loading saved sizes. Rectangle area represents size; double-click a folder to explore it.')
+            qt.QTimer.singleShot(0, lambda: self.scan(True) if not self.closing else None)
 
     def show_snapshot(self):
         self.drill(self.current if self.current in self.totals else self.root)
@@ -169,6 +175,11 @@ class StorageDialog(ScanDialog):
                              f'{len(self.snapshot.errors)} unreadable entries. '
                              'Logical file sizes; links excluded. Double-click folders to drill down.')
         self.summary.setToolTip('\n'.join(f'{path}: {error}' for path, error in self.snapshot.errors))
+        if self.shared_index and not self.snapshot.complete:
+            self.summary.setText(self.summary.text() + ' Partial view; more entries may still be discovered.')
+        if not children:
+            self.summary.setText('No cached entries yet. This view fills as indexing progresses; resume in the browser if paused.'
+                                 if not self.snapshot.complete else 'This folder is empty.')
 
     def select(self, path):
         self.selected_path = path
