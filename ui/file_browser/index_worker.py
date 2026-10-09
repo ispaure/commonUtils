@@ -32,7 +32,7 @@ class _IndexJob(Operation):
             # A second tab can read while the first creates the database/schema.
             # Cached display is optional; always proceed to the serialized scan.
             pass
-        result = scanner(self.root, self.isInterruptionRequested, report=self._report, reuse_for=2)
+        result = scanner(self.root, self.isInterruptionRequested, report=self._report, reuse_for=30)
         if not self.isInterruptionRequested():
             self._cached(force=True)
         return result

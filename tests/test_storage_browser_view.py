@@ -32,7 +32,7 @@ class StorageViewTests(unittest.TestCase):
                     self.assertEqual(storage.entries,[(folder,1200),(small,300)])
                     storage.map.selected.emit(folder);wait()
                     self.assertEqual(browser.selected_objects()[0].path,folder)
-                    storage.chart_selector.setCurrentIndex(1);app.processEvents()
+                    storage.chart_selector.setCurrentIndex(1);wait()
                     self.assertTrue(storage.radial.sectors)
                     self.assertIn(file,[path for path,size,shape in storage.radial.sectors])
                     storage.radial.activated.emit(folder);wait()
@@ -42,6 +42,30 @@ class StorageViewTests(unittest.TestCase):
                     self.assertEqual(browser.navigation.directory,root)
                     browser.view_selector.setCurrentIndex(0);app.processEvents()
                     self.assertEqual(browser.views.currentIndex(),0)
+            finally:
+                browser.shutdown();browser.close();app.processEvents()
+
+    def test_treemap_reads_one_folder_and_radial_loads_on_demand(self):
+        from commonUtils._directory_store import SqlEntries
+        app=qt.QApplication.instance() or qt.QApplication([])
+        with TemporaryDirectory() as temp:
+            root=Path(temp);child=root/'child';child.mkdir();(child/'file.txt').write_bytes(b'abc')
+            directory_cache.get(root)
+            browser=FileBrowser(root,calculate_folder_sizes=False)
+            read=SqlEntries.children;seen=[]
+            def children(entries,path,limit=None):
+                seen.append(path);return read(entries,path,limit)
+            def wait():
+                deadline=time.monotonic()+5
+                while browser.views.storage.busy:
+                    app.processEvents();time.sleep(.01);self.assertLess(time.monotonic(),deadline)
+                app.processEvents()
+            try:
+                with patch.object(SqlEntries,'children',children):
+                    browser.view_selector.setCurrentIndex(3);wait()
+                    self.assertEqual(seen,[root])
+                    browser.views.storage.chart_selector.setCurrentIndex(1);wait()
+                    self.assertIn(child,seen)
             finally:
                 browser.shutdown();browser.close();app.processEvents()
 
