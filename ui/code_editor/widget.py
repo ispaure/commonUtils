@@ -134,6 +134,7 @@ class CodeEdit(qt.QPlainTextEdit):
         return blocks
 
     def indent(self, backwards=False):
+        if self.isReadOnly():return
         blocks=self.selected_blocks(); cursor=self.textCursor(); cursor.beginEditBlock()
         for block in reversed(blocks):
             edit=qt.QTextCursor(block)
@@ -145,6 +146,7 @@ class CodeEdit(qt.QPlainTextEdit):
         cursor.endEditBlock()
 
     def toggle_comment(self):
+        if self.isReadOnly():return
         if not self.comment_prefix: return
         blocks=self.selected_blocks(); prefix=self.comment_prefix
         uncomment=all(not b.text().strip() or b.text().lstrip().startswith(prefix) for b in blocks)
@@ -159,6 +161,7 @@ class CodeEdit(qt.QPlainTextEdit):
         cursor.endEditBlock()
 
     def duplicate(self):
+        if self.isReadOnly():return
         cursor=self.textCursor(); cursor.beginEditBlock()
         if cursor.hasSelection():
             text=cursor.selectedText().replace('\u2029','\n'); cursor.setPosition(cursor.selectionEnd()); cursor.insertText(text)
@@ -167,6 +170,7 @@ class CodeEdit(qt.QPlainTextEdit):
         cursor.endEditBlock(); self.setTextCursor(cursor)
 
     def delete_line(self):
+        if self.isReadOnly():return
         cursor=self.textCursor(); cursor.beginEditBlock(); cursor.select(qt.QTextCursor.SelectionType.LineUnderCursor)
         cursor.removeSelectedText()
         if not cursor.atEnd(): cursor.deleteChar()
@@ -174,6 +178,7 @@ class CodeEdit(qt.QPlainTextEdit):
         cursor.endEditBlock(); self.setTextCursor(cursor)
 
     def move_lines(self, direction):
+        if self.isReadOnly():return
         blocks=self.selected_blocks(); first,last=blocks[0],blocks[-1]
         neighbor=first.previous() if direction<0 else last.next()
         if not neighbor.isValid(): return
