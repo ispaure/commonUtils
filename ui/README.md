@@ -422,7 +422,8 @@ lexical result paths; nested symlinks/junctions are listed without traversal.
 Each completely enumerated folder is a durable checkpoint. Entries are committed
 in batches inside very large folders, but an interrupted folder must be enumerated
 again. Cancelling leaves the completed-folder checkpoints and last complete index
-intact. `get()` resumes pending work, revalidating saved folders/files before reuse
+intact. `get()` resumes pending discovery before revalidating previously scanned
+folders/files, so missing branches become searchable first. It validates before reuse
 and reconciling additions, removals, replaced links and changed metadata. Unreadable
 or changing folders produce a clearly marked partial snapshot and remain retryable.
 `get(..., refresh=True)` discards pending work and rebuilds; `clear(root)` removes
@@ -438,14 +439,28 @@ The database reuses freed space rather than imposing a fixed entry limit.
 
 Search shows 500 results per page, with all matches available through Previous/Next.
 Column sorting applies to the entire match set before paging.
-It checks folder membership before reuse (`validate_files=False`); displayed file
-sizes retain the scan timestamp. Storage analysis additionally checks file metadata
-and computes totals on its worker. Rebuild requests fully fresh metadata. Search
-and storage share **Rebuild index**/**Clear saved index** controls; a normal search
-or **Analyze / Resume** continues saved work. The index path appears in the snapshot
-status tooltip. Dialogs participate in browser cancellation/shutdown, and snapshot
+Inside a `FileBrowser`, Search and Storage read cached snapshots on workers and
+follow shared background index updates. Opening Storage automatically displays
+its cached treemap; no selection or Analyze step is required. **Refresh view** only
+reloads saved sizes. Rebuild/clear controls are hidden in these managed views.
+Standalone legacy dialog hosts retain their scan/resume/rebuild APIs and controls.
+The index path appears in the snapshot status tooltip. Dialogs participate in
+browser cancellation/shutdown, and snapshot
 dates/partial-state labels distinguish indexed results from a live filesystem view.
 Browser modification dates use `filesystem.format_datetime()` consistently.
+
+Browsers in one application share a worker for the same database and location.
+Each tab can pause its own subscription; the last subscriber cancels the worker.
+Cached search results and folder sizes remain visible when paused. Other processes
+still serialize through the database writer lock. The browser status reports the
+current phase/folder, cumulative entry count, average processing rate, and elapsed
+time. Unknown discovery totals are never presented as a percentage.
+
+The scanner fetches pending folders in batches, commits once per completed folder
+(plus batches of 512 entries in large folders), and prioritizes unvisited folders.
+Progressive aggregate refresh intervals adapt to their computation cost; unchanged
+aggregate rows are not rewritten. Source metadata, paths and natural-order keys
+remain stored for validation and paging; source file contents are never indexed.
 
 `commonUtils.ui.process_runner.ProcessRunner` executes argument vectors through
 QProcess with incremental UTF-8 output, actual exit status, cooperative cancellation,

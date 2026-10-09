@@ -34,8 +34,12 @@ def _legacy_directory_index_path():
 
 
 def _sort_key(path):
+    return _encode_sort_parts(natural_path_key(path))
+
+
+def _encode_sort_parts(parts):
     result = bytearray()
-    for part in natural_path_key(path):
+    for part in parts:
         if isinstance(part, int):
             number = str(part).encode('ascii')
             result.extend(b'\x01' + len(number).to_bytes(4, 'big') + number + b'\0')
@@ -418,6 +422,9 @@ class DirectoryCache:
 
     def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report):
         text = str(folder)
+        # Every child shares the parent's natural-order chunks. Encode those once.
+        parts = natural_path_key(text + os.sep)
+        sort_prefix, sort_tail = _encode_sort_parts(parts[:-1]), parts[-1]
         for (error_path,) in db.execute('SELECT path FROM errors WHERE generation=?', (generation,)).fetchall():
             if error_path == text or Path(error_path).parent == folder:
                 db.execute('DELETE FROM errors WHERE generation=? AND path=?', (generation, error_path))
@@ -440,7 +447,7 @@ class DirectoryCache:
                         db.execute('INSERT OR REPLACE INTO entries VALUES(?,?,?,?,?,?,?,?,?,?)',
                                    (generation, str(path), text, path.name.casefold(), directory,
                                     0 if directory or link else info.st_size, info.st_mtime_ns,
-                                    link, identity, _sort_key(path)))
+                                    link, identity, sort_prefix + _sort_key(sort_tail + path.name)))
                         if directory and recursive:
                             seen.add(str(path))
                             db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "

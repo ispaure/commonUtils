@@ -48,10 +48,10 @@ class IntegratedSearchTests(unittest.TestCase):
 
     def test_initial_cache_read_race_does_not_prevent_scan(self):
         import sqlite3
-        from commonUtils.ui.file_browser.index_worker import FolderOperation
+        from commonUtils.ui.file_browser.index_worker import _IndexJob
         calls = []
         scanner = lambda *args, **kwargs: calls.append(args[0]) or {}
-        worker = FolderOperation(self.root, scanner, self.browser)
+        worker = _IndexJob(self.root, scanner, self.browser)
         with patch.object(worker, '_cached', side_effect=[sqlite3.OperationalError('database is initializing'), None]):
             self.assertEqual(worker._collect(scanner), {})
         self.assertEqual(calls, [self.root])
