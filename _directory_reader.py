@@ -12,6 +12,7 @@ import sqlite3
 from threading import RLock
 from ._directory_metadata import Entry
 from .operations import check_cancelled, OperationCancelled
+from ._directory_search import search_sql, search_words
 
 
 def _entry(row):
@@ -27,6 +28,7 @@ class SqlEntries(Sequence):
     def __init__(self, database, generation, *, parent=None, connection=None, scope=None):
         self.connection = connection or sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         self.connection.execute('PRAGMA query_only=ON')
+        self.connection.create_function('search_words', 1, search_words, deterministic=True)
         if connection is None:
             self.connection.execute('BEGIN')
             # Pin the immutable read transaction without counting every entry.
@@ -107,7 +109,8 @@ class SqlEntries(Sequence):
             return _entry(row)
 
     def search(self, name, *, cancelled=lambda: False):
-        return tuple(self._rows('AND instr(name_fold,?)>0', (name.casefold(),), cancelled=cancelled))
+        condition, parameters = search_sql(name)
+        return tuple(self._rows('AND '+condition, parameters, cancelled=cancelled))
 
     def by_depth(self):
         return self._rows(order='length(path) DESC,path')
@@ -127,19 +130,20 @@ class SqlEntries(Sequence):
         if sort not in columns:
             raise ValueError(f'Unsupported search sort {sort}')
         order = columns[sort] + (' DESC' if descending else ' ASC') + ',sort_key,path'
+        condition, parameters = search_sql(name)
         with self.lock:
             self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
             try:
                 check_cancelled(cancelled)
-                total = self.connection.execute(f'SELECT count(*) FROM {self.table} WHERE {self.where} AND instr(name_fold,?)>0',
-                                                self.parameters + (name.casefold(),)).fetchone()[0]
+                total = self.connection.execute(f'SELECT count(*) FROM {self.table} WHERE {self.where} AND {condition}',
+                                                self.parameters + parameters).fetchone()[0]
             except sqlite3.OperationalError:
                 if cancelled():
                     raise OperationCancelled('Search cancelled; the saved index is still available') from None
                 raise
             finally:
                 self.connection.set_progress_handler(None, 0)
-        matches = tuple(self._rows('AND instr(name_fold,?)>0', (name.casefold(),),
+        matches = tuple(self._rows('AND '+condition, parameters,
                                    cancelled=cancelled, limit=limit, offset=offset, order=order))
         return matches, total
 
@@ -234,4 +238,3 @@ class SqlDirectories(Sequence):
         if not 0 <= index < len(self):
             raise IndexError(index)
         return next(islice(iter(self), index, index + 1))
-
