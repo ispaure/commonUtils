@@ -64,10 +64,10 @@ class Workspace(qt.QMainWindow):
         self.toolbar = self.addToolBar('Views')
         self.toolbar.setMovable(False)
         self.new_action = self.toolbar.addAction('New tab', lambda: self.add_view())
-        self.new_action.setShortcut(qt.QKeySequence('Ctrl+T'))
+        self.new_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.AddTab))
         self.new_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.close_action = self.toolbar.addAction('Close tab', self.close_active)
-        self.close_action.setShortcut(qt.QKeySequence('Ctrl+W'))
+        self.close_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
         self.close_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.toolbar.addAction('Detach', self.detach_active)
         self.toolbar.addAction('Split left', lambda: self.arrange(self.active_dock, 'left'))
@@ -127,10 +127,17 @@ class Workspace(qt.QMainWindow):
             self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         elif placement == 'tabs':
             self.tabifyDockWidget(other, dock)
-        elif placement == 'left':
-            self.splitDockWidget(dock, other, qt.Qt.Orientation.Horizontal)
         else:
-            self.splitDockWidget(other, dock, qt.Qt.Orientation.Horizontal)
+            # Qt treats splitDockWidget's first argument as a whole tab group.
+            # Remove both anchors to dissolve that group before splitting them.
+            self.removeDockWidget(dock)
+            self.removeDockWidget(other)
+            first, second = (dock, other) if placement == 'left' else (other, dock)
+            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, first)
+            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, second)
+            first.show()
+            second.show()
+            self.splitDockWidget(first, second, qt.Qt.Orientation.Horizontal)
         dock.show()
         dock.raise_()
         self._activate(dock)
@@ -159,6 +166,8 @@ class Workspace(qt.QMainWindow):
             self.active_dock.close()
 
     def _retry_view_close(self, dock):
+        if dock not in self.docks:
+            return
         if self._closing:
             self.window().close()
         elif getattr(dock.widget(), 'closing', False):
