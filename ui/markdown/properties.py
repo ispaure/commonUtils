@@ -69,6 +69,8 @@ class MarkdownProperties(qt.QGroupBox):
         self.data = {}
         self.editable = False
         self.syncing = False
+        self._changing_checkbox = False
+        self._pending_refresh = None
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
@@ -129,6 +131,12 @@ class MarkdownProperties(qt.QGroupBox):
 
     def refresh(self, text):
         self.source = text
+        if self._changing_checkbox:
+            if self._pending_refresh is None:
+                qt.QTimer.singleShot(0, self, self._finish_checkbox_refresh)
+            self._pending_refresh = text
+            return
+        self._pending_refresh = None
         parts = split_frontmatter(text)
         self.syncing = True
         self.table.clear()
@@ -199,7 +207,17 @@ class MarkdownProperties(qt.QGroupBox):
 
     def _checkbox_changed(self, item, column):
         if not self.syncing and self.editable and column == 2 and item.text(1) == 'Checkbox':
-            self.apply_property(item.text(0), item.checkState(2) == qt.Qt.CheckState.Checked)
+            self._changing_checkbox = True
+            try:
+                self.apply_property(item.text(0), item.checkState(2) == qt.Qt.CheckState.Checked)
+            finally:
+                self._changing_checkbox = False
+
+    def _finish_checkbox_refresh(self):
+        text = self._pending_refresh
+        self._pending_refresh = None
+        if text is not None:
+            self.refresh(text)
 
     def remove_selected(self):
         item = self.table.currentItem()

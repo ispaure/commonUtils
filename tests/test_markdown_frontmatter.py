@@ -123,6 +123,8 @@ class FrontmatterWidgetTests(unittest.TestCase):
         item = next(table.topLevelItem(i) for i in range(table.topLevelItemCount())
                     if table.topLevelItem(i).text(0) == 'published')
         item.setCheckState(2, qt.Qt.CheckState.Unchecked)
+        from shiboken6 import isValid
+        self.assertTrue(isValid(item))  # Do not delete the item inside its change signal.
         self.assertFalse(parse_properties(split_frontmatter(self.viewer.markdown_text()))['published'])
         self.assertTrue(self.viewer.is_modified)
 

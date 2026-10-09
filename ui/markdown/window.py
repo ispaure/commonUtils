@@ -59,5 +59,6 @@ def open_markdown(path, *, parent=None, allow_edit=False):
     window = MarkdownWindow(path, parent, allow_edit=allow_edit)
     _windows.add(window)
     window.destroyed.connect(lambda: _windows.discard(window))
-    window.show()
+    from ..document_host import show_document
+    show_document(window)
     return window
