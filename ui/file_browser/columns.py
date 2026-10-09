@@ -40,6 +40,7 @@ class FolderColumnView(qt.QColumnView):
         self.setIconSize(qt.QSize(16, 16))
         self.viewport().setBackgroundRole(qt.QPalette.ColorRole.Window)
         self.viewport().setAutoFillBackground(True)
+        self._preview_requested = False
         self.preview_container = qt.QWidget()
         self.preview_layout = qt.QVBoxLayout(self.preview_container)
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
@@ -48,6 +49,9 @@ class FolderColumnView(qt.QColumnView):
         self.preview_host.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.preview_host.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.preview_host.viewport().installEventFilter(self)
+        # QColumnView lays out its preview after updating the current index.
+        # SelectionChanged alone runs before that layout and Qt can hide it again.
+        self.updatePreviewWidget.connect(lambda index: qt.QTimer.singleShot(0, self, self._sync_preview_width))
         self.set_file_preview_visible(False)
 
     def eventFilter(self, watched, event):
@@ -59,7 +63,7 @@ class FolderColumnView(qt.QColumnView):
         return super().eventFilter(watched, event)
 
     def _sync_preview_width(self):
-        if not self.preview_container.isHidden():
+        if self._preview_requested:
             self.set_file_preview_visible(True)
 
     def setColumnWidths(self, widths):
@@ -67,6 +71,7 @@ class FolderColumnView(qt.QColumnView):
         self._sync_preview_width()
 
     def set_file_preview_visible(self, visible):
+        self._preview_requested = visible
         widths = self.columnWidths()
         depth = 0
         parent = self.currentIndex().parent()
@@ -78,6 +83,7 @@ class FolderColumnView(qt.QColumnView):
             self.setPreviewColumnVisible(visible)
         # Qt before 6.11 has no public visibility switch for the preview host.
         self.preview_host.setFixedWidth(width if visible else 0)
+        self.preview_host.setVisible(visible)
         self.preview_container.setFixedWidth(width if visible else 0)
         self.preview_container.setMinimumHeight(self.preview_host.viewport().height() if visible else 0)
         self.preview_container.setVisible(visible)
