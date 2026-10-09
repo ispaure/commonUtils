@@ -1,6 +1,6 @@
 """SQLite directory generations with durable per-folder scan checkpoints."""
 from collections.abc import Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 import json
 import os
 from pathlib import Path
@@ -12,9 +12,14 @@ from time import sleep, time
 from ._directory_metadata import Entry, Snapshot, fingerprint
 from .operations import check_cancelled, OperationCancelled
 from .traversal import natural_path_key
+from .storage import cache_directory
 
 
 def directory_index_path():
+    return cache_directory(create=False) / 'directory-index.sqlite3'
+
+
+def _legacy_directory_index_path():
     if sys.platform == 'darwin':
         folder = Path.home() / 'Library' / 'Application Support'
     elif sys.platform == 'win32':
@@ -187,6 +192,7 @@ class DirectoryCache:
     """
     def __init__(self, *, database=None):
         self.database = (Path(database) if database is not None else directory_index_path()).absolute()
+        self._legacy_database = _legacy_directory_index_path() if database is None else None
         self._work_lock = RLock()
         self._state_lock = RLock()
         self._revision = 0
@@ -229,6 +235,7 @@ class DirectoryCache:
                             raise
                         sleep(.05)
                 try:
+                    self._migrate_legacy(cancelled)
                     connection = sqlite3.connect(self.database)
                     try:
                         connection.execute('PRAGMA journal_mode=WAL')
@@ -249,6 +256,28 @@ class DirectoryCache:
                         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         finally:
             self._work_lock.release()
+
+    def _migrate_legacy(self, cancelled):
+        # Called under the destination writer lock. SQLite backup includes committed
+        # WAL data even when an older application is still using the original DB.
+        # Retain the original for older consumers and recovery; never overwrite an
+        # existing canonical cache or import into explicitly supplied databases.
+        source = self._legacy_database
+        if source is None or source == self.database or self.database.exists() or not source.is_file():
+            return
+        from tempfile import NamedTemporaryFile
+        with NamedTemporaryFile(dir=self.database.parent, prefix='.index-migration-', delete=False) as stream:
+            staged = Path(stream.name)
+        try:
+            with closing(sqlite3.connect(f'{source.absolute().as_uri()}?mode=ro', uri=True)) as old:
+                with closing(sqlite3.connect(staged)) as new:
+                    old.backup(new, pages=128, progress=lambda *args: check_cancelled(cancelled), sleep=.05)
+                    if new.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
+                        raise RuntimeError('Existing directory index failed its integrity check')
+            check_cancelled(cancelled)
+            staged.replace(self.database)
+        finally:
+            staged.unlink(missing_ok=True)
 
     @staticmethod
     def _schema(db):

@@ -396,9 +396,9 @@ case-insensitive partial name search, and `storage_totals()`. `DirectoryCache`
 persists completed and partial indices in SQLite, without entry/root count limits.
 `directory_index_path()` defaults to:
 
-- macOS: `~/Library/Application Support/commonUtils/directory-index.sqlite3`
+- macOS: `~/Library/Caches/commonUtils/directory-index.sqlite3`
 - Windows: `%LOCALAPPDATA%/commonUtils/directory-index.sqlite3`
-- Linux: `$XDG_DATA_HOME/commonUtils/directory-index.sqlite3` (default `~/.local/share`)
+- Linux: `$XDG_CACHE_HOME/commonUtils/directory-index.sqlite3` (default `~/.cache`)
 
 One database holds every indexed root and recursion scope. SQLite can also create
 `-wal` and `-shm` files while connections are open; a `directory-index.lock` file
@@ -443,3 +443,20 @@ and optional whole-process retries. A process-specific parser returns
 logic. `open_process()` retains modeless windows, including their final result;
 application hosts call `prepare_close_all(retry_close)` before closing. Success
 requires a normal zero exit; cancellation and failed starts remain distinct outcomes.
+
+
+## Shared temporary storage
+
+`commonUtils.storage.cache_directory()` resolves/creates the persistent cache
+area using macOS Library/Caches, Windows LOCALAPPDATA, or Linux XDG_CACHE_HOME
+(with ~/.cache fallback; relative XDG paths are ignored). `temporary_directory()`
+creates its disposable `Temp` subdirectory. `temporary_workspace()` returns a
+private, automatically cleaned TemporaryDirectory there. Use `create=False` for
+side-effect-free path resolution. Persistent caches are never deleted on exit.
+Destination-side staging remains beside the destination for atomic replacement.
+
+On first use of the default SQLite index at its new location, a transactional
+SQLite backup migrates the former Application Support/XDG data location, including
+committed WAL data and partial checkpoints. The original remains for recovery and
+older running applications. Existing canonical caches are never overwritten;
+explicit `DirectoryCache(database=...)` paths are not migrated.
