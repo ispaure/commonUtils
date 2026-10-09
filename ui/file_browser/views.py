@@ -83,6 +83,14 @@ class FileViews(qt.QStackedWidget):
             self.context_position = view.viewport().mapToGlobal(point)
             self.context_requested.emit(self.source_index(view.indexAt(point)))
 
+    def select_source(self, source):
+        view = self.currentWidget()
+        index = self.covers.mapFromSource(source) if view is self.tiles else source
+        view.selectionModel().setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.ClearAndSelect |
+                                              qt.QItemSelectionModel.SelectionFlag.Rows)
+        view.scrollTo(index)
+        view.setFocus()
+
     def edit_name(self, source):
         source = self.source_index(source).siblingAtColumn(0)
         view = self.currentWidget()

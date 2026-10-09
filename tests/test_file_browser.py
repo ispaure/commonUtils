@@ -60,6 +60,21 @@ class BrowserTests(unittest.TestCase):
         self.app.processEvents()
         self.assertFalse(self.browser.busy or self.browser.folder_busy)
 
+    def test_search_results_locate_file_and_keep_worker_safe(self):
+        window = self.browser.open_search()
+        window.query.setText('ITEM')
+        window.run_search()
+        deadline = time.monotonic() + 5
+        while window.busy:
+            self.assertLess(time.monotonic(), deadline)
+            self.app.processEvents()
+            time.sleep(.01)
+        self.assertEqual(window.results.topLevelItemCount(), 1)
+        window.locate(self.path)
+        self.assertEqual(self.browser.selected_objects()[0].path, self.path)
+        window.close()
+        self.wait()
+
     def select(self, path):
         index = self.browser.model.index(str(path))
         self.browser.tree.selectionModel().setCurrentIndex(index,
