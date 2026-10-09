@@ -1,4 +1,4 @@
-"""Selection preview construction and sizing; FileBrowser retains its public fields."""
+"""Details shared by sidebar and column previews; established fields stay available."""
 from .. import pyside as qt
 
 
@@ -44,8 +44,25 @@ def create_preview_panel(browser):
 
 
 def update_preview_visibility(browser, selected):
-    """Open at roughly 30%; preserve the user's splitter size until it is hidden."""
-    visible = browser.preview_toggle.isChecked() and selected
+    """Use a native final column, a details sidebar, or storage's own ranked list."""
+    mode = browser._preview_mode()
+    columns = browser.views.columns
+    browser.preview_toggle.setVisible(mode in (0, 1))
+    if mode == 2:
+        from ...dirUtils import Directory
+        items = browser.selected_objects()
+        visible = len(items) == 1 and not isinstance(items[0], Directory)
+        if browser.preview_panel.parentWidget() is not columns.preview_container:
+            browser.preview_panel.setMinimumWidth(0)
+            columns.preview_layout.addWidget(browser.preview_panel)
+        columns.set_file_preview_visible(visible)
+        browser.preview_panel.setVisible(visible)
+        return
+    columns.set_file_preview_visible(False)
+    if browser.preview_panel.parentWidget() is not browser.splitter:
+        browser.splitter.addWidget(browser.preview_panel)
+        browser.preview_panel.setMinimumWidth(220)
+    visible = mode != 3 and browser.preview_toggle.isChecked() and browser.navigation.directory is not None
     opening = visible and browser.preview_panel.isHidden()
     browser.preview_panel.setVisible(visible)
     if opening:

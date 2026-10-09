@@ -1,4 +1,4 @@
-"""Folder-only column trails with compact, theme-aware chevrons."""
+"""Folder trails, theme-aware chevrons, and a matching selected-file preview column."""
 
 from .. import pyside as qt
 from .editing import FilenameEditorMixin
@@ -39,17 +39,47 @@ class FolderColumnView(qt.QColumnView):
         super().__init__()
         self.viewport().setBackgroundRole(qt.QPalette.ColorRole.Window)
         self.viewport().setAutoFillBackground(True)
+        self.preview_container = qt.QWidget()
+        self.preview_layout = qt.QVBoxLayout(self.preview_container)
+        self.preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.setPreviewWidget(self.preview_container)
+        self.preview_host = self.preview_container.parentWidget().parentWidget()
+        self.preview_host.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.preview_host.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.preview_host.viewport().installEventFilter(self)
+        self.set_file_preview_visible(False)
+
+    def eventFilter(self, watched, event):
+        if event.type() == qt.QEvent.Type.Resize:
+            if watched is self.preview_host.viewport():
+                self.preview_container.setMinimumHeight(max(0, watched.height()))
+            elif not self.preview_container.isHidden():
+                qt.QTimer.singleShot(0, self, self._sync_preview_width)
+        return super().eventFilter(watched, event)
+
+    def _sync_preview_width(self):
+        if not self.preview_container.isHidden():
+            self.set_file_preview_visible(True)
+
+    def setColumnWidths(self, widths):
+        super().setColumnWidths(widths)
+        self._sync_preview_width()
+
+    def set_file_preview_visible(self, visible):
+        widths = self.columnWidths()
+        depth = 0
+        parent = self.currentIndex().parent()
+        while parent.isValid() and parent != self.rootIndex():
+            depth += 1
+            parent = parent.parent()
+        width = widths[min(depth, len(widths)-1)] if widths else 240
         if hasattr(self, 'setPreviewColumnVisible'):
-            self.setPreviewColumnVisible(False)
-        else:
-            # Before Qt 6.11, the public preview widget still needs a zero-width host.
-            preview = qt.QWidget()
-            preview.setFixedWidth(0)
-            self.setPreviewWidget(preview)
-            host = preview.parentWidget().parentWidget()
-            host.setFixedWidth(0)
-            host.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            host.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.setPreviewColumnVisible(visible)
+        # Qt before 6.11 has no public visibility switch for the preview host.
+        self.preview_host.setFixedWidth(width if visible else 0)
+        self.preview_container.setFixedWidth(width if visible else 0)
+        self.preview_container.setMinimumHeight(self.preview_host.viewport().height() if visible else 0)
+        self.preview_container.setVisible(visible)
 
     def createColumn(self, index):
         column = super().createColumn(index)
@@ -58,5 +88,7 @@ class FolderColumnView(qt.QColumnView):
         column.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
         column.customContextMenuRequested.connect(lambda point, target=column: self.column_context_requested.emit(target, point))
         column.setIconSize(qt.QSize(16, 16))
+        column.installEventFilter(self)
+        column.viewport().installEventFilter(self)
         column.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         return column

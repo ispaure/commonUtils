@@ -33,13 +33,27 @@ cancelling one tab unsubscribes it, and only the last subscriber stops the scan.
 SQLite serializes writers across processes. Independent read transactions keep
 older displayed snapshots valid while generations are replaced or pruned.
 
-Preview is enabled by default, shown only with a selection, and starts at roughly
-30% of the splitter width (minimum 220 px). Users may resize it or switch it off.
+Preview is enabled by default in tile/list views and starts at roughly 30% of the
+splitter width (minimum 220 px). It shows selections or current-folder properties
+when nothing is selected. Users may resize it or switch it off. Column view always
+shows selected-file details in its native final column, matching the preceding
+column width; selecting folders continues the folder trail. Its toggle is hidden.
+Storage charts never show details previews: their right pane lists immediate files
+and folders largest first. Treemap and radial have separate toolbar buttons under
+Storage. Their old `chart_selector` API remains available as a hidden widget.
 Disabled previews do not start selection detail loaders. Existing `preview_panel`,
 `heading`, `message`, `cover`, `tabs`, `preview`, `load`, and selection signals remain
 available. Explicit `load(item)` still displays requested details when Preview is
 enabled, and `selected_object` remains available when automatic previews are off.
 The INI setting `[FileBrowser] preview_enabled` supplies new-tab defaults.
+
+Filename search ignores case, including Unicode case folding. Bare space-separated
+terms must all occur, in any order. Quoted phrases keep adjacent word order, treating
+whitespace, underscores and hyphens as equivalent separators; punctuation and
+wildcards otherwise remain literal. Unfinished quotes act as phrases during live
+typing. SQL and detached snapshots share these rules in `_directory_search.py`.
+Phrase normalization is a SQLite scalar function at query time, so existing saved
+names need no migration; unquoted keyword queries remain SQL substring predicates.
 
 The shared status line and tooltip contain phases/counters, never scanner paths or
 tab titles. Processed counts include discovery and validation operations, not a

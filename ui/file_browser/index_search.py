@@ -83,10 +83,13 @@ class IndexSearch(qt.QWidget):
         self.offset = 0
         self.pending = self.active
         if self.busy: self.operation.requestInterruption()
+        switched = (self.browser.list_stack.currentWidget() is self) != self.active
         self.browser.list_stack.setCurrentWidget(self if self.active else self.browser.views)
         if self.active:
             self.summary.setText('Searching cached names…')
             self.debounce.start()
+            if switched:
+                self.browser._selection_changed()
         else:
             self.debounce.stop()
             self.results.clear()

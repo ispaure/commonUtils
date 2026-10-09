@@ -1,5 +1,6 @@
 """Scalable, palette-aware icons and compact browser view controls."""
 
+import math
 from .. import pyside as qt
 
 
@@ -39,6 +40,12 @@ class ViewIcon(qt.QIconEngine):
             painter.drawLine(qt.QLineF(14, 3, 14, 21))
             painter.drawLine(qt.QLineF(2, 14, 14, 14))
             painter.drawLine(qt.QLineF(14, 10, 22, 10))
+        elif self.mode == 5:
+            painter.drawEllipse(qt.QRectF(2, 2, 20, 20))
+            painter.drawEllipse(qt.QRectF(7, 7, 10, 10))
+            for angle in (0, 90, 210):
+                x, y = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+                painter.drawLine(qt.QLineF(12 + 5*x, 12 + 5*y, 12 + 10*x, 12 + 10*y))
         else:
             painter.drawRoundedRect(qt.QRectF(2, 4, 20, 16), 1, 1)
             for x in (9, 16):
@@ -66,9 +73,19 @@ class ViewModeSelector(qt.QWidget):
         self.group.setExclusive(True)
         self.buttons = {}
         self._index = 0
-        for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns'), (3, 'Storage')):
+        layout.addWidget(qt.QLabel('View'))
+        self.storage_controls = qt.QWidget()
+        self.storage_controls.setAccessibleName('Storage views')
+        storage_layout = qt.QHBoxLayout(self.storage_controls)
+        storage_layout.setContentsMargins(0, 0, 0, 0)
+        storage_layout.setSpacing(2)
+        separator = qt.QFrame()
+        separator.setFrameShape(qt.QFrame.Shape.VLine)
+        storage_layout.addWidget(separator)
+        storage_layout.addWidget(qt.QLabel('Storage'))
+        for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns'), (3, 'Treemap'), (4, 'Radial')):
             button = qt.QToolButton()
-            button.setIcon(qt.QIcon(ViewIcon(mode)))
+            button.setIcon(qt.QIcon(ViewIcon(5 if mode == 4 else mode)))
             button.setIconSize(qt.QSize(23, 23))
             button.setCheckable(True)
             button.setAutoRaise(True)
@@ -76,7 +93,7 @@ class ViewModeSelector(qt.QWidget):
             button.setAccessibleName(f'{name} view')
             self.group.addButton(button, mode)
             self.buttons[mode] = button
-            layout.addWidget(button)
+            (storage_layout if mode >= 3 else layout).addWidget(button)
         self.buttons[0].setChecked(True)
         self.group.idClicked.connect(self.setCurrentIndex)
 
@@ -84,7 +101,7 @@ class ViewModeSelector(qt.QWidget):
         return self._index
 
     def currentText(self):
-        return ('List', 'Tiles', 'Columns', 'Storage')[self._index]
+        return ('List', 'Tiles', 'Columns', 'Treemap', 'Radial')[self._index]
 
     def setCurrentIndex(self, index):
         if index not in self.buttons:

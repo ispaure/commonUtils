@@ -288,7 +288,7 @@ class BrowserTests(unittest.TestCase):
     def test_icon_view_switches_and_responsive_grid_fills_the_viewport(self):
         selector = self.browser.view_selector
         self.assertFalse(isinstance(selector, qt.QComboBox))
-        self.assertEqual(list(selector.buttons), [1, 0, 2, 3])
+        self.assertEqual(list(selector.buttons), [1, 0, 2, 3, 4])
         for mode in (1, 2, 0):
             selector.buttons[mode].click()
             self.assertEqual(self.browser.views.currentIndex(), mode)
@@ -306,7 +306,7 @@ class BrowserTests(unittest.TestCase):
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
             self.assertEqual(tiles.iconSize().width(), min(71, max(16, tiles.gridSize().width() - 28)))
 
-    def test_column_files_end_the_trail_without_an_extra_preview(self):
+    def test_column_files_end_the_trail_with_a_matching_preview_column(self):
         from commonUtils.ui.file_browser.views import ColumnDelegate
         self.browser.view_selector.setCurrentIndex(2)
         columns = self.browser.views.columns
@@ -314,11 +314,12 @@ class BrowserTests(unittest.TestCase):
         columns.selectionModel().setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.ClearAndSelect)
         self.wait()
         if hasattr(columns, 'isPreviewColumnVisible'):
-            self.assertFalse(columns.isPreviewColumnVisible())
-        else:
-            host = columns.previewWidget().parentWidget().parentWidget()
-            self.assertEqual(host.width(), 0)
-            self.assertEqual(host.maximumWidth(), 0)
+            self.assertTrue(columns.isPreviewColumnVisible())
+        host = columns.previewWidget().parentWidget().parentWidget()
+        self.assertEqual(host.width(), columns.columnWidths()[0])
+        self.assertEqual(self.browser.preview_panel.parentWidget(), columns.preview_container)
+        self.assertFalse(self.browser.preview_panel.isHidden())
+        self.assertTrue(self.browser.preview_toggle.isHidden())
         self.assertEqual(columns.viewport().backgroundRole(), qt.QPalette.ColorRole.Window)
         children = [view for view in columns.findChildren(qt.QListView) if view.isVisible()]
         self.assertTrue(children)

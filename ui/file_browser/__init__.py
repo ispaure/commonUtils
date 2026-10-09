@@ -66,6 +66,7 @@ class FileBrowser(qt.QWidget):
         self.folder_pending = False
         self.folder_root = None
         self.refresh_pending = False
+        self._pending_detail_item = None
         self.stopping = False
         self.selected_object = None
         self.last_details = None
@@ -76,6 +77,9 @@ class FileBrowser(qt.QWidget):
         self.search_bar.setAccessibleName('Search indexed files and folders')
         self.search_bar.setClearButtonEnabled(True)
         self.search_bar.setPlaceholderText('Search this location and its subfolders')
+        self.search_bar.setToolTip('Search names, ignoring case. Words match in any order; '
+                                  '"quoted phrases" keep word order. Spaces, underscores and '
+                                  'hyphens are equivalent in phrases.')
         layout.addWidget(self.search_bar)
         layout.addLayout(self._create_navigation_controls())
         from .status import IndexStatusLabel
@@ -130,14 +134,16 @@ class FileBrowser(qt.QWidget):
         self.preview_toggle.setCheckable(True)
         from ...settings import get_setting
         self.preview_toggle.setChecked(get_setting('FileBrowser', 'preview_enabled', True))
-        self.preview_toggle.setToolTip('Show details when files or folders are selected')
-        self.preview_toggle.setAccessibleName('Show selection preview')
+        self.preview_toggle.setText('Preview on' if self.preview_toggle.isChecked() else 'Preview off')
+        self.preview_toggle.setToolTip('Show selection details, or current-folder properties when nothing is selected')
+        self.preview_toggle.setAccessibleName('Show file and folder preview')
         self.preview_toggle.toggled.connect(self._preview_toggled)
         controls.addWidget(self.preview_toggle)
         self.folder_size_button = FolderSizeControl(self)
         self.folder_size_slider = self.folder_size_button.slider
         self.folder_size_button.setVisible(False)
         controls.addWidget(self.folder_size_button)
+        controls.addWidget(self.view_selector.storage_controls)
         self.search_button = qt.QPushButton('Search…')
         self.search_button.clicked.connect(self.open_search)
         controls.addWidget(self.search_button)
@@ -220,9 +226,19 @@ class FileBrowser(qt.QWidget):
         create_preview_panel(self)
 
     def _preview_toggled(self, enabled):
+        self.preview_toggle.setText('Preview on' if enabled else 'Preview off')
         self._update_preview_visibility(bool(self.selected_objects()))
         if enabled:
             self._selection_changed()
+
+    def _preview_enabled(self):
+        mode = self._preview_mode()
+        return mode == 2 or mode != 3 and self.preview_toggle.isChecked()
+
+    def _preview_mode(self):
+        # Indexed search presents a list even when the underlying view is columns
+        # or a storage chart; its selected results still deserve normal details.
+        return 0 if self.index_search.active else self.views.currentIndex()
 
     def _update_preview_visibility(self, selected):
         from .preview import update_preview_visibility
@@ -443,11 +459,15 @@ class FileBrowser(qt.QWidget):
         items = self.selected_objects()
         self.selection_changed.emit(items)
         self._update_preview_visibility(bool(items))
+        self._pending_detail_item = None
         if self.busy:
             self.refresh_pending = True
             return
         self._clear_details()
-        if not self.preview_toggle.isChecked():
+        if not self._preview_enabled():
+            self.selected_object = items[0] if len(items) == 1 else None
+            return
+        if self._preview_mode() == 2 and (len(items) != 1 or isinstance(items[0], Directory)):
             self.selected_object = items[0] if len(items) == 1 else None
             return
         if len(items) == 1:
@@ -456,8 +476,8 @@ class FileBrowser(qt.QWidget):
             self.heading.setText(f'{len(items)} items selected')
             self.message.setText('Right-click the selection for available actions.')
         else:
-            self.heading.setText('Files')
-            self.message.setText('Select a file or folder.')
+            if self.navigation.directory is not None:
+                self.load(Directory(self.navigation.directory))
 
     def _generic_details(self, item, stats):
         fields = list(item.filesystem_information())
@@ -478,8 +498,13 @@ class FileBrowser(qt.QWidget):
 
     def load(self, item):
         if self.busy:
+            # Public callers can request a file while the default folder details
+            # are still loading. Retain that explicit request for the next worker.
+            self._pending_detail_item = item
+            self.selected_object = item
             self.refresh_pending = True
             return
+        self._pending_detail_item = None
         self._clear_details()
         self.selected_object = item
         self._update_preview_visibility(True)
@@ -563,7 +588,11 @@ class FileBrowser(qt.QWidget):
         if self.stopping:
             self._maybe_idle()
         elif self.refresh_pending:
-            self._selection_changed()
+            item = self._pending_detail_item
+            if item is not None:
+                self.load(item)
+            else:
+                self._selection_changed()
 
     def refresh_item(self, path):
         self.model.invalidate(path)

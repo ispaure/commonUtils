@@ -28,6 +28,52 @@ class BrowserPresentationTests(unittest.TestCase):
         self.assertIn('20 processed this run', message)
         self.assertIn('1m 01s elapsed', message)
 
+    def test_columns_force_file_preview_and_other_views_restore_toggle_and_folder_details(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / 'sub'; folder.mkdir()
+            file = root / 'file.txt'; file.write_text('text')
+            browser = FileBrowser(root, calculate_folder_sizes=False)
+            browser.resize(1000, 600); browser.show()
+            def wait(condition):
+                deadline = monotonic() + 5
+                while not condition():
+                    self.assertLess(monotonic(), deadline)
+                    self.app.processEvents(); sleep(.005)
+                self.app.processEvents()
+            try:
+                wait(lambda: browser.model.index(str(file)).isValid() and not browser.busy)
+                browser.preview_toggle.setChecked(False)
+                browser.view_selector.setCurrentIndex(2)
+                browser.views.select_source(browser.model.index(str(file)))
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+                self.assertTrue(browser.preview_toggle.isHidden())
+                self.assertEqual(browser.preview_panel.parentWidget(), browser.views.columns.preview_container)
+                self.assertEqual(browser.views.columns.preview_host.width(), browser.views.columns.columnWidths()[0])
+                browser.views.columns.setColumnWidths([310, 240, 240, 240])
+                wait(lambda: browser.views.columns.preview_host.width() == 310)
+                self.assertEqual(browser.views.columns.preview_host.width(), 310)
+                browser.views.select_source(browser.model.index(str(folder)))
+                wait(lambda: not browser.busy)
+                self.assertTrue(browser.preview_panel.isHidden())
+                browser.view_selector.setCurrentIndex(0)
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_toggle.isHidden())
+                self.assertTrue(browser.preview_panel.isHidden())
+                browser.preview_toggle.setChecked(True)
+                wait(lambda: not browser.busy)
+                browser.tree.clearSelection()
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+                self.assertEqual(browser.selected_object.path, browser.navigation.directory)
+                self.assertEqual(browser.preview_panel.parentWidget(), browser.splitter)
+                browser.view_selector.setCurrentIndex(1)
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+            finally:
+                browser.shutdown(); browser.close(); self.app.processEvents()
+
     def test_counters_survive_phase_changes_and_elapsed_time_advances_without_new_work(self):
         progress = IndexProgress(started_at=0)
         progress.update(990, 'Indexing /private/name', saved_entries=900)
@@ -61,7 +107,9 @@ class BrowserPresentationTests(unittest.TestCase):
             try:
                 wait(lambda: browser.model.index(str(first)).isValid())
                 self.assertTrue(browser.preview_toggle.isChecked())
-                self.assertTrue(browser.preview_panel.isHidden())
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+                self.assertEqual(browser.selected_object.path, root)
                 def select(path):
                     browser.tree.selectionModel().setCurrentIndex(browser.model.index(str(path)),
                         qt.QItemSelectionModel.SelectionFlag.ClearAndSelect | qt.QItemSelectionModel.SelectionFlag.Rows)
@@ -87,8 +135,9 @@ class BrowserPresentationTests(unittest.TestCase):
                 self.assertLessEqual(cover.width() / cover.devicePixelRatio(), browser.cover.contentsRect().width())
                 self.assertAlmostEqual(cover.width() / cover.height(), .5, places=2)
                 browser.tree.selectionModel().clearSelection()
-                self.app.processEvents()
-                self.assertTrue(browser.preview_panel.isHidden())
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+                self.assertEqual(browser.selected_object.path, root)
                 browser.load(browser.model.object_for_path(first))
                 wait(lambda: not browser.busy)
                 self.assertFalse(browser.preview_panel.isHidden())
