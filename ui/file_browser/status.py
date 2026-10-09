@@ -80,6 +80,53 @@ class IndexProgress:
                     f' · {format_duration(elapsed)} elapsed · {self.phase}')
 
 
+class IndexActivityBar(qt.QProgressBar):
+    """Indeterminate activity: a blue track with a moving soft highlight.
+
+    Retains QProgressBar's busy range/accessibility API. The highlight signals
+    activity, rather than claiming a known percentage. Hidden bars stop ticking.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setRange(0, 0)
+        self.setTextVisible(False)
+        self.setFixedSize(140, 10)
+        self.setStyleSheet('QProgressBar { min-height: 0px; }')
+        self.setAccessibleName('File index activity, total work unknown')
+        self.setToolTip('Index work is in progress; the total is not yet known')
+        self._started_at = monotonic()
+        self._animation = qt.QTimer(self)
+        self._animation.setInterval(40)
+        self._animation.timeout.connect(self.update)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._started_at = monotonic()
+        self._animation.start()
+
+    def hideEvent(self, event):
+        self._animation.stop()
+        super().hideEvent(event)
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+        rect = qt.QRectF(self.contentsRect())
+        shape = qt.QPainterPath()
+        shape.addRoundedRect(rect, rect.height() / 2, rect.height() / 2)
+        painter.fillPath(shape, self.palette().color(qt.QPalette.ColorRole.Highlight))
+        painter.setClipPath(shape)
+        band = rect.width() * .55
+        phase = ((monotonic() - self._started_at) / 1.4) % 1
+        start = rect.left() - band + (rect.width() + band) * phase
+        gradient = qt.QLinearGradient(start, 0, start + band, 0)
+        gradient.setColorAt(0, qt.QColor(255, 255, 255, 0))
+        gradient.setColorAt(.5, qt.QColor(255, 255, 255, 125))
+        gradient.setColorAt(1, qt.QColor(255, 255, 255, 0))
+        painter.fillRect(rect, gradient)
+        painter.end()
+
+
 class IndexStatusLabel(qt.QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -123,9 +170,7 @@ class WorkspaceIndexStatus(qt.QObject):
         bar.setSizeGripEnabled(False)
         self.label = IndexStatusLabel()
         self.label.setAccessibleName('Workspace indexing status')
-        self.activity = qt.QProgressBar()
-        self.activity.setRange(0,0); self.activity.setTextVisible(False)
-        self.activity.setFixedWidth(70); self.activity.setMaximumHeight(10)
+        self.activity = IndexActivityBar()
         bar.addWidget(self.label,1); bar.addPermanentWidget(self.activity)
         workspace.active_changed.connect(self.refresh)
 

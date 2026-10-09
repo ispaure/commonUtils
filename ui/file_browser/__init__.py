@@ -85,10 +85,10 @@ class FileBrowser(qt.QWidget):
                                   'hyphens are equivalent in phrases.')
         layout.addWidget(self.search_bar)
         layout.addLayout(self._create_navigation_controls())
-        from .status import IndexStatusLabel
+        from .status import IndexStatusLabel, IndexActivityBar
         self.index_status = IndexStatusLabel()
         self.index_status.setTextFormat(qt.Qt.TextFormat.PlainText)
-        self.index_activity = qt.QProgressBar()
+        self.index_activity = IndexActivityBar()
         self.index_activity.setRange(0, 0)
         self.index_activity.setTextVisible(False)
         self.index_activity.setAccessibleName('Background indexing in progress')
@@ -97,7 +97,7 @@ class FileBrowser(qt.QWidget):
         layout.addWidget(self.splitter, 1)
         status_row = qt.QHBoxLayout()
         status_row.addWidget(self.index_status,1)
-        self.index_activity.setFixedWidth(70)
+        self.index_activity.setFixedWidth(140)
         self.index_activity.setMaximumHeight(10)
         status_row.addWidget(self.index_activity)
         layout.addLayout(status_row)
