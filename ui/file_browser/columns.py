@@ -37,6 +37,7 @@ class FolderColumnView(qt.QColumnView):
     column_context_requested = qt.Signal(object, object)
     def __init__(self):
         super().__init__()
+        self.setIconSize(qt.QSize(16, 16))
         self.viewport().setBackgroundRole(qt.QPalette.ColorRole.Window)
         self.viewport().setAutoFillBackground(True)
         self.preview_container = qt.QWidget()
@@ -81,13 +82,18 @@ class FolderColumnView(qt.QColumnView):
         self.preview_container.setMinimumHeight(self.preview_host.viewport().height() if visible else 0)
         self.preview_container.setVisible(visible)
 
+    def setIconSize(self, size):
+        super().setIconSize(size)
+        for column in self.findChildren(qt.QListView):
+            column.setIconSize(size)
+
     def createColumn(self, index):
         column = super().createColumn(index)
         column.setItemDelegate(ColumnDelegate(column))
         column.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
         column.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
         column.customContextMenuRequested.connect(lambda point, target=column: self.column_context_requested.emit(target, point))
-        column.setIconSize(qt.QSize(16, 16))
+        column.setIconSize(self.iconSize())
         column.installEventFilter(self)
         column.viewport().installEventFilter(self)
         column.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)

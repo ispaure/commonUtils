@@ -18,7 +18,7 @@ class BrowserPresentationTests(unittest.TestCase):
         app = qt.QApplication.instance() or qt.QApplication([])
         root = Path('/fixture')
         snapshot = SimpleNamespace(
-            folder_stats=lambda **kw: {root: SimpleNamespace(files=100000, folders=400)},
+            folder_stats=lambda *args, **kw: {root: SimpleNamespace(files=100000, folders=400)},
             errors=(), children=lambda *a, **kw: (),
         )
         job = _IndexJob(root, lambda *a, **kw: None, app)

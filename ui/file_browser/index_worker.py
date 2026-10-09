@@ -86,13 +86,13 @@ class _IndexJob(Operation):
             snapshot = source or directory_cache.peek(root, cancelled=self.isInterruptionRequested)
             if snapshot is None:
                 continue
-            totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
             if root == self.root:
-                stats = totals.get(root)
+                stats = snapshot.folder_stats([root], cancelled=self.isInterruptionRequested).get(root)
                 self.saved_entries = stats.files + stats.folders if stats else 0
                 self._status.update(0, self._status.phase, saved_entries=self.saved_entries)
                 self.last_progress = self._status.render()
                 self.progress.emit(self.last_progress)
+            totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
             changed = self.totals_by_root.get(root) != totals
             self.totals_by_root[root] = totals
             if root == self.root:

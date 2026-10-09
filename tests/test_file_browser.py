@@ -364,7 +364,13 @@ class BrowserTests(unittest.TestCase):
         self.assertGreater(tiles.iconSize().width(), small * 1.5)
         self.assertTrue(self.browser.folder_size_button.isVisible())
         self.browser.view_selector.setCurrentIndex(0)
-        self.assertFalse(self.browser.folder_size_button.isVisible())
+        self.assertTrue(self.browser.folder_size_button.isVisible())
+        self.assertEqual(self.browser.tree.iconSize(), qt.QSize(32, 32))
+        self.browser.view_selector.setCurrentIndex(2)
+        self.app.processEvents()
+        self.assertTrue(self.browser.views.columns.findChildren(qt.QListView))
+        self.assertTrue(all(column.iconSize() == qt.QSize(32, 32)
+                            for column in self.browser.views.columns.findChildren(qt.QListView)))
 
     def test_size_control_scales_mixed_files_and_bounds_icons_in_narrow_views(self):
         tiles = self.browser.views.tiles

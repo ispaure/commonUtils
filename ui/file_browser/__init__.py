@@ -837,7 +837,7 @@ class FileBrowser(qt.QWidget):
             self.index_updated.emit(root)
             if not self.folder_busy:
                 self.index_status.setText('Cached or partial sizes available.')
-            if isinstance(self.selected_object, Directory):
+            if isinstance(self.selected_object, Directory) and self._preview_enabled() and not self.preview_panel.isHidden():
                 self.load(self.selected_object, preserve=True)
 
     def _folders_loaded(self, root, result, error=''):
@@ -864,7 +864,7 @@ class FileBrowser(qt.QWidget):
             if changed:
                 self.index_updated.emit(root)
             self.index_progress.emit(self.index_status.text())
-            if changed and isinstance(self.selected_object, Directory):
+            if changed and isinstance(self.selected_object, Directory) and self._preview_enabled() and not self.preview_panel.isHidden():
                 self.load(self.selected_object, preserve=True)
 
     def _index_progressed(self, message):
