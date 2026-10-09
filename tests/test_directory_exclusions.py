@@ -84,6 +84,22 @@ class MacOSExclusionTests(unittest.TestCase):
             self.cache.repair_cached_exclusions(self.root)
         self.assert_clean(self.cache.peek(self.root))
 
+    def test_sqlite_interrupted_cleanup_rolls_back_without_masking_cancellation(self):
+        for number in range(3000):
+            (self.data / f'file{number}').write_bytes(b'x')
+        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+            self.cache.get(self.root)
+        stop = [False]
+        def report(done, total, message):
+            if message.startswith('Removing saved duplicate'):
+                stop[0] = True
+        with self.macos():
+            with self.assertRaises(OperationCancelled):
+                self.cache.repair_cached_exclusions(self.root, cancelled=lambda: stop[0], report=report)
+            self.assertEqual(storage_totals(self.cache.peek(self.root))[self.root], 3010)
+            self.cache.repair_cached_exclusions(self.root)
+        self.assert_clean(self.cache.peek(self.root))
+
     def test_reconciliation_repairs_saved_ancestor_totals(self):
         with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)

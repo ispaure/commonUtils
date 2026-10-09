@@ -107,6 +107,7 @@ def upgrade_entries(db, cancelled=lambda: False):
                 record_id INTEGER NOT NULL REFERENCES entry_records(id),
                 PRIMARY KEY(generation,parent_id,node_id));
             CREATE INDEX generation_record ON generation_entries(record_id);
+            CREATE INDEX generation_node ON generation_entries(node_id);
         ''')
         # Only folder-sized work constructs Path objects. Huge file sets migrate
         # through SQL; their full paths never enter the new persistent tables.
@@ -256,6 +257,10 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
                    'generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,'
                    'path TEXT NOT NULL,checked_at REAL NOT NULL,PRIMARY KEY(generation,path))')
         ensure_reader_view(db)
+        # Foreign-key checks when pruning a name must not scan every scope.
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='generation_node'").fetchone():
+            report(0, 0, 'Optimizing saved index cleanup')
+            db.execute('CREATE INDEX generation_node ON generation_entries(node_id)')
         # Reconciliation must look up one parent's children, not walk every
         # saved folder for every scanned folder (quadratic at disk scale).
         if not db.execute("SELECT 1 FROM sqlite_master WHERE name='folder_parent'").fetchone():
