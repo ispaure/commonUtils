@@ -2,6 +2,7 @@
 from weakref import WeakValueDictionary
 from uuid import uuid4
 from . import pyside as qt
+from shiboken6 import isValid
 
 MIME = 'application/x-commonutils-workspace-tab'
 _docks = WeakValueDictionary()
@@ -31,7 +32,7 @@ class WorkspaceDragMixin:
         if result == qt.Qt.DropAction.IgnoreAction and not qt.QApplication.mouseButtons():
             from .workspace import _workspaces
             point = qt.QCursor.pos()
-            if not any(workspace.isVisible() and qt.QRect(workspace.mapToGlobal(qt.QPoint()), workspace.size()).contains(point)
+            if not any(isValid(workspace) and workspace.isVisible() and qt.QRect(workspace.mapToGlobal(qt.QPoint()), workspace.size()).contains(point)
                        for workspace in tuple(_workspaces)):
                 dock.setFloating(True)
                 dock.move(point - qt.QPoint(40, 15))
@@ -42,7 +43,8 @@ class WorkspaceDragMixin:
             return None
         key = bytes(event.mimeData().data(MIME)).decode('ascii', errors='ignore')
         dock = _docks.get(key)
-        return dock if dock is not None and dock in dock.workspace.docks else None
+        return dock if (dock is not None and isValid(dock) and isValid(dock.workspace) and dock in dock.workspace.docks
+                        and dock.workspace.dock_group == self.dock_group) else None
 
     def _drop_location(self, point, moving):
         target = next((dock for dock in self.docks if dock is not moving
