@@ -14,6 +14,24 @@ from commonUtils.operations import OperationCancelled
 
 
 class DirectorySchemaTests(unittest.TestCase):
+    def test_cleanup_foreign_key_checks_are_bounded_after_existing_cache_upgrade(self):
+        with closing(sqlite3.connect(':memory:')) as db:
+            db.execute('PRAGMA foreign_keys=ON')
+            initialize_schema(db)
+            parent = ensure_folder(db, Path('/files'))
+            db.executemany('INSERT INTO entry_nodes VALUES(?,?,?, ?,?)',
+                           [(1,parent,'unused','unused',b'u'), (2,parent,'kept','kept',b'k')])
+            db.execute("INSERT INTO entry_records VALUES(2,2,0,1,0,0,'identity')")
+            db.executemany("INSERT INTO scans VALUES(?,'/files',1,0)", [(number,) for number in range(1,20001)])
+            db.executemany('INSERT INTO generation_entries VALUES(?,?,2,2)',
+                           [(number,parent) for number in range(1,20001)])
+            db.execute('DROP INDEX generation_node')
+            initialize_schema(db)
+            db.set_progress_handler(lambda: 1, 1000)
+            db.execute('DELETE FROM entry_nodes WHERE id=1')
+            db.set_progress_handler(None, 0)
+            self.assertEqual(db.execute('SELECT count(*) FROM generation_entries').fetchone()[0], 20000)
+
     def test_existing_cache_reconciles_one_folder_without_visiting_unrelated_folders(self):
         with closing(sqlite3.connect(':memory:')) as db:
             initialize_schema(db)

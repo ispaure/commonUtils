@@ -296,8 +296,11 @@ class DirectoryCache:
             db.execute('RELEASE exclusion_repair')
         except BaseException:
             db.set_progress_handler(None, 0)
-            db.execute('ROLLBACK TO exclusion_repair')
-            db.execute('RELEASE exclusion_repair')
+            # SQLite may already roll back the transaction when an interrupted
+            # DELETE aborts. Preserve the original cancellation in that case.
+            if db.in_transaction:
+                db.execute('ROLLBACK TO exclusion_repair')
+                db.execute('RELEASE exclusion_repair')
             self._dirty_totals = dirty_before
             raise
 
