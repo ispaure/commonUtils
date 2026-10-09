@@ -483,6 +483,8 @@ class FileBrowser(qt.QWidget):
         self.refresh_folder_totals()
 
     def refresh(self):
+        from ...directory_index import directory_cache
+        directory_cache.invalidate(self.navigation.library)
         for path in list(self.views.covers.icons):
             self.model.invalidate(path)
             self.views.covers.invalidate(path)

@@ -2,7 +2,9 @@
 from pathlib import Path
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
-from ...directory_index import scan_metadata
+from ...directory_index import directory_cache
+from datetime import datetime
+from ...filesystem import format_datetime
 from ...filesystem import format_size
 
 
@@ -29,26 +31,35 @@ class ScanDialog(qt.QDialog):
         self.summary.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.summary.setWordWrap(True)
         self.layout.addWidget(self.summary)
+        self.freshness = qt.QLabel('No snapshot collected yet.')
+        self.freshness.setWordWrap(True)
+        self.freshness.setTextFormat(qt.Qt.TextFormat.PlainText)
+        self.layout.addWidget(self.freshness)
         self.layout.addWidget(self.task)
 
     @property
     def busy(self):
         return self.task.busy
 
-    def scan(self, recursive):
+    def scan(self, recursive, *, refresh=False):
         if self.busy or self.closing:
             return
         root = self.root
         self.summary.setText('Scanning…')
-        self.task.start(lambda report, cancelled: scan_metadata(root, recursive, report=report, cancelled=cancelled))
+        self.freshness.setText('Scan in progress; any displayed results belong to the previous snapshot.')
+        self.task.start(lambda report, cancelled: directory_cache.get(root, recursive, refresh=refresh, report=report, cancelled=cancelled))
 
     def _completed(self, result, error):
         if not self.closing:
             if error:
                 self.summary.setText(f'Scan stopped: {error}')
+                self.freshness.setText('Scan did not complete; any displayed results belong to the previous snapshot.')
             else:
                 self.snapshot = result
                 self.show_snapshot()
+                stamp = format_datetime(datetime.fromtimestamp(result.scanned_at))
+                self.freshness.setText(f'Snapshot scanned {stamp}.' +
+                                     (' Cached metadata checked before reuse.' if result.reused else ' Fresh scan.'))
         if self.closing:
             self.close()
         self.idle.emit()
@@ -94,7 +105,9 @@ class SearchDialog(ScanDialog):
         self.search_button = qt.QPushButton('Search')
         self.search_button.clicked.connect(self.run_search)
         self.query.returnPressed.connect(self.run_search)
-        for widget in (self.query, self.recursive, self.search_button):
+        self.rescan_button = qt.QPushButton('Rescan')
+        self.rescan_button.clicked.connect(lambda: self.run_search(refresh=True))
+        for widget in (self.query, self.recursive, self.search_button, self.rescan_button):
             controls.addWidget(widget)
         self.layout.insertLayout(1, controls)
         self.results = qt.QTreeWidget()
@@ -107,13 +120,13 @@ class SearchDialog(ScanDialog):
         self.layout.insertWidget(2, self.results, 1)
         self.summary.setText('Enter a name and search. Double-click a result to show it in the browser.')
 
-    def run_search(self):
+    def run_search(self, checked=False, *, refresh=False):
         if self.busy:
             return
         self.results.clear()
         self._query = self.query.text()
         self.search_button.setEnabled(False)
-        self.scan(self.recursive.isChecked())
+        self.scan(self.recursive.isChecked(), refresh=refresh)
 
     def _completed(self, result, error):
         self.search_button.setEnabled(True)
