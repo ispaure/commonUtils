@@ -612,3 +612,12 @@ for typed validation, boolean checkboxes and dropdowns. Applications supply the
 path and decide how saved changes apply. See the
 [configuration guide](../configuration/README.md) for conventions and a complete
 embedding example.
+
+## Reusable code editing
+
+The optional [code-editor components](code_editor/README.md) provide a native
+QPlainTextEdit gutter, undoable line commands, bounded asynchronous search and
+palette-aware syntax definitions. They contain no application window or feature
+logic. Qt-independent `commonUtils.text_files` supplies strict encoding handling,
+text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
+are unchanged. Applications own their document tabs, settings and save prompts.
