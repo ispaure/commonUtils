@@ -62,7 +62,7 @@ class FilesystemObject:
             stats = self.path.stat()
             if hasattr(self, 'ext'):
                 values.append(('Size', format_size(stats.st_size)))
-            values.append(('Modified', datetime.fromtimestamp(stats.st_mtime).isoformat(sep=' ', timespec='seconds')))
+            values.append(('Modified', format_datetime(datetime.fromtimestamp(stats.st_mtime))))
             created = self.created_time
             if created is not None:
                 values.append(('Created', created.isoformat(sep=' ', timespec='seconds')))
@@ -148,3 +148,12 @@ def format_size(size):
         if size < 1024 or unit == 'TB':
             return f'{size:,} B' if unit == 'B' else f'{size:.1f} {unit}'
         size /= 1024
+
+
+def format_datetime(value):
+    """Human-readable local date/time, independent of platform strftime flags."""
+    if value is None:
+        return '—'
+    months = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+    return (f'{months[value.month - 1]} {value.day}, {value.year} at '
+            f'{value.hour % 12 or 12}:{value.minute:02d} {"AM" if value.hour < 12 else "PM"}')
