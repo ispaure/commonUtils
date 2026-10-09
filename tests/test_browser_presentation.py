@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import monotonic, sleep
 import unittest
+from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 from commonUtils.ui.file_browser.status import format_duration, indexing_phase, IndexProgress, private_status
@@ -64,11 +65,21 @@ class BrowserPresentationTests(unittest.TestCase):
                 self.assertFalse(browser.preview_panel.isHidden())
                 self.assertGreaterEqual(browser.splitter.sizes()[1], 220)
                 browser.preview_toggle.setChecked(False)
-                select(second)
+                with patch.object(browser, 'load', wraps=browser.load) as load:
+                    select(second)
+                    load.assert_not_called()
                 self.assertTrue(browser.preview_panel.isHidden())
                 browser.preview_toggle.setChecked(True)
                 wait(lambda: not browser.busy)
                 self.assertFalse(browser.preview_panel.isHidden())
+                browser.cover_pixmap = qt.QPixmap(300, 600)
+                browser.cover_pixmap.fill(qt.Qt.GlobalColor.red)
+                browser._scale_cover()
+                browser.splitter.setSizes([780, 220])
+                self.app.processEvents()
+                cover = browser.cover.pixmap()
+                self.assertLessEqual(cover.width() / cover.devicePixelRatio(), browser.cover.contentsRect().width())
+                self.assertAlmostEqual(cover.width() / cover.height(), .5, places=2)
                 browser.tree.selectionModel().clearSelection()
                 self.app.processEvents()
                 self.assertTrue(browser.preview_panel.isHidden())

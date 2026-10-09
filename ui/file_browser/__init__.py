@@ -9,7 +9,7 @@ from ...dirUtils import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel, ByteSortModel, BrowserTree, _BrowserSelection
 from .details import DetailsPanel
-from .controls import ViewModeSelector, FolderSizeControl
+from .controls import ViewModeSelector, FolderSizeControl, ViewIcon
 from .navigation import NavigationBar
 from ..operations import Operation
 from .views import FileViews
@@ -124,6 +124,9 @@ class FileBrowser(qt.QWidget):
         controls.addWidget(self.view_selector)
         self.preview_toggle = qt.QToolButton(self)
         self.preview_toggle.setText('Preview')
+        self.preview_toggle.setIcon(qt.QIcon(ViewIcon(4)))
+        self.preview_toggle.setIconSize(qt.QSize(20, 20))
+        self.preview_toggle.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.preview_toggle.setCheckable(True)
         from ...settings import get_setting
         self.preview_toggle.setChecked(get_setting('FileBrowser', 'preview_enabled', True))
@@ -213,33 +216,8 @@ class FileBrowser(qt.QWidget):
         self.splitter.addWidget(self.list_stack)
 
     def _create_preview_panel(self):
-        self.preview_panel = qt.QWidget()
-        self.preview_panel.setMinimumWidth(220)
-        panel_layout = qt.QVBoxLayout(self.preview_panel)
-        header = qt.QHBoxLayout()
-        self.heading = qt.QLabel('Files')
-        self.heading.setTextFormat(qt.Qt.TextFormat.PlainText)
-        self.heading.setWordWrap(True)
-        header.addWidget(self.heading, 1)
-        panel_layout.addLayout(header)
-        self.message = qt.QLabel('Select a file or folder.')
-        self.message.setTextFormat(qt.Qt.TextFormat.PlainText)
-        self.message.setWordWrap(True)
-        panel_layout.addWidget(self.message)
-        self.cover = qt.QLabel()
-        self.cover.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
-        self.cover.setMinimumSize(180, 200)
-        self.cover.setMaximumHeight(500)
-        panel_layout.addWidget(self.cover)
-        self.tabs = qt.QTabWidget()
-        self.tabs.setDocumentMode(True)
-        panel_layout.addWidget(self.tabs, 1)
-        self._empty_preview = qt.QPlainTextEdit()
-        self._empty_preview.setReadOnly(True)
-        self.splitter.addWidget(self.preview_panel)
-        self.splitter.setStretchFactor(0, 7)
-        self.splitter.setStretchFactor(1, 3)
-        self.preview_panel.hide()
+        from .preview import create_preview_panel
+        create_preview_panel(self)
 
     def _preview_toggled(self, enabled):
         self._update_preview_visibility(bool(self.selected_objects()))
@@ -247,14 +225,8 @@ class FileBrowser(qt.QWidget):
             self._selection_changed()
 
     def _update_preview_visibility(self, selected):
-        """Give selection details roughly 30% on opening; respect manual resizing."""
-        visible = self.preview_toggle.isChecked() and selected
-        opening = visible and self.preview_panel.isHidden()
-        self.preview_panel.setVisible(visible)
-        if opening:
-            width = max(1, self.splitter.width())
-            details = min(max(220, round(width * .3)), max(220, width - 300))
-            self.splitter.setSizes([max(1, width - details), details])
+        from .preview import update_preview_visibility
+        update_preview_visibility(self, selected)
 
     @property
     def preview(self):
@@ -565,8 +537,11 @@ class FileBrowser(qt.QWidget):
         self.details_loaded.emit(result)
 
     def _scale_cover(self):
+        if self.cover_pixmap.isNull():
+            return
         ratio = self.devicePixelRatioF()
-        preview = self.cover_pixmap.scaled(round(320 * ratio), round(440 * ratio),
+        preview = self.cover_pixmap.scaled(round(min(320, max(1, self.cover.contentsRect().width())) * ratio),
+                                          round(440 * ratio),
                                           qt.Qt.AspectRatioMode.KeepAspectRatio,
                                           qt.Qt.TransformationMode.SmoothTransformation)
         preview.setDevicePixelRatio(ratio)

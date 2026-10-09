@@ -29,6 +29,11 @@ class ViewIcon(qt.QIconEngine):
             for y in (5, 12, 19):
                 painter.drawEllipse(qt.QPointF(4, y), .8, .8)
                 painter.drawLine(qt.QLineF(9, y, 21, y))
+        elif self.mode == 4:
+            painter.drawRoundedRect(qt.QRectF(2, 4, 20, 16), 1, 1)
+            painter.drawLine(qt.QLineF(14, 4, 14, 20))
+            for y in (8, 12, 16):
+                painter.drawLine(qt.QLineF(17, y, 20, y))
         elif self.mode == 3:
             painter.drawRect(qt.QRectF(2, 3, 20, 18))
             painter.drawLine(qt.QLineF(14, 3, 14, 21))

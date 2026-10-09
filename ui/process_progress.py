@@ -176,7 +176,8 @@ class ProcessProgressWindow(qt.QDialog):
         self.details.setText(detail)
         if state == 'running':
             self.bar.setProperty('operationState', 'running')
-            self.bar.setStyleSheet('')
+            self.bar.setStyleSheet('QProgressBar { color: #101620; }'
+                                  if self.context and self.bar.format() == '100% of known work · Still running' else '')
         if state == 'running' and message == 'Starting process…':
             self.metrics = {}
             for value in self.fields.values(): value.setText('Not reported')
@@ -215,7 +216,7 @@ class ProcessProgressWindow(qt.QDialog):
             self.bar.setValue(1000)
             self.bar.setFormat('Complete')
             self.bar.setProperty('operationState', 'succeeded')
-            self.bar.setStyleSheet('QProgressBar::chunk { background-color: #36945c; }')
+            self.bar.setStyleSheet('QProgressBar { color: #ffffff; } QProgressBar::chunk { background-color: #247a46; }')
             self.bar.setToolTip('The process exited successfully.')
         else:
             self.bar.setValue(max(0, previous_value) if had_percentage else 0)
