@@ -460,3 +460,17 @@ SQLite backup migrates the former Application Support/XDG data location, includi
 committed WAL data and partial checkpoints. The original remains for recovery and
 older running applications. Existing canonical caches are never overwritten;
 explicit `DirectoryCache(database=...)` paths are not migrated.
+
+## Opt-in Slate appearance
+
+`from commonUtils.ui.theme import apply_theme` then `controller = apply_theme(app)`
+opts an existing QApplication into the shared Fusion palette and stylesheet.
+Imports and other commonUtils consumers keep their current appearance. Modes are
+`system` (default), `light`, and `dark`; `controller.set_mode(mode)` changes the
+appearance immediately, and system mode follows Qt's OS color-scheme notifications.
+`[Theme] mode=...` in the shared settings INI supplies the startup preference.
+Logistics opts in at launch and offers a live Appearance selector in commonUtils
+settings. The INI editor retains explicit saving and existing wheel preferences.
+Selected tabs combine a contrasting surface, bold text and palette accent underline,
+including workspace headers and native grouped dock tabs. Standard selection pairs
+and ordinary/muted text meet WCAG 4.5:1 contrast in both palettes.
