@@ -50,7 +50,7 @@ Platform-specific implementations use:
 
 The native backend currently provides OK and OK/Cancel dialogs.
 
-### 📄 `pyside.py`
+### 📁 `pyside/`
 
 Provides the more complete PySide6 UI toolkit used for building application interfaces.
 
@@ -61,6 +61,8 @@ snippets below assume the application has performed the setup shown next.
 ```python
 from commonUtils.ui import pyside
 
+# Legacy commonUtils.pySideUtils imports resolve to this same module.
+# Implementations are grouped into application, widgets, windows, messages and progress.
 q_app = pyside.initialize_q_app()  # Once per process; retain this object.
 ```
 
