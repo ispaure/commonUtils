@@ -63,6 +63,23 @@ class SharedJobTests(unittest.TestCase):
                 self.assertFalse(handle.isRunning())
                 handle.deleteLater()
 
+    def test_cancel_during_finished_signal_race_completes_handle(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            cache = DirectoryCache(database=root/'index.sqlite3')
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache):
+                handle = FolderOperation(root, lambda *args, **kwargs: {}, self.app)
+                handle.start()
+                job = handle._job
+                self.assertTrue(job.wait(5000))
+                # finished was emitted, but emulate the gap before Qt exposes
+                # isFinished=True. A new signal connection cannot see that emit.
+                with patch.object(job, 'isFinished', return_value=False):
+                    handle.requestInterruption()
+                self.wait(handle.isFinished)
+                self.assertFalse(handle.isRunning())
+                handle.deleteLater()
+
     def test_last_subscriber_cancels_and_waits_for_its_worker(self):
         with TemporaryDirectory() as folder:
             root=Path(folder);cache=DirectoryCache(database=root/'index.sqlite3')

@@ -24,6 +24,7 @@ class _IndexJob(Operation):
         self.last_totals = None
         self.last_paths = None
         self.subscribers = set()
+        self.retiring = set()
         self._view_lock = RLock()
         self._view_roots = {}
         self._cache_requested = Event()
@@ -145,6 +146,8 @@ class FolderOperation(qt.QObject):
         # Also cover a host deleting its widget directly instead of closing it.
         job = self._job
         self._job = None
+        if self._waiting_job is not None:
+            self._waiting_job.retiring.discard(self)
         if job is not None:
             job.subscribers.discard(self)
             job.set_view_root(self)
@@ -171,7 +174,8 @@ class FolderOperation(qt.QObject):
             job.completed.connect(lambda result, error, owner=job: setattr(owner, 'result', (result,error)))
             def finish(owner=job):
                 if _jobs.get(key) is owner: del _jobs[key]
-                for subscriber in tuple(owner.subscribers): subscriber._finish(*owner.result)
+                for subscriber in tuple(owner.subscribers | owner.retiring): subscriber._finish(*owner.result)
+                owner.retiring.clear()
                 owner.deleteLater()
             job.finished.connect(finish)
             fresh = True
@@ -232,9 +236,9 @@ class FolderOperation(qt.QObject):
         job = self._detach()
         if job is not None and not job.subscribers:
             self._waiting_job = job
-            # Connect before cancelling. A fast worker may already have emitted
-            # finished while its queued GUI callback has not run yet.
-            job.finished.connect(self._finish)
+            # The job's original finish callback also retires cancelled owners.
+            # A late signal connection can miss finished before Qt sets isFinished.
+            job.retiring.add(self)
             job.requestInterruption()
             if job.isFinished():
                 qt.QTimer.singleShot(0, self._finish)
