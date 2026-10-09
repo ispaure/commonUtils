@@ -106,6 +106,7 @@ class StorageView(qt.QWidget):
             chart.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             chart.customContextMenuRequested.connect(lambda point, target=chart: self._chart_context(target,point))
         self.chart_selector.currentIndexChanged.connect(self.charts.setCurrentIndex)
+        self.chart_selector.currentIndexChanged.connect(lambda index: self.refresh())
         self.results = qt.QTreeWidget()
         self.results.setHeaderLabels(['File or folder (largest first)', 'Size', 'Share'])
         self.results.setRootIsDecorated(False)
@@ -170,17 +171,17 @@ class StorageView(qt.QWidget):
             self.pending = True; return
         self.busy = True
         root = self.root
-        self.operation = Operation(lambda: self._collect(root),self)
+        radial = self.chart_selector.currentIndex() == 1
+        self.operation = Operation(lambda: self._collect(root,radial=radial),self)
         self.operation.completed.connect(lambda result,error: self._loaded(root,result,error))
         self.operation.finished.connect(self._finished)
         self.operation.start()
 
-    def _collect(self, root):
+    def _collect(self, root, *, radial=False):
         cancelled = self.operation.isInterruptionRequested
         snapshot = directory_cache.peek(root,cancelled=cancelled)
         if snapshot is None:
             return [],{},{},False
-        totals = snapshot.folder_stats(cancelled=cancelled)
         nodes = {}
         node_totals = {}
         root_entries = []
@@ -189,6 +190,7 @@ class StorageView(qt.QWidget):
             nonlocal budget, root_entries
             if cancelled() or budget <= 0: return
             children = list(snapshot.children(path))
+            totals = snapshot.folder_stats([entry.path for entry in children if entry.directory],cancelled=cancelled)
             items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
                      for entry in children if not entry.symlink]
             items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
@@ -197,7 +199,7 @@ class StorageView(qt.QWidget):
                 root_entries = items
             nodes[path] = items[:budget]
             budget -= len(nodes[path])
-            if depth < 4:
+            if radial and depth < 4:
                 directories = {entry.path for entry in children if entry.directory and not entry.symlink}
                 for child,size in nodes[path]:
                     if child in directories and size: collect(child,depth+1)

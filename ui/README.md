@@ -419,10 +419,10 @@ serializes writers across windows/processes. No source file contents are stored.
 The index storage folder is excluded from its own scans. Root symlinks retain
 lexical result paths; nested symlinks/junctions are listed without traversal.
 
-Each completely enumerated folder is a durable checkpoint. Entries are committed
-in batches inside very large folders, but an interrupted folder must be enumerated
-again. Cancelling leaves the completed-folder checkpoints and last complete index
-intact. `get()` resumes pending discovery before revalidating previously scanned
+Completed folders retain resumable checkpoints. Metadata is written in batches of
+512 entries; commits occur after 4,096 entries or roughly half a second, with an
+explicit flush on cooperative cancellation. An interrupted folder must be enumerated
+again. Cancelling preserves the completed-folder checkpoints and last complete index. `get()` resumes pending discovery before revalidating previously scanned
 folders/files, so missing branches become searchable first. It validates before reuse
 and reconciling additions, removals, replaced links and changed metadata. Unreadable
 or changing folders produce a clearly marked partial snapshot and remain retryable.
@@ -444,6 +444,9 @@ follow shared background index updates. Storage is the fourth browser view,
 with Treemap selected by default and a Radial option showing up to four levels
 (maximum 3,000 radial chart nodes; gaps represent omitted entries). Both use saved sizes, normal breadcrumbs/history,
 file previews and context actions; they never launch an independent filesystem scan.
+Treemap loads only immediate entries and their cached folder totals. Radial detail
+is fetched on demand. Child lookups use the parent index and cached snapshot entry
+counts are lazy, so displaying a chart does not require a whole-generation count.
 Partial charts are labeled and refresh as indexing commits progress. The legacy
 Storage dialog API remains available; its **Refresh view** only reloads saved sizes.
 Rebuild/clear controls are hidden in managed dialogs.
@@ -465,8 +468,12 @@ ancestor reuses its saved subtree checkpoints; completed folders need no new
 enumeration. Interrupted folders are still enumerated again because directory
 iteration positions cannot safely be persisted across filesystem changes.
 
-The scanner fetches pending folders in batches, commits once per completed folder
-(plus batches of 512 entries in large folders), and prioritizes unvisited folders.
+The scanner fetches pending folders in batches and prioritizes unvisited folders.
+Folder identity checks use one metadata call. Progressive totals recompute changed
+folders and their ancestors from immediate entries and persisted child totals.
+A full aggregate pass streams unsorted file rows and sorts directories alone.
+`DirectoryCache.last_metrics` exposes metadata, database-write, aggregation,
+validation and checkpoint seconds plus bounded checkpoint counts for diagnosis.
 Progressive aggregate refresh intervals adapt to their computation cost; unchanged
 aggregate rows are not rewritten. Source metadata, paths and natural-order keys
 remain stored for validation and paging; source file contents are never indexed.
@@ -537,8 +544,9 @@ Logistics workspaces show one indexing line at the bottom of the window, with
 middle-elided paths and full details in its tooltip. Standalone browser widgets retain
 a local bottom status line. Discovery counters are cumulative for the current run;
 they do not reset for each folder. Concurrent UI requests
-reuse a validation completed within two seconds; explicit invalidation bypasses this
-window. Existing explicit DirectoryCache.get calls retain immediate validation.
+reuse a validation completed within 30 seconds; explicit invalidation bypasses this
+window. A newly opened subtree can read a freshly validated ancestor directly,
+without copying a generation or rechecking every descendant. Existing explicit DirectoryCache.get calls retain immediate validation.
 The current location and up to 128 indexed immediate children are watched for changes,
 with debounced reconciliation. A 60-second periodic check (up to five minutes for slow
 scans) validates recursive metadata to catch missed events and unwatched descendants.

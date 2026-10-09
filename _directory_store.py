@@ -5,9 +5,10 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import stat
 import sys
 from threading import RLock
-from time import sleep, time
+from time import sleep, time, perf_counter
 
 from ._directory_metadata import Entry, Snapshot, fingerprint
 from .operations import check_cancelled, OperationCancelled
@@ -63,6 +64,8 @@ class SqlEntries(Sequence):
         self.connection.execute('PRAGMA query_only=ON')
         if connection is None:
             self.connection.execute('BEGIN')
+            # Pin the immutable read transaction without counting every entry.
+            self.connection.execute('SELECT 1 FROM scans WHERE id=?',(generation,)).fetchone()
         self.generation = generation
         self.parent = parent
         self.lock = RLock()
@@ -73,18 +76,26 @@ class SqlEntries(Sequence):
             prefix = str(scope).rstrip(os.sep) + os.sep
             self.where += ' AND path>=? AND path<?'
             self.parameters += (prefix, prefix[:-1] + chr(ord(os.sep) + 1))
-        self.count = self.connection.execute(f'SELECT count(*) FROM entries WHERE {self.where}', self.parameters).fetchone()[0]
+        self._count = None
+
+    @property
+    def count(self):
+        with self.lock:
+            if self._count is None:
+                self._count = self.connection.execute(f'SELECT count(*) FROM entries WHERE {self.where}', self.parameters).fetchone()[0]
+            return self._count
 
     def __len__(self):
         return self.count
 
     def _rows(self, extra='', parameters=(), *, order='sort_key,path', cancelled=lambda: False,
-              limit=None, offset=0):
+              limit=None, offset=0, index=None):
         with self.lock:
             self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
             try:
                 cursor = self.connection.execute(
-                    f'SELECT path,directory,size,modified,symlink,identity FROM entries WHERE {self.where} '
+                    f'SELECT path,directory,size,modified,symlink,identity FROM entries'
+                    + (' INDEXED BY '+index if index else '') + f' WHERE {self.where} '
                     + extra + f' ORDER BY {order}' + (' LIMIT ? OFFSET ?' if limit is not None else ''),
                     self.parameters + parameters + ((limit, offset) if limit is not None else ()))
                 for row in cursor:
@@ -126,7 +137,7 @@ class SqlEntries(Sequence):
         return self._rows(order='length(path) DESC,path')
 
     def children(self, path, limit=None):
-        return tuple(self._rows('AND parent=?', (str(path),), limit=limit))
+        return tuple(self._rows('AND parent=?', (str(path),), limit=limit, index='entry_parent'))
 
     def get(self, path):
         return next(self._rows('AND path=?', (str(path),)), None)
@@ -296,6 +307,11 @@ class DirectoryCache:
                         self._schema(connection)
                         connection.set_progress_handler(lambda: int(cancelled()), 10_000)
                         yield connection
+                    except OperationCancelled:
+                        # Flush bounded pending work when cancellation arrives between folders.
+                        connection.set_progress_handler(None,0)
+                        connection.commit()
+                        raise
                     except sqlite3.OperationalError:
                         if cancelled():
                             raise OperationCancelled('Operation cancelled; saved folder checkpoints can be resumed') from None
@@ -367,13 +383,49 @@ class DirectoryCache:
     @staticmethod
     def _folder_identity(folder, root):
         info = folder.stat() if folder == root else folder.lstat()
-        if folder != root and (folder.is_symlink() or folder.is_junction()):
+        if stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and folder!=root and folder.is_junction()):
             raise OSError('Directory became a link during scanning')
-        if not folder.is_dir():
+        if not stat.S_ISDIR(info.st_mode):
             raise NotADirectoryError(folder)
         return json.dumps(fingerprint(info))
 
+    def _mark_totals_changed(self, folder, root):
+        self._dirty_totals.add(folder)
+        for parent in folder.parents:
+            if folder == root or root not in folder.parents:
+                break
+            self._dirty_totals.add(parent)
+            if parent == root:
+                break
+
+    def _publish_totals(self, db, generation, root, cancelled):
+        started = perf_counter()
+        try:
+            if not db.execute('SELECT 1 FROM folder_totals WHERE generation=? LIMIT 1',(generation,)).fetchone():
+                store_folder_stats(db,generation,root,cancelled)
+            else:
+                store_folder_stats(db,generation,root,cancelled,paths=self._dirty_totals)
+            self._dirty_totals.clear()
+        finally:
+            self.last_metrics['aggregation_seconds'] += perf_counter()-started
+
+    def _checkpoint(self, db, cancelled, *, force=False):
+        if force or cancelled() or self._checkpoint_entries>=4096 or time()-self._checkpoint_at>=.5:
+            started = perf_counter()
+            db.commit()
+            self.last_metrics['checkpoint_seconds'] += perf_counter()-started
+            self.last_metrics['checkpoints'] += 1
+            self._checkpoint_entries = 0
+            self._checkpoint_at = time()
+
     def _validate(self, db, generation, root, cancelled, report, *, root_only=False, check_files=True):
+        started = perf_counter()
+        try:
+            return self._validate_impl(db,generation,root,cancelled,report,root_only=root_only,check_files=check_files)
+        finally:
+            self.last_metrics['validation_seconds'] += perf_counter()-started
+
+    def _validate_impl(self, db, generation, root, cancelled, report, *, root_only=False, check_files=True):
         unchanged = True
         for (path,) in db.execute('SELECT path FROM errors WHERE generation=?', (generation,)).fetchall():
             db.execute("UPDATE folders SET status='pending' WHERE generation=? AND (path=? OR path=?)",
@@ -399,6 +451,7 @@ class DirectoryCache:
             except OSError:
                 valid = False
             if not valid:
+                self._mark_totals_changed(Path(text),root)
                 unchanged = False
                 db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=?", (generation, text))
             count += 1
@@ -410,27 +463,48 @@ class DirectoryCache:
     def _remove_tree(db, generation, folder):
         # A separator-aware prefix handles '%'/'_' in literal folder names safely.
         prefix = folder.rstrip(os.sep) + os.sep
-        for table in ('entries', 'folders', 'errors'):
+        upper = prefix[:-1] + chr(ord(os.sep)+1)
+        for table in ('entries', 'folders', 'errors', 'folder_totals'):
             # The parent has already reconciled its entries. Preserve a new file
             # or link at the old directory's path while deleting its old children.
             if table == 'entries':
-                db.execute('DELETE FROM entries WHERE generation=? AND substr(path,1,?)=?',
-                           (generation, len(prefix), prefix))
+                db.execute('DELETE FROM entries WHERE generation=? AND path>=? AND path<?',
+                           (generation, prefix, upper))
             else:
-                db.execute(f'DELETE FROM {table} WHERE generation=? AND (path=? OR substr(path,1,?)=?)',
-                           (generation, folder, len(prefix), prefix))
+                db.execute(f'DELETE FROM {table} WHERE generation=? AND path=?',(generation,folder))
+                db.execute(f'DELETE FROM {table} WHERE generation=? AND path>=? AND path<?',
+                           (generation,prefix,upper))
 
     def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report):
         text = str(folder)
         # Every child shares the parent's natural-order chunks. Encode those once.
         parts = natural_path_key(text + os.sep)
         sort_prefix, sort_tail = _encode_sort_parts(parts[:-1]), parts[-1]
-        for (error_path,) in db.execute('SELECT path FROM errors WHERE generation=?', (generation,)).fetchall():
-            if error_path == text or Path(error_path).parent == folder:
-                db.execute('DELETE FROM errors WHERE generation=? AND path=?', (generation, error_path))
+        prefix = text.rstrip(os.sep)+os.sep
+        upper = prefix[:-1]+chr(ord(os.sep)+1)
+        db.execute('DELETE FROM errors WHERE generation=? AND path=?',(generation,text))
+        db.execute('DELETE FROM errors WHERE generation=? AND path>=? AND path<? AND instr(substr(path,?),?)=0',
+                   (generation,prefix,upper,len(prefix)+1,os.sep))
         db.execute('DELETE FROM entries WHERE generation=? AND parent=?', (generation, text))
         seen = set()
         count = 0
+        entry_rows, folder_rows = [], []
+        def flush():
+            if not entry_rows:
+                return
+            # A cancelled scan still saves its last bounded metadata batch.
+            db.set_progress_handler(None,0)
+            started = perf_counter()
+            try:
+                db.executemany('INSERT OR REPLACE INTO entries VALUES(?,?,?,?,?,?,?,?,?,?)',entry_rows)
+                db.executemany("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "
+                               "DO UPDATE SET status=CASE WHEN folders.identity=? AND folders.status='done' "
+                               "THEN 'done' ELSE 'pending' END",folder_rows)
+                self._checkpoint_entries += len(entry_rows)
+                entry_rows.clear();folder_rows.clear()
+            finally:
+                self.last_metrics['database_write_seconds'] += perf_counter()-started
+                db.set_progress_handler(lambda:int(cancelled()),10000)
         try:
             before = self._folder_identity(folder, root)
             with os.scandir(folder) as children:
@@ -440,26 +514,27 @@ class DirectoryCache:
                     if path in self._excluded_paths:
                         continue
                     try:
+                        started = perf_counter()
                         info = child.stat(follow_symlinks=False)
-                        link = child.is_symlink() or path.is_junction()
-                        directory = not link and child.is_dir(follow_symlinks=False)
+                        self.last_metrics['metadata_seconds'] += perf_counter()-started
+                        link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and path.is_junction())
+                        directory = not link and stat.S_ISDIR(info.st_mode)
                         identity = json.dumps(fingerprint(info))
-                        db.execute('INSERT OR REPLACE INTO entries VALUES(?,?,?,?,?,?,?,?,?,?)',
-                                   (generation, str(path), text, path.name.casefold(), directory,
-                                    0 if directory or link else info.st_size, info.st_mtime_ns,
-                                    link, identity, sort_prefix + _sort_key(sort_tail + path.name)))
+                        entry_rows.append((generation, str(path), text, path.name.casefold(), directory,
+                                           0 if directory or link else info.st_size, info.st_mtime_ns,
+                                           link, identity, sort_prefix + _sort_key(sort_tail + path.name)))
                         if directory and recursive:
                             seen.add(str(path))
-                            db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "
-                                       "DO UPDATE SET status=CASE WHEN folders.identity=? AND folders.status='done' "
-                                       "THEN 'done' ELSE 'pending' END", (generation, str(path), text, identity))
+                            folder_rows.append((generation,str(path),text,identity))
                     except OSError as error:
                         db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)', (generation, str(path), str(error)))
                     count += 1
                     self._discovered_entries += 1
                     if count % 512 == 0:
-                        db.commit()
+                        flush()
+                        self._checkpoint(db,cancelled)
                     report(self._discovered_entries, 0, f'Indexing {folder}')
+            flush()
             for (old,) in db.execute('SELECT path FROM folders WHERE generation=? AND parent=?', (generation, text)).fetchall():
                 if old not in seen:
                     self._remove_tree(db, generation, old)
@@ -471,12 +546,14 @@ class DirectoryCache:
             db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)', (generation, text, str(error)))
             db.execute("UPDATE folders SET status='error' WHERE generation=? AND path=?", (generation, text))
         finally:
-            # Partial entries are saved, but the folder stays pending until a full enumeration finishes.
-            db.commit()
+            # Preserve partial metadata; the folder stays pending until enumeration finishes.
+            flush()
+            self._mark_totals_changed(folder,root)
+            self._checkpoint(db,cancelled)
             if not cancelled() and time() - self._totals_last > self._totals_interval:
                 started = time()
-                store_folder_stats(db, generation, root, cancelled)
-                db.commit()
+                self._publish_totals(db,generation,root,cancelled)
+                self._checkpoint(db,cancelled,force=True)
                 self._totals_last = time()
                 self._totals_interval = max(2, min(60, (self._totals_last - started) * 20))
                 report(0, 0, 'Saved progressive folder totals')
@@ -551,6 +628,10 @@ class DirectoryCache:
         report(0, 0, 'Waiting for index writer…')
         with self._writer(cancelled) as db:
             self._discovered_entries = self._checked_entries = 0
+            self._dirty_totals = set()
+            self._checkpoint_entries = 0
+            self._checkpoint_at = time()
+            self.last_metrics = dict(metadata_seconds=0.,database_write_seconds=0.,aggregation_seconds=0.,validation_seconds=0.,checkpoint_seconds=0.,checkpoints=0)
             self._totals_interval = 2
             with self._state_lock:
                 revision = self._revision
@@ -568,6 +649,25 @@ class DirectoryCache:
                     pass
             db.execute('INSERT OR IGNORE INTO roots(root,recursive) VALUES(?,?)', (str(root), recursive))
             completed, building = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            if recursive and not completed and not building and not refresh and reuse_for:
+                # Navigation can read a freshly validated ancestor directly; no work
+                # generation, metadata pass or duplicate subtree rows are needed.
+                ancestors = tuple(str(path) for path in root.parents)
+                if ancestors:
+                    candidates = db.execute('SELECT root,completed FROM roots WHERE recursive=1 AND building IS NULL '
+                                            'AND completed IS NOT NULL AND root IN ('+', '.join('?' for _ in ancestors)+') '
+                                            'ORDER BY length(root) DESC',ancestors).fetchall()
+                    for source_text,source in candidates:
+                        source_root = Path(source_text)
+                        with self._state_lock:
+                            stamp = self._validated_times.get((source_root,True),0)
+                            checked = self._validated_roots.get((source_root,True),0)
+                            changed = any(mark>checked and (path is None or path==root or path in root.parents or root in path.parents)
+                                          for path,mark in self._invalidations.items())
+                            fresh = time()-stamp<reuse_for and not changed
+                        if fresh:
+                            report(0,0,'Using recently checked ancestor index…')
+                            return self._snapshot(db,source,root,True,reused=True,scope=root,cancelled=cancelled)
             if recursive and not completed and not building and not refresh:
                 # Seed a newly browsed subtree from completed or partial ancestor checkpoints.
                 # Validation still checks every descendant before reuse, but names
@@ -629,6 +729,7 @@ class DirectoryCache:
                 if completed and not refresh:
                     db.execute('INSERT INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key FROM entries WHERE generation=?', (building, completed))
                     db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=?', (building, completed))
+                    db.execute('INSERT INTO folder_totals SELECT ?,path,size,files,folders,skipped,extensions,complete,scanned_at FROM folder_totals WHERE generation=?',(building,completed))
                 else:
                     db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (building, str(root), ''))
                 db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=?', (building, str(root), recursive))
@@ -675,7 +776,7 @@ class DirectoryCache:
             # Revalidate folders/files changed during this pass before calling it complete.
             valid = self._validate(db, building, root, cancelled, report)
             errors = db.execute('SELECT count(*) FROM errors WHERE generation=?', (building,)).fetchone()[0]
-            store_folder_stats(db, building, root, cancelled)
+            self._publish_totals(db,building,root,cancelled)
             db.execute('UPDATE scans SET scanned_at=? WHERE id=?', (time(), building))
             complete = valid and not errors
             if complete:

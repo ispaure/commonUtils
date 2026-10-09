@@ -133,3 +133,67 @@ class IndexEfficiencyTests(unittest.TestCase):
             self.assertTrue(snapshot.complete)
             self.assertEqual(len(snapshot.entries),0)
             self.assertEqual(snapshot.folder_stats()[root].size,0)
+
+    def test_navigation_reuses_fresh_ancestor_without_copying_or_validating_subtree(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';child=root/'child';child.mkdir(parents=True)
+            (child/'file.txt').write_bytes(b'abc')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3');cache.get(root)
+            with patch.object(cache,'_validate',side_effect=AssertionError('Navigation validated the subtree again')):
+                snapshot=cache.get(child,reuse_for=30)
+            self.assertTrue(snapshot.reused)
+            self.assertEqual(snapshot.folder_stats()[child].size,3)
+            self.assertEqual([entry.path for entry in snapshot.entries],[child/'file.txt'])
+            with cache._writer(lambda:False) as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM scans').fetchone()[0],1)
+            (child/'file.txt').write_bytes(b'changed');cache.invalidate(child)
+            self.assertEqual(cache.get(child,reuse_for=30).folder_stats()[child].size,7)
+
+    def test_many_small_folders_use_bounded_batch_checkpoints(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            for i in range(40):
+                child=root/str(i);child.mkdir();(child/'file.txt').write_bytes(b'x')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3');snapshot=cache.get(root)
+            self.assertEqual(len(snapshot.entries),80)
+            self.assertLess(cache.last_metrics['checkpoints'],10)
+            self.assertIn('validation_seconds',cache.last_metrics)
+
+    def test_progressive_totals_roll_up_only_changed_branches_and_match_full_pass(self):
+        from commonUtils._directory_totals import collect_folder_stats
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            for i in range(8):
+                child=root/str(i);child.mkdir();(child/'file.txt').write_bytes(b'abc')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3')
+            scan=cache._scan_folder
+            def scanning(*args):
+                result=scan(*args)
+                cache._publish_totals(args[0],args[1],args[2],args[5]);args[0].commit()
+                return result
+            with patch.object(cache,'_scan_folder',side_effect=scanning),patch('commonUtils._directory_totals.collect_folder_stats',wraps=collect_folder_stats) as full:
+                snapshot=cache.get(root)
+            self.assertEqual(full.call_count,1)
+            self.assertEqual(snapshot.folder_stats()[root].size,24)
+            (root/'0'/'file.txt').unlink();(root/'0'/'new.cbz').write_bytes(b'changed')
+            cache.invalidate(root/'0');fresh=cache.get(root)
+            with cache._writer(lambda:False) as db:
+                generation=db.execute('SELECT completed FROM roots WHERE root=?',(str(root),)).fetchone()[0]
+                expected=collect_folder_stats(db,generation,root)
+            actual=fresh.folder_stats()
+            for path,value in expected.items():
+                self.assertEqual((actual[path].size,actual[path].files,actual[path].folders,actual[path].skipped,actual[path].extension_counts,actual[path].complete),
+                                 (value.size,value.files,value.folders,value.skipped,value.extension_counts,value.complete))
+
+    def test_fast_extension_counts_preserve_path_suffix_semantics(self):
+        from collections import Counter
+        from commonUtils._directory_totals import _extension
+        names=['.hidden','..odd','file..CBZ','file.tar.gz','trailing.','no_extension','résumé.TXT']
+        for name in names:
+            self.assertEqual(_extension(str(Path('/example')/name)),Path(name).suffix.lower().lstrip('.'))
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            for name in names:(root/name).write_bytes(b'x')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3')
+            self.assertEqual(cache.get(root).folder_stats()[root].extension_counts,
+                             dict(Counter(Path(name).suffix.lower().lstrip('.') for name in names)))
