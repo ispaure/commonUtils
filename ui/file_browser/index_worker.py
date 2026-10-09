@@ -66,7 +66,7 @@ class _IndexJob(Operation):
             self._status.update(0, 'Loading saved sizes…', saved_entries=self.saved_entries)
             self.last_progress = self._status.render()
             self.progress.emit(self.last_progress)
-            totals = snapshot.folder_stats(cancelled=self.isInterruptionRequested)
+            totals = snapshot.folder_stats(children_of=self.root, cancelled=self.isInterruptionRequested)
             self.last_totals = totals
             self.updated.emit(self.root, totals)
             paths = (self.root,) + tuple(entry.path for entry in snapshot.children(self.root, limit=128) if not entry.symlink)

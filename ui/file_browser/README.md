@@ -45,6 +45,10 @@ The shared status line and tooltip contain phases/counters, never scanner paths 
 tab titles. Processed counts include discovery and validation operations, not a
 claim of unique files; rate is the average over the run. Elapsed time continues
 updating while the worker is busy with SQL, and supports seconds, minutes and hours.
+The stable prefix and counters precede the changing phase. Browser size updates
+read totals only for the current folder and its immediate child folders; each saved
+total still includes all descendants. Full `scan_folders()` results remain available
+to existing callers; the browser opts into `visible_only=True`.
 
 ## Compact cache (schema 3)
 
@@ -62,6 +66,10 @@ metadata still need validation; compact storage does not turn filesystem enumera
 into a journal-based index. Natural path order is preserved by combining each cached
 folder prefix with its filename key during reads. Broad result sorting can use a
 SQLite temporary sort; immediate-child charts do not traverse the whole generation.
+Folder reconciliation uses the covering `folder_parent(generation,parent,path)`
+index. Without it, every folder scan examines all saved folder checkpoints. Existing
+schema 3 databases receive this index on the next writer initialization; no metadata
+rebuild is needed. Only one copy of the pending-folder queue index is retained.
 
 Upgrades run under the writer lock. Before upgrading an existing schema 1/2 cache,
 a SQLite backup creates `directory-index.pre-v3.sqlite3` beside the index, including

@@ -41,6 +41,22 @@ class IndexedSizeTests(unittest.TestCase):
         self.assertEqual(fresh.folder_stats()[self.root].size,33)
         self.assertEqual(first.folder_stats()[self.root].size,10)
 
+    def test_browser_totals_read_one_level_and_keep_recursive_sizes(self):
+        snapshot = self.cache.get(self.root)
+        statements = []
+        snapshot.entries.connection.set_trace_callback(statements.append)
+        stats = snapshot.folder_stats(children_of=self.root)
+        self.assertEqual(set(stats), {self.root, self.root / 'sub'})
+        self.assertEqual(stats[self.root / 'sub'].size, 7)
+        self.assertEqual(stats[self.root].size, 10)
+        self.assertTrue(any('parent_id=' in sql for sql in statements))
+        with patch('commonUtils.directory_index.directory_cache', self.cache):
+            self.assertEqual(set(scan_folders(self.root, visible_only=True)), set(stats))
+            self.assertIn(self.root / 'sub' / 'nested', scan_folders(self.root))
+        scoped = self.cache.peek(self.root / 'sub')
+        self.assertEqual(set(scoped.folder_stats(children_of=scoped.root)),
+                         {self.root / 'sub', self.root / 'sub' / 'nested'})
+
     def test_partial_sizes_are_not_marked_final_and_retry_permissions(self):
         import os
         real=os.scandir

@@ -32,10 +32,13 @@ class Snapshot:
     complete: bool = True
     metadata_checked: bool = True
 
-    def folder_stats(self, paths=None, *, cancelled=lambda: False):
+    def folder_stats(self, paths=None, *, cancelled=lambda: False, children_of=None):
         """Persisted aggregates; requested paths keep browser updates bounded."""
         if hasattr(self.entries, 'folder_stats'):
-            return self.entries.folder_stats(paths, cancelled=cancelled, stale=not self.metadata_checked)
+            options = {'children_of': children_of} if children_of is not None else {}
+            return self.entries.folder_stats(paths, cancelled=cancelled, stale=not self.metadata_checked, **options)
+        if children_of is not None and paths is not None:
+            raise ValueError('Choose explicit paths or immediate child folders')
         # Standalone metadata snapshots retain their public API without a database.
         from .filesystem import FolderStats
         stats = {self.root: FolderStats(complete=self.complete, scanned_at=self.scanned_at)}
@@ -51,6 +54,9 @@ class Snapshot:
                 parent.size += entry.size; parent.files += 1
                 ext = entry.path.suffix.lower().lstrip('.')
                 parent.extension_counts[ext] = parent.extension_counts.get(ext, 0) + 1
+        if children_of is not None:
+            return {path: value for path, value in stats.items()
+                    if path == children_of or path.parent == children_of}
         return stats if paths is None else {path: stats[path] for path in paths if path in stats}
 
     def search(self, name, *, cancelled=lambda: False):
