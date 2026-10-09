@@ -739,7 +739,7 @@ class DirectoryCache:
             return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete, cancelled=cancelled)
 
     def reconcile_folder(self, root, *, changes=(), full=False, once=False, cancelled=lambda: False,
-                         report=lambda done, total, message: None):
+                         report=lambda done, total, message: None, recursive_initial=True):
         """Check visible contents; completed caches update atomically without tree-wide validation.
 
         With full=True, also check every saved descendant for explicit Refresh.
@@ -751,6 +751,13 @@ class DirectoryCache:
         """
         root = Path(root).absolute()
         changes = tuple(changes)
+        if not recursive_initial and not full:
+            # Navigation may request only visible contents. Never seed/copy a
+            # whole cached subtree or resume its pending descendants here.
+            snapshot = self.get(root, recursive=False, cancelled=cancelled, report=report)
+            with self._state_lock:
+                self._session_checked.add((self.database, root))
+            return snapshot
         if once and not full and not changes and self.was_checked_this_session(root):
             snapshot = self.peek(root, cancelled=cancelled)
             if snapshot is not None:
@@ -782,12 +789,14 @@ class DirectoryCache:
             row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
             if row is None and not recursive:
                 row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=1', (str(root),)).fetchone()
-            if row is None and recursive:
+            if (row is None or not (row[1] or row[2])) and recursive:
                 ancestors = tuple(str(path) for path in root.parents)
                 if ancestors:
                     row = db.execute('SELECT root,completed,building FROM roots WHERE recursive=1 AND root IN (' +
                                      ','.join('?' for _ in ancestors) + ') AND (completed IS NOT NULL OR building IS NOT NULL) '
                                      'ORDER BY length(root) DESC LIMIT 1', ancestors).fetchone()
+                if row is None:
+                    row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=0', (str(root),)).fetchone()
             if row is None or not (row[1] or row[2] and partial):
                 db.close()
                 return None

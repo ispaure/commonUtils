@@ -54,8 +54,8 @@ class StorageViewTests(unittest.TestCase):
             seen = []
             def children(path, limit=None):
                 seen.append(limit)
-                return entries[:limit]
-            snapshot = SimpleNamespace(complete=True, children=children, folder_stats=lambda *a, **k: {})
+                return [(entry.path, entry.directory, entry.size) for entry in entries[:limit]]
+            snapshot = SimpleNamespace(complete=True, storage_children=lambda path, limit, **kw: children(path, limit), folder_stats=lambda *a, **k: {})
             storage = browser.views.storage
             storage.operation = SimpleNamespace(isInterruptionRequested=lambda: False)
             with patch('commonUtils.ui.file_browser.storage_view.directory_cache.peek', return_value=snapshot):
@@ -123,7 +123,8 @@ class StorageViewTests(unittest.TestCase):
                         small: [Entry(deep,True,0,0)], deep: [Entry(leaf,True,0,0)],
                         leaf: [Entry(file,False,5,0)]}
             sizes = {root: 3105, big: 3100, small: 5, deep: 5, leaf: 5}
-            snapshot = SimpleNamespace(complete=True, children=lambda path, limit=None: children.get(path, [])[:limit],
+            snapshot = SimpleNamespace(complete=True,
+                storage_children=lambda path, limit, **kw: [(entry.path, entry.directory, sizes[entry.path] if entry.directory else entry.size) for entry in children.get(path, [])[:limit]],
                 folder_stats=lambda paths, **kw: {path: FolderStats(size=sizes[path]) for path in paths})
             browser = FileBrowser(root,calculate_folder_sizes=False); browser.resize(1000,700); browser.show()
             try:
@@ -187,16 +188,16 @@ class StorageViewTests(unittest.TestCase):
             root=Path(temp);child=root/'child';child.mkdir();(child/'file.txt').write_bytes(b'abc')
             directory_cache.get(root)
             browser=FileBrowser(root,calculate_folder_sizes=False)
-            read=SqlEntries.children;seen=[]
-            def children(entries,path,limit=None):
-                seen.append(path);return read(entries,path,limit)
+            read=SqlEntries.storage_children;seen=[]
+            def children(entries,path,limit,**kwargs):
+                seen.append(path);return read(entries,path,limit,**kwargs)
             def wait():
                 deadline=time.monotonic()+5
                 while browser.views.storage.busy:
                     app.processEvents();time.sleep(.01);self.assertLess(time.monotonic(),deadline)
                 app.processEvents()
             try:
-                with patch.object(SqlEntries,'children',children):
+                with patch.object(SqlEntries,'storage_children',children):
                     browser.view_selector.setCurrentIndex(3);wait()
                     self.assertEqual(seen,[root])
                     browser.views.storage.chart_selector.setCurrentIndex(1);wait()

@@ -118,6 +118,38 @@ class SqlEntries(Sequence):
     def children(self, path, limit=None):
         return tuple(self._rows('AND '+self.parent_filter, (str(path),), limit=limit))
 
+    def storage_children(self, path, limit, *, cancelled=lambda: False):
+        """Largest children and scalar totals, without deserializing subtree metadata."""
+        path = Path(path)
+        if self.scope is not None and path != self.scope and self.scope not in path.parents:
+            return ()
+        if self.parent is not None and path != self.parent:
+            return ()
+        parent = ('e.parent_id=(SELECT id FROM folder_paths WHERE path=?)' if self.compact else 'e.parent=?')
+        with self.lock:
+            self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
+            try:
+                # Independently cached branches remain useful while their new
+                # parent is only partially indexed. Prefer this generation's total.
+                query = (f'SELECT e.path,e.directory,CASE WHEN e.directory THEN '
+                         'max(coalesce(t.size,0),coalesce(c.size,0)) ELSE e.size END AS bytes '
+                         f'FROM {self.table} e LEFT JOIN folder_totals t '
+                         'ON t.generation=e.generation AND t.path=e.path '
+                         'LEFT JOIN roots r ON r.root=e.path AND r.recursive=1 '
+                         'LEFT JOIN folder_totals c ON c.generation=coalesce(r.building,r.completed) AND c.path=r.root '
+                         f'WHERE e.generation=? AND {parent} AND e.symlink=0 '
+                         'ORDER BY bytes DESC,e.name_fold,e.path LIMIT ?')
+                result = []
+                for text, directory, size in self.connection.execute(query, (self.generation, str(path), limit)):
+                    check_cancelled(cancelled)
+                    result.append((Path(text), bool(directory), size))
+                return tuple(result)
+            except sqlite3.OperationalError:
+                check_cancelled(cancelled)
+                raise
+            finally:
+                self.connection.set_progress_handler(None, 0)
+
     def get(self, path):
         path = Path(path)
         return next(self._rows('AND '+self.parent_filter+' AND path=?', (str(path.parent), str(path))), None)

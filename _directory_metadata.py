@@ -71,6 +71,15 @@ class Snapshot:
                 matches.append(entry)
         return tuple(matches)
 
+    def storage_children(self, path, limit, *, cancelled=lambda: False):
+        if hasattr(self.entries, 'storage_children'):
+            return self.entries.storage_children(path, limit, cancelled=cancelled)
+        totals = self.folder_stats(cancelled=cancelled)
+        items = [(entry.path, entry.directory, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
+                 for entry in self.children(path) if not entry.symlink]
+        check_cancelled(cancelled)
+        return tuple(sorted(items, key=lambda item: (-item[2], item[0].name.casefold()))[:limit])
+
     def search_page(self, name, offset=0, limit=500, *, cancelled=lambda: False, sort='path', descending=False):
         if offset < 0 or limit < 1:
             raise ValueError('Search page requires a nonnegative offset and positive limit')

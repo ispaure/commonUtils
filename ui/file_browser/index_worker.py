@@ -129,12 +129,13 @@ class FolderOperation(qt.QObject):
     completed = qt.Signal(object, str)
     finished = qt.Signal()
 
-    def __init__(self, root, scanner, parent, *, request_key=None):
+    def __init__(self, root, scanner, parent, *, request_key=None, background_priority=True):
         super().__init__(parent)
         self.root = root
         self.visible_root = root
         self.scanner = scanner
         self.request_key = request_key
+        self.background_priority = background_priority
         self.started_at = monotonic()
         self._job = None
         self._waiting_job = None
@@ -192,7 +193,9 @@ class FolderOperation(qt.QObject):
             self.updated.emit(self.visible_root, job.totals_by_root[self.visible_root])
         if self.visible_root in job.paths_by_root:
             self.watch_paths.emit(self.visible_root, job.paths_by_root[self.visible_root])
-        if fresh: job.start()
+        if fresh:
+            priority = qt.QThread.Priority.LowPriority if self.background_priority else qt.QThread.Priority.InheritPriority
+            job.start(priority)
 
     def retarget(self, root):
         """Follow a descendant view while the original shared scan keeps running."""
