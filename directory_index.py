@@ -58,3 +58,13 @@ def scan_metadata(root, recursive=True, *, cancelled=lambda: False,
             errors.append((folder, str(error)))
     return Snapshot(root, recursive, tuple(sorted(entries, key=lambda item: natural_path_key(item.path))),
                     tuple(errors), time())
+
+
+def storage_totals(snapshot):
+    """Logical bytes by path; links excluded, directory totals calculated bottom-up."""
+    totals = {snapshot.root: 0}
+    for entry in snapshot.entries:
+        totals[entry.path] = 0 if entry.directory or entry.symlink else entry.size
+    for entry in sorted(snapshot.entries, key=lambda item: len(item.path.parts), reverse=True):
+        totals[entry.path.parent] = totals.get(entry.path.parent, 0) + totals[entry.path]
+    return totals
