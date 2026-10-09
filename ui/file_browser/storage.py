@@ -98,7 +98,7 @@ class StorageDialog(ScanDialog):
         self.locate_button = qt.QPushButton('Show in browser')
         self.locate_button.clicked.connect(lambda: self.locate(self.selected_path))
         self.refresh_button = qt.QPushButton('Analyze / Refresh')
-        self.refresh_button.clicked.connect(lambda: self.scan(True))
+        self.refresh_button.clicked.connect(lambda: self.scan(True, refresh=True))
         for widget in (self.up_button, self.locate_button, self.refresh_button):
             controls.addWidget(widget)
         self.layout.insertLayout(1, controls)
