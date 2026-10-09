@@ -27,7 +27,8 @@ class StorageTests(unittest.TestCase):
             ('linux', {}, self.home/'.cache')]:
             with self.subTest(platform=platform, env=env), patch('commonUtils.storage.sys.platform', platform), patch.dict(os.environ, env, clear=True):
                 expected=expected/'commonUtils'
-                self.assertEqual(cache_directory(create=False), expected)
+                persistent = self.home/'Library'/'Application Support'/'commonUtils'/'Cache' if platform == 'darwin' else expected
+                self.assertEqual(cache_directory(create=False), persistent)
                 self.assertEqual(temporary_directory(create=False), expected/'Temp')
                 self.assertEqual(temporary_directory(), expected/'Temp')
                 self.assertTrue((expected/'Temp').is_dir())
@@ -68,3 +69,19 @@ class StorageTests(unittest.TestCase):
         self.assertFalse(new.database.exists())
         self.assertFalse(list(self.home.glob('.index-migration-*')))
         self.assertTrue(old.exists())
+
+    def test_macos_migration_prefers_recent_caches_database(self):
+        root=self.home/'files'; root.mkdir(); (root/'a.txt').write_text('content')
+        older=self.home/'Library'/'Application Support'/'commonUtils'/'directory-index.sqlite3'
+        DirectoryCache(database=older).get(root)
+        (root/'b.txt').write_text('new')
+        recent=self.home/'Library'/'Caches'/'commonUtils'/'directory-index.sqlite3'
+        DirectoryCache(database=recent).get(root)
+        with patch('commonUtils.storage.sys.platform', 'darwin'):
+            new=DirectoryCache()
+            self.assertEqual(new.database, self.home/'Library'/'Application Support'/'commonUtils'/'Cache'/'directory-index.sqlite3')
+            self.assertEqual(new._legacy_database, recent)
+            with new._writer(lambda: False): pass
+            self.assertEqual(len(new.peek(root).entries), 2)
+            self.assertTrue(recent.exists())
+            self.assertTrue(older.exists())

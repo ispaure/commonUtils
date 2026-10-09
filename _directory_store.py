@@ -22,6 +22,9 @@ def directory_index_path():
 
 def _legacy_directory_index_path():
     if sys.platform == 'darwin':
+        recent = Path.home() / 'Library' / 'Caches' / 'commonUtils' / 'directory-index.sqlite3'
+        if recent.is_file():
+            return recent
         folder = Path.home() / 'Library' / 'Application Support'
     elif sys.platform == 'win32':
         folder = Path(os.environ.get('LOCALAPPDATA') or Path.home() / 'AppData' / 'Local')

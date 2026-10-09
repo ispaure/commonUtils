@@ -408,7 +408,7 @@ case-insensitive partial name search, and `storage_totals()`. `DirectoryCache`
 persists completed and partial indices in SQLite, without entry/root count limits.
 `directory_index_path()` defaults to:
 
-- macOS: `~/Library/Caches/commonUtils/directory-index.sqlite3`
+- macOS: `~/Library/Application Support/commonUtils/Cache/directory-index.sqlite3`
 - Windows: `%LOCALAPPDATA%/commonUtils/directory-index.sqlite3`
 - Linux: `$XDG_CACHE_HOME/commonUtils/directory-index.sqlite3` (default `~/.cache`)
 
@@ -460,18 +460,22 @@ requires a normal zero exit; cancellation and failed starts remain distinct outc
 ## Shared temporary storage
 
 `commonUtils.storage.cache_directory()` resolves/creates the persistent cache
-area using macOS Library/Caches, Windows LOCALAPPDATA, or Linux XDG_CACHE_HOME
-(with ~/.cache fallback; relative XDG paths are ignored). `temporary_directory()`
-creates its disposable `Temp` subdirectory. `temporary_workspace()` returns a
+area using macOS Library/Application Support/commonUtils/Cache, Windows LOCALAPPDATA,
+or Linux XDG_CACHE_HOME (with ~/.cache fallback; relative XDG paths are ignored).
+`temporary_directory()` creates disposable workspaces under macOS
+Library/Caches/commonUtils/Temp, or the persistent area's Temp subdirectory on
+Windows/Linux. `temporary_workspace()` returns a
 private, automatically cleaned TemporaryDirectory there. Use `create=False` for
 side-effect-free path resolution. Persistent caches are never deleted on exit.
 Destination-side staging remains beside the destination for atomic replacement.
 
 On first use of the default SQLite index at its new location, a transactional
-SQLite backup migrates the former Application Support/XDG data location, including
+SQLite backup migrates the former location, including
 committed WAL data and partial checkpoints. The original remains for recovery and
 older running applications. Existing canonical caches are never overwritten;
 explicit `DirectoryCache(database=...)` paths are not migrated.
+On macOS, migration prefers Library/Caches/commonUtils's index and falls back to
+the older index directly under Application Support/commonUtils.
 
 ## Opt-in Slate appearance
 
