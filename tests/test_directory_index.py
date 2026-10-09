@@ -30,24 +30,28 @@ class DirectoryIndexTests(unittest.TestCase):
             (root / 'nested').mkdir()
             file = root / 'nested' / 'file.txt'
             file.write_bytes(b'one')
-            cache = DirectoryCache()
-            first = cache.get(root)
-            with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Repeated enumeration')):
-                reused = cache.get(root)
-                self.assertTrue(reused.reused)
-                self.assertEqual(reused.scanned_at, first.scanned_at)
-                self.assertEqual(len(cache.get(root, False).entries), 1)
-            file.write_bytes(b'changed')
-            self.assertFalse(cache.get(root).reused)
-            self.assertEqual(cache.get(root).search('file')[0].size, 7)
-            (root / 'nested' / 'new.txt').write_bytes(b'new')
-            self.assertFalse(cache.get(root).reused)
-            self.assertEqual(len(cache.get(root).entries), 3)
-            self.assertFalse(cache.get(root, refresh=True).reused)
-            cache.invalidate(file)
-            self.assertFalse(cache.get(root).reused)
-            file.unlink()
-            self.assertFalse(cache.get(root).reused)
+            with TemporaryDirectory() as index_dir:
+                cache = DirectoryCache(database=Path(index_dir) / 'index.sqlite3')
+                self._check_cache(cache, root, file)
+
+    def _check_cache(self, cache, root, file):
+        first = cache.get(root)
+        with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Repeated enumeration')):
+            reused = cache.get(root)
+            self.assertTrue(reused.reused)
+            self.assertEqual(reused.scanned_at, first.scanned_at)
+            self.assertEqual(len(cache.get(root, False).entries), 1)
+        file.write_bytes(b'changed')
+        self.assertFalse(cache.get(root).reused)
+        self.assertEqual(cache.get(root).search('file')[0].size, 7)
+        (root / 'nested' / 'new.txt').write_bytes(b'new')
+        self.assertFalse(cache.get(root).reused)
+        self.assertEqual(len(cache.get(root).entries), 3)
+        self.assertFalse(cache.get(root, refresh=True).reused)
+        cache.invalidate(file)
+        self.assertFalse(cache.get(root).reused)
+        file.unlink()
+        self.assertFalse(cache.get(root).reused)
 
     def test_junction_like_directories_are_listed_without_traversal(self):
         with TemporaryDirectory() as temp:
