@@ -197,7 +197,7 @@ class FileViews(qt.QStackedWidget):
 
     def set_icon_scale(self, percent):
         self.tiles.set_folder_scale(percent)
-        size = round(32 * percent / 50)
+        size = round(16 * percent / 50)
         for view in (self.tree, self.columns):
             view.setIconSize(qt.QSize(size, size))
 

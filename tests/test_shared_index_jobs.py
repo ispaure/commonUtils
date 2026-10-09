@@ -102,8 +102,11 @@ class SharedJobTests(unittest.TestCase):
             cache=DirectoryCache(database=base/'cache'/'index.sqlite3');cache.get(root)
             messages=[];read=Snapshot.folder_stats
             def totals(snapshot,*args,**kwargs):
-                self.assertIn('1 saved entries',messages[-1])
-                self.assertEqual(kwargs['children_of'], root)
+                if 'children_of' in kwargs:
+                    self.assertIn('1 saved entries',messages[-1])
+                    self.assertEqual(kwargs['children_of'], root)
+                else:
+                    self.assertEqual(args, ([root],))
                 return read(snapshot,*args,**kwargs)
             with patch('commonUtils.ui.file_browser.index_worker.directory_cache',cache):
                 job=_IndexJob(root,lambda *args,**kwargs:None,self.app)
