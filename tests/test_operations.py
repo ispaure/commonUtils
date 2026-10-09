@@ -60,6 +60,9 @@ class OperationProgressTests(unittest.TestCase):
         self.progress.start(lambda report, cancelled: 'second')
         self.wait()
         self.assertEqual(results, [('first', ''), ('second', '')])
+        self.assertEqual(self.progress.bar.maximum(), 1000)
+        self.assertEqual(self.progress.bar.value(), 1000)
+        self.assertEqual(self.progress.message.text(), 'Finished.')
 
     def test_quiet_operation_keeps_cancellation_and_normal_visibility_default(self):
         entered, release = Event(), Event()
@@ -92,6 +95,9 @@ class OperationProgressTests(unittest.TestCase):
         popup.assert_not_called()
         self.assertIsNone(result[0][0])
         self.assertIn('worker error', result[0][1])
+        self.assertEqual(self.progress.bar.maximum(), 1000)
+        self.assertEqual(self.progress.bar.value(), 0)
+        self.assertIn('Operation failed', self.progress.message.text())
 
     def test_cancel_keeps_progress_alive_until_worker_stops(self):
         entered, release = Event(), Event()
@@ -111,3 +117,5 @@ class OperationProgressTests(unittest.TestCase):
             release.set()
             self.wait()
         self.assertEqual(results, [(True, '')])
+        self.assertEqual(self.progress.bar.maximum(), 1000)
+        self.assertEqual(self.progress.message.text(), 'Cancelled.')

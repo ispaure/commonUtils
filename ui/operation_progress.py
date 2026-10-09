@@ -69,6 +69,12 @@ class OperationProgress(qt.QWidget):
         self.operation = None
         self.busy = False
         self.cancel_button.setEnabled(False)
+        result, error = self._result
+        cancelled = self.cancelled.is_set() or getattr(result, 'cancelled', False)
+        self.bar.setRange(0, 1000)
+        self.bar.setValue(0 if error or cancelled else 1000)
+        self.message.setText(f'Operation failed: {error}' if error else
+                             'Cancelled.' if cancelled else 'Finished.')
         operation.deleteLater()
         self.completed.emit(*self._result)
 
