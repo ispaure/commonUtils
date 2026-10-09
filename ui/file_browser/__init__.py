@@ -448,6 +448,7 @@ class FileBrowser(qt.QWidget):
             return
         self._clear_details()
         if not self.preview_toggle.isChecked():
+            self.selected_object = items[0] if len(items) == 1 else None
             return
         if len(items) == 1:
             self.load(items[0])
@@ -481,6 +482,7 @@ class FileBrowser(qt.QWidget):
             return
         self._clear_details()
         self.selected_object = item
+        self._update_preview_visibility(True)
         self.heading.setText(item.name if isinstance(item, Directory) else item.file_name)
         self.message.setText('Loading information…')
         stats = self.model.folder_totals.get(item.path)

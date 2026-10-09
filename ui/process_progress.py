@@ -172,7 +172,7 @@ class ProcessProgressWindow(qt.QDialog):
         detail = message.splitlines()[0] if message else ''
         if state == 'running' and self.context and self.bar.format() == '100% of known work · Still running':
             self.state.setText(f'Still running · Attempt {attempt}')
-            detail = 'All work discovered so far is processed. Scanning or final checks may still be running.'
+            detail = 'Reported progress is 100%. Scanning or final checks may still be running.'
         self.details.setText(detail)
         if state == 'running':
             self.bar.setProperty('operationState', 'running')
@@ -199,7 +199,7 @@ class ProcessProgressWindow(qt.QDialog):
             self.bar.setValue(min(1000, max(0, int(update.done / update.total * 1000))))
             if self.context and update.done >= update.total:
                 self.bar.setFormat('100% of known work · Still running')
-                self.details.setText('All work discovered so far is processed. Scanning or final checks may still be running.')
+                self.details.setText('Reported progress is 100%. Scanning or final checks may still be running.')
             elif self.context:
                 self.bar.setFormat(self.bar.format() + ' of known work')
             self.bar.setToolTip('Totals can grow as more files are discovered. Completion is confirmed when the process exits successfully.')
