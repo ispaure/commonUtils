@@ -56,7 +56,12 @@ class FolderColumnView(qt.QColumnView):
         self.set_file_preview_visible(False)
 
     def eventFilter(self, watched, event):
-        if event.type() in (qt.QEvent.Type.MouseButtonPress, qt.QEvent.Type.KeyPress):
+        selecting = (event.type() == qt.QEvent.Type.MouseButtonPress and event.button() == qt.Qt.MouseButton.LeftButton
+                     or event.type() == qt.QEvent.Type.KeyPress and event.key() in
+                     (qt.Qt.Key.Key_Up, qt.Qt.Key.Key_Down, qt.Qt.Key.Key_Left, qt.Qt.Key.Key_Right,
+                      qt.Qt.Key.Key_Home, qt.Qt.Key.Key_End, qt.Qt.Key.Key_PageUp, qt.Qt.Key.Key_PageDown,
+                      qt.Qt.Key.Key_Space, qt.Qt.Key.Key_A))
+        if selecting:
             self.selection_input.emit(event.modifiers())
         if event.type() == qt.QEvent.Type.MouseButtonRelease:
             qt.QTimer.singleShot(0, self, self._sync_preview_width)
