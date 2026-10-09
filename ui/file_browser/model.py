@@ -5,7 +5,7 @@ from pathlib import Path
 from .. import pyside as qt
 from ...dirUtils import Directory
 from ...fileTypes.registry import file_types, object_from_path
-from ...filesystem import format_size
+from ...filesystem import format_size, format_datetime
 from ...file_operations import validate_name
 
 
@@ -48,7 +48,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                     return format_size(stats.size) if stats is not None else '…'
                 return format_size(item.size) if item.size is not None else '—'
             if index.column() == 3 and item.modified_time is not None:
-                return item.modified_time.strftime('%Y-%m-%d %H:%M')
+                return format_datetime(item.modified_time)
         if index.isValid() and index.column() == 1 and role == qt.Qt.ItemDataRole.ToolTipRole:
             if isinstance(self.item(index), Directory):
                 return 'Recursive file size; symbolic links are excluded.'
