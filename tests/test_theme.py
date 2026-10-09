@@ -58,6 +58,13 @@ class ThemeTests(unittest.TestCase):
             for _ in range(5):self.app.processEvents()
             bars=[bar for bar in workspace.findChildren(qt.QTabBar) if bar.count()==2]
             self.assertTrue(bars)
+            self.assertIs(workspace.active_dock, workspace._tab_dock(bars[0], bars[0].currentIndex()))
+            bars[0].setCurrentIndex(0)
+            self.app.processEvents()
+            self.assertIs(workspace.active_view, first)
+            bars[0].setCurrentIndex(1)
+            self.app.processEvents()
+            self.assertIs(workspace.active_view, workspace.docks[1].widget())
             self.assertIn('palette(highlight)',bars[0].styleSheet())
             self.assertEqual(bars[0].palette().color(qt.QPalette.ColorRole.Highlight).name(),colors.accent)
             self.assertTrue(workspace.docks[0].tab_header.title.font().bold())

@@ -1,5 +1,6 @@
 """Worker snapshots keep database reads and aggregate loading off the GUI thread."""
 from time import monotonic
+import sqlite3
 from ..operations import Operation
 from .. import pyside as qt
 from ...directory_index import directory_cache
@@ -16,7 +17,12 @@ class FolderOperation(Operation):
         super().__init__(lambda: self._collect(scanner), parent)
 
     def _collect(self, scanner):
-        self._cached(force=True)
+        try:
+            self._cached(force=True)
+        except sqlite3.OperationalError:
+            # A second tab can read while the first creates the database/schema.
+            # Cached display is optional; always proceed to the serialized scan.
+            pass
         result = scanner(self.root, self.isInterruptionRequested, report=self._report, reuse_for=2)
         if not self.isInterruptionRequested():
             self._cached(force=True)

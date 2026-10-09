@@ -168,6 +168,9 @@ class Workspace(qt.QMainWindow):
             if not hasattr(bar, 'workspace_plus'):
                 bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.add_view())
                 bar.currentChanged.connect(self._schedule_tab_headers)
+                bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
+            if self.active_dock in [self._tab_dock(bar, index) for index in range(bar.count())]:
+                self._activate(self._tab_dock(bar, bar.currentIndex()))
             width = max(60, (bar.width() - 32) // bar.count())
             style = (f'QTabBar::tab {{ width: {width}px; height: 30px; padding: 0px; }} '
                      'QTabBar::scroller { width: 96px; } '
@@ -291,7 +294,14 @@ class Workspace(qt.QMainWindow):
         return view
 
     def _activate(self, dock):
-        if dock in self.docks:
+        if dock in self.docks and dock is not self.active_dock:
+            # Repolishing can emit visibility/focus changes for an obscured dock.
+            # Qt's selected native tab remains the authority for that group.
+            if not dock.isFloating():
+                for bar in self.findChildren(qt.QTabBar):
+                    if bar.parent() is self and any(self._tab_dock(bar, index) is dock for index in range(bar.count())):
+                        if self._tab_dock(bar, bar.currentIndex()) is not dock:
+                            return
             self.active_dock = dock
             self.active_changed.emit(dock.widget())
 
