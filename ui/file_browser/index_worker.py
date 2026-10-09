@@ -86,16 +86,19 @@ class _IndexJob(Operation):
             snapshot = source or directory_cache.peek(root, cancelled=self.isInterruptionRequested)
             if snapshot is None:
                 continue
+            totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
             if root == self.root:
-                self.saved_entries = len(snapshot.entries)
-                self._status.update(0, 'Loading saved sizes…', saved_entries=self.saved_entries)
+                stats = totals.get(root)
+                self.saved_entries = stats.files + stats.folders if stats else 0
+                self._status.update(0, self._status.phase, saved_entries=self.saved_entries)
                 self.last_progress = self._status.render()
                 self.progress.emit(self.last_progress)
-            totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
+            changed = self.totals_by_root.get(root) != totals
             self.totals_by_root[root] = totals
             if root == self.root:
                 self.last_totals = totals
-            self.updated.emit(root, totals)
+            if changed:
+                self.updated.emit(root, totals)
             failed = {path for path, error in snapshot.errors}
             def watchable(path):
                 return path not in failed and not any(parent in failed for parent in path.parents)

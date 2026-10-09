@@ -81,6 +81,8 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             return False
 
     def set_folder_totals(self, totals):
+        if self.folder_totals == (totals or {}):
+            return
         self.folder_totals = totals or {}
         # Updating every indexed path would make QFileSystemModel load distant
         # folders on the GUI thread. Only invalidate currently displayed parents.

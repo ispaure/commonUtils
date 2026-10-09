@@ -10,6 +10,61 @@ from unittest.mock import patch
 
 
 class StorageViewTests(unittest.TestCase):
+    def test_rapid_mode_switches_and_revisiting_folder_keep_charts_available(self):
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            child = root / 'child'
+            child.mkdir()
+            (child / 'data.bin').write_bytes(b'x' * 100)
+            directory_cache.get(root)
+            browser = FileBrowser(root, calculate_folder_sizes=False)
+            try:
+                for _ in range(12):
+                    for mode in (3, 4, 0, 4, 3):
+                        browser.view_selector.setCurrentIndex(mode)
+                        app.processEvents()
+                def wait():
+                    deadline = time.monotonic() + 5
+                    while browser.views.storage.busy:
+                        app.processEvents(); time.sleep(.005)
+                        self.assertLess(time.monotonic(), deadline)
+                wait()
+                storage = browser.views.storage
+                self.assertEqual(storage.entries, [(child, 100)])
+                with patch.object(storage, '_collect', wraps=storage._collect) as collect:
+                    for _ in range(20): storage.refresh()
+                    wait()
+                    self.assertEqual(collect.call_count, 0)
+                browser.navigate(child); wait()
+                browser.navigate(root); wait()
+                self.assertEqual(storage.results.topLevelItemCount(), 1)
+                self.assertEqual(storage.map.items, [(child, 100)])
+            finally:
+                browser.shutdown(); browser.close(); browser.deleteLater(); app.processEvents()
+
+    def test_storage_bounds_materialization_of_a_large_folder(self):
+        from types import SimpleNamespace
+        from commonUtils._directory_metadata import Entry
+        app = qt.QApplication.instance() or qt.QApplication([])
+        browser = FileBrowser(calculate_folder_sizes=False)
+        try:
+            root = Path('/example')
+            entries = [Entry(root / str(n), False, 1, 0) for n in range(4000)]
+            seen = []
+            def children(path, limit=None):
+                seen.append(limit)
+                return entries[:limit]
+            snapshot = SimpleNamespace(complete=True, children=children, folder_stats=lambda *a, **k: {})
+            storage = browser.views.storage
+            storage.operation = SimpleNamespace(isInterruptionRequested=lambda: False)
+            with patch('commonUtils.ui.file_browser.storage_view.directory_cache.peek', return_value=snapshot):
+                result = storage._collect(root)
+            self.assertEqual(seen, [3000])
+            self.assertEqual(len(result[0]), 3000)
+        finally:
+            browser.shutdown(); browser.close(); browser.deleteLater(); app.processEvents()
+
     def test_cached_charts_selection_drilldown_and_mode_switch(self):
         app=qt.QApplication.instance() or qt.QApplication([])
         with TemporaryDirectory() as temp:
@@ -67,8 +122,8 @@ class StorageViewTests(unittest.TestCase):
                         big: [Entry(big/f'{i}.bin',False,1,0) for i in range(3100)],
                         small: [Entry(deep,True,0,0)], deep: [Entry(leaf,True,0,0)],
                         leaf: [Entry(file,False,5,0)]}
-            sizes = {big: 3100, small: 5, deep: 5, leaf: 5}
-            snapshot = SimpleNamespace(complete=True, children=lambda path: children.get(path, []),
+            sizes = {root: 3105, big: 3100, small: 5, deep: 5, leaf: 5}
+            snapshot = SimpleNamespace(complete=True, children=lambda path, limit=None: children.get(path, [])[:limit],
                 folder_stats=lambda paths, **kw: {path: FolderStats(size=sizes[path]) for path in paths})
             browser = FileBrowser(root,calculate_folder_sizes=False); browser.resize(1000,700); browser.show()
             try:

@@ -75,7 +75,8 @@ class IndexSearch(qt.QWidget):
         if path != self.scope:
             self.scope = path
             self.browser.search_bar.setPlaceholderText(f'Search {path.name or path} and its subfolders')
-            self.browser.search_bar.clear()
+            if self.active:
+                self._query_changed(self.browser.search_bar.text())
 
     def _query_changed(self, text):
         self._revision += 1
@@ -193,7 +194,7 @@ class IndexSearch(qt.QWidget):
 
     def _activate(self, row, column):
         path = row.data(0, qt.Qt.ItemDataRole.UserRole)
-        if path.is_dir(): self.show_in_browser(path)
+        if path.is_dir(): self.browser.navigate(path)
         elif path.exists(): self.browser._activate(self.browser.model.index(str(path)))
         else: self.summary.setText('This cached result is currently unavailable.')
 

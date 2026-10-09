@@ -387,14 +387,24 @@ class FileBrowser(qt.QWidget):
     def _update_watch_paths(self, root, paths):
         if self.stopping or root != self.navigation.directory:
             return
-        expected = {str(path) for path in paths}
+        from ...directory_index import directory_cache
+        from ..._directory_exclusions import scan_exclusions, is_excluded
+        exclusions = scan_exclusions(root, directory_cache.database)
+        expected = {str(path) for path in paths if not is_excluded(path, exclusions)}
         previous = set(self.index_watcher.directories()) | set(self.index_watcher.files())
         if previous - expected: self.index_watcher.removePaths(list(previous - expected))
         if expected - previous: self.index_watcher.addPaths(list(expected - previous))
 
     def _indexed_path_changed(self, path):
         if self.stopping or not self.calculate_folder_sizes: return
+        root = self.navigation.directory
+        path = Path(path)
+        if root is None or (path != root and root not in path.parents):
+            return
         from ...directory_index import directory_cache
+        from ..._directory_exclusions import scan_exclusions, is_excluded
+        if is_excluded(Path(path), scan_exclusions(self.navigation.directory, directory_cache.database)):
+            return
         directory_cache.invalidate(Path(path))
         self._changed_paths.add(Path(path))
         self._reconcile_pending = True
@@ -584,20 +594,24 @@ class FileBrowser(qt.QWidget):
                     fields.append(('Excluded links / unreadable items', stats.skipped))
         return BrowserDetails(tuple(fields))
 
-    def load(self, item):
+    def load(self, item, *, preserve=False):
         if self.busy:
             # Public callers can request a file while the default folder details
             # are still loading. Retain that explicit request for the next worker.
             self._pending_detail_item = item
+            self._pending_detail_preserve = preserve
             self.selected_object = item
             self.refresh_pending = True
             return
         self._pending_detail_item = None
-        self._clear_details()
+        self._preserving_details = preserve
+        if not preserve:
+            self._clear_details()
         self.selected_object = item
         self._update_preview_visibility(True)
         self.heading.setText(item.name if isinstance(item, Directory) else item.file_name)
-        self.message.setText('Loading information…')
+        if not preserve:
+            self.message.setText('Loading information…')
         stats = self.model.folder_totals.get(item.path)
         panels = [BrowserPanel('filesystem', 'File Information', lambda: self._generic_details(item, stats))]
         panels.extend(item.browser_panels())
@@ -622,6 +636,10 @@ class FileBrowser(qt.QWidget):
     def _loaded(self, result, error):
         if self.refresh_pending or self.stopping:
             return
+        if self._preserving_details:
+            selected = self.selected_object
+            self._clear_details()
+            self.selected_object = selected
         self.message.setText(error)
         self.last_details = result
         for panel, details, issue in result or ():
@@ -678,7 +696,7 @@ class FileBrowser(qt.QWidget):
         elif self.refresh_pending:
             item = self._pending_detail_item
             if item is not None:
-                self.load(item)
+                self.load(item, preserve=getattr(self, '_pending_detail_preserve', False))
             else:
                 self._selection_changed()
 
@@ -808,19 +826,22 @@ class FileBrowser(qt.QWidget):
 
     def _folders_progressed(self, root, result):
         if self.calculate_folder_sizes and root == self.navigation.directory and result and not self.folder_pending and not self.stopping:
+            if self.model.folder_totals == result:
+                return
             self.model.set_folder_totals(result)
             self.index_search.refresh()
             self.index_updated.emit(root)
             if not self.folder_busy:
                 self.index_status.setText('Cached or partial sizes available.')
             if isinstance(self.selected_object, Directory):
-                self._selection_changed()
+                self.load(self.selected_object, preserve=True)
 
     def _folders_loaded(self, root, result, error=''):
         if error and root == self.navigation.directory and not self.stopping:
             self.index_status.setText('Index unavailable. Any cached sizes remain available; refresh to retry.')
             self.index_progress.emit(self.index_status.text())
         if self.calculate_folder_sizes and root == self.navigation.directory and result is not None and not self.folder_pending and not self.stopping:
+            changed = self.model.folder_totals != result
             self.model.set_folder_totals(result)
             self.index_search.refresh()
             stats = result.get(root)
@@ -836,10 +857,11 @@ class FileBrowser(qt.QWidget):
             else:
                 message = f'Index and sizes up to date · Checked {checked}'
             self.index_status.setText(message)
-            self.index_updated.emit(root)
+            if changed:
+                self.index_updated.emit(root)
             self.index_progress.emit(self.index_status.text())
-            if isinstance(self.selected_object, Directory):
-                self._selection_changed()
+            if changed and isinstance(self.selected_object, Directory):
+                self.load(self.selected_object, preserve=True)
 
     def _index_progressed(self, message):
         from .status import private_status

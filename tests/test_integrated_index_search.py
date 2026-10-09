@@ -119,6 +119,22 @@ class IntegratedSearchTests(unittest.TestCase):
         self.assertEqual(self.browser.selected_objects()[0].path,self.file)
         self.assertFalse(self.browser.search_bar.text())
 
+    def test_activating_search_folder_keeps_query_and_scopes_descendants(self):
+        self.browser.search_bar.setText('needle')
+        self.wait(lambda: not self.browser.index_search.busy and not self.browser.index_search.debounce.isActive())
+        folder = self.root / 'needle-folder'
+        folder.mkdir()
+        (folder / 'needle-inside.txt').write_text('inside')
+        self.browser.refresh()
+        self.wait(lambda: not self.browser.folder_busy and not self.browser.index_search.busy)
+        row = qt.QTreeWidgetItem()
+        row.setData(0, qt.Qt.ItemDataRole.UserRole, folder)
+        self.browser.index_search._activate(row, 0)
+        self.wait(lambda: not self.browser.index_search.busy and not self.browser.index_search.debounce.isActive())
+        self.assertEqual(self.browser.search_bar.text(), 'needle')
+        self.assertEqual(self.browser.navigation.directory, folder)
+        self.assertEqual(self.browser.index_search.total, 1)
+
     def test_real_watchers_update_additions_removal_rename_and_visible_file_metadata(self):
         self.search('needle',1)
         new=self.root/'Needle-new.txt';new.write_text('new')
@@ -190,4 +206,7 @@ class IntegratedSearchTests(unittest.TestCase):
         self.assertEqual(self.browser.index_search.results.topLevelItemCount(),0)
         self.browser.navigate(self.file.parent)
         self.wait(lambda:not self.browser.folder_busy)
-        self.assertFalse(self.browser.search_bar.text())
+        self.assertEqual(self.browser.search_bar.text(), 'absent')
+        self.wait(lambda: not self.browser.index_search.busy and not self.browser.index_search.debounce.isActive())
+        self.assertEqual(self.browser.index_search.scope, self.file.parent)
+        self.assertIs(self.browser.list_stack.currentWidget(), self.browser.index_search)
