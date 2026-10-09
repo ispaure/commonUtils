@@ -118,4 +118,6 @@ def prepare_close_all(retry_close=None):
             window.idle.connect(retry_close)
         if not window.prepare_close():
             ready = False
+        else:
+            window.close()
     return ready
