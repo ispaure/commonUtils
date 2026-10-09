@@ -227,17 +227,22 @@ class DirectoryCache:
         # A separator-aware prefix handles '%'/'_' in literal folder names safely.
         prefix = folder.rstrip(os.sep) + os.sep
         upper = prefix[:-1] + chr(ord(os.sep)+1)
-        for table in ('entries', 'folders', 'errors', 'folder_totals'):
+        for table in ('entries', 'folders', 'errors', 'folder_totals', 'folder_checks'):
             # The parent has already reconciled its entries. Preserve a new file
             # or link at the old directory's path while deleting its old children.
             if table == 'entries':
+                if db.execute("SELECT 1 FROM sqlite_temp_master WHERE name='reconcile_records'").fetchone():
+                    db.execute('INSERT OR IGNORE INTO reconcile_records '
+                               'SELECT g.record_id FROM generation_entries g JOIN folder_paths f ON f.id=g.parent_id '
+                               'WHERE g.generation=? AND (f.path=? OR (f.path>=? AND f.path<?))',
+                               (generation,folder,prefix,upper))
                 delete_entries(db, generation, scope=folder)
             else:
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND path=?',(generation,folder))
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND path>=? AND path<?',
                            (generation,prefix,upper))
 
-    def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report):
+    def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report, *, checkpoint=True):
         text = str(folder)
         parent_id = ensure_folder(db, folder)
         prefix = text.rstrip(os.sep)+os.sep
@@ -245,6 +250,9 @@ class DirectoryCache:
         db.execute('DELETE FROM errors WHERE generation=? AND path=?',(generation,text))
         db.execute('DELETE FROM errors WHERE generation=? AND path>=? AND path<? AND instr(substr(path,?),?)=0',
                    (generation,prefix,upper,len(prefix)+1,os.sep))
+        if not checkpoint:
+            db.execute('INSERT OR IGNORE INTO reconcile_records SELECT record_id FROM generation_entries '
+                       'WHERE generation=? AND parent_id=?', (generation,parent_id))
         delete_children(db, generation, folder)
         seen = set()
         count = 0
@@ -292,7 +300,8 @@ class DirectoryCache:
                     self._discovered_entries += 1
                     if count % 512 == 0:
                         flush()
-                        self._checkpoint(db,cancelled)
+                        if checkpoint:
+                            self._checkpoint(db,cancelled)
                     report(self._discovered_entries, 0, f'Indexing {folder}')
             flush()
             for (old,) in db.execute('SELECT path FROM folders WHERE generation=? AND parent=?', (generation, text)).fetchall():
@@ -309,8 +318,9 @@ class DirectoryCache:
             # Preserve partial metadata; the folder stays pending until enumeration finishes.
             flush()
             self._mark_totals_changed(folder,root)
-            self._checkpoint(db,cancelled)
-            if not cancelled() and time() - self._totals_last > self._totals_interval:
+            if checkpoint:
+                self._checkpoint(db,cancelled)
+            if checkpoint and not cancelled() and time() - self._totals_last > self._totals_interval:
                 started = time()
                 self._publish_totals(db,generation,root,cancelled)
                 self._checkpoint(db,cancelled,force=True)
@@ -327,6 +337,10 @@ class DirectoryCache:
         errors = tuple((Path(path), error) for path, error in db.execute('SELECT path,error FROM errors WHERE generation=?', (generation,)))
         scanned = db.execute('SELECT scanned_at FROM scans WHERE id=?', (generation,)).fetchone()[0]
         directories = SqlDirectories(entries)
+        has_totals = db.execute("SELECT 1 FROM sqlite_master WHERE name='folder_totals'").fetchone()
+        total = db.execute('SELECT complete FROM folder_totals WHERE generation=? AND path=?',
+                           (generation, str(root))).fetchone() if has_totals else None
+        complete = complete and (total is None or bool(total[0]))
         return Snapshot(root, recursive, entries, errors, scanned or time(), directories=directories, reused=reused,
                         validated_at=time(), resumed=resumed, complete=complete, metadata_checked=metadata_checked)
 
@@ -532,6 +546,7 @@ class DirectoryCache:
             valid = self._validate(db, building, root, cancelled, report)
             errors = db.execute('SELECT count(*) FROM errors WHERE generation=?', (building,)).fetchone()[0]
             self._publish_totals(db,building,root,cancelled)
+            db.execute('INSERT OR REPLACE INTO folder_checks VALUES(?,?,?)', (building, str(root), time()))
             db.execute('UPDATE scans SET scanned_at=? WHERE id=?', (time(), building))
             complete = valid and not errors
             if complete:
@@ -544,6 +559,19 @@ class DirectoryCache:
                     self._validated_roots[(root, recursive)] = revision
                     self._validated_times[(root, recursive)] = time()
             return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete, cancelled=cancelled)
+
+    def reconcile_folder(self, root, *, changes=(), full=False, cancelled=lambda: False,
+                         report=lambda done, total, message: None):
+        """Check visible contents; completed caches update atomically without tree-wide validation.
+
+        With full=True, also check every saved descendant for explicit Refresh.
+        Missing or interrupted indices retain the established resumable full scan.
+        Existing readers keep their SQLite transaction while changed rows and parent
+        aggregates are updated in the same generation, without copying the tree.
+        """
+        from ._directory_reconcile import reconcile_existing
+        snapshot = reconcile_existing(self, Path(root).absolute(), changes, cancelled, report, full=full)
+        return snapshot if snapshot is not None else self.get(root, cancelled=cancelled, report=report)
 
     def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
         """Read cached data immediately, without locks, validation or filesystem scan.
