@@ -58,6 +58,32 @@ class MacOSExclusionTests(unittest.TestCase):
         self.assertEqual(storage_totals(old)[self.root], 10)  # Existing read transaction.
         self.assert_clean(self.cache.peek(self.root))
 
+    def test_cache_first_repair_does_not_resume_partial_scan_or_walk_files(self):
+        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+            old = self.cache.get(self.root)
+        with self.cache._writer(lambda: False) as db:
+            db.execute('UPDATE roots SET building=completed,completed=NULL WHERE root=?', (str(self.root),))
+            db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=?", (old.entries.generation, str(self.root)))
+            db.commit()
+        with self.macos(), patch('commonUtils._directory_store.os.scandir',
+                                 side_effect=AssertionError('Cache repair must not enumerate folders')):
+            self.cache.repair_cached_exclusions(self.root)
+            self.assert_clean(self.cache.peek(self.root))
+            self.assertIsNotNone(self.cache.status(self.root))
+            self.assertGreater(self.cache.status(self.root)['folders_remaining'], 0)
+        self.assertEqual(storage_totals(old)[self.root], 10)
+
+    def test_cache_first_repair_cancellation_can_be_retried(self):
+        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+            self.cache.get(self.root)
+        with self.macos(), patch.object(self.cache, '_publish_totals', side_effect=OperationCancelled):
+            with self.assertRaises(OperationCancelled):
+                self.cache.repair_cached_exclusions(self.root)
+        self.assertEqual(storage_totals(self.cache.peek(self.root))[self.root], 10)
+        with self.macos():
+            self.cache.repair_cached_exclusions(self.root)
+        self.assert_clean(self.cache.peek(self.root))
+
     def test_reconciliation_repairs_saved_ancestor_totals(self):
         with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)

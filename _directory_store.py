@@ -55,6 +55,7 @@ class DirectoryCache:
         self._validated_times = {}
         self._session_checked = set()
         self._priority_folders = {}
+        self._exclusion_checked = set()
 
     def invalidate(self, root=None):
         # Browser refresh runs on the GUI thread. Avoid waiting for a worker or DB.
@@ -258,6 +259,7 @@ class DirectoryCache:
             db.execute('DELETE FROM exclusion_records')
             for path in affected:
                 check_cancelled(cancelled)
+                report(0, 0, f'Removing saved duplicate or excluded branch: {path}')
                 prefix = str(path).rstrip(os.sep) + os.sep
                 upper = prefix[:-1] + chr(ord(os.sep) + 1)
                 db.execute('INSERT OR IGNORE INTO exclusion_records '
@@ -277,6 +279,7 @@ class DirectoryCache:
                 self._mark_totals_changed(path.parent, root)
             # Prune only touched, now-unreferenced metadata. Explicit Data scopes
             # may share these records and must retain them. No full-table vacuum.
+            report(0, 0, 'Removing unused metadata from excluded branches')
             db.execute('CREATE TEMP TABLE IF NOT EXISTS exclusion_nodes(id INTEGER PRIMARY KEY)')
             db.execute('DELETE FROM exclusion_nodes')
             db.execute('INSERT OR IGNORE INTO exclusion_nodes SELECT node_id FROM entry_records '
@@ -287,6 +290,7 @@ class DirectoryCache:
                        'AND NOT EXISTS (SELECT 1 FROM entry_records WHERE node_id=entry_nodes.id)')
             db.execute('DELETE FROM exclusion_records')
             db.execute('DELETE FROM exclusion_nodes')
+            report(0, 0, 'Recalculating saved sizes after exclusion cleanup')
             self._publish_totals(db, generation, root, cancelled)
             check_cancelled(cancelled)
             db.execute('RELEASE exclusion_repair')
@@ -773,6 +777,34 @@ class DirectoryCache:
                 self._session_checked.add((self.database, root))
         return snapshot
 
+    def repair_cached_exclusions(self, root, *, cancelled=lambda: False,
+                                 report=lambda done, total, message: None):
+        """Repair saved macOS root aliases without resuming or validating a scan.
+
+        Cache-first applications call this on their index worker before peek().
+        Ordinary peek() remains read-only. Independent Data scopes are retained.
+        """
+        root = Path(root).absolute()
+        from ._directory_exclusions import MACOS_DATA
+        exclusions = scan_exclusions(root, self.database)
+        if MACOS_DATA not in exclusions or not self.database.is_file():
+            return
+        with self._state_lock:
+            if root in self._exclusion_checked:
+                return
+        with self._writer(cancelled, report) as db:
+            self._excluded_paths = exclusions
+            self._dirty_totals = set()
+            self.last_metrics = dict(metadata_seconds=0., database_write_seconds=0., aggregation_seconds=0.,
+                                     validation_seconds=0., checkpoint_seconds=0., checkpoints=0)
+            rows = db.execute('SELECT completed,building FROM roots WHERE root=?', (str(root),)).fetchall()
+            for generation in {value for row in rows for value in row if value is not None}:
+                check_cancelled(cancelled)
+                self._repair_exclusions(db, generation, root, cancelled, report)
+            db.commit()
+        with self._state_lock:
+            self._exclusion_checked.add(root)
+
     def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
         """Read cached data immediately, without locks, validation or filesystem scan.
 
@@ -887,3 +919,4 @@ class DirectoryCache:
             db.commit()
             with self._state_lock:
                 self._session_checked.clear()
+                self._exclusion_checked.clear()
