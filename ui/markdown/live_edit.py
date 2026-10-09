@@ -2,9 +2,10 @@
 from .. import pyside as qt
 from .syntax import _units
 from .links import link_spans
-from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes
+from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
 from .preview import LivePreviewHighlighter
 from .syntax import HEADING, fenced_regions
+from .presentation import style_document
 
 
 class SourceMarkdownEdit(qt.QPlainTextEdit):
@@ -49,6 +50,7 @@ class FormattedMarkdownEdit(qt.QTextEdit):
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         materialize_formats(self)
         restore_escapes(self.document(), tokens)
+        style_document(self.document(), self.palette())
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
         self._highlighter.setDocument(self.document())
@@ -134,6 +136,7 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         fmt = block.blockFormat()
         if fmt.headingLevel() != level:
             fmt.setHeadingLevel(level)
+            fmt.setTopMargin(heading_top_margin(block, level))
             cursor.setBlockFormat(fmt)
             chars = qt.QTextCharFormat()
             chars.setFontWeight(qt.QFont.Weight.Bold if level else qt.QFont.Weight.Normal)

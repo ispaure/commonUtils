@@ -26,6 +26,12 @@ class MarkdownWindow(qt.QMainWindow):
         if self.viewer.allow_edit:
             view_menu.addAction('Edit / Read', self.viewer.edit_button.click)
         view_menu.addAction('Table of contents', self.viewer.show_contents)
+        view_menu.addAction(self.viewer.speech.action)
+        view_menu.addAction(self.viewer.fullscreen_action)
+        view_menu.addAction('Render Mermaid diagrams', self.viewer.render_diagrams)
+        view_menu.addSeparator()
+        for action in (self.viewer.text_larger_action, self.viewer.text_smaller_action, self.viewer.text_reset_action):
+            view_menu.addAction(action)
         self.setWindowTitle('Documentation')
         self.resize(900, 700)
         self.viewer.open_document(path)
@@ -37,6 +43,9 @@ class MarkdownWindow(qt.QMainWindow):
 
     def closeEvent(self, event):
         if self.viewer.can_close():
+            self.viewer.speech.stop()
+            if self.viewer._diagram_renderer:
+                self.viewer._diagram_renderer.cancel()
             super().closeEvent(event)
         else:
             event.ignore()
