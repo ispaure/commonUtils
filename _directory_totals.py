@@ -56,7 +56,7 @@ def collect_changed_stats(db, generation, root, paths, cancelled):
         value = FolderStats(complete=row[0]=='done')
         # A single indexed lookup reads immediate entries and their saved aggregates.
         children = db.execute('SELECT e.path,e.directory,e.size,e.symlink,t.size,t.files,t.folders,t.skipped,t.extensions,t.complete '
-                              'FROM entries AS e INDEXED BY entry_parent LEFT JOIN folder_totals AS t '
+                              'FROM entries AS e LEFT JOIN folder_totals AS t '
                               'ON t.generation=e.generation AND t.path=e.path WHERE e.generation=? AND e.parent=?',(generation,text))
         for child,directory,size,link,child_size,files,folders,skipped,extensions,complete in children:
             check_cancelled(cancelled)
