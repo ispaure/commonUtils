@@ -40,10 +40,17 @@ def store_folder_stats(db, generation, root, cancelled=lambda: False):
     stamp = time()
     db.execute('SAVEPOINT aggregate_totals')
     try:
-        db.execute('DELETE FROM folder_totals WHERE generation=?', (generation,))
+        db.execute('DELETE FROM folder_totals WHERE generation=? AND path NOT IN '
+                   '(SELECT path FROM folders WHERE generation=?)', (generation, generation))
         for path, value in stats.items():
             check_cancelled(cancelled)
-            db.execute('INSERT INTO folder_totals VALUES(?,?,?,?,?,?,?,?,?)',
+            db.execute('INSERT INTO folder_totals VALUES(?,?,?,?,?,?,?,?,?) '
+                       'ON CONFLICT(generation,path) DO UPDATE SET size=excluded.size,files=excluded.files,'
+                       'folders=excluded.folders,skipped=excluded.skipped,extensions=excluded.extensions,'
+                       'complete=excluded.complete,scanned_at=excluded.scanned_at WHERE '
+                       'folder_totals.size!=excluded.size OR folder_totals.files!=excluded.files OR '
+                       'folder_totals.folders!=excluded.folders OR folder_totals.skipped!=excluded.skipped OR '
+                       'folder_totals.extensions!=excluded.extensions OR folder_totals.complete!=excluded.complete',
                        (generation, str(path), value.size, value.files, value.folders, value.skipped,
                         json.dumps(value.extension_counts), value.complete, stamp))
         db.execute('RELEASE aggregate_totals')

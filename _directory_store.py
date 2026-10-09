@@ -349,6 +349,7 @@ class DirectoryCache:
             CREATE TABLE IF NOT EXISTS folders(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
                 path TEXT NOT NULL,parent TEXT NOT NULL,status TEXT NOT NULL,identity TEXT,
                 PRIMARY KEY(generation,path));
+            CREATE INDEX IF NOT EXISTS folder_pending ON folders(generation,status,length(path),path);
             CREATE INDEX IF NOT EXISTS folder_queue_order ON folders(generation,status,length(path),path);
             CREATE TABLE IF NOT EXISTS errors(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
                 path TEXT NOT NULL,error TEXT NOT NULL,PRIMARY KEY(generation,path));
@@ -386,6 +387,8 @@ class DirectoryCache:
                     children = db.execute('SELECT path,identity FROM entries WHERE generation=? AND parent=?', (generation, text))
                     for child, identity in children:
                         check_cancelled(cancelled)
+                        self._checked_entries += 1
+                        report(self._checked_entries, 0, f'Checking file metadata · {text}')
                         if json.dumps(fingerprint(Path(child).lstat())) != identity:
                             valid = False
                             break
@@ -395,7 +398,7 @@ class DirectoryCache:
                 unchanged = False
                 db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=?", (generation, text))
             count += 1
-            report(count, 0, f'Checking indexed folder {text}')
+            report(self._checked_entries, 0, f'Checking indexed folder {text}')
         db.commit()
         return unchanged
 
@@ -419,7 +422,6 @@ class DirectoryCache:
             if error_path == text or Path(error_path).parent == folder:
                 db.execute('DELETE FROM errors WHERE generation=? AND path=?', (generation, error_path))
         db.execute('DELETE FROM entries WHERE generation=? AND parent=?', (generation, text))
-        db.commit()
         seen = set()
         count = 0
         try:
@@ -447,9 +449,10 @@ class DirectoryCache:
                     except OSError as error:
                         db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)', (generation, str(path), str(error)))
                     count += 1
+                    self._discovered_entries += 1
                     if count % 512 == 0:
                         db.commit()
-                    report(count, 0, f'Indexing {folder} · {count:,} entries in this folder')
+                    report(self._discovered_entries, 0, f'Indexing {folder} · {count:,} entries in this folder')
             for (old,) in db.execute('SELECT path FROM folders WHERE generation=? AND parent=?', (generation, text)).fetchall():
                 if old not in seen:
                     self._remove_tree(db, generation, old)
@@ -463,10 +466,12 @@ class DirectoryCache:
         finally:
             # Partial entries are saved, but the folder stays pending until a full enumeration finishes.
             db.commit()
-            if not cancelled() and time() - self._totals_last > 2:
+            if not cancelled() and time() - self._totals_last > self._totals_interval:
+                started = time()
                 store_folder_stats(db, generation, root, cancelled)
                 db.commit()
                 self._totals_last = time()
+                self._totals_interval = max(2, min(60, (self._totals_last - started) * 20))
                 report(0, 0, 'Saved progressive folder totals')
 
     def _snapshot(self, db, generation, root, recursive, *, reused=False, resumed=False, complete=True, parent=None,
@@ -488,7 +493,10 @@ class DirectoryCache:
             raise NotADirectoryError(root)
         if root.resolve() == self.database.parent.resolve():
             raise ValueError('The directory index storage folder cannot index itself. Choose another folder.')
+        report(0, 0, 'Waiting for index writer…')
         with self._writer(cancelled) as db:
+            self._discovered_entries = self._checked_entries = 0
+            self._totals_interval = 2
             with self._state_lock:
                 revision = self._revision
                 checked_revision = self._validated_roots.get((root, recursive), 0)
@@ -556,19 +564,35 @@ class DirectoryCache:
                     db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (building, str(root), ''))
                 db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=?', (building, str(root), recursive))
                 db.commit()
-            unchanged = self._validate(db, building, root, cancelled, report)
+            # Finish discovering missing branches before rechecking old metadata.
+            # Completed folders are validated after discovery, including on resume.
+            unchanged = False
+            if not resumed and completed:
+                unchanged = self._validate(db, building, root, cancelled, report)
             if unchanged and completed and not resumed and not dirty and not refresh:
                 db.execute('UPDATE roots SET building=NULL WHERE root=? AND recursive=?', (str(root), recursive))
                 db.execute('DELETE FROM scans WHERE id=?', (building,))
                 db.commit()
                 return self._snapshot(db, completed, root, recursive, reused=True, cancelled=cancelled)
             report(0, 0, 'Resuming saved folder checkpoints…' if resumed else 'Updating persistent index…')
-            while True:
-                check_cancelled(cancelled)
-                row = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' ORDER BY length(path),path LIMIT 1", (building,)).fetchone()
-                if row is None:
-                    break
-                self._scan_folder(db, building, root, recursive, Path(row[0]), cancelled, report)
+            def discover_pending():
+                while True:
+                    check_cancelled(cancelled)
+                    # Batches avoid sorting the whole pending tree for every folder.
+                    rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' AND identity IS NULL ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
+                    if not rows:
+                        rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
+                    if not rows:
+                        break
+                    for (path,) in rows:
+                        check_cancelled(cancelled)
+                        # A parent reconciliation can remove a previously queued child.
+                        if db.execute("SELECT 1 FROM folders WHERE generation=? AND path=? AND status='pending'", (building, path)).fetchone():
+                            self._scan_folder(db, building, root, recursive, Path(path), cancelled, report)
+            discover_pending()
+            if resumed:
+                self._validate(db, building, root, cancelled, report)
+                discover_pending()
             check_cancelled(cancelled)
             # Revalidate folders/files changed during this pass before calling it complete.
             valid = self._validate(db, building, root, cancelled, report)
@@ -601,6 +625,8 @@ class DirectoryCache:
         try:
             db.execute('BEGIN')
             row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            if row is None and not recursive:
+                row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=1', (str(root),)).fetchone()
             if row is None and recursive:
                 ancestors = tuple(str(path) for path in root.parents)
                 if ancestors:
@@ -613,7 +639,7 @@ class DirectoryCache:
             generation = row[2] if partial and row[2] else row[1]
             scope = root if row[0] != str(root) else None
             snapshot = self._snapshot(db, generation, root, recursive, complete=generation == row[1],
-                                      metadata_checked=False, reader=db, scope=scope)
+                                      metadata_checked=False, reader=db, scope=scope, parent=root if not recursive else None)
             return snapshot  # Snapshot owns this read transaction, including its lifetime.
         except BaseException:
             db.close()
