@@ -19,6 +19,24 @@ class View(qt.QLabel):
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_drag_uses_the_full_pane_and_floating_header_keeps_native_movement(self):
+        workspace = self.create()
+        workspace.add_view()
+        dock = workspace.active_dock
+        drag = Mock()
+        drag.exec.return_value = qt.Qt.DropAction.MoveAction
+        with patch('commonUtils.ui.workspace_drag.qt.QDrag', return_value=drag):
+            workspace.drag_tab(dock)
+        self.assertEqual(drag.setPixmap.call_args.args[0].size(), dock.grab().size())
+        dock.setFloating(True)
+        self.settle()
+        event = qt.QMouseEvent(qt.QEvent.Type.MouseButtonPress, qt.QPointF(80, 10),
+                              qt.QPointF(80, 10), qt.Qt.MouseButton.LeftButton,
+                              qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+        dock.tab_header.mousePressEvent(event)
+        self.assertFalse(event.isAccepted())
+        self.assertIsNone(dock.tab_header._press)
+
     def test_retired_tab_disappears_before_worker_finishes(self):
         workspace = self.create()
         view = workspace.add_view('busy')

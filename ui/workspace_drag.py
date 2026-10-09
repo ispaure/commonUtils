@@ -22,6 +22,10 @@ class WorkspaceDragMixin:
     def drag_tab(self, dock):
         drag = qt.QDrag(self)
         drag.setMimeData(tab_mime(dock))
+        drag.setPixmap(dock.grab())
+        point = dock.mapFromGlobal(qt.QCursor.pos())
+        drag.setHotSpot(qt.QPoint(max(0, min(point.x(), dock.width() - 1)),
+                                max(0, min(point.y(), dock.height() - 1))))
         result = drag.exec(qt.Qt.DropAction.MoveAction)
         self._drop_preview.hide()
         if result == qt.Qt.DropAction.IgnoreAction and not qt.QApplication.mouseButtons():
