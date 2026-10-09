@@ -369,6 +369,7 @@ class FileBrowser(qt.QWidget):
         if not root.is_dir() or (path != root and root not in path.parents):
             raise ValueError('Starting folder must be within the navigation root')
         self.navigation.set_library(root, directory=path)
+        self.views.navigation_root = root
         self.model.setRootPath(str(root))
         self.views.set_root(path)
 

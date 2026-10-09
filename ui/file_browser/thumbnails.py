@@ -4,14 +4,15 @@ from collections import OrderedDict
 import math
 from ...dirUtils import Directory
 from .. import pyside as qt
+from .model import ByteSortModel
 
 
-class CoverModel(qt.QIdentityProxyModel):
+class CoverModel(ByteSortModel):
     cover_requested = qt.Signal(str)
 
     def __init__(self, source, parent=None):
-        super().__init__(parent)
-        self.setSourceModel(source)
+        super().__init__(source, parent)
+        self.sort(0, qt.Qt.SortOrder.AscendingOrder)
         self.icons = OrderedDict()
         self.requested = set()
         self.revisions = {}

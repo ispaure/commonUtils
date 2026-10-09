@@ -22,6 +22,11 @@ class FileViews(qt.QStackedWidget):
     def __init__(self, model, tree, parent=None):
         super().__init__(parent)
         self.model = model
+        self._switching = False
+        self.navigation_root = None
+        self._column_extended = False
+        self._column_selection_pending = False
+        self._column_last_selection = None
         self._hidden_root = None
         self._hidden_filter = None
         self.tree = tree
@@ -44,13 +49,18 @@ class FileViews(qt.QStackedWidget):
         self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
         self.columns.column_context_requested.connect(self._context)
+        self.columns.selection_input.connect(self._column_input)
         for view in (tree, self.tiles, self.columns):
             self.addWidget(view)
             view.setSelectionMode(qt.QAbstractItemView.SelectionMode.ExtendedSelection)
             view.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
             view.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             view.customContextMenuRequested.connect(lambda point, target=view: self._context(target, point))
-            view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
+            if view is self.columns:
+                view.selectionModel().selectionChanged.connect(self._queue_column_selection)
+                view.selectionModel().currentChanged.connect(self._queue_column_selection)
+            else:
+                view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
             view.doubleClicked.connect(lambda index: self.activated.emit(self.source_index(index)))
         from .storage_view import StorageView
         self.storage = StorageView(parent)
@@ -82,8 +92,39 @@ class FileViews(qt.QStackedWidget):
         if self.currentIndex() == 3:
             index = self.model.index(str(self.storage.selected_path)) if self.storage.selected_path else qt.QModelIndex()
             return [index] if index.isValid() else []
-        return list(dict.fromkeys(self.source_index(index) for index in
-                                  self.currentWidget().selectionModel().selectedIndexes() if index.column() == 0))
+        rows = list(dict.fromkeys(self.source_index(index) for index in
+                                 self.currentWidget().selectionModel().selectedIndexes() if index.column() == 0))
+        if self.currentWidget() is self.columns:
+            current = self.columns.currentIndex()
+            # QColumnView retains selected ancestors as its visual trail. They
+            # aren't a user multi-selection in the currently active column.
+            rows = [index for index in rows if index.parent() == current.parent()]
+            if current in rows and not self._column_extended:
+                return [current]
+        return rows
+
+    def _queue_column_selection(self, *args):
+        if self._switching:
+            return
+        if not self._column_selection_pending:
+            self._column_selection_pending = True
+            qt.QTimer.singleShot(0, self, self._finish_column_selection)
+
+    def _column_input(self, modifiers):
+        self._column_extended = bool(modifiers & (qt.Qt.KeyboardModifier.ControlModifier |
+                                     qt.Qt.KeyboardModifier.MetaModifier | qt.Qt.KeyboardModifier.ShiftModifier))
+
+    def _finish_column_selection(self):
+        self._column_selection_pending = False
+        key = self._column_selection_key()
+        if key == self._column_last_selection:
+            return
+        self._column_last_selection = key
+        self._selection(self.columns)
+
+    def _column_selection_key(self):
+        return (self.root, tuple(self.model.filePath(index) for index in self.selected_rows()),
+                self.model.filePath(self.columns.currentIndex()))
 
     def current_index(self):
         if self.currentIndex() == 3:
@@ -106,7 +147,7 @@ class FileViews(qt.QStackedWidget):
         return self.root
 
     def _selection(self, view):
-        if view is self.currentWidget():
+        if view is self.currentWidget() and not self._switching:
             self.directory_changed.emit(self.browsing_directory())
             self.selection_changed.emit()
 
@@ -164,6 +205,8 @@ class FileViews(qt.QStackedWidget):
             blocker.unblock()
         self.storage.set_root(self.root)
         self.tree.collapseAll()
+        if self.currentWidget() is self.columns:
+            self._column_last_selection = self._column_selection_key()
         self.directory_changed.emit(self.root)
         self.selection_changed.emit()
         self.directory_opened.emit(self.root)
@@ -173,6 +216,16 @@ class FileViews(qt.QStackedWidget):
         mode = min(mode, 3)  # Both storage buttons share the established storage widget.
         selected = self.selected_rows()
         directory = self.browsing_directory()
+        if mode == 2:
+            # A directory already opened in another mode belongs in the first
+            # column, with its contents in the next one.
+            focus = selected[-1] if selected else self.model.index(str(directory))
+            parent = Path(self.model.filePath(focus.parent())) if focus.parent().isValid() else None
+            scope = self.navigation_root
+            if (focus.isValid() and parent is not None
+                    and (scope is None or parent == scope or scope in parent.parents)):
+                directory = parent
+                selected = selected or [focus]
         if directory != self.root:
             self.set_root(directory)
         self.setCurrentIndex(mode)
@@ -185,13 +238,19 @@ class FileViews(qt.QStackedWidget):
             self.selection_changed.emit()
             return
         selection = self.currentWidget().selectionModel()
-        blocker = qt.QSignalBlocker(selection)
+        if mode == 2:
+            self._column_extended = len(selected) > 1
+        self._switching = True
         selection.clearSelection()
         for source in selected:
             index = self.covers.mapFromSource(source) if mode == 1 else source
             selection.select(index, qt.QItemSelectionModel.SelectionFlag.Select | qt.QItemSelectionModel.SelectionFlag.Rows)
             selection.setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.NoUpdate)
-        blocker.unblock()
+        self._switching = False
+        if selected:
+            self.currentWidget().scrollTo(index)
+        if mode == 2:
+            self._column_last_selection = self._column_selection_key()
         self.directory_changed.emit(self.browsing_directory())
         self.selection_changed.emit()
 
