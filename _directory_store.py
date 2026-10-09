@@ -51,7 +51,7 @@ class SqlEntries(Sequence):
     The read transaction keeps an older displayed generation valid during rebuilds
     and cleanup. It is released when the owning Snapshot/iterator is collected.
     """
-    def __init__(self, database, generation, *, parent=None, connection=None):
+    def __init__(self, database, generation, *, parent=None, connection=None, scope=None):
         self.connection = connection or sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         self.connection.execute('PRAGMA query_only=ON')
         if connection is None:
@@ -61,6 +61,11 @@ class SqlEntries(Sequence):
         self.lock = RLock()
         self.where = 'generation=?' + (' AND parent=?' if parent is not None else '')
         self.parameters = (generation,) + ((str(parent),) if parent is not None else ())
+        self.scope = scope
+        if scope is not None:
+            prefix = str(scope).rstrip(os.sep) + os.sep
+            self.where += ' AND path>=? AND path<?'
+            self.parameters += (prefix, prefix[:-1] + chr(ord(os.sep) + 1))
         self.count = self.connection.execute(f'SELECT count(*) FROM entries WHERE {self.where}', self.parameters).fetchone()[0]
 
     def __len__(self):
@@ -113,8 +118,8 @@ class SqlEntries(Sequence):
     def by_depth(self):
         return self._rows(order='length(path) DESC,path')
 
-    def children(self, path):
-        return tuple(self._rows('AND parent=?', (str(path),)))
+    def children(self, path, limit=None):
+        return tuple(self._rows('AND parent=?', (str(path),), limit=limit))
 
     def get(self, path):
         return next(self._rows('AND path=?', (str(path),)), None)
@@ -157,6 +162,10 @@ class SqlEntries(Sequence):
                     return values
                 extra = ' AND path IN (' + ','.join('?' for _ in paths) + ')'
                 parameters += tuple(str(path) for path in paths)
+            elif self.scope is not None:
+                prefix = str(self.scope).rstrip(os.sep) + os.sep
+                extra = ' AND (path=? OR (path>=? AND path<?))'
+                parameters += (str(self.scope), prefix, prefix[:-1] + chr(ord(os.sep) + 1))
             self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
             try:
                 for row in self.connection.execute('SELECT path,size,files,folders,skipped,extensions,complete,scanned_at '
@@ -181,18 +190,24 @@ class SqlDirectories(Sequence):
     """Folder fingerprints from the same immutable read transaction as entries."""
     def __init__(self, entries):
         self.entries = entries
+        self.where = 'generation=? AND identity IS NOT NULL'
+        self.parameters = (entries.generation,)
+        if entries.scope is not None:
+            prefix = str(entries.scope).rstrip(os.sep) + os.sep
+            self.where += ' AND (path=? OR (path>=? AND path<?))'
+            self.parameters += (str(entries.scope), prefix, prefix[:-1] + chr(ord(os.sep) + 1))
 
     def __len__(self):
         with self.entries.lock:
             return self.entries.connection.execute(
-                'SELECT count(*) FROM folders WHERE generation=? AND identity IS NOT NULL',
-                (self.entries.generation,)).fetchone()[0]
+                f'SELECT count(*) FROM folders WHERE {self.where}',
+                self.parameters).fetchone()[0]
 
     def __iter__(self):
         with self.entries.lock:
             cursor = self.entries.connection.execute(
-                'SELECT path,identity FROM folders WHERE generation=? AND identity IS NOT NULL ORDER BY path',
-                (self.entries.generation,))
+                f'SELECT path,identity FROM folders WHERE {self.where} ORDER BY path',
+                self.parameters)
             try:
                 for path, identity in cursor:
                     yield Path(path), tuple(json.loads(identity))
@@ -228,6 +243,7 @@ class DirectoryCache:
         self._revision = 0
         self._invalidations = {}
         self._validated_roots = {}
+        self._validated_times = {}
 
     def invalidate(self, root=None):
         # Browser refresh runs on the GUI thread. Avoid waiting for a worker or DB.
@@ -451,11 +467,11 @@ class DirectoryCache:
                 report(0, 0, 'Saved progressive folder totals')
 
     def _snapshot(self, db, generation, root, recursive, *, reused=False, resumed=False, complete=True, parent=None,
-                  metadata_checked=True, reader=None, cancelled=lambda: False):
+                  metadata_checked=True, reader=None, cancelled=lambda: False, scope=None):
         if reader is None and not db.execute('SELECT 1 FROM folder_totals WHERE generation=? LIMIT 1', (generation,)).fetchone():
             store_folder_stats(db, generation, root, cancelled)
             db.commit()
-        entries = SqlEntries(self.database, generation, parent=parent, connection=reader)
+        entries = SqlEntries(self.database, generation, parent=parent, connection=reader, scope=scope)
         errors = tuple((Path(path), error) for path, error in db.execute('SELECT path,error FROM errors WHERE generation=?', (generation,)))
         scanned = db.execute('SELECT scanned_at FROM scans WHERE id=?', (generation,)).fetchone()[0]
         directories = SqlDirectories(entries)
@@ -463,18 +479,18 @@ class DirectoryCache:
                         validated_at=time(), resumed=resumed, complete=complete, metadata_checked=metadata_checked)
 
     def get(self, root, recursive=True, *, refresh=False, cancelled=lambda: False,
-            report=lambda done, total, message: None, validate_files=True):
+            report=lambda done, total, message: None, validate_files=True, reuse_for=0):
         root = Path(root).absolute()
         if not root.is_dir():
             raise NotADirectoryError(root)
         if root.resolve() == self.database.parent.resolve():
             raise ValueError('The directory index storage folder cannot index itself. Choose another folder.')
-        with self._state_lock:
-            revision = self._revision
-            checked_revision = self._validated_roots.get((root, recursive), 0)
-            dirty = any(mark > checked_revision and (path is None or path == root or path in root.parents or root in path.parents)
-                        for path, mark in self._invalidations.items())
         with self._writer(cancelled) as db:
+            with self._state_lock:
+                revision = self._revision
+                checked_revision = self._validated_roots.get((root, recursive), 0)
+                dirty = any(mark > checked_revision and (path is None or path == root or path in root.parents or root in path.parents)
+                            for path, mark in self._invalidations.items())
             self._totals_last = time()
             real_root = root.resolve()
             self._excluded_paths = set()
@@ -486,12 +502,41 @@ class DirectoryCache:
                     pass
             db.execute('INSERT OR IGNORE INTO roots(root,recursive) VALUES(?,?)', (str(root), recursive))
             completed, building = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            if recursive and not completed and not building and not refresh:
+                # Seed a newly browsed subtree from a completed ancestor index.
+                # Validation still checks every descendant before reuse, but names
+                # and unchanged folders need no second filesystem enumeration.
+                ancestors = tuple(str(path) for path in root.parents)
+                if ancestors:
+                    covering = db.execute('SELECT completed FROM roots WHERE recursive=1 AND completed IS NOT NULL '
+                                          'AND root IN (' + ','.join('?' for _ in ancestors) + ') ORDER BY length(root) DESC LIMIT 1', ancestors).fetchone()
+                    if covering:
+                        completed = db.execute('INSERT INTO scans(root,recursive,scanned_at) '
+                                               'SELECT ?,1,scanned_at FROM scans WHERE id=?', (str(root), covering[0])).lastrowid
+                        prefix = str(root).rstrip(os.sep) + os.sep
+                        upper = prefix[:-1] + chr(ord(os.sep) + 1)
+                        db.execute('INSERT INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key '
+                                   'FROM entries WHERE generation=? AND path>=? AND path<?', (completed, covering[0], prefix, upper))
+                        db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=? '
+                                   'AND (path=? OR (path>=? AND path<?))', (completed, covering[0], str(root), prefix, upper))
+                        if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?', (completed, str(root))).fetchone():
+                            db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (completed, str(root), ''))
+                        db.execute('UPDATE roots SET completed=? WHERE root=? AND recursive=1', (completed, str(root)))
+                        db.commit()
+            with self._state_lock:
+                recently_checked = time() - self._validated_times.get((root, recursive), 0) < reuse_for
+            if completed and not building and not refresh and not dirty and recently_checked:
+                return self._snapshot(db, completed, root, recursive, reused=True, cancelled=cancelled)
+
             if not recursive and not completed and not building and not refresh and not dirty:
                 full = db.execute('SELECT completed FROM roots WHERE root=? AND recursive=1', (str(root),)).fetchone()
                 if full and full[0] and self._validate(db, full[0], root, cancelled, report, root_only=True, check_files=validate_files):
                     return self._snapshot(db, full[0], root, False, reused=True, parent=root, metadata_checked=validate_files, cancelled=cancelled)
             if completed and not building and not refresh and not dirty:
                 if self._validate(db, completed, root, cancelled, report, check_files=validate_files):
+                    if validate_files:
+                        with self._state_lock:
+                            self._validated_times[(root, recursive)] = time()
                     return self._snapshot(db, completed, root, recursive, reused=True, metadata_checked=validate_files, cancelled=cancelled)
             resumed = bool(building) and not refresh
             if refresh and building:
@@ -536,6 +581,7 @@ class DirectoryCache:
             with self._state_lock:
                 if revision == self._revision and complete:
                     self._validated_roots[(root, recursive)] = revision
+                    self._validated_times[(root, recursive)] = time()
             return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete, cancelled=cancelled)
 
     def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
@@ -551,13 +597,20 @@ class DirectoryCache:
         db = sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         try:
             db.execute('BEGIN')
-            row = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
-            if row is None or not (row[0] or row[1] and partial):
+            row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            if row is None and recursive:
+                ancestors = tuple(str(path) for path in root.parents)
+                if ancestors:
+                    row = db.execute('SELECT root,completed,building FROM roots WHERE recursive=1 AND root IN (' +
+                                     ','.join('?' for _ in ancestors) + ') AND (completed IS NOT NULL OR building IS NOT NULL) '
+                                     'ORDER BY length(root) DESC LIMIT 1', ancestors).fetchone()
+            if row is None or not (row[1] or row[2] and partial):
                 db.close()
                 return None
-            generation = row[1] if partial and row[1] else row[0]
-            snapshot = self._snapshot(db, generation, root, recursive, complete=generation == row[0],
-                                      metadata_checked=False, reader=db)
+            generation = row[2] if partial and row[2] else row[1]
+            scope = root if row[0] != str(root) else None
+            snapshot = self._snapshot(db, generation, root, recursive, complete=generation == row[1],
+                                      metadata_checked=False, reader=db, scope=scope)
             return snapshot  # Snapshot owns this read transaction, including its lifetime.
         except BaseException:
             db.close()
