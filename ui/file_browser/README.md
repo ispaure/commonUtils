@@ -37,7 +37,9 @@ Preview is enabled by default, shown only with a selection, and starts at roughl
 30% of the splitter width (minimum 220 px). Users may resize it or switch it off.
 Disabled previews do not start selection detail loaders. Existing `preview_panel`,
 `heading`, `message`, `cover`, `tabs`, `preview`, `load`, and selection signals remain
-available. The INI setting `[FileBrowser] preview_enabled` supplies new-tab defaults.
+available. Explicit `load(item)` still displays requested details when Preview is
+enabled, and `selected_object` remains available when automatic previews are off.
+The INI setting `[FileBrowser] preview_enabled` supplies new-tab defaults.
 
 The shared status line and tooltip contain phases/counters, never scanner paths or
 tab titles. Processed counts include discovery and validation operations, not a

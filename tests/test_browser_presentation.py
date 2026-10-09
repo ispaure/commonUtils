@@ -68,6 +68,7 @@ class BrowserPresentationTests(unittest.TestCase):
                 with patch.object(browser, 'load', wraps=browser.load) as load:
                     select(second)
                     load.assert_not_called()
+                self.assertEqual(browser.selected_object.path, second)
                 self.assertTrue(browser.preview_panel.isHidden())
                 browser.preview_toggle.setChecked(True)
                 wait(lambda: not browser.busy)
@@ -83,6 +84,10 @@ class BrowserPresentationTests(unittest.TestCase):
                 browser.tree.selectionModel().clearSelection()
                 self.app.processEvents()
                 self.assertTrue(browser.preview_panel.isHidden())
+                browser.load(browser.model.object_for_path(first))
+                wait(lambda: not browser.busy)
+                self.assertFalse(browser.preview_panel.isHidden())
+                self.assertEqual(browser.selected_object.path, first)
             finally:
                 browser.stop()
                 wait(lambda: not browser.busy and not browser.folder_busy and not browser.views.cover_busy)
