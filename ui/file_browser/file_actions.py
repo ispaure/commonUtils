@@ -114,7 +114,10 @@ class FileActions(qt.QObject):
             else:
                 qt.QApplication.clipboard().clear()
         if not self.browser.stopping:
-            self.browser.refresh()
+            affected = tuple(path.parent for path in paths)
+            if result is not None:
+                affected += tuple(target.parent for source, target in result.completed)
+            self.browser.refresh_changed(affected)
             if error:
                 self._error(error)
             elif result is not None and result.failures:
@@ -126,7 +129,7 @@ class FileActions(qt.QObject):
             path = Path(parent) / name
             self.browser.model.invalidate(path)
             self.browser.views.covers.invalidate(path)
-        self.browser.refresh()
+        self.browser.refresh_changed((Path(parent),))
 
     def _error(self, message):
         qt.QMessageBox.warning(self.browser, 'File operation could not be completed', message)

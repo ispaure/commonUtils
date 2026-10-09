@@ -16,6 +16,7 @@ class FileViews(qt.QStackedWidget):
     activated = qt.Signal(object)
     idle = qt.Signal()
     directory_changed = qt.Signal(object)
+    directory_opened = qt.Signal(object)
 
     def __init__(self, model, tree, parent=None):
         super().__init__(parent)
@@ -143,6 +144,7 @@ class FileViews(qt.QStackedWidget):
         self.tree.collapseAll()
         self.directory_changed.emit(self.root)
         self.selection_changed.emit()
+        self.directory_opened.emit(self.root)
 
     def set_mode(self, mode):
         chart_mode = max(0, mode - 3)

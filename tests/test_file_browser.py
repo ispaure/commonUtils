@@ -497,8 +497,9 @@ class BrowserTests(unittest.TestCase):
         def scan(root, cancelled, **kwargs):
             entered.set()
             release.wait(5)
-            return {root: FolderStats(files=999)}
-        with patch('commonUtils.ui.file_browser.scan_folders', side_effect=scan):
+            from unittest.mock import Mock
+            return Mock(folder_stats=lambda **kwargs: {root: FolderStats(files=999)})
+        with patch('commonUtils.directory_index.directory_cache.reconcile_folder', side_effect=scan):
             try:
                 self.browser.set_folder_sizes_enabled(True)
                 self.assertTrue(entered.wait(2))

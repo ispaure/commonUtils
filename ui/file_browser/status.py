@@ -32,7 +32,7 @@ def indexing_phase(message):
         return 'Checking indexed files'
     if message.startswith('Reusing '):
         return 'Reusing saved index'
-    if message == 'Saved progressive folder totals':
+    if message == 'Saved progressive folder totals' or message.startswith('Saving '):
         return 'Saving folder sizes'
     return 'Indexing files'
 

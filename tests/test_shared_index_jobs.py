@@ -98,3 +98,24 @@ class SharedJobTests(unittest.TestCase):
                 self.assertIn('1 saved entries',messages[-1])
                 self.assertIn('2 processed this run',messages[-1])
                 job.deleteLater()
+
+    def test_deep_refresh_never_joins_an_immediate_folder_check(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder); cache = DirectoryCache(database=root / 'index.sqlite3')
+            release = Event(); calls = []
+            def scanner(root, stop, **kwargs):
+                calls.append(root)
+                while not release.wait(.01):
+                    if stop(): return None
+                return {}
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache):
+                first = FolderOperation(root, scanner, self.app, request_key=('reconcile', ()))
+                second = FolderOperation(root, scanner, self.app, request_key=('full', ()))
+                try:
+                    first.start(); second.start()
+                    self.wait(lambda: len(calls) == 2)
+                    self.assertIsNot(first._job, second._job)
+                finally:
+                    release.set()
+                    self.wait(lambda: first.isFinished() and second.isFinished())
+                    first.deleteLater(); second.deleteLater()

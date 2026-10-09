@@ -142,6 +142,9 @@ class IntegratedSearchTests(unittest.TestCase):
                     sleep(.002)
                     yield entry
         def scandir(path): return SlowDirectory(path) if Path(path)==self.root else real(path)
+        # Initial/partial scans publish durable progress. A completed index's
+        # targeted Refresh is atomic and retains the old snapshot until commit.
+        self.cache.clear(self.root)
         with patch('commonUtils.directory_index.os.scandir', side_effect=scandir):
             self.browser.refresh()
             self.browser.search_bar.setText('progress-')
