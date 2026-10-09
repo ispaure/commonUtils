@@ -252,6 +252,9 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
     """Create or upgrade the persistent schema under the caller's writer lock."""
     version = db.execute('PRAGMA user_version').fetchone()[0]
     if version == SCHEMA_VERSION:
+        db.execute('CREATE TABLE IF NOT EXISTS folder_checks('
+                   'generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,'
+                   'path TEXT NOT NULL,checked_at REAL NOT NULL,PRIMARY KEY(generation,path))')
         ensure_reader_view(db)
         # Reconciliation must look up one parent's children, not walk every
         # saved folder for every scanned folder (quadratic at disk scale).
@@ -287,6 +290,8 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
             path TEXT NOT NULL,size INTEGER NOT NULL,files INTEGER NOT NULL,folders INTEGER NOT NULL,
             skipped INTEGER NOT NULL,extensions TEXT NOT NULL,complete INTEGER NOT NULL,scanned_at REAL NOT NULL,
             PRIMARY KEY(generation,path));
+        CREATE TABLE IF NOT EXISTS folder_checks(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+            path TEXT NOT NULL,checked_at REAL NOT NULL,PRIMARY KEY(generation,path));
     ''')
     db.execute('DROP INDEX IF EXISTS folder_queue_order')
     upgrade_entries(db, cancelled)

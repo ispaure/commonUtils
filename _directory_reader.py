@@ -180,8 +180,13 @@ class SqlEntries(Sequence):
                 parameters += (str(self.scope), prefix, prefix[:-1] + chr(ord(os.sep) + 1))
             self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
             try:
-                for row in self.connection.execute('SELECT path,size,files,folders,skipped,extensions,complete,scanned_at '
-                                                   'FROM folder_totals WHERE generation=?' + extra, parameters):
+                source, stamp = 'folder_totals', 'scanned_at'
+                if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name='folder_checks'").fetchone():
+                    source = ('(SELECT t.*,c.checked_at FROM folder_totals t LEFT JOIN folder_checks c '
+                              'ON c.generation=t.generation AND c.path=t.path)')
+                    stamp = 'coalesce(checked_at,scanned_at)'
+                for row in self.connection.execute(f'SELECT path,size,files,folders,skipped,extensions,complete,{stamp} '
+                                                   f'FROM {source} WHERE generation=?' + extra, parameters):
                     check_cancelled(cancelled)
                     path, size, files, folders, skipped, extensions, complete, stamp = row
                     values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale)
