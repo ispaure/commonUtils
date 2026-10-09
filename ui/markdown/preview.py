@@ -119,3 +119,12 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             marker_fmt = self._marker_format(active)
             self.setFormat(start, first - start, marker_fmt)
             self.setFormat(last, end - last, marker_fmt)
+        # Apply last so nested emphasis cannot dim active link delimiters.
+        for span in links:
+            start, end = _units(text[:span.start]), _units(text[:span.end])
+            if self._active(position + start, position + end):
+                for index in range(start, end):
+                    fmt = self.format(index)
+                    fmt.setForeground(qt.QColor('white'))
+                    fmt.clearProperty(qt.QTextFormat.Property.FontPointSize)
+                    self.setFormat(index, 1, fmt)

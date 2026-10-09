@@ -33,6 +33,27 @@ class LiveMarkdownTests(unittest.TestCase):
         self.assertIn('###### Heading', self.editor.document().toMarkdown())
         self.assertFalse(self.editor.document().isModified())
 
+    def test_active_link_text_and_syntax_are_white_for_supported_forms(self):
+        from commonUtils.ui.markdown.links import link_spans
+        for text in ('[Label](target.md)', '[**Bold**](<target file.md>)',
+                     '[[Page|Label]]', '[Page|Label]', '[Label](url \"Title\")'):
+            with self.subTest(text=text):
+                self.editor.setPlainText(text + ' after')
+                cursor = self.editor.textCursor()
+                cursor.setPosition(2)
+                self.editor.setTextCursor(cursor)
+                self.editor._highlighter.refresh_cursor()
+                spans = list(link_spans(text))
+                self.assertTrue(spans)
+                block = self.editor.document().begin()
+                for index in range(spans[0].start, spans[0].end):
+                    fmt = next(qt.QTextCharFormat(item.format) for item in block.layout().formats()
+                               if item.start <= index < item.start + item.length)
+                    self.assertEqual(fmt.foreground().color(), qt.QColor('white'))
+                cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+                self.editor.setTextCursor(cursor)
+                self.assertEqual(self.editor.toPlainText(), text + ' after')
+
     def type(self, text):
         QTest.keyClicks(self.editor, text)
 
