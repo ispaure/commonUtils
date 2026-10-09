@@ -90,6 +90,9 @@ class FileBrowser(qt.QWidget):
         self.search_button = qt.QPushButton('Search…')
         self.search_button.clicked.connect(self.open_search)
         controls.addWidget(self.search_button)
+        self.storage_button = qt.QPushButton('Storage…')
+        self.storage_button.clicked.connect(self.open_storage)
+        controls.addWidget(self.storage_button)
         self.refresh_button = qt.QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_button)
@@ -98,6 +101,10 @@ class FileBrowser(qt.QWidget):
     def open_search(self):
         from .discovery import SearchDialog
         return self._open_scan_window(SearchDialog)
+
+    def open_storage(self):
+        from .storage import StorageDialog
+        return self._open_scan_window(StorageDialog)
 
     def _open_scan_window(self, kind):
         if self.stopping or self.navigation.directory is None:

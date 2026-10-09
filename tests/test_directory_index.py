@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from commonUtils.directory_index import scan_metadata
+from commonUtils.directory_index import scan_metadata, storage_totals
 from commonUtils.operations import OperationCancelled
 
 
@@ -17,6 +17,8 @@ class DirectoryIndexTests(unittest.TestCase):
             self.assertEqual(len(snapshot.search('fol')), 1)
             self.assertEqual(snapshot.search('big')[0].size, 5)
             self.assertEqual(len(snapshot.entries), 4)
+            self.assertEqual(storage_totals(snapshot)[snapshot.root], 6)
+            self.assertEqual(storage_totals(snapshot)[snapshot.root / 'Folder'], 5)
             self.assertEqual(len(scan_metadata(root, False).entries), 3)
             with self.assertRaises(OperationCancelled):
                 scan_metadata(root, cancelled=lambda: True)

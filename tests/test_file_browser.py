@@ -75,6 +75,30 @@ class BrowserTests(unittest.TestCase):
         window.close()
         self.wait()
 
+    def test_storage_totals_treemap_and_drilldown(self):
+        folder = self.root / 'large'
+        folder.mkdir()
+        (folder / 'large.bin').write_bytes(b'x' * 1000)
+        window = self.browser.open_storage()
+        window.scan(True)
+        deadline = time.monotonic() + 5
+        while window.busy:
+            self.assertLess(time.monotonic(), deadline)
+            self.app.processEvents()
+            time.sleep(.01)
+        self.assertGreaterEqual(window.totals[self.root], 1003)
+        window.drill(folder)
+        self.app.processEvents()
+        self.assertEqual(window.results.topLevelItemCount(), 1)
+        self.assertEqual(window.totals[folder], 1000)
+        self.assertTrue(window.up_button.isEnabled())
+        from commonUtils.ui.file_browser.storage import treemap_rectangles
+        rects = treemap_rectangles([(self.path, 1), (folder, 3)], qt.QRectF(0, 0, 400, 200))
+        self.assertEqual(sum(rect.width() * rect.height() for _, _, rect in rects), 80000)
+        self.assertFalse(rects[0][2].intersects(rects[1][2]))
+        window.close()
+        self.wait()
+
     def select(self, path):
         index = self.browser.model.index(str(path))
         self.browser.tree.selectionModel().setCurrentIndex(index,
