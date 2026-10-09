@@ -11,6 +11,25 @@ CAPTION_HEIGHT = 44
 
 
 class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        option = qt.QStyleOptionViewItem(option)
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else qt.QApplication.style()
+        area = style.subElementRect(qt.QStyle.SubElement.SE_ItemViewItemDecoration, option, option.widget)
+        pixmap = option.icon.pixmap(option.decorationSize, self.parent().devicePixelRatioF())
+        # Keep the shared caption/selection geometry, but paint the image ourselves:
+        # some native/custom icon engines stretch to Qt's portrait decoration rect.
+        option.icon = qt.QIcon()
+        style.drawControl(qt.QStyle.ControlElement.CE_ItemViewItem, option, painter, option.widget)
+        if not pixmap.isNull():
+            ratio = pixmap.devicePixelRatioF()
+            pixmap = pixmap.scaled(round(area.width() * ratio), round(area.height() * ratio),
+                                   qt.Qt.AspectRatioMode.KeepAspectRatio, qt.Qt.TransformationMode.SmoothTransformation)
+            pixmap.setDevicePixelRatio(ratio)
+            size = pixmap.deviceIndependentSize()
+            painter.drawPixmap(qt.QPointF(area.center().x() - size.width()/2,
+                                         area.center().y() - size.height()/2), pixmap)
+
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         view = self.parent()

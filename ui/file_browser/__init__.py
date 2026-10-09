@@ -164,6 +164,10 @@ class FileBrowser(qt.QWidget):
         self.tree.setColumnWidth(1, 90)
         self.tree.hideColumn(2)
         self.tree.header().moveSection(3, 1)
+        self.tree.header().setStretchLastSection(False)
+        self.tree.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
+        for column in (1, 3):
+            self.tree.header().setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
         self.views = FileViews(self.model, self.tree, self)
         self.views.selection_changed.connect(self._selection_changed)
         self.views.directory_changed.connect(self.navigation.set_directory)

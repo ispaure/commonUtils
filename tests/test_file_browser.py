@@ -419,6 +419,32 @@ class BrowserTests(unittest.TestCase):
                             if icon is icons[0]:
                                 self.assertAlmostEqual(pixmap.width() / pixmap.height(), .5, delta=.03)
 
+    def test_tile_paint_preserves_square_wide_and_portrait_images(self):
+        tiles = self.browser.views.tiles
+        self.browser.view_selector.setCurrentIndex(1)
+        covers = self.browser.views.covers
+        index = covers.mapFromSource(self.browser.model.index(str(self.path)))
+        original = type(covers).data
+        for width, height in [(200, 200), (400, 200), (200, 400)]:
+            pixmap = qt.QPixmap(width, height); pixmap.fill(qt.QColor('#ff00ff'))
+            icon = qt.QIcon(pixmap)
+            def data(model, item, role=qt.Qt.ItemDataRole.DisplayRole):
+                return icon if role == qt.Qt.ItemDataRole.DecorationRole else original(model, item, role)
+            with patch.object(type(covers), 'data', data):
+                image = qt.QImage(200, 240, qt.QImage.Format.Format_ARGB32)
+                image.fill(qt.QColor('white'))
+                option = qt.QStyleOptionViewItem(); option.rect = qt.QRect(0, 0, 200, 240)
+                option.widget = tiles; option.decorationPosition = qt.QStyleOptionViewItem.Position.Top
+                option.decorationAlignment = qt.Qt.AlignmentFlag.AlignCenter
+                painter = qt.QPainter(image)
+                tiles.itemDelegate().paint(painter, option, index); painter.end()
+                pixels = [(x,y) for y in range(240) for x in range(200)
+                          if image.pixelColor(x,y).name() == '#ff00ff']
+                self.assertTrue(pixels)
+                actual_width = max(x for x,y in pixels)-min(x for x,y in pixels)+1
+                actual_height = max(y for x,y in pixels)-min(y for x,y in pixels)+1
+                self.assertAlmostEqual(actual_width/actual_height, width/height, delta=.08)
+
     def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
         covers = self.browser.views.covers
         path = str(self.path)
