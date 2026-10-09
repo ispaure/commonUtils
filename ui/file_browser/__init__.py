@@ -815,6 +815,8 @@ class FileBrowser(qt.QWidget):
         def scanner(path, cancelled, *, report, reuse_for):
             try:
                 if read_cache:
+                    if not paused:
+                        directory_cache.repair_cached_exclusions(path, cancelled=cancelled, report=report)
                     snapshot = directory_cache.peek(path, cancelled=cancelled)
                 else:
                     snapshot = None
