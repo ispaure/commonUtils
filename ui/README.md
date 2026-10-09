@@ -341,6 +341,27 @@ Hosts should call `can_close()` before destroying it. The `saved(path)` signal
 allows consumers to refresh configuration. It renders text directly without
 interpreting INI sections or keys.
 
+## Shared navigation settings
+
+`commonUtils.settings.settings_path()` locates `ui/settings.ini` beside the browser
+package. Logistics exposes this file under **Settings → commonUtils** using the
+plain-text editor. Saves apply to existing comic readers on the next wheel event.
+`get_setting(section, key, default, minimum=None, maximum=None)` reads bool, int,
+float or string values using the default's type (bounds are keyword arguments).
+`get_wheel_navigation_settings()` returns immutable validated wheel preferences.
+Both accept a keyword `path` override for other hosts/tests. Missing, unreadable,
+malformed or invalid settings use defaults; reads never rewrite the INI. File
+identity timestamps cache parsing and invalidate it after edits.
+
+The `[WheelNavigation]` defaults are `immediate_notches=true`, `sensitivity=20`
+(range 1–100), and `cooldown_ms=250` (range 0–2000). Each vertical angle-only wheel
+event with no scroll phase turns one page regardless of delta magnitude. Smooth
+pixel/phase events accumulate to 60 pixels or 120 angle units divided by sensitivity,
+with a cooldown to avoid bursts. Disable immediate notches to apply the smooth
+threshold and cooldown to all wheels. Loading, modifiers and modal dialogs still
+block navigation. These preferences affect discrete page navigation, not ordinary
+file-browser list scrolling.
+
 `FileBrowser(..., calculate_folder_sizes=False)` skips automatic recursive size/count
 scans for large roots. `set_folder_sizes_enabled(True)` starts totals on demand;
 disabling requests cancellation and drops cached totals. The default stays enabled
