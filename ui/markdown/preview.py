@@ -33,13 +33,21 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             return cursor.selectionStart() < end and cursor.selectionEnd() > start
         return start <= cursor.position() < end
 
-    def _marker_format(self, active):
+    def _marker_format(self, active, *, collapse=False):
         fmt = qt.QTextCharFormat()
         fmt.setFontWeight(qt.QFont.Weight.Normal)
         fmt.setFontItalic(False)
         fmt.setFontFixedPitch(False)
         if active:
             fmt.setForeground(self.editor.palette().color(qt.QPalette.ColorRole.PlaceholderText))
+        elif collapse:
+            # Qt ignores sub-point sizes on some platforms. A one-pixel font
+            # with negative tracking clamps every marker advance to zero.
+            font = qt.QFont(self.editor.font())
+            font.setPixelSize(1)
+            font.setLetterSpacing(qt.QFont.SpacingType.AbsoluteSpacing, -1)
+            fmt.setFont(font)
+            fmt.setForeground(qt.QColor('transparent'))
         else:
             fmt.setFontPointSize(0.1)
             fmt.setForeground(qt.QColor('transparent'))
@@ -75,7 +83,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
         heading = HEADING.match(text)
         if heading:
             self.setFormat(0, heading.end(), self._marker_format(
-                self._active(position, position + _units(text) + 1)))
+                self._active(position, position + _units(text) + 1), collapse=True))
         links = list(link_spans(text))
         for span in links:
             start, end = _units(text[:span.start]), _units(text[:span.end])

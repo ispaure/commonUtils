@@ -14,6 +14,25 @@ class LiveMarkdownTests(unittest.TestCase):
         self.editor = FormattedMarkdownEdit()
         self.addCleanup(self.editor.deleteLater)
 
+    def test_inactive_heading_has_zero_marker_width_and_keeps_source(self):
+        self.editor.setMarkdown('###### Heading\n\nOther')
+        self.editor.resize(500, 300)
+        self.editor.show()
+        cursor = self.editor.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        self.editor.setTextCursor(cursor)
+        self.app.processEvents()
+        block = self.editor.document().begin()
+        line = block.layout().lineAt(0)
+        self.assertAlmostEqual(line.cursorToX(7)[0], line.cursorToX(0)[0], places=2)
+        cursor.setPosition(8)
+        self.editor.setTextCursor(cursor)
+        self.app.processEvents()
+        self.assertGreater(block.layout().lineAt(0).cursorToX(7)[0], 10)
+        self.assertTrue(self.editor.toPlainText().startswith('###### Heading'))
+        self.assertIn('###### Heading', self.editor.document().toMarkdown())
+        self.assertFalse(self.editor.document().isModified())
+
     def type(self, text):
         QTest.keyClicks(self.editor, text)
 
