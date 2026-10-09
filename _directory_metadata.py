@@ -32,6 +32,27 @@ class Snapshot:
     complete: bool = True
     metadata_checked: bool = True
 
+    def folder_stats(self, paths=None, *, cancelled=lambda: False):
+        """Persisted aggregates; requested paths keep browser updates bounded."""
+        if hasattr(self.entries, 'folder_stats'):
+            return self.entries.folder_stats(paths, cancelled=cancelled, stale=not self.metadata_checked)
+        # Standalone metadata snapshots retain their public API without a database.
+        from .filesystem import FolderStats
+        stats = {self.root: FolderStats(complete=self.complete, scanned_at=self.scanned_at)}
+        ordered = sorted(self.entries, key=lambda entry: len(entry.path.parts), reverse=True)
+        for entry in ordered:
+            check_cancelled(cancelled)
+            parent = stats.setdefault(entry.path.parent, FolderStats(complete=self.complete, scanned_at=self.scanned_at))
+            if entry.symlink:
+                parent.skipped += 1
+            elif entry.directory:
+                parent.include(stats.setdefault(entry.path, FolderStats(complete=self.complete, scanned_at=self.scanned_at)))
+            else:
+                parent.size += entry.size; parent.files += 1
+                ext = entry.path.suffix.lower().lstrip('.')
+                parent.extension_counts[ext] = parent.extension_counts.get(ext, 0) + 1
+        return stats if paths is None else {path: stats[path] for path in paths if path in stats}
+
     def search(self, name, *, cancelled=lambda: False):
         if hasattr(self.entries, "search"):
             return self.entries.search(name, cancelled=cancelled)
@@ -108,6 +129,11 @@ def storage_totals(snapshot, *, cancelled=lambda: False):
     for entry in snapshot.entries:
         check_cancelled(cancelled)
         totals[entry.path] = 0 if entry.directory or entry.symlink else entry.size
+    if hasattr(snapshot.entries, 'folder_stats'):
+        aggregates = snapshot.folder_stats(cancelled=cancelled)
+        if snapshot.root in aggregates:
+            totals.update({path: value.size for path, value in aggregates.items()})
+            return totals
     ordered = snapshot.entries.by_depth() if hasattr(snapshot.entries, 'by_depth') else sorted(
         snapshot.entries, key=lambda item: len(item.path.parts), reverse=True)
     for entry in ordered:

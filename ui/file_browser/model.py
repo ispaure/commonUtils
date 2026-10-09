@@ -14,6 +14,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.folder_totals = {}
+        self.size_parents = set()
         self._items = OrderedDict()
 
     def item(self, index):
@@ -45,13 +46,16 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                     stats = self.folder_totals.get(item.path)
                     if item.path.is_symlink():
                         return '—'
-                    return format_size(stats.size) if stats is not None else '…'
+                    return (('≥ ' if not stats.complete else '') + format_size(stats.size)) if stats is not None else '…'
                 return format_size(item.size) if item.size is not None else '—'
             if index.column() == 3 and item.modified_time is not None:
                 return format_datetime(item.modified_time)
         if index.isValid() and index.column() == 1 and role == qt.Qt.ItemDataRole.ToolTipRole:
             if isinstance(self.item(index), Directory):
-                return 'Recursive file size; symbolic links are excluded.'
+                stats = self.folder_totals.get(Path(self.filePath(index)))
+                state = ('Incomplete / calculating' if not stats.complete else 'Cached; checking for changes'
+                         if stats.stale else 'Up to date') if stats is not None else 'Calculating'
+                return f'{state}. Recursive logical file size; symbolic links are excluded.'
         return super().data(index, role)
 
     def setData(self, index, value, role=qt.Qt.ItemDataRole.EditRole):
@@ -77,12 +81,15 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             return False
 
     def set_folder_totals(self, totals):
-        previous = self.folder_totals
         self.folder_totals = totals or {}
-        for path in previous.keys() | self.folder_totals.keys():
-            index = self.index(str(path), 1)
-            if index.isValid():
-                self.dataChanged.emit(index, index, [qt.Qt.ItemDataRole.DisplayRole])
+        # Updating every indexed path would make QFileSystemModel load distant
+        # folders on the GUI thread. Only invalidate currently displayed parents.
+        for path in self.size_parents or {self.rootPath()}:
+            parent = self.index(str(path))
+            rows = self.rowCount(parent)
+            if parent.isValid() and rows:
+                self.dataChanged.emit(self.index(0, 1, parent), self.index(rows - 1, 1, parent),
+                                      [qt.Qt.ItemDataRole.DisplayRole, qt.Qt.ItemDataRole.ToolTipRole])
 
     def invalidate(self, path):
         self._items.pop(Path(path), None)

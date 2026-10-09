@@ -94,53 +94,29 @@ class FolderStats:
     skipped: int = 0
     extension_counts: dict[str, int] = field(default_factory=dict)
 
+    complete: bool = True
+    scanned_at: float = 0
+    stale: bool = False
+
     def include(self, other):
         self.size += other.size
         self.files += other.files
         self.folders += other.folders + 1
         self.skipped += other.skipped
+        self.complete = self.complete and other.complete
         for extension, count in other.extension_counts.items():
             self.extension_counts[extension] = self.extension_counts.get(extension, 0) + count
 
 
-def scan_folders(root, cancelled=lambda: False):
-    """Recursive totals from stat calls; no file contents, link traversal or extraction."""
-    totals = {}
-    children = {}
-    stack = [(Path(root), False)]
-    while stack:
-        if cancelled():
-            return None
-        folder, visited = stack.pop()
-        if visited:
-            for child in children[folder]:
-                totals[folder].include(totals[child])
-            continue
-        stats = totals[folder] = FolderStats()
-        children[folder] = []
-        stack.append((folder, True))
-        try:
-            with os.scandir(folder) as entries:
-                for entry in entries:
-                    if cancelled():
-                        return None
-                    try:
-                        if entry.is_symlink():
-                            stats.skipped += 1
-                        elif entry.is_dir(follow_symlinks=False):
-                            child = Path(entry.path)
-                            children[folder].append(child)
-                            stack.append((child, False))
-                        elif entry.is_file(follow_symlinks=False):
-                            stats.size += entry.stat(follow_symlinks=False).st_size
-                            stats.files += 1
-                            extension = Path(entry.name).suffix.lower().lstrip('.')
-                            stats.extension_counts[extension] = stats.extension_counts.get(extension, 0) + 1
-                    except OSError:
-                        stats.skipped += 1
-        except OSError:
-            stats.skipped += 1
-    return totals
+def scan_folders(root, cancelled=lambda: False, *, report=lambda done, total, message: None):
+    """Compatibility API: recursive totals from the shared persistent index."""
+    from .directory_index import directory_cache
+    from .operations import OperationCancelled
+    try:
+        snapshot = directory_cache.get(root, cancelled=cancelled, report=report)
+        return snapshot.folder_stats(cancelled=cancelled)
+    except OperationCancelled:
+        return None
 
 
 def format_size(size):
