@@ -521,25 +521,34 @@ class DirectoryCache:
             db.execute('INSERT OR IGNORE INTO roots(root,recursive) VALUES(?,?)', (str(root), recursive))
             completed, building = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
             if recursive and not completed and not building and not refresh:
-                # Seed a newly browsed subtree from a completed ancestor index.
+                # Seed a newly browsed subtree from completed or partial ancestor checkpoints.
                 # Validation still checks every descendant before reuse, but names
                 # and unchanged folders need no second filesystem enumeration.
                 ancestors = tuple(str(path) for path in root.parents)
                 if ancestors:
-                    covering = db.execute('SELECT completed FROM roots WHERE recursive=1 AND completed IS NOT NULL '
+                    covering = db.execute('SELECT coalesce(building,completed),building IS NOT NULL FROM roots '
+                                          'WHERE recursive=1 AND (completed IS NOT NULL OR building IS NOT NULL) '
                                           'AND root IN (' + ','.join('?' for _ in ancestors) + ') ORDER BY length(root) DESC LIMIT 1', ancestors).fetchone()
                     if covering:
-                        completed = db.execute('INSERT INTO scans(root,recursive,scanned_at) '
-                                               'SELECT ?,1,scanned_at FROM scans WHERE id=?', (str(root), covering[0])).lastrowid
+                        report(0, 0, 'Reusing saved subtree checkpoints…')
+                        seed = db.execute('INSERT INTO scans(root,recursive,scanned_at) '
+                                          'SELECT ?,1,scanned_at FROM scans WHERE id=?', (str(root), covering[0])).lastrowid
                         prefix = str(root).rstrip(os.sep) + os.sep
                         upper = prefix[:-1] + chr(ord(os.sep) + 1)
                         db.execute('INSERT INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key '
-                                   'FROM entries WHERE generation=? AND path>=? AND path<?', (completed, covering[0], prefix, upper))
+                                   'FROM entries WHERE generation=? AND path>=? AND path<?', (seed, covering[0], prefix, upper))
                         db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=? '
-                                   'AND (path=? OR (path>=? AND path<?))', (completed, covering[0], str(root), prefix, upper))
-                        if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?', (completed, str(root))).fetchone():
-                            db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (completed, str(root), ''))
-                        db.execute('UPDATE roots SET completed=? WHERE root=? AND recursive=1', (completed, str(root)))
+                                   'AND (path=? OR (path>=? AND path<?))', (seed, covering[0], str(root), prefix, upper))
+                        db.execute('INSERT INTO errors SELECT ?,path,error FROM errors WHERE generation=? '
+                                   'AND (path=? OR (path>=? AND path<?))', (seed, covering[0], str(root), prefix, upper))
+                        if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?', (seed, str(root))).fetchone():
+                            db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (seed, str(root), ''))
+                        if covering[1]:
+                            building = seed
+                            db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=1', (seed, str(root)))
+                        else:
+                            completed = seed
+                            db.execute('UPDATE roots SET completed=? WHERE root=? AND recursive=1', (seed, str(root)))
                         db.commit()
             with self._state_lock:
                 recently_checked = time() - self._validated_times.get((root, recursive), 0) < reuse_for

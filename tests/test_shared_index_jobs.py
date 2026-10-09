@@ -78,3 +78,22 @@ class SharedJobTests(unittest.TestCase):
                 handle.deleteLater()
                 self.app.sendPostedEvents(None,qt.QEvent.Type.DeferredDelete)
                 self.wait(stopped.is_set)
+
+    def test_saved_count_is_reported_before_loading_totals_and_separate_from_run_count(self):
+        from commonUtils.directory_index import Snapshot
+        from commonUtils.ui.file_browser.index_worker import _IndexJob
+        with TemporaryDirectory() as folder:
+            base=Path(folder);root=base/'files';root.mkdir();(root/'file.txt').write_text('abc')
+            cache=DirectoryCache(database=base/'cache'/'index.sqlite3');cache.get(root)
+            messages=[];read=Snapshot.folder_stats
+            def totals(snapshot,*args,**kwargs):
+                self.assertIn('1 saved entries',messages[-1])
+                return read(snapshot,*args,**kwargs)
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache',cache):
+                job=_IndexJob(root,lambda *args,**kwargs:None,self.app)
+                job.progress.connect(messages.append)
+                with patch.object(Snapshot,'folder_stats',totals):job._cached(force=True)
+                job._report(2,0,f'Indexing {root} · 2 entries in this folder')
+                self.assertIn('1 saved entries',messages[-1])
+                self.assertIn('2 processed this run',messages[-1])
+                job.deleteLater()

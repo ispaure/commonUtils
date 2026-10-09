@@ -40,7 +40,11 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
         # Normalize after Qt initializes the option so its intrinsic size cannot override
         # the browser's bounds. Work in physical pixels for Retina displays.
         ratio = view.devicePixelRatioF()
-        pixmap = option.icon.pixmap(size, ratio)
+        # macOS native engines can stretch their artwork to the requested canvas.
+        # Rasterize onto a square first; fitting an already-stretched pixmap later
+        # cannot recover its original proportions. Cached covers keep their ratio.
+        edge = max(size.width(), size.height())
+        pixmap = option.icon.pixmap(qt.QSize(edge, edge), ratio)
         bounds = qt.QSize(round(size.width() * ratio), round(size.height() * ratio))
         pixmap = pixmap.scaled(bounds, qt.Qt.AspectRatioMode.KeepAspectRatio,
                                qt.Qt.TransformationMode.SmoothTransformation)

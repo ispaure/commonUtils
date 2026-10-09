@@ -453,8 +453,13 @@ Browsers in one application share a worker for the same database and location.
 Each tab can pause its own subscription; the last subscriber cancels the worker.
 Cached search results and folder sizes remain visible when paused. Other processes
 still serialize through the database writer lock. The browser status reports the
-current phase/folder, cumulative entry count, average processing rate, and elapsed
-time. Unknown discovery totals are never presented as a percentage.
+current phase/folder, saved entry count, entries processed in this run, average
+processing rate, and elapsed
+time. Saved counts are shown before loading folder totals. Unknown discovery
+totals are never presented as a percentage. Navigating into a partially indexed
+ancestor reuses its saved subtree checkpoints; completed folders need no new
+enumeration. Interrupted folders are still enumerated again because directory
+iteration positions cannot safely be persisted across filesystem changes.
 
 The scanner fetches pending folders in batches, commits once per completed folder
 (plus batches of 512 entries in large folders), and prioritizes unvisited folders.
