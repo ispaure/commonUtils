@@ -134,6 +134,10 @@ class StorageView(qt.QWidget):
         self.busy = False
         self.closing = False
         self.pending = False
+        self._revision = 0
+        self._loaded_key = None
+        self._request_key = None
+        self._last_result = None
         self._navigation_zoom = 0
         self.entries = []
         self.nodes = {}
@@ -179,7 +183,12 @@ class StorageView(qt.QWidget):
         self.splitter.addWidget(self.charts); self.splitter.addWidget(self.results)
         self.splitter.setStretchFactor(0,7); self.splitter.setStretchFactor(1,3)
         self.splitter.setSizes([700,300]); layout.addWidget(self.splitter,1)
-        browser.index_updated.connect(lambda path: self.refresh() if path == self.root else None)
+        browser.index_updated.connect(self._index_changed)
+
+    def _index_changed(self, path):
+        if path == self.root:
+            self._revision += 1
+            self.refresh()
 
     def _chart_changed(self, index):
         self.charts.setCurrentIndex(index)
@@ -229,6 +238,8 @@ class StorageView(qt.QWidget):
     def set_root(self, path):
         path = Path(path)
         if path != self.root:
+            self._loaded_key = None
+            self._last_result = None
             previous = self.root
             self._navigation_zoom = (1 if previous is not None and previous in path.parents else
                                      -1 if previous is not None and path in previous.parents else 0)
@@ -241,13 +252,17 @@ class StorageView(qt.QWidget):
     def refresh(self):
         if self.closing or self.browser.views.currentIndex() != 3 or self.root is None:
             return
+        key = (self.root, self.chart_selector.currentIndex(), self._revision)
+        if key == self._loaded_key or self.busy and key == self._request_key:
+            return
         if self.busy:
             self.pending = True; return
+        self._request_key = key
         self.busy = True
         root = self.root
         radial = self.chart_selector.currentIndex() == 1
         self.operation = Operation(lambda: self._collect(root,radial=radial),self)
-        self.operation.completed.connect(lambda result,error: self._loaded(root,result,error))
+        self.operation.completed.connect(lambda result,error: self._loaded(root,result,error, key=key))
         self.operation.finished.connect(self._finished)
         self.operation.start()
 
@@ -256,6 +271,7 @@ class StorageView(qt.QWidget):
         snapshot = directory_cache.peek(root,cancelled=cancelled)
         if snapshot is None:
             return [],{},{},False
+        root_stats = snapshot.folder_stats([root], cancelled=cancelled).get(root)
         nodes = {}
         node_totals = {}
         root_entries = []
@@ -269,12 +285,13 @@ class StorageView(qt.QWidget):
             next_queue = []
             for index, path in enumerate(queue):
                 if cancelled() or allowance <= 0: break
-                children = list(snapshot.children(path))
+                # Bound database materialization, GUI rows and chart geometry.
+                children = list(snapshot.children(path, limit=3000))
                 totals = snapshot.folder_stats([entry.path for entry in children if entry.directory],cancelled=cancelled)
                 items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
                          for entry in children if not entry.symlink]
                 items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
-                node_totals[path] = sum(size for _,size in items)
+                node_totals[path] = root_stats.size if path == root and root_stats else sum(size for _,size in items)
                 if path == root:
                     root_entries = items
                 quota = max(1, allowance // (len(queue)-index)) if radial else len(items)
@@ -286,10 +303,16 @@ class StorageView(qt.QWidget):
             queue = next_queue
         return root_entries,nodes,node_totals,snapshot.complete
 
-    def _loaded(self, root, result, error):
+    def _loaded(self, root, result, error, *, key=None):
         if self.closing or root != self.root: return
+        if key is not None and key != (self.root, self.chart_selector.currentIndex(), self._revision):
+            return
         if error:
             self.summary.setText(f'Saved sizes unavailable: {error}'); return
+        self._loaded_key = key
+        if self._last_result == (root, result):
+            return
+        self._last_result = (root, result)
         self.entries,self.nodes,node_totals,complete = result
         self.map.set_items(self.entries)
         self.radial.root = root; self.radial.nodes = self.nodes; self.radial.totals = node_totals; self.radial.set_items(self.entries)
@@ -297,7 +320,7 @@ class StorageView(qt.QWidget):
         self._navigation_zoom = 0
         blocker = qt.QSignalBlocker(self.results)
         self.results.clear()
-        total = sum(size for _,size in self.entries)
+        total = node_totals.get(root, sum(size for _,size in self.entries))
         self._rows = {}
         def add_rows(items, parent=None):
             for path,size in items:
@@ -313,11 +336,13 @@ class StorageView(qt.QWidget):
         self.summary.setText(f'{format_size(total)} · {len(self.entries):,} entries · '+
                              ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.') +
                              (' · Four levels; up to 3,000 entries. Gaps may be omitted entries; zero-byte folders have no area.'
-                              if self.chart_selector.currentIndex() == 1 else ''))
+                              if self.chart_selector.currentIndex() == 1 else '') +
+                             (' · First 3,000 children shown; use List or Search for the full folder.' if len(self.entries) == 3000 else ''))
         self.select_path(self.selected_path) if self.selected_path else None
 
     def _finished(self):
         self.busy = False; self.operation.deleteLater()
+        self.operation = None
         if self.closing: self.idle.emit()
         elif self.pending:
             self.pending = False; self.refresh()

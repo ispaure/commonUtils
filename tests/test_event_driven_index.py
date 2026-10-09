@@ -50,6 +50,20 @@ class EventDrivenIndexTests(unittest.TestCase):
         paths = watcher.directories() + watcher.files()
         if paths: watcher.removePaths(paths)
 
+    def test_unchanged_totals_and_cache_notifications_do_not_reload_details(self):
+        self.wait(lambda: not self.browser.busy)
+        totals = self.browser.model.folder_totals
+        with patch.object(self.browser, 'load', wraps=self.browser.load) as load:
+            self.browser._folders_progressed(self.root, totals)
+            self.browser._folders_loaded(self.root, totals)
+            self.assertEqual(load.call_count, 0)
+        pending = self.browser._reconcile_pending
+        changes = set(self.browser._changed_paths)
+        self.browser._indexed_path_changed(str(self.cache.database))
+        self.assertEqual(self.browser._reconcile_pending, pending)
+        self.assertEqual(self.browser._changed_paths, changes)
+
+
     def test_partial_scan_stops_and_notifications_do_not_start_another_full_run(self):
         self.unwatch()
         self.cache.clear(self.root)

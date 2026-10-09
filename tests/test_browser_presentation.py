@@ -12,6 +12,24 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 
 class BrowserPresentationTests(unittest.TestCase):
+    def test_index_status_uses_saved_aggregates_without_counting_all_entries(self):
+        from types import SimpleNamespace
+        from commonUtils.ui.file_browser.index_worker import _IndexJob
+        app = qt.QApplication.instance() or qt.QApplication([])
+        root = Path('/fixture')
+        snapshot = SimpleNamespace(
+            folder_stats=lambda **kw: {root: SimpleNamespace(files=100000, folders=400)},
+            errors=(), children=lambda *a, **kw: (),
+        )
+        job = _IndexJob(root, lambda *a, **kw: None, app)
+        try:
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache.peek', return_value=snapshot):
+                job._cached(force=True)
+            self.assertEqual(job.saved_entries, 100400)
+            self.assertIn('Waiting for index writer', job.last_progress)
+        finally:
+            job.deleteLater()
+
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])
