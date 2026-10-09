@@ -390,13 +390,47 @@ Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.
 
 `commonUtils.directory_index` supplies immutable `Entry`/`Snapshot` metadata,
-case-insensitive partial name search, `storage_totals()`, and a bounded
-`DirectoryCache`. Scans preserve lexical browser roots, avoid traversing links or
-junctions, and report errors. Cache reuse checks file and directory identities
-without re-enumerating unchanged folders. `get(..., refresh=True)` forces a scan;
-`invalidate(root)` invalidates overlapping scopes. Search and storage dialogs are
-owned by their browser and participate in its cancellation/shutdown protocol.
-Snapshot dates remain visible to distinguish results from a live filesystem view.
+case-insensitive partial name search, and `storage_totals()`. `DirectoryCache`
+persists completed and partial indices in SQLite, without entry/root count limits.
+`directory_index_path()` defaults to:
+
+- macOS: `~/Library/Application Support/commonUtils/directory-index.sqlite3`
+- Windows: `%LOCALAPPDATA%/commonUtils/directory-index.sqlite3`
+- Linux: `$XDG_DATA_HOME/commonUtils/directory-index.sqlite3` (default `~/.local/share`)
+
+One database holds every indexed root and recursion scope. SQLite can also create
+`-wal` and `-shm` files while connections are open; a `directory-index.lock` file
+serializes writers across windows/processes. No source file contents are stored.
+`DirectoryCache(database=path)` selects a different database for another host/test.
+The index storage folder is excluded from its own scans. Root symlinks retain
+lexical result paths; nested symlinks/junctions are listed without traversal.
+
+Each completely enumerated folder is a durable checkpoint. Entries are committed
+in batches inside very large folders, but an interrupted folder must be enumerated
+again. Cancelling leaves the completed-folder checkpoints and last complete index
+intact. `get()` resumes pending work, revalidating saved folders/files before reuse
+and reconciling additions, removals, replaced links and changed metadata. Unreadable
+or changing folders produce a clearly marked partial snapshot and remain retryable.
+`get(..., refresh=True)` discards pending work and rebuilds; `clear(root)` removes
+overlapping indices. `invalidate(root)` requests an update on the next operation
+without blocking the GUI thread. Cancellation is cooperative between filesystem
+calls, and also interrupts long SQLite queries and waits for another writer.
+
+Snapshots expose a read-only sequence of entries backed by SQLite. Iteration and
+storage aggregation stream rows; name filtering/paging runs in SQL. Existing open
+snapshots remain consistent during rebuilds/clears via SQLite read transactions.
+These readers can retain WAL data until their result windows release old snapshots.
+The database reuses freed space rather than imposing a fixed entry limit.
+
+Search shows 500 results per page, with all matches available through Previous/Next.
+Column sorting applies to the entire match set before paging.
+It checks folder membership before reuse (`validate_files=False`); displayed file
+sizes retain the scan timestamp. Storage analysis additionally checks file metadata
+and computes totals on its worker. Rebuild requests fully fresh metadata. Search
+and storage share **Rebuild index**/**Clear saved index** controls; a normal search
+or **Analyze / Resume** continues saved work. The index path appears in the snapshot
+status tooltip. Dialogs participate in browser cancellation/shutdown, and snapshot
+dates/partial-state labels distinguish indexed results from a live filesystem view.
 Browser modification dates use `filesystem.format_datetime()` consistently.
 
 `commonUtils.ui.process_runner.ProcessRunner` executes argument vectors through

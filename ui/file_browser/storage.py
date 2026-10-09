@@ -3,6 +3,13 @@ from .. import pyside as qt
 from .discovery import ScanDialog
 from ...directory_index import storage_totals
 from ...filesystem import format_size
+from dataclasses import dataclass
+
+
+@dataclass
+class StorageScan:
+    snapshot: object
+    totals: dict
 
 
 def treemap_rectangles(items, rect):
@@ -97,9 +104,11 @@ class StorageDialog(ScanDialog):
         self.up_button.clicked.connect(lambda: self.drill(self.current.parent))
         self.locate_button = qt.QPushButton('Show in browser')
         self.locate_button.clicked.connect(lambda: self.locate(self.selected_path))
-        self.refresh_button = qt.QPushButton('Analyze / Refresh')
-        self.refresh_button.clicked.connect(lambda: self.scan(True, refresh=True))
-        for widget in (self.up_button, self.locate_button, self.refresh_button):
+        self.refresh_button = qt.QPushButton('Analyze / Resume')
+        self.refresh_button.clicked.connect(lambda: self.scan(True))
+        self.rebuild_button = qt.QPushButton('Rebuild index')
+        self.rebuild_button.clicked.connect(lambda: self.scan(True, refresh=True))
+        for widget in (self.up_button, self.locate_button, self.refresh_button, self.rebuild_button):
             controls.addWidget(widget)
         self.layout.insertLayout(1, controls)
         self.map = Treemap()
@@ -119,21 +128,31 @@ class StorageDialog(ScanDialog):
         self.up_button.setEnabled(False)
 
     def show_snapshot(self):
-        self.totals = storage_totals(self.snapshot)
         self.drill(self.current if self.current in self.totals else self.root)
+
+    def collect(self, root, recursive, refresh, report, cancelled):
+        snapshot = super().collect(root, recursive, refresh, report, cancelled)
+        report(0, 0, 'Calculating storage totals…')
+        return StorageScan(snapshot, storage_totals(snapshot, cancelled=cancelled))
+
+    def _completed(self, result, error):
+        if isinstance(result, StorageScan):
+            self.totals = result.totals
+            result = result.snapshot
+        super()._completed(result, error)
 
     def drill(self, path):
         if not self.snapshot:
             return
-        if path not in self.totals or (path != self.root and not any(
-                entry.path == path and entry.directory for entry in self.snapshot.entries)):
+        entry = self.snapshot.entry(path) if path != self.root else None
+        if path not in self.totals or (path != self.root and not (entry and entry.directory)):
             self.select(path)
             return
         self.current = path
         self.selected_path = path
         self.location.setText(str(path))
-        children = sorted(((entry.path, self.totals[entry.path]) for entry in self.snapshot.entries
-                           if entry.path.parent == path), key=lambda item: (-item[1], item[0].name.casefold()))
+        children = sorted(((entry.path, self.totals[entry.path]) for entry in self.snapshot.children(path)),
+                          key=lambda item: (-item[1], item[0].name.casefold()))
         self.map.set_items(children)
         self.results.clear()
         total = self.totals[path]
