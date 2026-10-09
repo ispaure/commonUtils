@@ -6,6 +6,23 @@ from .links import link_spans
 from .syntax import fenced_regions, HEADING, inline_spans, FENCE_OPEN, fence_close
 
 
+def heading_top_margin(block, level):
+    """Give sections breathing room without padding the document's first title."""
+    return (28.0 if level <= 2 else 22.0) if level and block.previous().isValid() else 0.0
+
+
+def space_headings(document):
+    """Apply presentation-only heading spacing after Markdown import."""
+    block = document.begin()
+    while block.isValid():
+        fmt = block.blockFormat()
+        level = fmt.headingLevel()
+        if level:
+            fmt.setTopMargin(heading_top_margin(block, level))
+            qt.QTextCursor(block).setBlockFormat(fmt)
+        block = block.next()
+
+
 class LiveMarkdownDocument(qt.QTextDocument):
     def toMarkdown(self, *args, **kwargs):
         """Preserve authored delimiters while Qt serializes tables, links and images.

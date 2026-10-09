@@ -3,6 +3,7 @@ from pathlib import Path
 
 from .. import pyside as qt
 from .io import _encode_markdown, _write_markdown
+from .extensions import mermaid_blocks
 
 
 class MarkdownEditingMixin:
@@ -12,8 +13,10 @@ class MarkdownEditingMixin:
         return self.editor.document().isModified() or self._rich_pending()
 
     def _modified_changed(self, modified):
-        path = self.current_path
+        path = self._loaded_path if self._loaded_path is not None else self.current_path
         self.location.setText((str(path) if path else 'Untitled') + (' *' if modified else ''))
+        if hasattr(self, 'document_title'):
+            self.document_title.setText((path.name if path else 'Untitled') + (' *' if modified else ''))
         self.modified_changed.emit(modified)
 
     def _action(self, title, callback, standard=None, extra=()):
@@ -107,7 +110,12 @@ class MarkdownEditingMixin:
         if enabled and self.edit_mode.currentData() == 'formatted':
             self._load_formatted()
         self.pages.setCurrentWidget(self.active_editor() if enabled else self.browser)
+        self.diagrams_button.setVisible(not enabled and bool(mermaid_blocks(self.editor.toPlainText())))
         self.editor_toolbar.setVisible(enabled)
+        self.properties_button.setVisible(enabled and self.allow_edit)
+        self.appearance_button.setVisible(not enabled)
+        for action in (self.text_larger_action, self.text_smaller_action, self.text_reset_action):
+            action.setEnabled(not enabled)
         self.edit_mode.setVisible(enabled)
         self.replace_text.setEnabled(enabled)
         self.properties.set_editable(enabled and self.edit_mode.currentData() == "formatted")
@@ -196,6 +204,7 @@ class MarkdownEditingMixin:
         self._render_source(self.markdown_text())
         self._modified_changed(False)
         self.location.setText(str(destination))
+        self.document_title.setText(destination.name)
         self.status.setText('Saved.')
         self._update_buttons()
         self.path_changed.emit(destination)
@@ -297,4 +306,3 @@ class MarkdownEditingMixin:
             count += 1
         cursor.endEditBlock()
         self.status.setText(f'Replaced {count} matches.')
-

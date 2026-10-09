@@ -2,6 +2,15 @@
 
 `commonUtils.ui.markdown` uses Qt's Markdown/rich-text renderer for headings, lists,
 tables, fenced code, local images and links, without a web-engine dependency.
+Reading uses the application's light/dark palette, comfortable typography and
+spacing, shaded table headers, subtle row separators and padded quote/code blocks.
+The toolbar shares navigation/fullscreen icons and spacing with the book/comic
+readers. **F11** toggles fullscreen; **Escape** closes Contents/Find first, then
+leaves fullscreen. Long document names/status messages stay on one line, with
+their full text in a tooltip.
+**Aa** adjusts reading text from 10–24 pt for this window; **View → Larger text /
+Smaller text / Reset text size** provides the same controls and platform zoom
+shortcuts. Editor/source fonts are independent of the reading-size setting.
 Holding **Alt** while opening a standalone window enables editing centrally;
 buttons and other callers need no modifier handling. Otherwise documents open in
 preview-only mode by default, with no Edit toggle or write
@@ -34,7 +43,51 @@ encoded spaces and `#heading-fragments`. Headings receive GitHub-style anchors,
 with duplicate headings suffixed `-1`, `-2`, and so on. Back/Forward (Alt+Left /
 Alt+Right) restore document history and scroll positions. Navigating after going
 Back discards the abandoned forward branch. Navigation buttons use the same native
-Qt icons and shared control as FileBrowser.
+reader icons and shared controls as the book/comic readers.
+
+### Quotes and Obsidian callouts
+
+Normal `>` quotes appear as padded panels. Reading also supports
+[Obsidian callouts](https://obsidian.md/help/callouts), including titles,
+standard type aliases, nested content, and foldable `+` / `-` titles:
+
+```markdown
+> [!tip] A helpful detail
+> Markdown text, links, lists and nested quotes work here.
+
+> [!warning]- Read before changing anything
+> This starts collapsed. Click the title to expand it.
+```
+
+`+` starts expanded; `-` starts collapsed. Folding is local to the viewer and
+never changes the file. Unknown types use the note color with their authored
+title. Examples inside fenced code remain literal. Callout documents automatically
+use **Source** for editing: Qt's rich exporter would otherwise escape `[!type]`
+markers after an edit. **Read** displays unsaved source with its callout styling.
+This is a standalone document reader, without Obsidian vault plugins/custom CSS.
+
+### Optional Mermaid diagrams
+
+Complete top-level `mermaid` code fences remain readable source by default. Choose
+**Diagrams** in the reading toolbar or **View → Render Mermaid diagrams** to
+render them with the locally installed [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli)
+(`mmdc`). Its optional installation command is `npm install -g @mermaid-js/mermaid-cli`;
+restart the application so its PATH includes the executable. The reader never
+downloads tools or uses a hosted diagram service when opening a document.
+
+Rendering runs asynchronously with a 20-second timeout per diagram, up to 12
+diagrams per document. It uses strict Mermaid settings, rejects diagram-level
+configuration/external-resource declarations, and keeps failed diagrams as code.
+Images are bounded to 16 megapixels, fit the available width, and are cached only
+in memory (24 images per viewer). Private work files live in the commonUtils Temp
+workspace and are cleaned after rendering. Authored Markdown is never replaced
+with generated image links. Light/dark diagram images are cached separately;
+render again after a theme change if that theme's image is not yet available.
+
+Presentation lives in `presentation.py`; reading/render lifecycle in `reading.py`;
+reading-only syntax transforms in `extensions.py`; optional process/resource
+handling in `diagrams.py`. Editing,
+source synchronization, file IO and public viewer APIs stay separate.
 
 Standard `[label](https://example.com)` links and local `[[Page]]`, `[[Page|Label]]` or
 `[Page|Label]` aliases are supported in reading and formatted editing. Aliases
@@ -234,3 +287,20 @@ Qt's HTML-block importer can otherwise silently discard following paragraphs.
 Reader layout is finalized before restoring scroll position; regression fixtures
 check the final paragraph of long documents in all three modes. Source mode remains
 the choice for exact source preservation and unsupported extensions.
+
+## Read aloud
+
+The toolbar and standalone **View** menu offer **Read aloud…**. Select text to
+read a passage, or press **Read** to read the rendered document from the beginning.
+The shared `commonUtils.ui.read_aloud.ReadAloud` panel provides language, voice,
+speed, stop and capability-dependent pause/resume controls using QtTextToSpeech.
+It initializes the native engine only on request and reports missing backends
+inside the panel. No speech API credentials or additional Python dependency are
+required. Playback stops when replacing content, entering edit mode, closing the
+panel or closing the reader. Speech does not edit the document.
+
+`ReadAloud(owner, text_provider, scope=...)` accepts a plain-text callback. The
+caller should connect content replacement to `stop()` and also stop during any
+custom asynchronous shutdown. `reader_text()` prefers a selection and accepts a
+UTF-16 document offset. Bounded utterances advance on Qt's Ready state; clearing
+the queue and its timer prevents playback restarting after cancellation.

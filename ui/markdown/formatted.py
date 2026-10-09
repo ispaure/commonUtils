@@ -3,6 +3,7 @@ from .. import pyside as qt
 from ...markdownUtils import split_frontmatter
 from .headings import _iter_headings
 from .syntax import HEADING
+from .extensions import reading_source
 
 
 class MarkdownFormattedMixin:
@@ -25,6 +26,13 @@ class MarkdownFormattedMixin:
         if not parts.complete:
             self.set_edit_mode('source')
             self.status.setText('Unclosed YAML properties: repair the closing --- in Source mode.')
+            return
+        if reading_source(parts.body)[1]:
+            # Qt's rich exporter escapes [!type] markers after actual edits.
+            # Keep these documents in exact-source mode until our live editor
+            # can round-trip their custom syntax, rather than damaging callouts.
+            self.set_edit_mode('source')
+            self.status.setText('Callouts are shown in Read mode. Edit their exact Markdown in Source mode.')
             return
         if self._rich_source is not None and self._rich_snapshot is not None and parts.body == split_frontmatter(self._rich_source).body:
             self._rich_source = source

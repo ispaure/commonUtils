@@ -1,5 +1,6 @@
 """Markdown table actions using Qt's existing document and undo stack."""
 from .. import pyside as qt
+from .presentation import style_table
 
 
 class MarkdownTablesMixin:
@@ -55,6 +56,7 @@ class MarkdownTablesMixin:
         fmt.setHeaderRowCount(1)
         fmt.setCellPadding(4)
         table = cursor.insertTable(rows, columns, fmt)
+        style_table(table, self.formatted_editor.palette())
         cursor.endEditBlock()
         self.formatted_editor.setTextCursor(table.cellAt(0, 0).firstCursorPosition())
         self.formatted_editor.setFocus()
@@ -92,9 +94,7 @@ class MarkdownTablesMixin:
             table.removeColumns(column, 1)
             column = min(column, table.columns() - 1)
         if not remove:
-            fmt = table.format()
-            fmt.setHeaderRowCount(1)
-            table.setFormat(fmt)
+            style_table(table, self.formatted_editor.palette())
         cursor.endEditBlock()
         if remove:
             cursor = qt.QTextCursor(self.formatted_editor.document())
