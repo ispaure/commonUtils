@@ -46,6 +46,17 @@ class IntegratedSearchTests(unittest.TestCase):
         self.wait(lambda:self.browser.index_search.total==expected and not self.browser.index_search.busy
                   and not self.browser.index_search.debounce.isActive())
 
+    def test_initial_cache_read_race_does_not_prevent_scan(self):
+        import sqlite3
+        from commonUtils.ui.file_browser.index_worker import FolderOperation
+        calls = []
+        scanner = lambda *args, **kwargs: calls.append(args[0]) or {}
+        worker = FolderOperation(self.root, scanner, self.browser)
+        with patch.object(worker, '_cached', side_effect=[sqlite3.OperationalError('database is initializing'), None]):
+            self.assertEqual(worker._collect(scanner), {})
+        self.assertEqual(calls, [self.root])
+        worker.deleteLater()
+
     def test_recursive_search_queries_sql_without_new_walk_and_preserves_selection_and_clear(self):
         with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Search traversed filesystem')):
             self.search('nEEdLE',1)
