@@ -5,6 +5,49 @@ from weakref import WeakSet
 _workspaces = WeakSet()
 
 
+def _tab_button(text, tooltip, parent, callback=None):
+    button = qt.QToolButton(parent)
+    button.setText(text)
+    button.setToolTip(tooltip)
+    button.setAccessibleName(tooltip)
+    button.setAutoRaise(True)
+    button.setFixedSize(28, 28)
+    if callback is not None:
+        button.clicked.connect(callback)
+    return button
+
+
+class DockTabHeader(qt.QWidget):
+    """Single-tab header; ignored title mouse events retain native dock dragging."""
+    def __init__(self, dock):
+        super().__init__(dock)
+        layout = qt.QHBoxLayout(self)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(0)
+        self.close_button = _tab_button('×', 'Close tab', self, dock.close)
+        self.title = qt.QLabel(dock.windowTitle(), self)
+        self.title.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
+        self.title.setMinimumWidth(0)
+        self.title.setSizePolicy(qt.QSizePolicy.Policy.Ignored, qt.QSizePolicy.Policy.Preferred)
+        self.title.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.new_button = _tab_button('+', 'New tab', self, lambda: dock.workspace.add_view())
+        layout.addWidget(self.close_button)
+        layout.addWidget(self.title, 1)
+        layout.addWidget(self.new_button)
+        dock.windowTitleChanged.connect(self.title.setText)
+        self.setFixedHeight(30)
+
+    def paintEvent(self, event):
+        option = qt.QStyleOptionTab()
+        option.initFrom(self)
+        option.rect = qt.QRect(0, 0, max(0, self.width() - 32), self.height())
+        option.shape = qt.QTabBar.Shape.RoundedNorth
+        option.position = qt.QStyleOptionTab.TabPosition.OnlyOneTab
+        option.state |= qt.QStyle.StateFlag.State_Selected
+        painter = qt.QStylePainter(self)
+        painter.drawControl(qt.QStyle.ControlElement.CE_TabBarTabShape, option)
+
+
 class WorkspaceDock(qt.QDockWidget):
     def __init__(self, workspace, view, title):
         super().__init__(title, workspace)
@@ -15,24 +58,13 @@ class WorkspaceDock(qt.QDockWidget):
                          qt.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
         self.setAllowedAreas(qt.Qt.DockWidgetArea.LeftDockWidgetArea | qt.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.tab_header = DockTabHeader(self)
+        self.setTitleBarWidget(self.tab_header)
 
     def contextMenuEvent(self, event):
         self.workspace._activate(self)
         menu = qt.QMenu(self)
-        menu.addAction('Detach into window', lambda: self.setFloating(True))
-        menu.addAction('Dock left', lambda: self.workspace.arrange(self, 'left'))
-        menu.addAction('Dock right', lambda: self.workspace.arrange(self, 'right'))
-        menu.addAction('Combine as tabs', lambda: self.workspace.arrange(self, 'tabs'))
-        attach = menu.addMenu('Attach to window')
-        from shiboken6 import isValid
-        for workspace in list(_workspaces):
-            if isValid(workspace) and not workspace._closing:
-                title = workspace.window().windowTitle() or 'File Browser'
-                if workspace is self.workspace:
-                    title += ' (current)'
-                attach.addAction(title, lambda checked=False, target=workspace: target.adopt(self))
-        menu.addSeparator()
-        menu.addAction('Close view', self.close)
+        menu.addAction('Close tab', self.close)
         menu.exec(event.globalPos())
         menu.deleteLater()
 
@@ -55,15 +87,22 @@ class Workspace(qt.QMainWindow):
         self.docks = []
         self.active_dock = None
         self._closing = False
+        self._headers_pending = False
         self._drop_target = qt.QDockWidget('Return a detached tab', self)
         self._drop_target.setObjectName('workspace.emptyDropTarget')
         self._drop_target.setFeatures(qt.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         self._drop_target.toggleViewAction().setVisible(False)
         self._drop_target.setAllowedAreas(qt.Qt.DockWidgetArea.LeftDockWidgetArea |
                                           qt.Qt.DockWidgetArea.RightDockWidgetArea)
-        self._drop_target.setTitleBarWidget(qt.QWidget(self._drop_target))
-        hint = qt.QLabel('Drop a detached tab here to return it to this window.\n'
-                        'You can also click Reattach in the toolbar.')
+        empty_header = qt.QWidget(self._drop_target)
+        empty_layout = qt.QHBoxLayout(empty_header)
+        empty_layout.setContentsMargins(2, 0, 2, 0)
+        empty_layout.addStretch()
+        self.empty_new_button = _tab_button('+', 'New tab', empty_header, lambda: self.add_view())
+        empty_layout.addWidget(self.empty_new_button)
+        empty_header.setFixedHeight(30)
+        self._drop_target.setTitleBarWidget(empty_header)
+        hint = qt.QLabel('Open a tab with +, or drop a detached tab here to return it to this window.')
         hint.setWordWrap(True)
         hint.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
         hint.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
@@ -76,21 +115,98 @@ class Workspace(qt.QMainWindow):
                             qt.QMainWindow.DockOption.GroupedDragging)
         qt.QApplication.instance().focusChanged.connect(self._focus_changed)
         self.setTabPosition(qt.Qt.DockWidgetArea.AllDockWidgetAreas, qt.QTabWidget.TabPosition.North)
-        self.toolbar = self.addToolBar('Views')
-        self.toolbar.setMovable(False)
-        self.new_action = self.toolbar.addAction('New tab', lambda: self.add_view())
+        self.new_action = qt.QAction('New tab', self)
+        self.new_action.triggered.connect(lambda: self.add_view())
+        self.addAction(self.new_action)
         self.new_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.AddTab))
         self.new_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        self.close_action = self.toolbar.addAction('Close tab', self.close_active)
+        self.close_action = qt.QAction('Close tab', self)
+        self.close_action.triggered.connect(self.close_active)
+        self.addAction(self.close_action)
         self.close_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
         self.close_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        self.toolbar.addAction('Detach', self.detach_active)
-        self.reattach_action = self.toolbar.addAction('Reattach', self.reattach_active)
-        self.reattach_action.setToolTip('Return the active detached tab, or another detached tab belonging to this window.')
-        self.toolbar.addAction('Split left', lambda: self.arrange(self.active_dock, 'left'))
-        self.toolbar.addAction('Split right', lambda: self.arrange(self.active_dock, 'right'))
-        self.toolbar.addAction('Combine tabs', lambda: self.arrange(self.active_dock, 'tabs'))
+        # Retain programmatic actions and layout operations without a button row.
+        self.reattach_action = qt.QAction('Reattach', self)
+        self.reattach_action.triggered.connect(self.reattach_active)
+        self.installEventFilter(self)
         self._update_drop_target()
+
+    def _schedule_tab_headers(self):
+        if not self._headers_pending:
+            self._headers_pending = True
+            qt.QTimer.singleShot(0, self._refresh_tab_headers)
+
+    def _tab_dock(self, bar, index):
+        # Native dock bars store the dock's C++ identity. Compare identities only;
+        # never dereference Qt's private tab data or replace it with our own data.
+        from shiboken6 import getCppPointer
+        identity = bar.tabData(index)
+        return next((dock for dock in self.docks if getCppPointer(dock)[0] == identity), None)
+
+    def _refresh_tab_headers(self):
+        self._headers_pending = False
+        if self._closing:
+            return
+        for dock in self.docks:
+            grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
+            dock.tab_header.setFixedHeight(0 if grouped else 30)
+        for bar in self.findChildren(qt.QTabBar):
+            # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
+            if bar.parent() is not self or not bar.count() or not self._tab_dock(bar, 0):
+                continue
+            bar.installEventFilter(self)
+            bar.setExpanding(False)
+            bar.setElideMode(qt.Qt.TextElideMode.ElideRight)
+            bar.setUsesScrollButtons(True)
+            if not hasattr(bar, 'workspace_plus'):
+                bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.add_view())
+                bar.currentChanged.connect(self._schedule_tab_headers)
+            width = max(60, (bar.width() - 32) // bar.count())
+            style = (f'QTabBar::tab {{ width: {width}px; height: 30px; padding: 0px; }} '
+                     'QTabBar::scroller { width: 96px; }')
+            if bar.styleSheet() != style:
+                bar.setStyleSheet(style)
+            for index in range(bar.count()):
+                dock = self._tab_dock(bar, index)
+                if dock is None:
+                    continue
+                button = bar.tabButton(index, qt.QTabBar.ButtonPosition.LeftSide)
+                if button is None:
+                    button = _tab_button('×', 'Close tab', bar)
+                    button.clicked.connect(lambda checked=False, owner=button: owner.dock.close())
+                    bar.setTabButton(index, qt.QTabBar.ButtonPosition.LeftSide, button)
+                button.dock = dock
+            arrows = [bar.findChild(qt.QToolButton, name)
+                      for name in ('ScrollLeftButton', 'ScrollRightButton')]
+            overflow = all(arrow is not None and arrow.isVisible() for arrow in arrows)
+            # Keep + available even when native overflow arrows appear. Qt reserves
+            # 96 pixels for these controls; the remaining tabs scroll as usual.
+            for index, arrow in enumerate(arrows):
+                if arrow is not None:
+                    if not hasattr(arrow, 'workspace_connected'):
+                        arrow.clicked.connect(self._schedule_tab_headers)
+                        arrow.workspace_connected = True
+                    if overflow:
+                        arrow.setFixedSize(28, 28)
+                        arrow.move(bar.width() - 62 + index * 32, 1)
+            bar.workspace_plus.move(bar.width() - (94 if overflow else 30), max(0, (bar.height() - 28) // 2))
+            bar.workspace_plus.show()
+            bar.workspace_plus.raise_()
+
+    def eventFilter(self, watched, event):
+        if watched is self or isinstance(watched, qt.QTabBar) and watched.parent() is self:
+            if event.type() in (qt.QEvent.Type.Resize, qt.QEvent.Type.LayoutRequest):
+                self._schedule_tab_headers()
+            if isinstance(watched, qt.QTabBar) and event.type() == qt.QEvent.Type.ContextMenu:
+                dock = self._tab_dock(watched, watched.tabAt(event.pos()))
+                if dock:
+                    event.accept()
+                    menu = qt.QMenu(watched)
+                    menu.addAction('Close tab', dock.close)
+                    menu.exec(event.globalPos())
+                    menu.deleteLater()
+                    return True
+        return super().eventFilter(watched, event)
 
     def _hide_drop_target(self):
         self._drop_target.hide()
@@ -103,6 +219,7 @@ class Workspace(qt.QMainWindow):
         topLevelChanged signal would disturb an in-progress native drop.
         """
         floating = [dock for dock in self.docks if dock.isFloating()]
+        self._schedule_tab_headers()
         self.reattach_action.setEnabled(bool(floating) and not self._closing)
         if self._closing or any(not dock.isFloating() for dock in self.docks):
             self._hide_drop_target()

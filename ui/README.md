@@ -372,11 +372,16 @@ for existing consumers. Directory listings and feature actions remain available.
 
 `commonUtils.ui.workspace.Workspace(factory)` hosts cooperative document views in
 native Qt dock tabs. Views may provide `view_title`, `title_changed`, `idle`, and
-`prepare_close()`. Each view owns its state. Toolbar actions create/close tabs,
-float docks, split left/right and combine tabs. Dock-title context menus transfer
-views between live workspaces without reconstructing them. Empty workspaces provide
-a full-size native dock anchor; it disappears after a real view returns. **Reattach**
-returns a floating view without requiring a drag, even when no tabs remain docked.
+`prepare_close()`. Each view owns its state. Tab headers share their group's width,
+with a close button on the left of each tab and a small **+** after the tabs.
+Right-clicking a header offers **Close tab**. New/close keyboard shortcuts remain
+available, including when no tabs are open. Native tab dragging remains supported.
+The former action toolbar is removed; `detach_active()`, `reattach_active()`,
+`arrange(dock, placement)` (left/right/tabs), and `adopt(dock)` remain available
+in code for floating, splitting, combining and transferring existing views.
+Empty workspaces provide a full-size native dock anchor and a **+** button;
+the anchor disappears after a real view returns. `reattach_active()` returns a
+floating view without requiring a drag, even when no tabs remain docked.
 New tabs are grouped only with docked views, leaving detached views independent.
 Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.
