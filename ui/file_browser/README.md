@@ -19,7 +19,8 @@ and imports compatible. File handlers may also be used outside Logistics.
 
 The index backend is separated into `commonUtils._directory_reader` (immutable
 SQLite readers), `_directory_schema` (migration, record interning and membership),
-`_directory_store` (scan scheduling/checkpoints), `_directory_totals` (incremental
+`_directory_store` (scan scheduling/checkpoints), `_directory_reconcile` (targeted
+completed-index updates), `_directory_totals` (incremental
 aggregation), and `_directory_order` (natural ordering). The old reader/order
 imports remain available from `_directory_store`. Public access continues through
 `commonUtils.directory_index`.
@@ -63,6 +64,34 @@ The stable prefix and counters precede the changing phase. Browser size updates
 read totals only for the current folder and its immediate child folders; each saved
 total still includes all descendants. Full `scan_folders()` results remain available
 to existing callers; the browser opts into `visible_only=True`.
+
+## Event-driven index updates
+
+Initial scans and partial resumes discover the subtree once. After completion there
+is no periodic full-tree validation. Opening/reopening a folder checks its immediate
+entries; current-folder filesystem notifications and browser copy/move/rename
+operations check affected folders. New or changed branches are scanned, removed
+branches are purged, and recursive saved totals propagate to indexed ancestors.
+Deep changes in an unwatched folder can remain cached until it is visited or the
+user presses **Refresh**, which validates the entire current subtree.
+
+`DirectoryCache.reconcile_folder()` updates completed generations in one writer
+transaction without copying the whole generation. Independent SQLite read snapshots
+retain their old contents. Cancellation rolls back updates to a completed index, retaining the previous
+saved contents; initial/partial scans retain their durable checkpoint/resume behavior.
+Explicit Refresh validates the subtree in bounded batches in the same generation,
+so saved totals also update in its indexed ancestors. Retired metadata cleanup only
+examines records touched by the update, keeping repeated edits from growing the cache. The
+additive `folder_checks` table records the last immediate-folder check separately
+from full-tree validation timestamps, without rebuilding the index. The status line
+shows last-checked time and distinguishes cached subtree sizes from full validation.
+
+The toolbar shows **Pause** during a scan and **Resume** while paused. Pausing only
+unsubscribes this tab; other tabs may continue. Cached search/sizes remain available,
+including when navigating while paused. No idle background-indexing toggle is needed.
+Legacy `set_folder_sizes_enabled()` and Logistics `folder_sizes` widget fields remain
+available for compatibility. Shared jobs include request kind and affected paths in
+their key, so a deep Refresh cannot silently join a weaker immediate-folder check.
 
 ## Compact cache (schema 3)
 

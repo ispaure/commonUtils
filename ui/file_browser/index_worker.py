@@ -90,10 +90,11 @@ class FolderOperation(qt.QObject):
     completed = qt.Signal(object, str)
     finished = qt.Signal()
 
-    def __init__(self, root, scanner, parent):
+    def __init__(self, root, scanner, parent, *, request_key=None):
         super().__init__(parent)
         self.root = root
         self.scanner = scanner
+        self.request_key = request_key
         self.started_at = monotonic()
         self._job = None
         self._waiting_job = None
@@ -112,6 +113,8 @@ class FolderOperation(qt.QObject):
 
     def start(self):
         key = (directory_cache.database, self.root)
+        if self.request_key is not None:
+            key += (self.request_key,)
         job = _jobs.get(key)
         if job is None or job.isInterruptionRequested():
             job = _IndexJob(self.root, self.scanner, qt.QApplication.instance())
