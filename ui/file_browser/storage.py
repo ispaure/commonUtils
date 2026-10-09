@@ -46,12 +46,14 @@ class Treemap(qt.QWidget):
         super().__init__(parent)
         self.items = []
         self.rectangles = []
+        self.selected_path = None
         self.setMinimumSize(250, 180)
         self.setMouseTracking(True)
         self.setAccessibleName('Storage distribution; matching entries are also available in the list')
 
     def set_items(self, items):
         self.items = list(items)
+        self.rectangles = []
         self.update()
 
     def paintEvent(self, event):
@@ -60,6 +62,9 @@ class Treemap(qt.QWidget):
         self.rectangles = treemap_rectangles(self.items, qt.QRectF(self.rect()))
         for index, (path, size, rect) in enumerate(self.rectangles):
             painter.fillRect(rect.adjusted(1, 1, -1, -1), qt.QColor.fromHsv((index * 47) % 360, 130, 125))
+            if path == self.selected_path:
+                painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Highlight),3))
+                painter.drawRect(rect.adjusted(2,2,-2,-2))
             painter.setPen(qt.QColor('white'))
             if rect.width() > 65 and rect.height() > 35:
                 painter.save()

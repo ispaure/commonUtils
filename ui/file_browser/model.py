@@ -93,3 +93,91 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
 
     def invalidate(self, path):
         self._items.pop(Path(path), None)
+
+
+class ByteSortModel(qt.QSortFilterProxyModel):
+    """The list sorts displayed byte totals without changing other view models."""
+    def __init__(self, filesystem, parent=None):
+        super().__init__(parent)
+        self.filesystem = filesystem
+        self.setSourceModel(filesystem)
+        self.setDynamicSortFilter(True)
+        self.collator = qt.QCollator()
+        self.collator.setNumericMode(True)
+        self.collator.setCaseSensitivity(qt.Qt.CaseSensitivity.CaseInsensitive)
+
+    def mapFromSource(self, index):
+        if index.isValid() and index.model() is self.filesystem:
+            # QFileSystemModel indexes can retain a file pointer with an old row
+            # while asynchronous loading reorders siblings. Refresh by path before
+            # passing the row-based index to the sorting proxy.
+            index = self.filesystem.index(self.filesystem.filePath(index), index.column())
+        return super().mapFromSource(index)
+
+    def _bytes(self, index):
+        path = Path(self.filesystem.filePath(index))
+        if self.filesystem.isDir(index):
+            stats = self.filesystem.folder_totals.get(path)
+            return stats.size if stats is not None and not path.is_symlink() else None
+        return self.filesystem.size(index)
+
+    def lessThan(self, left, right):
+        if left.column() == 1:
+            a, b = self._bytes(left), self._bytes(right)
+            if (a is None) != (b is None):
+                return (a is not None) if self.sortOrder() == qt.Qt.SortOrder.AscendingOrder else (a is None)
+            if a != b:
+                return a < b
+        elif left.column() == 3:
+            a, b = self.filesystem.lastModified(left), self.filesystem.lastModified(right)
+            if a != b:
+                return a < b
+        else:
+            a, b = self.filesystem.isDir(left), self.filesystem.isDir(right)
+            if a != b:
+                return a
+        return self.collator.compare(self.filesystem.fileName(left), self.filesystem.fileName(right)) < 0
+
+
+class _BrowserSelection(qt.QItemSelectionModel):
+    """Accept filesystem indexes from existing browser integrations."""
+    def setCurrentIndex(self, index, command):
+        if index.model() is self.model().sourceModel():
+            index = self.model().mapFromSource(index)
+        super().setCurrentIndex(index, command)
+
+    def select(self, selection, command):
+        if isinstance(selection, qt.QModelIndex) and selection.model() is self.model().sourceModel():
+            selection = self.model().mapFromSource(selection)
+        elif isinstance(selection, qt.QItemSelection) and selection and selection[0].model() is self.model().sourceModel():
+            selection = self.model().mapSelectionFromSource(selection)
+        super().select(selection, command)
+
+
+class BrowserTree(qt.QTreeView):
+    def source_to_view(self, index):
+        return self.model().mapFromSource(index) if index.model() is self.model().sourceModel() else index
+
+    def setRootIndex(self, index):
+        super().setRootIndex(self.source_to_view(index))
+
+    def rootIndex(self):
+        return self.model().mapToSource(super().rootIndex())
+
+    def expand(self, index):
+        super().expand(self.source_to_view(index))
+
+    def collapse(self, index):
+        super().collapse(self.source_to_view(index))
+
+    def setCurrentIndex(self, index):
+        super().setCurrentIndex(self.source_to_view(index))
+
+    def scrollTo(self, index, hint=qt.QAbstractItemView.ScrollHint.EnsureVisible):
+        super().scrollTo(self.source_to_view(index), hint)
+
+    def visualRect(self, index):
+        return super().visualRect(self.source_to_view(index))
+
+    def edit(self, index, *args):
+        return super().edit(self.source_to_view(index), *args)

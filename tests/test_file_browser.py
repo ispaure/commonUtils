@@ -288,7 +288,7 @@ class BrowserTests(unittest.TestCase):
     def test_icon_view_switches_and_responsive_grid_fills_the_viewport(self):
         selector = self.browser.view_selector
         self.assertFalse(isinstance(selector, qt.QComboBox))
-        self.assertEqual(list(selector.buttons), [1, 0, 2])
+        self.assertEqual(list(selector.buttons), [1, 0, 2, 3])
         for mode in (1, 2, 0):
             selector.buttons[mode].click()
             self.assertEqual(self.browser.views.currentIndex(), mode)
