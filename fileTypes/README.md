@@ -304,3 +304,31 @@ host application rather than the file-type registry.
 the shared [Markdown reader](../ui/README.md#markdown-reader). Resolution and text
 operations do not import Qt; only activation requires an existing QApplication.
 Feature-installed activation handlers still take precedence over the file's hook.
+
+### `iniType.py`
+
+`INIFile` is a generic, string-valued INI document. It preserves key case,
+disables interpolation, rejects duplicate keys/sections, supports UTF-8 BOMs and
+DEFAULT inheritance, and does not interpret application-specific suffixes.
+
+```python
+from commonUtils.fileTypes.iniType import INIFile
+
+file = INIFile(Path("config.ini")).read()
+value = file.get("General", "name", fallback="")
+file.set("General", "name", "new value")
+file.save()
+```
+
+`sections()` lists sections (including DEFAULT when populated); `items(section)`
+includes inherited defaults. `updated_text(text, {(section, key): value})` is also
+available for editors that own their save lifecycle. Field updates preserve
+comments, unrelated formatting and multiline values. Ambiguous layouts fail
+rather than silently changing unrelated settings. Save uses an atomic temporary
+file, preserves existing permissions/BOM/newlines, and refuses external changes
+since `read()`. Callers should serialize writes to the same file; the conflict
+check is not a cross-process lock. Standard I/O and ConfigParser errors propagate.
+The old `configUtils` and `TXTFile` APIs remain unchanged.
+
+The optional [typed-key schema and visual editor](../configuration/README.md)
+are separate layers; INIFile itself never interprets suffixes.
