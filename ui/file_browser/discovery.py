@@ -126,10 +126,14 @@ class SearchDialog(ScanDialog):
         self.results.clear()
         self._query = self.query.text()
         self.search_button.setEnabled(False)
+        self.query.setEnabled(False)
+        self.recursive.setEnabled(False)
         self.scan(self.recursive.isChecked(), refresh=refresh)
 
     def _completed(self, result, error):
         self.search_button.setEnabled(True)
+        self.query.setEnabled(True)
+        self.recursive.setEnabled(True)
         super()._completed(result, error)
 
     def show_snapshot(self):

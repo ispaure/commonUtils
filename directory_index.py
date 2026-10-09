@@ -55,8 +55,8 @@ def scan_metadata(root, recursive=True, *, cancelled=lambda: False,
                     path = Path(child.path)
                     try:
                         info = child.stat(follow_symlinks=False)
-                        link = child.is_symlink()
-                        directory = child.is_dir(follow_symlinks=False)
+                        link = child.is_symlink() or path.is_junction()
+                        directory = not link and child.is_dir(follow_symlinks=False)
                         entries.append(Entry(path, directory, 0 if directory or link else info.st_size,
                                              info.st_mtime_ns, link, fingerprint(info)))
                         if directory and recursive:
