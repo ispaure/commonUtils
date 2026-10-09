@@ -19,6 +19,48 @@ class View(qt.QLabel):
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_retired_tab_disappears_before_worker_finishes(self):
+        workspace = self.create()
+        view = workspace.add_view('busy')
+        dock = workspace.active_dock
+        view.can_retire = True
+        with patch.object(view, 'prepare_close', return_value=False):
+            dock.close()
+            self.assertEqual(workspace.docks, [])
+            self.assertEqual(workspace._retiring, [dock])
+            self.assertFalse(dock.isVisible())
+            self.assertFalse(workspace.prepare_close())
+        workspace._retry_view_close(dock)
+        self.assertEqual(workspace._retiring, [])
+
+    def test_dropping_tab_on_either_edge_splits_and_center_rejoins(self):
+        from commonUtils.ui.workspace_drag import tab_mime
+        workspace = self.create()
+        workspace.add_view('first')
+        moving = workspace.active_dock
+        workspace.add_view('second')
+        self.settle()
+        for edge in ('left', 'tabs', 'right'):
+            target = next(dock for dock in workspace.docks if dock is not moving)
+            rect = target.geometry()
+            x = rect.left() + 3 if edge == 'left' else rect.right() - 3 if edge == 'right' else rect.center().x()
+            point = qt.QPoint(x, rect.center().y())
+            mime = tab_mime(moving)
+            enter = qt.QDragEnterEvent(point, qt.Qt.DropAction.MoveAction, mime,
+                                      qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+            self.app.sendEvent(workspace, enter)
+            self.assertTrue(enter.isAccepted())
+            drop = qt.QDropEvent(qt.QPointF(point), qt.Qt.DropAction.MoveAction, mime,
+                                qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+            self.app.sendEvent(workspace, drop)
+            self.settle()
+            self.assertTrue(drop.isAccepted())
+            if edge == 'tabs':
+                self.assertIn(target, workspace.tabifiedDockWidgets(moving))
+            else:
+                self.assertNotIn(target, workspace.tabifiedDockWidgets(moving))
+                self.assertEqual(moving.x() < target.x(), edge == 'left')
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.hosts = []
