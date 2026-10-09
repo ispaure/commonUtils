@@ -67,6 +67,23 @@ class IntegratedSearchTests(unittest.TestCase):
             self.browser.search_bar.clear();self.app.processEvents()
             self.assertIs(self.browser.list_stack.currentWidget(),self.browser.views)
 
+    def test_keyword_and_phrase_search_and_column_result_preview(self):
+        for name in ('Alpha_Beta.txt', 'Beta alpha.txt', 'alpha more beta.txt'):
+            (self.root / name).write_text('text')
+        self.browser.refresh(); self.wait(lambda: not self.browser.folder_busy)
+        self.browser.view_selector.setCurrentIndex(2)
+        self.search('alpha beta', 3)
+        self.search('"ALPHA beta"', 1)
+        row = self.browser.index_search.results.topLevelItem(0)
+        self.assertEqual(row.text(0), 'Alpha_Beta.txt')
+        row.setSelected(True)
+        self.wait(lambda: not self.browser.busy)
+        self.assertFalse(self.browser.preview_panel.isHidden())
+        self.assertEqual(self.browser.preview_panel.parentWidget(), self.browser.splitter)
+        self.browser.search_bar.clear()
+        self.wait(lambda: not self.browser.busy)
+        self.assertEqual(self.browser.preview_panel.parentWidget(), self.browser.views.columns.preview_container)
+
     def test_show_result_in_browser_uses_normal_parent_navigation(self):
         self.search('needle',1)
         self.assertTrue(self.browser.index_search.show_in_browser(self.file))

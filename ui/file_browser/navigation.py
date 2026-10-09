@@ -42,6 +42,7 @@ class BreadcrumbBar(qt.QWidget):
         while self.crumbs.count():
             item = self.crumbs.takeAt(0)
             if item.widget() is not None:
+                item.widget().hide()
                 item.widget().deleteLater()
         self.root_button.setVisible(bool(paths))
         if paths:

@@ -15,6 +15,9 @@ class DetailsPanel(qt.QScrollArea):
         super().__init__(parent)
         self.fields = tuple(fields)
         self.error = error
+        self.form = None
+        self.field_labels = []
+        self._compact = None
         self.setWidgetResizable(True)
         self.setFrameShape(qt.QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -28,6 +31,7 @@ class DetailsPanel(qt.QScrollArea):
             layout.addWidget(message)
         else:
             form = qt.QFormLayout()
+            self.form = form
             form.setContentsMargins(0, 0, 0, 0)
             form.setHorizontalSpacing(14)
             form.setVerticalSpacing(9)
@@ -41,6 +45,7 @@ class DetailsPanel(qt.QScrollArea):
                 label.setWordWrap(True)
                 label.setMinimumWidth(85)
                 label.setMaximumWidth(135)
+                self.field_labels.append(label)
                 text = DetailValue(str(value))
                 text.setAlignment(qt.Qt.AlignmentFlag.AlignLeft | qt.Qt.AlignmentFlag.AlignTop)
                 text.setTextFormat(qt.Qt.TextFormat.PlainText)
@@ -56,6 +61,19 @@ class DetailsPanel(qt.QScrollArea):
             layout.addLayout(form)
         layout.addStretch()
         self.setWidget(content)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        compact = self.viewport().width() < 300
+        if self.form is None or compact == self._compact:
+            return
+        self._compact = compact
+        self.form.setRowWrapPolicy(qt.QFormLayout.RowWrapPolicy.WrapAllRows if compact else
+                                   qt.QFormLayout.RowWrapPolicy.DontWrapRows)
+        alignment = (qt.Qt.AlignmentFlag.AlignLeft if compact else qt.Qt.AlignmentFlag.AlignRight)
+        self.form.setLabelAlignment(alignment | qt.Qt.AlignmentFlag.AlignTop)
+        for label in self.field_labels:
+            label.setAlignment(alignment | qt.Qt.AlignmentFlag.AlignTop)
 
     def toPlainText(self):
         """Retain read-only text access for callers inspecting detail content."""

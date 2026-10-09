@@ -145,12 +145,15 @@ class FileViews(qt.QStackedWidget):
         self.selection_changed.emit()
 
     def set_mode(self, mode):
+        chart_mode = max(0, mode - 3)
+        mode = min(mode, 3)  # Both storage buttons share the established storage widget.
         selected = self.selected_rows()
         directory = self.browsing_directory()
         if directory != self.root:
             self.set_root(directory)
         self.setCurrentIndex(mode)
         if mode == 3:
+            self.storage.chart_selector.setCurrentIndex(chart_mode)
             self.storage.set_root(directory)
             if selected:
                 self.storage.select_path(Path(self.model.filePath(selected[-1])))

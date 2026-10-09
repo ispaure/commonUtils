@@ -91,7 +91,7 @@ class StorageView(qt.QWidget):
         self.chart_selector.addItems(['Treemap', 'Radial'])
         self.chart_selector.setAccessibleName('Storage visualization')
         self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 largest chart entries; gaps represent omitted entries. Hover for names and sizes.')
-        controls.addWidget(self.chart_selector)
+        self.chart_selector.hide()  # Compatibility API; the toolbar owns chart buttons.
         self.summary = qt.QLabel('Loading saved sizes…')
         self.summary.setWordWrap(True)
         controls.addWidget(self.summary,1)
@@ -105,10 +105,10 @@ class StorageView(qt.QWidget):
             chart.activated.connect(self.activated)
             chart.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             chart.customContextMenuRequested.connect(lambda point, target=chart: self._chart_context(target,point))
-        self.chart_selector.currentIndexChanged.connect(self.charts.setCurrentIndex)
-        self.chart_selector.currentIndexChanged.connect(lambda index: self.refresh())
+        self.chart_selector.currentIndexChanged.connect(self._chart_changed)
         self.results = qt.QTreeWidget()
-        self.results.setHeaderLabels(['File or folder (largest first)', 'Size', 'Share'])
+        self.results.setHeaderLabels(['File or folder', 'Size', 'Share'])
+        self.results.headerItem().setToolTip(0, 'Files and folders, ordered largest first')
         self.results.setRootIsDecorated(False)
         self.results.setUniformRowHeights(True)
         self.results.header().setSectionResizeMode(0,qt.QHeaderView.ResizeMode.Stretch)
@@ -118,10 +118,21 @@ class StorageView(qt.QWidget):
         self.results.itemActivated.connect(lambda row, column: self.activated.emit(row.data(0,qt.Qt.ItemDataRole.UserRole)))
         self.results.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
         self.results.customContextMenuRequested.connect(self._list_context)
-        splitter = qt.QSplitter(qt.Qt.Orientation.Vertical)
-        splitter.addWidget(self.charts); splitter.addWidget(self.results)
-        splitter.setSizes([500,180]); layout.addWidget(splitter,1)
+        self.splitter = qt.QSplitter(qt.Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.results.setMinimumWidth(220)
+        self.splitter.addWidget(self.charts); self.splitter.addWidget(self.results)
+        self.splitter.setStretchFactor(0,7); self.splitter.setStretchFactor(1,3)
+        self.splitter.setSizes([700,300]); layout.addWidget(self.splitter,1)
         browser.index_updated.connect(lambda path: self.refresh() if path == self.root else None)
+
+    def _chart_changed(self, index):
+        self.charts.setCurrentIndex(index)
+        if self.browser.views.currentIndex() == 3:
+            blocker = qt.QSignalBlocker(self.browser.view_selector)
+            self.browser.view_selector.setCurrentIndex(3 + index)
+            blocker.unblock()
+        self.refresh()
 
     def _selected(self, row):
         self.selected_path = row.data(0,qt.Qt.ItemDataRole.UserRole) if row else None
