@@ -143,7 +143,7 @@ class SqlEntries(Sequence):
                                    cancelled=cancelled, limit=limit, offset=offset, order=order))
         return matches, total
 
-    def folder_stats(self, paths=None, *, cancelled=lambda: False, stale=False):
+    def folder_stats(self, paths=None, *, cancelled=lambda: False, stale=False, children_of=None):
         from .filesystem import FolderStats
         values = {}
         with self.lock:
@@ -151,7 +151,20 @@ class SqlEntries(Sequence):
                 return values  # An old cache will be upgraded by the next scan.
             extra = ''
             parameters = (self.generation,)
-            if paths is not None:
+            if children_of is not None:
+                if paths is not None:
+                    raise ValueError('Choose explicit paths or immediate child folders')
+                # The browser needs one level, not every descendant's JSON totals.
+                # Both the address lookup and totals lookup have persistent indexes.
+                if self.compact:
+                    extra = (' AND path IN (SELECT path FROM folder_paths WHERE path=? OR '
+                             'parent_id=(SELECT id FROM folder_paths WHERE path=?))')
+                    parameters += (str(children_of), str(children_of))
+                else:
+                    extra = (' AND (path=? OR path IN (SELECT path FROM folders '
+                             'WHERE generation=? AND parent=?))')
+                    parameters += (str(children_of), self.generation, str(children_of))
+            elif paths is not None:
                 paths = tuple(paths)
                 if not paths:
                     return values
@@ -221,5 +234,4 @@ class SqlDirectories(Sequence):
         if not 0 <= index < len(self):
             raise IndexError(index)
         return next(islice(iter(self), index, index + 1))
-
 

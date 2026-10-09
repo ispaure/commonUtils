@@ -611,7 +611,8 @@ class FileBrowser(qt.QWidget):
         self.folder_pending = False
         self.folder_root = root
         self.index_status.setText('Checking saved sizes and indexing this location…')
-        self.folder_operation = FolderOperation(root, scan_folders, self)
+        self.folder_operation = FolderOperation(root, lambda *args, **kwargs: scan_folders(
+            *args, **kwargs, visible_only=True), self)
         self.folder_operation.updated.connect(self._folders_progressed)
         self.folder_operation.progress.connect(lambda message: self._index_progressed(message)
                                                if root == self.navigation.directory else None)

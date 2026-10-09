@@ -39,6 +39,11 @@ class BrowserPresentationTests(unittest.TestCase):
         self.assertIn('1h 01m 01s elapsed', message)
         self.assertNotIn('/private', message)
         self.assertIn('1h 01m 02s elapsed', progress.render(3662))
+        self.assertTrue(message.startswith('File index · 900 saved entries'))
+        self.assertTrue(message.endswith(' · Saving folder sizes'))
+        progress.update(0, 'Loading saved sizes')
+        loading = progress.render(3661)
+        self.assertEqual(message.rsplit(' · ', 1)[0], loading.rsplit(' · ', 1)[0])
 
     def test_preview_opens_on_selection_and_toggle_suppresses_future_selections(self):
         with TemporaryDirectory() as folder:

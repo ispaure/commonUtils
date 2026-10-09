@@ -88,6 +88,7 @@ class SharedJobTests(unittest.TestCase):
             messages=[];read=Snapshot.folder_stats
             def totals(snapshot,*args,**kwargs):
                 self.assertIn('1 saved entries',messages[-1])
+                self.assertEqual(kwargs['children_of'], root)
                 return read(snapshot,*args,**kwargs)
             with patch('commonUtils.ui.file_browser.index_worker.directory_cache',cache):
                 job=_IndexJob(root,lambda *args,**kwargs:None,self.app)

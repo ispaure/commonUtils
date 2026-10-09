@@ -75,9 +75,9 @@ class IndexProgress:
         with self.lock:
             elapsed = (monotonic() if now is None else now) - self.started_at
             processed = sum(self.counts.values())
-            return (f'{self.phase} · {self.saved_entries:,} saved entries'
+            return (f'File index · {self.saved_entries:,} saved entries'
                     f' · {processed:,} processed this run · {processed / max(.1, elapsed):,.0f} entries/s'
-                    f' · {format_duration(elapsed)} elapsed')
+                    f' · {format_duration(elapsed)} elapsed · {self.phase}')
 
 
 class IndexStatusLabel(qt.QLabel):
