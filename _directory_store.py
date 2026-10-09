@@ -1,5 +1,4 @@
-"""SQLite directory generations with durable per-folder scan checkpoints."""
-from collections.abc import Sequence
+"""Directory scan scheduling, validation, and durable per-folder checkpoints."""
 from contextlib import contextmanager, closing
 import json
 import os
@@ -11,10 +10,13 @@ from threading import RLock
 from time import sleep, time, perf_counter
 
 from ._directory_metadata import Entry, Snapshot, fingerprint
+# Keep these long-standing imports available to existing consumers/instrumentation.
+from ._directory_reader import SqlEntries, SqlDirectories, _entry
 from .operations import check_cancelled, OperationCancelled
-from .traversal import natural_path_key
+from ._directory_order import _sort_key, _encode_sort_parts
 from .storage import cache_directory
 from ._directory_totals import store_folder_stats
+from ._directory_schema import initialize_schema, ensure_folder, copy_entries, write_entries, delete_children, delete_entries, retire_generation
 
 
 def directory_index_path():
@@ -32,218 +34,6 @@ def _legacy_directory_index_path():
     else:
         folder = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share')
     return folder / 'commonUtils' / 'directory-index.sqlite3'
-
-
-def _sort_key(path):
-    return _encode_sort_parts(natural_path_key(path))
-
-
-def _encode_sort_parts(parts):
-    result = bytearray()
-    for part in parts:
-        if isinstance(part, int):
-            number = str(part).encode('ascii')
-            result.extend(b'\x01' + len(number).to_bytes(4, 'big') + number + b'\0')
-        else:
-            result.extend(b'\x02' + part.encode('utf-8', 'surrogatepass') + b'\0')
-    return bytes(result)
-
-
-def _entry(row):
-    return Entry(Path(row[0]), bool(row[1]), row[2], row[3], bool(row[4]), tuple(json.loads(row[5])))
-
-
-class SqlEntries(Sequence):
-    """An immutable SQLite read snapshot; entries are streamed rather than all loaded.
-
-    The read transaction keeps an older displayed generation valid during rebuilds
-    and cleanup. It is released when the owning Snapshot/iterator is collected.
-    """
-    def __init__(self, database, generation, *, parent=None, connection=None, scope=None):
-        self.connection = connection or sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
-        self.connection.execute('PRAGMA query_only=ON')
-        if connection is None:
-            self.connection.execute('BEGIN')
-            # Pin the immutable read transaction without counting every entry.
-            self.connection.execute('SELECT 1 FROM scans WHERE id=?',(generation,)).fetchone()
-        self.generation = generation
-        self.parent = parent
-        self.lock = RLock()
-        self.where = 'generation=?' + (' AND parent=?' if parent is not None else '')
-        self.parameters = (generation,) + ((str(parent),) if parent is not None else ())
-        self.scope = scope
-        if scope is not None:
-            prefix = str(scope).rstrip(os.sep) + os.sep
-            self.where += ' AND path>=? AND path<?'
-            self.parameters += (prefix, prefix[:-1] + chr(ord(os.sep) + 1))
-        self._count = None
-
-    @property
-    def count(self):
-        with self.lock:
-            if self._count is None:
-                self._count = self.connection.execute(f'SELECT count(*) FROM entries WHERE {self.where}', self.parameters).fetchone()[0]
-            return self._count
-
-    def __len__(self):
-        return self.count
-
-    def _rows(self, extra='', parameters=(), *, order='sort_key,path', cancelled=lambda: False,
-              limit=None, offset=0, index=None):
-        with self.lock:
-            self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
-            try:
-                cursor = self.connection.execute(
-                    f'SELECT path,directory,size,modified,symlink,identity FROM entries'
-                    + (' INDEXED BY '+index if index else '') + f' WHERE {self.where} '
-                    + extra + f' ORDER BY {order}' + (' LIMIT ? OFFSET ?' if limit is not None else ''),
-                    self.parameters + parameters + ((limit, offset) if limit is not None else ()))
-                for row in cursor:
-                    check_cancelled(cancelled)
-                    yield _entry(row)
-            except sqlite3.OperationalError:
-                if cancelled():
-                    raise OperationCancelled('Search cancelled; the saved index is still available') from None
-                raise
-            finally:
-                if 'cursor' in locals():
-                    cursor.close()
-                self.connection.set_progress_handler(None, 0)
-
-    def __iter__(self):
-        return self._rows()
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            from itertools import islice
-            start, stop, step = index.indices(self.count)
-            if step < 0:
-                return tuple(self)[index]
-            return tuple(islice(iter(self), start, stop, step))
-        if index < 0:
-            index += self.count
-        if not 0 <= index < self.count:
-            raise IndexError(index)
-        with self.lock:
-            row = self.connection.execute(
-                f'SELECT path,directory,size,modified,symlink,identity FROM entries WHERE {self.where} '
-                'ORDER BY sort_key,path LIMIT 1 OFFSET ?', self.parameters + (index,)).fetchone()
-            return _entry(row)
-
-    def search(self, name, *, cancelled=lambda: False):
-        return tuple(self._rows('AND instr(name_fold,?)>0', (name.casefold(),), cancelled=cancelled))
-
-    def by_depth(self):
-        return self._rows(order='length(path) DESC,path')
-
-    def children(self, path, limit=None):
-        return tuple(self._rows('AND parent=?', (str(path),), limit=limit, index='entry_parent'))
-
-    def get(self, path):
-        return next(self._rows('AND path=?', (str(path),)), None)
-
-    def search_page(self, name, offset=0, limit=500, *, cancelled=lambda: False, sort='path', descending=False):
-        if offset < 0 or limit < 1:
-            raise ValueError('Search page requires a nonnegative offset and positive limit')
-        columns = {'path': 'sort_key', 'name': 'name_fold', 'size': 'size',
-                   'type': 'CASE WHEN symlink THEN 2 WHEN directory THEN 1 ELSE 0 END'}
-        if sort not in columns:
-            raise ValueError(f'Unsupported search sort {sort}')
-        order = columns[sort] + (' DESC' if descending else ' ASC') + ',sort_key,path'
-        with self.lock:
-            self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
-            try:
-                check_cancelled(cancelled)
-                total = self.connection.execute(f'SELECT count(*) FROM entries WHERE {self.where} AND instr(name_fold,?)>0',
-                                                self.parameters + (name.casefold(),)).fetchone()[0]
-            except sqlite3.OperationalError:
-                if cancelled():
-                    raise OperationCancelled('Search cancelled; the saved index is still available') from None
-                raise
-            finally:
-                self.connection.set_progress_handler(None, 0)
-        matches = tuple(self._rows('AND instr(name_fold,?)>0', (name.casefold(),),
-                                   cancelled=cancelled, limit=limit, offset=offset, order=order))
-        return matches, total
-
-    def folder_stats(self, paths=None, *, cancelled=lambda: False, stale=False):
-        from .filesystem import FolderStats
-        values = {}
-        with self.lock:
-            if not self.connection.execute("SELECT 1 FROM sqlite_master WHERE name='folder_totals'").fetchone():
-                return values  # An old cache will be upgraded by the next scan.
-            extra = ''
-            parameters = (self.generation,)
-            if paths is not None:
-                paths = tuple(paths)
-                if not paths:
-                    return values
-                extra = ' AND path IN (' + ','.join('?' for _ in paths) + ')'
-                parameters += tuple(str(path) for path in paths)
-            elif self.scope is not None:
-                prefix = str(self.scope).rstrip(os.sep) + os.sep
-                extra = ' AND (path=? OR (path>=? AND path<?))'
-                parameters += (str(self.scope), prefix, prefix[:-1] + chr(ord(os.sep) + 1))
-            self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
-            try:
-                for row in self.connection.execute('SELECT path,size,files,folders,skipped,extensions,complete,scanned_at '
-                                                   'FROM folder_totals WHERE generation=?' + extra, parameters):
-                    check_cancelled(cancelled)
-                    path, size, files, folders, skipped, extensions, complete, stamp = row
-                    values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale)
-            except sqlite3.OperationalError:
-                check_cancelled(cancelled)
-                raise
-            finally:
-                self.connection.set_progress_handler(None, 0)
-        return values
-
-    def __del__(self):
-        connection = getattr(self, 'connection', None)
-        if connection is not None:
-            connection.close()
-
-
-class SqlDirectories(Sequence):
-    """Folder fingerprints from the same immutable read transaction as entries."""
-    def __init__(self, entries):
-        self.entries = entries
-        self.where = 'generation=? AND identity IS NOT NULL'
-        self.parameters = (entries.generation,)
-        if entries.scope is not None:
-            prefix = str(entries.scope).rstrip(os.sep) + os.sep
-            self.where += ' AND (path=? OR (path>=? AND path<?))'
-            self.parameters += (str(entries.scope), prefix, prefix[:-1] + chr(ord(os.sep) + 1))
-
-    def __len__(self):
-        with self.entries.lock:
-            return self.entries.connection.execute(
-                f'SELECT count(*) FROM folders WHERE {self.where}',
-                self.parameters).fetchone()[0]
-
-    def __iter__(self):
-        with self.entries.lock:
-            cursor = self.entries.connection.execute(
-                f'SELECT path,identity FROM folders WHERE {self.where} ORDER BY path',
-                self.parameters)
-            try:
-                for path, identity in cursor:
-                    yield Path(path), tuple(json.loads(identity))
-            finally:
-                cursor.close()
-
-    def __getitem__(self, index):
-        from itertools import islice
-        if isinstance(index, slice):
-            start, stop, step = index.indices(len(self))
-            if step < 0:
-                return tuple(self)[index]
-            return tuple(islice(iter(self), start, stop, step))
-        if index < 0:
-            index += len(self)
-        if not 0 <= index < len(self):
-            raise IndexError(index)
-        return next(islice(iter(self), index, index + 1))
 
 
 class DirectoryCache:
@@ -270,7 +60,7 @@ class DirectoryCache:
             self._invalidations[None if root is None else Path(root).absolute()] = self._revision
 
     @contextmanager
-    def _writer(self, cancelled):
+    def _writer(self, cancelled, report=lambda done, total, message: None):
         while not self._work_lock.acquire(timeout=.05):
             check_cancelled(cancelled)
         try:
@@ -304,8 +94,8 @@ class DirectoryCache:
                     try:
                         connection.execute('PRAGMA journal_mode=WAL')
                         connection.execute('PRAGMA foreign_keys=ON')
-                        self._schema(connection)
                         connection.set_progress_handler(lambda: int(cancelled()), 10_000)
+                        self._schema(connection, cancelled, report)
                         yield connection
                     except OperationCancelled:
                         # Flush bounded pending work when cancellation arrives between folders.
@@ -349,36 +139,9 @@ class DirectoryCache:
             staged.unlink(missing_ok=True)
 
     @staticmethod
-    def _schema(db):
-        version = db.execute('PRAGMA user_version').fetchone()[0]
-        if version not in (0, 1, 2):
-            raise RuntimeError(f'Unsupported directory index version {version}; choose another index file')
-        db.executescript('''
-            CREATE TABLE IF NOT EXISTS scans(id INTEGER PRIMARY KEY, root TEXT NOT NULL,
-                recursive INTEGER NOT NULL, scanned_at REAL NOT NULL DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS roots(root TEXT NOT NULL, recursive INTEGER NOT NULL,
-                completed INTEGER, building INTEGER, PRIMARY KEY(root,recursive));
-            CREATE TABLE IF NOT EXISTS entries(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
-                path TEXT NOT NULL, parent TEXT NOT NULL, name_fold TEXT NOT NULL,
-                directory INTEGER NOT NULL, size INTEGER NOT NULL, modified INTEGER NOT NULL,
-                symlink INTEGER NOT NULL, identity TEXT NOT NULL, sort_key BLOB NOT NULL,
-                PRIMARY KEY(generation,path));
-            CREATE INDEX IF NOT EXISTS entry_parent ON entries(generation,parent);
-            CREATE INDEX IF NOT EXISTS entry_order ON entries(generation,sort_key,path);
-            CREATE INDEX IF NOT EXISTS entry_name_order ON entries(generation,name_fold,sort_key,path);
-            CREATE TABLE IF NOT EXISTS folders(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
-                path TEXT NOT NULL,parent TEXT NOT NULL,status TEXT NOT NULL,identity TEXT,
-                PRIMARY KEY(generation,path));
-            CREATE INDEX IF NOT EXISTS folder_pending ON folders(generation,status,length(path),path);
-            CREATE INDEX IF NOT EXISTS folder_queue_order ON folders(generation,status,length(path),path);
-            CREATE TABLE IF NOT EXISTS errors(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
-                path TEXT NOT NULL,error TEXT NOT NULL,PRIMARY KEY(generation,path));
-            CREATE TABLE IF NOT EXISTS folder_totals(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
-                path TEXT NOT NULL,size INTEGER NOT NULL,files INTEGER NOT NULL,folders INTEGER NOT NULL,
-                skipped INTEGER NOT NULL,extensions TEXT NOT NULL,complete INTEGER NOT NULL,scanned_at REAL NOT NULL,
-                PRIMARY KEY(generation,path));
-            PRAGMA user_version=2;
-        ''')
+    def _schema(db, cancelled=lambda: False, report=lambda done, total, message: None):
+        """Compatibility entry point; schema ownership lives in _directory_schema."""
+        initialize_schema(db, cancelled, report)
 
     @staticmethod
     def _folder_identity(folder, root):
@@ -468,8 +231,7 @@ class DirectoryCache:
             # The parent has already reconciled its entries. Preserve a new file
             # or link at the old directory's path while deleting its old children.
             if table == 'entries':
-                db.execute('DELETE FROM entries WHERE generation=? AND path>=? AND path<?',
-                           (generation, prefix, upper))
+                delete_entries(db, generation, scope=folder)
             else:
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND path=?',(generation,folder))
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND path>=? AND path<?',
@@ -477,15 +239,13 @@ class DirectoryCache:
 
     def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report):
         text = str(folder)
-        # Every child shares the parent's natural-order chunks. Encode those once.
-        parts = natural_path_key(text + os.sep)
-        sort_prefix, sort_tail = _encode_sort_parts(parts[:-1]), parts[-1]
+        parent_id = ensure_folder(db, folder)
         prefix = text.rstrip(os.sep)+os.sep
         upper = prefix[:-1]+chr(ord(os.sep)+1)
         db.execute('DELETE FROM errors WHERE generation=? AND path=?',(generation,text))
         db.execute('DELETE FROM errors WHERE generation=? AND path>=? AND path<? AND instr(substr(path,?),?)=0',
                    (generation,prefix,upper,len(prefix)+1,os.sep))
-        db.execute('DELETE FROM entries WHERE generation=? AND parent=?', (generation, text))
+        delete_children(db, generation, folder)
         seen = set()
         count = 0
         entry_rows, folder_rows = [], []
@@ -496,7 +256,7 @@ class DirectoryCache:
             db.set_progress_handler(None,0)
             started = perf_counter()
             try:
-                db.executemany('INSERT OR REPLACE INTO entries VALUES(?,?,?,?,?,?,?,?,?,?)',entry_rows)
+                write_entries(db, generation, parent_id, entry_rows)
                 db.executemany("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "
                                "DO UPDATE SET status=CASE WHEN folders.identity=? AND folders.status='done' "
                                "THEN 'done' ELSE 'pending' END",folder_rows)
@@ -520,9 +280,9 @@ class DirectoryCache:
                         link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and path.is_junction())
                         directory = not link and stat.S_ISDIR(info.st_mode)
                         identity = json.dumps(fingerprint(info))
-                        entry_rows.append((generation, str(path), text, path.name.casefold(), directory,
+                        entry_rows.append((path.name, path.name.casefold(), directory,
                                            0 if directory or link else info.st_size, info.st_mtime_ns,
-                                           link, identity, sort_prefix + _sort_key(sort_tail + path.name)))
+                                           link, identity, _sort_key(path.name)[1:]))
                         if directory and recursive:
                             seen.add(str(path))
                             folder_rows.append((generation,str(path),text,identity))
@@ -582,28 +342,24 @@ class DirectoryCache:
             if root not in branch.parents:
                 continue
             report(0, 0, f'Reusing saved branch {branch}')
-            entry_exclusions, folder_exclusions, parameters = [], [], []
+            folder_exclusions, parameters, excluded_branches = [], [], []
             for nested in covered:
                 if branch not in nested.parents:
                     continue
                 prefix = str(nested).rstrip(os.sep) + os.sep
                 upper = prefix[:-1] + chr(ord(os.sep) + 1)
-                entry_exclusions.append('NOT (path>=? AND path<?)')
+                excluded_branches.append(nested)
                 folder_exclusions.append('NOT (path=? OR (path>=? AND path<?))')
                 parameters.append((str(nested),prefix,upper))
-            entry_where = ''.join(' AND '+clause for clause in entry_exclusions)
             folder_where = ''.join(' AND '+clause for clause in folder_exclusions)
-            entry_args = tuple(value for group in parameters for value in group[1:])
             folder_args = tuple(value for group in parameters for value in group)
             prefix = source_text.rstrip(os.sep) + os.sep
             upper = prefix[:-1] + chr(ord(os.sep) + 1)
-            db.execute('DELETE FROM entries WHERE generation=? AND path>=? AND path<?'+entry_where,
-                       (generation,prefix,upper)+entry_args)
+            delete_entries(db, generation, scope=branch, exclude=excluded_branches)
             for table in ('folders','errors'):
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND (path=? OR (path>=? AND path<?))'+folder_where,
                            (generation,source_text,prefix,upper)+folder_args)
-            db.execute('INSERT OR IGNORE INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key '
-                       'FROM entries WHERE generation=?'+entry_where, (generation, source)+entry_args)
+            copy_entries(db, generation, source, exclude=excluded_branches)
             db.execute('INSERT OR IGNORE INTO folders SELECT ?,path,CASE WHEN path=? THEN ? ELSE parent END,status,identity '
                        'FROM folders WHERE generation=?'+folder_where, (generation, source_text, str(branch.parent), source)+folder_args)
             db.execute('INSERT OR IGNORE INTO errors SELECT ?,path,error FROM errors WHERE generation=?'+folder_where,
@@ -626,7 +382,7 @@ class DirectoryCache:
         if root.resolve() == self.database.parent.resolve():
             raise ValueError('The directory index storage folder cannot index itself. Choose another folder.')
         report(0, 0, 'Waiting for index writer…')
-        with self._writer(cancelled) as db:
+        with self._writer(cancelled, report) as db:
             self._discovered_entries = self._checked_entries = 0
             self._dirty_totals = set()
             self._checkpoint_entries = 0
@@ -683,8 +439,7 @@ class DirectoryCache:
                                           'SELECT ?,1,scanned_at FROM scans WHERE id=?', (str(root), covering[0])).lastrowid
                         prefix = str(root).rstrip(os.sep) + os.sep
                         upper = prefix[:-1] + chr(ord(os.sep) + 1)
-                        db.execute('INSERT INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key '
-                                   'FROM entries WHERE generation=? AND path>=? AND path<?', (seed, covering[0], prefix, upper))
+                        copy_entries(db, seed, covering[0], scope=root)
                         db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=? '
                                    'AND (path=? OR (path>=? AND path<?))', (seed, covering[0], str(root), prefix, upper))
                         db.execute('INSERT INTO errors SELECT ?,path,error FROM errors WHERE generation=? '
@@ -720,14 +475,14 @@ class DirectoryCache:
                     return self._snapshot(db, completed, root, recursive, reused=True, metadata_checked=validate_files, cancelled=cancelled)
             resumed = bool(building) and not refresh
             if refresh and building:
-                db.execute('DELETE FROM scans WHERE id=?', (building,))
+                retire_generation(db, building)
                 building = None
             # Validate on disk using one folder at a time. A completed generation is
             # immutable for readers, so validation/status changes happen in a work copy.
             if not building:
                 building = db.execute('INSERT INTO scans(root,recursive) VALUES(?,?)', (str(root), recursive)).lastrowid
                 if completed and not refresh:
-                    db.execute('INSERT INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key FROM entries WHERE generation=?', (building, completed))
+                    copy_entries(db, building, completed)
                     db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=?', (building, completed))
                     db.execute('INSERT INTO folder_totals SELECT ?,path,size,files,folders,skipped,extensions,complete,scanned_at FROM folder_totals WHERE generation=?',(building,completed))
                 else:
@@ -750,7 +505,7 @@ class DirectoryCache:
                 unchanged = self._validate(db, building, root, cancelled, report)
             if unchanged and completed and not resumed and not dirty and not refresh:
                 db.execute('UPDATE roots SET building=NULL WHERE root=? AND recursive=?', (str(root), recursive))
-                db.execute('DELETE FROM scans WHERE id=?', (building,))
+                retire_generation(db, building)
                 db.commit()
                 return self._snapshot(db, completed, root, recursive, reused=True, cancelled=cancelled)
             report(0, 0, 'Resuming saved folder checkpoints…' if resumed else 'Updating persistent index…')
@@ -782,7 +537,7 @@ class DirectoryCache:
             if complete:
                 db.execute('UPDATE roots SET completed=?,building=NULL WHERE root=? AND recursive=?', (building, str(root), recursive))
                 if completed:
-                    db.execute('DELETE FROM scans WHERE id=?', (completed,))
+                    retire_generation(db, completed)
             db.commit()
             with self._state_lock:
                 if revision == self._revision and complete:
@@ -836,7 +591,8 @@ class DirectoryCache:
                 return None
             generation = row[0]
             done, pending = db.execute("SELECT coalesce(sum(status='done'),0),coalesce(sum(status!='done'),0) FROM folders WHERE generation=?", (generation,)).fetchone()
-            entries = db.execute('SELECT count(*) FROM entries WHERE generation=?', (generation,)).fetchone()[0]
+            table = 'generation_entries' if db.execute('PRAGMA user_version').fetchone()[0] >= 3 else 'entries'
+            entries = db.execute(f'SELECT count(*) FROM {table} WHERE generation=?', (generation,)).fetchone()[0]
             return {'folders_done': done, 'folders_remaining': pending, 'entries': entries}
 
     def clear(self, root=None, *, cancelled=lambda: False):
@@ -852,6 +608,9 @@ class DirectoryCache:
                     db.execute('DELETE FROM roots WHERE root=? AND recursive=?', (text, recursive))
                     for generation in (completed, building):
                         if generation:
-                            db.execute('DELETE FROM scans WHERE id=?', (generation,))
+                            retire_generation(db, generation)
             check_cancelled(cancelled)
+            if not db.execute('SELECT 1 FROM generation_entries LIMIT 1').fetchone():
+                db.execute('DELETE FROM entry_nodes')
+                db.execute('DELETE FROM folder_paths')
             db.commit()

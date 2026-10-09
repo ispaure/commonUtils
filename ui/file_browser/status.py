@@ -18,6 +18,10 @@ def format_duration(seconds):
 
 def indexing_phase(message):
     """Never expose scanner-supplied paths or errors in the shared status line."""
+    if message.startswith('Optimizing '):
+        return 'Optimizing saved index'
+    if message.startswith('Preparing '):
+        return 'Preparing file index'
     if message.startswith('Waiting '):
         return 'Waiting for index writer'
     if message.startswith('Loading '):

@@ -585,3 +585,11 @@ Transfer percentages are explicitly percentages of work discovered so far. At
 scanning/final-check explanation. Totals can grow and the percentage can decrease.
 Only a successful process exit displays **Complete**, using a green progress bar;
 stopped operations retain their measured progress with a distinct stopped state.
+
+
+The schema-3 directory index interns filenames by parent folder ID and shares
+immutable metadata across overlapping roots and generations. Existing absolute
+`Entry.path` APIs and resumable checkpoints are preserved. A transactional upgrade
+retains `directory-index.pre-v3.sqlite3` for recovery; freed database pages are reused
+without an automatic full-file rewrite. See [file browser maintenance](file_browser/README.md)
+for module responsibilities, compatibility contracts, storage and test guidance.
