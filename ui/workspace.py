@@ -35,6 +35,7 @@ class DockTabHeader(qt.QWidget):
         self.title.setSizePolicy(qt.QSizePolicy.Policy.Ignored, qt.QSizePolicy.Policy.Preferred)
         self.title.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.new_button = _tab_button('+', 'New tab', self, lambda: dock.workspace.add_view())
+        self.new_button.setVisible(dock.workspace.allow_new_tabs)
         layout.addWidget(self.close_button)
         layout.addWidget(self.title, 1)
         layout.addWidget(self.new_button)
@@ -82,7 +83,8 @@ class DockTabHeader(qt.QWidget):
     def paintEvent(self, event):
         option = qt.QStyleOptionTab()
         option.initFrom(self)
-        option.rect = qt.QRect(0, 0, max(0, self.width() - 32), self.height())
+        reserve = 32 if self.parentWidget().workspace.allow_new_tabs else 0
+        option.rect = qt.QRect(0, 0, max(0, self.width() - reserve), self.height())
         option.shape = qt.QTabBar.Shape.RoundedNorth
         option.position = qt.QStyleOptionTab.TabPosition.OnlyOneTab
         option.state |= qt.QStyle.StateFlag.State_Selected
@@ -134,10 +136,12 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
     """Views expose prepare_close() and idle; their application state stays in the view."""
     active_changed = qt.Signal(object)
 
-    def __init__(self, factory, parent=None):
+    def __init__(self, factory, parent=None, *, allow_new_tabs=True, dock_group='browser'):
         super().__init__(parent)
         self.setWindowFlags(qt.Qt.WindowType.Widget)
         self.factory = factory
+        self.allow_new_tabs = allow_new_tabs
+        self.dock_group = dock_group
         self.docks = []
         self._retiring = []
         self.setAcceptDrops(True)
@@ -156,6 +160,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         empty_layout.setContentsMargins(2, 0, 2, 0)
         empty_layout.addStretch()
         self.empty_new_button = _tab_button('+', 'New tab', empty_header, lambda: self.add_view())
+        self.empty_new_button.setVisible(allow_new_tabs)
         empty_layout.addWidget(self.empty_new_button)
         empty_header.setFixedHeight(30)
         self._drop_target.setTitleBarWidget(empty_header)
@@ -177,6 +182,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self.addAction(self.new_action)
         self.new_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.AddTab))
         self.new_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.new_action.setEnabled(allow_new_tabs)
         self.close_action = qt.QAction('Close tab', self)
         self.close_action.triggered.connect(self.close_active)
         self.addAction(self.close_action)
@@ -252,7 +258,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                         arrow.setFixedSize(28, 28)
                         arrow.move(bar.width() - 62 + index * 32, 1)
             bar.workspace_plus.move(bar.width() - (94 if overflow else 30), max(0, (bar.height() - 28) // 2))
-            bar.workspace_plus.show()
+            bar.workspace_plus.setVisible(self.allow_new_tabs)
             bar.workspace_plus.raise_()
 
     def eventFilter(self, watched, event):
