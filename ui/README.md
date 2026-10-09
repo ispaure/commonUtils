@@ -353,7 +353,11 @@ for existing consumers. Directory listings and feature actions remain available.
 native Qt dock tabs. Views may provide `view_title`, `title_changed`, `idle`, and
 `prepare_close()`. Each view owns its state. Toolbar actions create/close tabs,
 float docks, split left/right and combine tabs. Dock-title context menus transfer
-views between live workspaces without reconstructing them. Call `prepare_close()`
+views between live workspaces without reconstructing them. Empty workspaces provide
+a full-size native dock anchor; it disappears after a real view returns. **Reattach**
+returns a floating view without requiring a drag, even when no tabs remain docked.
+New tabs are grouped only with docked views, leaving detached views independent.
+Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.
 
 `commonUtils.directory_index` supplies immutable `Entry`/`Snapshot` metadata,

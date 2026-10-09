@@ -55,6 +55,21 @@ class Workspace(qt.QMainWindow):
         self.docks = []
         self.active_dock = None
         self._closing = False
+        self._drop_target = qt.QDockWidget('Return a detached tab', self)
+        self._drop_target.setObjectName('workspace.emptyDropTarget')
+        self._drop_target.setFeatures(qt.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+        self._drop_target.toggleViewAction().setVisible(False)
+        self._drop_target.setAllowedAreas(qt.Qt.DockWidgetArea.LeftDockWidgetArea |
+                                          qt.Qt.DockWidgetArea.RightDockWidgetArea)
+        self._drop_target.setTitleBarWidget(qt.QWidget(self._drop_target))
+        hint = qt.QLabel('Drop a detached tab here to return it to this window.\n'
+                        'You can also click Reattach in the toolbar.')
+        hint.setWordWrap(True)
+        hint.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
+        hint.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
+        hint.setMinimumSize(200, 150)
+        hint.setAccessibleName('Empty workspace docking area')
+        self._drop_target.setWidget(hint)
         _workspaces.add(self)
         self.setDockOptions(qt.QMainWindow.DockOption.AllowTabbedDocks |
                             qt.QMainWindow.DockOption.AllowNestedDocks |
@@ -70,9 +85,38 @@ class Workspace(qt.QMainWindow):
         self.close_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
         self.close_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.toolbar.addAction('Detach', self.detach_active)
+        self.reattach_action = self.toolbar.addAction('Reattach', self.reattach_active)
+        self.reattach_action.setToolTip('Return the active detached tab, or another detached tab belonging to this window.')
         self.toolbar.addAction('Split left', lambda: self.arrange(self.active_dock, 'left'))
         self.toolbar.addAction('Split right', lambda: self.arrange(self.active_dock, 'right'))
         self.toolbar.addAction('Combine tabs', lambda: self.arrange(self.active_dock, 'tabs'))
+        self._update_drop_target()
+
+    def _hide_drop_target(self):
+        self._drop_target.hide()
+        self.removeDockWidget(self._drop_target)
+
+    def _update_drop_target(self):
+        """Give Qt a full-size native docking anchor when all real views are floating.
+
+        Run after native docking completes: changing dock layout inside Qt's
+        topLevelChanged signal would disturb an in-progress native drop.
+        """
+        floating = [dock for dock in self.docks if dock.isFloating()]
+        self.reattach_action.setEnabled(bool(floating) and not self._closing)
+        if self._closing or any(not dock.isFloating() for dock in self.docks):
+            self._hide_drop_target()
+        else:
+            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, self._drop_target)
+            self._drop_target.show()
+
+    def _docking_changed(self, floating):
+        qt.QTimer.singleShot(0, self._update_drop_target)
+
+    def _docked_anchor(self, excluding=None):
+        if self.active_dock is not excluding and self.active_dock and not self.active_dock.isFloating():
+            return self.active_dock
+        return next((dock for dock in self.docks if dock is not excluding and not dock.isFloating()), None)
 
     @property
     def active_view(self):
@@ -83,11 +127,13 @@ class Workspace(qt.QMainWindow):
             return None
         view = self.factory(argument)
         dock = WorkspaceDock(self, view, getattr(view, 'view_title', 'View'))
-        previous = self.active_dock
+        previous = self._docked_anchor()
+        self._hide_drop_target()
         self.docks.append(dock)
         self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         if previous:
             self.tabifyDockWidget(previous, dock)
+        dock.topLevelChanged.connect(lambda floating: dock.workspace._docking_changed(floating))
         dock.visibilityChanged.connect(lambda visible: dock.workspace._activate(dock) if visible else None)
         signal = getattr(view, 'title_changed', None)
         if signal is not None:
@@ -98,6 +144,7 @@ class Workspace(qt.QMainWindow):
         dock.show()
         dock.raise_()
         self._activate(dock)
+        self._update_drop_target()
         return view
 
     def _activate(self, dock):
@@ -118,10 +165,17 @@ class Workspace(qt.QMainWindow):
             self.active_dock.setFloating(True)
             self.active_dock.show()
 
+    def reattach_active(self):
+        dock = self.active_dock if self.active_dock and self.active_dock.isFloating() else next(
+            (item for item in reversed(self.docks) if item.isFloating()), None)
+        if dock:
+            self.adopt(dock)
+
     def arrange(self, dock, placement):
         if dock is None or dock not in self.docks:
             return
-        other = next((item for item in self.docks if item is not dock and not item.isFloating()), None)
+        other = self._docked_anchor(excluding=dock)
+        self._hide_drop_target()
         dock.setFloating(False)
         if other is None:
             self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
@@ -152,7 +206,8 @@ class Workspace(qt.QMainWindow):
             dock.workspace = self
             dock.setParent(self)
             self.docks.append(dock)
-        previous = self.active_dock
+        previous = self._docked_anchor(excluding=dock)
+        self._hide_drop_target()
         self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         dock.setFloating(False)
         if previous and previous is not dock:
@@ -181,9 +236,11 @@ class Workspace(qt.QMainWindow):
             if self.active_dock:
                 self.active_dock.raise_()
             self.active_changed.emit(self.active_view)
+        self._update_drop_target()
 
     def prepare_close(self):
         self._closing = True
+        self._update_drop_target()
         ready = True
         for dock in tuple(self.docks):
             if not getattr(dock.widget(), 'prepare_close', lambda: True)():
