@@ -38,6 +38,7 @@ class DockTabHeader(qt.QWidget):
         layout.addWidget(self.title, 1)
         layout.addWidget(self.new_button)
         dock.windowTitleChanged.connect(self.title.setText)
+        font = self.title.font(); font.setBold(True); self.title.setFont(font)
         self.setFixedHeight(30)
 
     def paintEvent(self, event):
@@ -49,6 +50,10 @@ class DockTabHeader(qt.QWidget):
         option.state |= qt.QStyle.StateFlag.State_Selected
         painter = qt.QStylePainter(self)
         painter.drawControl(qt.QStyle.ControlElement.CE_TabBarTabShape, option)
+        # Palette-based selection works with and without the opt-in shared theme.
+        painter.fillRect(option.rect.adjusted(0, 0, 0, -3), self.palette().brush(qt.QPalette.ColorRole.Base))
+        painter.fillRect(0, self.height() - 3, option.rect.width(), 3,
+                         self.palette().brush(qt.QPalette.ColorRole.Highlight))
 
 
 class WorkspaceDock(qt.QDockWidget):
@@ -165,7 +170,9 @@ class Workspace(qt.QMainWindow):
                 bar.currentChanged.connect(self._schedule_tab_headers)
             width = max(60, (bar.width() - 32) // bar.count())
             style = (f'QTabBar::tab {{ width: {width}px; height: 30px; padding: 0px; }} '
-                     'QTabBar::scroller { width: 96px; }')
+                     'QTabBar::scroller { width: 96px; } '
+                     'QTabBar::tab:selected { background: palette(base); color: palette(text); '
+                     'border-bottom: 3px solid palette(highlight); font-weight: bold; }')
             if bar.styleSheet() != style:
                 bar.setStyleSheet(style)
             for index in range(bar.count()):
