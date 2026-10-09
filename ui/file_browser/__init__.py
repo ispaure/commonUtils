@@ -106,7 +106,7 @@ class FileBrowser(qt.QWidget):
         status_row = qt.QHBoxLayout()
         status_row.addWidget(self.index_status,1)
         self.index_activity.setFixedWidth(140)
-        self.index_activity.setMaximumHeight(10)
+        self.index_activity.setMaximumHeight(14)
         status_row.addWidget(self.index_activity)
         status_row.addWidget(self.index_details_button)
         status_row.addWidget(self.refresh_button)
@@ -138,10 +138,17 @@ class FileBrowser(qt.QWidget):
     def _create_navigation_controls(self):
         self.navigation = NavigationBar(self)
         self.navigation.requested.connect(self.navigate)
+        toolbar = qt.QVBoxLayout()
+        navigation_row = qt.QHBoxLayout()
+        navigation_row.addWidget(self.navigation, 1)
+        toolbar.addLayout(navigation_row)
         controls = qt.QHBoxLayout()
-        controls.addWidget(self.navigation, 1)
+        toolbar.addLayout(controls)
         self.view_selector = ViewModeSelector(self)
         self.view_selector.setAccessibleName('Browser view')
+        self.folder_size_button = FolderSizeControl(self)
+        self.folder_size_slider = self.folder_size_button.slider
+        controls.addWidget(self.folder_size_button)
         controls.addWidget(self.view_selector)
         self.preview_toggle = qt.QToolButton(self)
         self.preview_toggle.setText('Preview')
@@ -156,10 +163,6 @@ class FileBrowser(qt.QWidget):
         self.preview_toggle.setAccessibleName('Show file and folder preview')
         self.preview_toggle.toggled.connect(self._preview_toggled)
         controls.addWidget(self.preview_toggle)
-        self.folder_size_button = FolderSizeControl(self)
-        self.folder_size_slider = self.folder_size_button.slider
-        self.folder_size_button.setVisible(False)
-        controls.addWidget(self.folder_size_button)
         controls.addWidget(self.view_selector.storage_controls)
         self.search_button = qt.QToolButton(self)
         self.search_button.setIcon(qt.QIcon(ViewIcon(6)))
@@ -169,7 +172,8 @@ class FileBrowser(qt.QWidget):
         self.search_button.setAccessibleName('Search files and folders')
         self.search_button.setToolTip('Show or hide search (Ctrl/Cmd+F)')
         self.search_button.toggled.connect(self._search_toggled)
-        controls.addWidget(self.search_button)
+        navigation_row.addWidget(self.search_button)
+        controls.addStretch()
         self.storage_button = qt.QPushButton('Storage…')
         self.storage_button.clicked.connect(self.open_storage)
         self.storage_button.hide() # Legacy dialog API; Storage is now a view.
@@ -182,7 +186,7 @@ class FileBrowser(qt.QWidget):
         self.index_pause_button.clicked.connect(self._toggle_index_pause)
         self.index_pause_button.hide()
         # Retained as a hidden compatibility object; scanning has no pause UI.
-        return controls
+        return toolbar
 
     def open_search(self):
         if self.stopping:
@@ -258,8 +262,8 @@ class FileBrowser(qt.QWidget):
         self.views.path_activated.connect(self._activate_path)
         self.views.idle.connect(self._maybe_idle)
         self.view_selector.currentIndexChanged.connect(self.views.set_mode)
-        self.view_selector.currentIndexChanged.connect(lambda mode: self.folder_size_button.setVisible(mode == 1))
-        self.folder_size_slider.valueChanged.connect(self.views.tiles.set_folder_scale)
+        self.view_selector.currentIndexChanged.connect(lambda mode: self.folder_size_button.setEnabled(mode < 3))
+        self.folder_size_slider.valueChanged.connect(self.views.set_icon_scale)
         self.splitter = qt.QSplitter()
         self.splitter.setChildrenCollapsible(False)
         self.list_stack = qt.QStackedWidget()

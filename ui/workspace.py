@@ -103,6 +103,7 @@ class WorkspaceDock(qt.QDockWidget):
         self.setAcceptDrops(True)
         self.installEventFilter(workspace)
         view.setProperty('workspaceView', True)
+        view.setAttribute(qt.Qt.WidgetAttribute.WA_StyledBackground, True)
         view.setStyleSheet(view.styleSheet() + '\nQWidget[workspaceView="true"] { border: 1px solid palette(mid); border-radius: 5px; }')
 
     def contextMenuEvent(self, event):

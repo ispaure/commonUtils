@@ -26,4 +26,7 @@ class FilenameEditorMixin:
 
 
 class FilenameDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
-    pass
+    def paint(self, painter, option, index):
+        # Styles may adjust their option's content rectangle for hover padding.
+        # A fresh value prevents adjustments accumulating across repeated paints.
+        super().paint(painter, qt.QStyleOptionViewItem(option), index)

@@ -10,6 +10,38 @@ from commonUtils.ui.file_browser.storage_view import RadialMap
 
 
 class BrowserPolishTests(unittest.TestCase):
+    def test_repeated_slate_hover_paints_keep_option_geometry_fixed(self):
+        from commonUtils.ui.file_browser.editing import FilenameDelegate
+        from commonUtils.ui.theme import apply_theme
+        app = qt.QApplication.instance() or qt.QApplication([])
+        palette, css = app.palette(), app.styleSheet()
+        view = qt.QTreeView()
+        model = qt.QStandardItemModel()
+        model.appendRow(qt.QStandardItem('Folder name'))
+        view.setModel(model)
+        delegate = FilenameDelegate(view)
+        option = qt.QStyleOptionViewItem()
+        option.initFrom(view)
+        option.widget = view
+        option.rect = qt.QRect(0, 0, 300, 40)
+        option.state |= qt.QStyle.StateFlag.State_MouseOver
+        try:
+            for mode in ('light', 'dark'):
+                apply_theme(app, mode=mode)
+                for _ in range(30):
+                    pixmap = qt.QPixmap(300, 40)
+                    pixmap.fill(app.palette().color(qt.QPalette.ColorRole.Base))
+                    painter = qt.QPainter(pixmap)
+                    delegate.paint(painter, option, model.index(0, 0))
+                    painter.end()
+                    self.assertEqual(option.rect, qt.QRect(0, 0, 300, 40))
+        finally:
+            controller = getattr(app, '_commonutils_theme', None)
+            if controller:
+                controller.deleteLater(); del app._commonutils_theme
+            app.setPalette(palette); app.setStyleSheet(css)
+            view.deleteLater(); app.processEvents()
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 
