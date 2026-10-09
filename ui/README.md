@@ -382,6 +382,9 @@ in code for floating, splitting, combining and transferring existing views.
 Empty workspaces provide a full-size native dock anchor and a **+** button;
 the anchor disappears after a real view returns. `reattach_active()` returns a
 floating view without requiring a drag, even when no tabs remain docked.
+Detached views also accept native top-edge drops. Once Qt finishes the drop,
+the returning view joins the existing tab group (or fills an empty workspace)
+instead of leaving a separate top split. Left/right docking remains available.
 New tabs are grouped only with docked views, leaving detached views independent.
 Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.

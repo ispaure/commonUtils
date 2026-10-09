@@ -191,6 +191,58 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(len(workspace.docks), 1)
         self.assertEqual(workspace.tabifiedDockWidgets(dock), [])
 
+    def test_top_drop_into_empty_workspace_returns_the_original_view(self):
+        workspace = self.create()
+        view = workspace.add_view({'history': ['a', 'b']})
+        dock = workspace.active_dock
+        workspace.detach_active()
+        self.settle()
+        top = qt.Qt.DockWidgetArea.TopDockWidgetArea
+        self.assertTrue(dock.isAreaAllowed(top))
+        self.assertTrue(workspace._drop_target.isAreaAllowed(top))
+        # Simulate the native top-edge drop's layout transition and signals.
+        workspace.addDockWidget(top, dock)
+        dock.setFloating(False)
+        dock.show()
+        self.settle()
+        self.assertFalse(dock.isFloating())
+        self.assertFalse(workspace._drop_target.isVisible())
+        self.assertIs(workspace.active_view, view)
+        self.assertEqual(view.state['history'], ['a', 'b'])
+        self.assertEqual(workspace.dockWidgetArea(dock), qt.Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.assertGreater(dock.width(), workspace.width() * .95)
+
+    def test_top_drop_joins_existing_tabs_instead_of_creating_a_top_split(self):
+        workspace = self.create()
+        workspace.add_view('first')
+        anchor = workspace.active_dock
+        view = workspace.add_view('returning')
+        dock = workspace.active_dock
+        workspace.detach_active()
+        self.settle()
+        workspace.addDockWidget(qt.Qt.DockWidgetArea.TopDockWidgetArea, dock)
+        dock.setFloating(False)
+        dock.show()
+        self.settle()
+        self.assertIs(workspace.active_view, view)
+        self.assertIn(dock, workspace.tabifiedDockWidgets(anchor))
+        self.assertEqual(self.tab_bar(workspace).count(), 2)
+        self.assertEqual(workspace.dockWidgetArea(dock), workspace.dockWidgetArea(anchor))
+        self.assertFalse(view.closing)
+
+    def test_top_tab_group_settles_without_repeated_redocking(self):
+        workspace = self.create()
+        workspace.add_view('first')
+        first = workspace.active_dock
+        workspace.add_view('second')
+        second = workspace.active_dock
+        workspace.addDockWidget(qt.Qt.DockWidgetArea.TopDockWidgetArea, first)
+        workspace.tabifyDockWidget(first, second)
+        self.settle()
+        self.assertEqual(workspace.dockWidgetArea(first), qt.Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.assertIn(second, workspace.tabifiedDockWidgets(first))
+        self.assertEqual(len(workspace.docks), 2)
+
     def test_new_view_stays_docked_when_previous_view_is_floating(self):
         workspace = self.create()
         workspace.add_view('original')
