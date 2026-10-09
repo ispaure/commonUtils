@@ -118,40 +118,39 @@ class ViewModeSelector(qt.QWidget):
             self.currentIndexChanged.emit(index)
 
 
-class FolderSizeControl(qt.QToolButton):
-    """Tile-only size menu; the owner connects slider.valueChanged to its view."""
+class FolderSizeControl(qt.QWidget):
+    """Inline size control; the public slider remains available to hosts."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setText('Size')
         self.setAccessibleName('Icon size')
-        self.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
-        menu = qt.QMenu(self)
-        widget = qt.QWidget()
-        layout = qt.QVBoxLayout(widget)
-        self.label = qt.QLabel()
+        self.setSizePolicy(qt.QSizePolicy.Policy.Fixed, qt.QSizePolicy.Policy.Fixed)
+        layout = qt.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.label = qt.QLabel('Size:')
         layout.addWidget(self.label)
         self.slider = qt.QSlider(qt.Qt.Orientation.Horizontal)
         self.slider.setRange(25, 100)
         self.slider.setValue(50)
         self.slider.setAccessibleName('Icon size percentage')
+        self.slider.setFixedWidth(100)
         self.slider.valueChanged.connect(self._update_label)
         layout.addWidget(self.slider)
-        action = qt.QWidgetAction(menu)
-        action.setDefaultWidget(widget)
-        menu.addAction(action)
-        self.setMenu(menu)
         self._update_label(50)
 
     def _update_label(self, percent):
         text = f'Icon size: {percent}%'
-        self.label.setText(text)
+        self.slider.setToolTip(text)
         self.setToolTip(text)
 
 
 def navigation_button(parent, name, icon):
     button = qt.QToolButton(parent)
-    button.setIcon(parent.style().standardIcon(icon))
+    from ..reader_chrome import ReaderIcon
+    icons = {qt.QStyle.StandardPixmap.SP_ArrowBack: 'previous',
+             qt.QStyle.StandardPixmap.SP_ArrowForward: 'next',
+             qt.QStyle.StandardPixmap.SP_ArrowUp: 'up'}
+    button.setIcon(qt.QIcon(ReaderIcon(icons[icon])) if icon in icons else parent.style().standardIcon(icon))
     button.setIconSize(qt.QSize(20, 20))
     button.setAutoRaise(True)
     button.setToolTip(name)

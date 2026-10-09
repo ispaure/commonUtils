@@ -90,7 +90,7 @@ class IndexActivityBar(qt.QProgressBar):
         super().__init__(parent)
         self.setRange(0, 0)
         self.setTextVisible(False)
-        self.setFixedSize(140, 10)
+        self.setFixedSize(140, 14)
         self.setStyleSheet('QProgressBar { min-height: 0px; }')
         self.setAccessibleName('File index activity, total work unknown')
         self.setToolTip('Index work is in progress; the total is not yet known')
@@ -131,6 +131,10 @@ class IndexStatusLabel(qt.QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.full_text = ''
+        self.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
+        font = self.font()
+        font.setItalic(True)
+        self.setFont(font)
         self.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.setWordWrap(False)
         self.setSizePolicy(qt.QSizePolicy.Policy.Ignored,qt.QSizePolicy.Policy.Fixed)
@@ -168,6 +172,10 @@ class WorkspaceIndexStatus(qt.QObject):
         self.connected = set()
         bar = workspace.statusBar()
         bar.setSizeGripEnabled(False)
+        content = qt.QWidget(bar)
+        row = qt.QHBoxLayout(content)
+        row.setContentsMargins(10, 8, 10, 8)
+        row.setSpacing(8)
         self.label = IndexStatusLabel()
         self.label.setAccessibleName('Workspace indexing status')
         self.activity = IndexActivityBar()
@@ -177,9 +185,12 @@ class WorkspaceIndexStatus(qt.QObject):
         self.details_button = qt.QPushButton('Index details…')
         self.details_button.setToolTip('Show saved scan errors and unfinished folders for the active tab')
         self.details_button.clicked.connect(self._index_details)
-        bar.addWidget(self.label,1); bar.addPermanentWidget(self.activity)
-        bar.addPermanentWidget(self.details_button)
-        bar.addPermanentWidget(self.refresh_button)
+        row.addWidget(self.label,1)
+        row.addWidget(self.details_button)
+        row.addWidget(self.refresh_button)
+        row.addWidget(self.activity)
+        bar.addWidget(content,1)
+        bar.setStyleSheet('QStatusBar::item { border: none; }')
         workspace.active_changed.connect(self.refresh)
 
     def _refresh_index(self):
@@ -214,7 +225,8 @@ class WorkspaceIndexStatus(qt.QObject):
                 browser.destroyed.connect(lambda obj=None, owner=browser: self.connected.discard(owner))
         active = self.workspace.active_view
         browser = getattr(active,'file_browser',None)
-        running = len({item.folder_operation.root for _,item in browsers if item.folder_busy})
+        running = len({item.folder_operation.root for _,item in browsers if item.folder_busy
+                       and not getattr(item, '_loading_cached_only', False)})
         message = browser.index_status.text() if browser else 'No folder open.'
         if running > 1: message += f' · {running} indexing locations'
         elif running and browser is not None and not browser.folder_busy:

@@ -195,6 +195,12 @@ class FileViews(qt.QStackedWidget):
         self.directory_changed.emit(self.browsing_directory())
         self.selection_changed.emit()
 
+    def set_icon_scale(self, percent):
+        self.tiles.set_folder_scale(percent)
+        size = round(32 * percent / 50)
+        for view in (self.tree, self.columns):
+            view.setIconSize(qt.QSize(size, size))
+
     def _tile_metrics(self, size, ratio):
         if self.covers.set_resolution(size, ratio):
             self.cover_queue.clear()

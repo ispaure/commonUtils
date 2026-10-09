@@ -56,9 +56,9 @@ def theme_stylesheet(c):
         }}
         QLineEdit {{ padding: 6px; min-height: 20px; }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {c.accent}; }}
-        QAbstractItemView::item {{ padding: 4px; }}
-        QAbstractItemView::item:hover {{ background: {c.hover}; }}
-        QAbstractItemView::item:selected {{ background: {c.accent}; color: {c.selected_text}; }}
+        QAbstractItemView::item {{ padding: 4px; margin: 0px; border: none; }}
+        QAbstractItemView::item:hover {{ background: {c.hover}; padding: 4px; margin: 0px; border: none; }}
+        QAbstractItemView::item:selected {{ background: {c.accent}; color: {c.selected_text}; padding: 4px; margin: 0px; border: none; }}
         QHeaderView::section {{ background: {c.window}; color: {c.text}; border: none;
             border-bottom: 1px solid {c.border}; padding: 7px; }}
         QPushButton, QComboBox {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border};

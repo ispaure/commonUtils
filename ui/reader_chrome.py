@@ -38,6 +38,8 @@ class ReaderIcon(qt.QIconEngine):
                     x, y, sx, sy = x + sx * 5, y + sy * 5, -sx, -sy
                 painter.drawLine(qt.QLineF(x, y, x + sx * 5, y))
                 painter.drawLine(qt.QLineF(x, y, x, y + sy * 5))
+        elif self.name == 'up':
+            painter.drawPolyline([qt.QPointF(5, 15), qt.QPointF(12, 9), qt.QPointF(19, 15)])
         elif self.name in ('previous', 'next', 'previous-file', 'next-file'):
             forward = self.name.startswith('next')
             x, dx = (15, -6) if forward else (9, 6)
