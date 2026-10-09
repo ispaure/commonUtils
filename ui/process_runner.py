@@ -1,5 +1,5 @@
 """Asynchronous process execution and retry state, independent of presentation."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import deque
 import codecs
 import re
@@ -13,6 +13,7 @@ class ProcessUpdate:
     message: str = ''
     state: str = 'running'
     attempt: int = 0
+    metrics: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,8 @@ class ProcessRunner(qt.QObject):
         if self.cancel_requested:
             self._complete(ProcessResult('cancelled', None, self.attempt))
             return
+        if callable(getattr(self.parser, 'reset', None)):
+            self.parser.reset()
         self.execution_attempt += 1
         self.attempt = self.execution_attempt
         self.decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')

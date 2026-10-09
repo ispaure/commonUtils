@@ -510,3 +510,11 @@ are bounded; no watcher is allocated for every entry in a huge tree. Refresh for
 reconciliation. Disconnected paths retain cached records and show an unavailable
 status. New navigation cancels/supersedes scans and queries; close cooperatively waits
 for workers, and cancelled indexing retains durable checkpoints.
+
+`ProcessUpdate.metrics` optionally carries structured counters through the existing
+ProcessRunner progress signal; its older positional fields remain unchanged.
+`ProcessProgressWindow` / `open_process(..., context=...)` can show operation source
+and destination plus transfer fields, while keeping raw output behind a collapsible
+Details and logs control. Missing counters remain unknown. The actual exit result
+owns completion, retries/cancellation remain in ProcessRunner, and stopped operations
+clear live speed/ETA/active-transfer display while preserving measured progress.
