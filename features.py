@@ -114,10 +114,13 @@ class FileActivation:
     """The first matching activation handles a double-clicked file."""
     accepts: tuple[type | str, ...] | type | str
     handler: Callable
+    is_available: Callable | None = None
 
     def __post_init__(self):
         if not callable(self.handler):
             raise TypeError('Activation handler must be callable')
+        if self.is_available is not None and not callable(self.is_available):
+            raise TypeError('Activation availability must be callable')
         object.__setattr__(self, 'accepts', _accepts(self.accepts))
 
 
