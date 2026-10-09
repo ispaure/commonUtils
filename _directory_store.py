@@ -154,9 +154,9 @@ class DirectoryCache:
 
     def _mark_totals_changed(self, folder, root):
         self._dirty_totals.add(folder)
+        if folder == root or root not in folder.parents:
+            return
         for parent in folder.parents:
-            if folder == root or root not in folder.parents:
-                break
             self._dirty_totals.add(parent)
             if parent == root:
                 break

@@ -253,6 +253,12 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
     version = db.execute('PRAGMA user_version').fetchone()[0]
     if version == SCHEMA_VERSION:
         ensure_reader_view(db)
+        # Reconciliation must look up one parent's children, not walk every
+        # saved folder for every scanned folder (quadratic at disk scale).
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='folder_parent'").fetchone():
+            report(0, 0, 'Optimizing saved index')
+            db.execute('CREATE INDEX folder_parent ON folders(generation,parent,path)')
+        db.execute('DROP INDEX IF EXISTS folder_queue_order')  # Duplicate of folder_pending.
         return
     if version not in (0, 1, 2):
         raise RuntimeError(f'Unsupported directory index version {version}; choose another index file')
@@ -274,7 +280,7 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
             path TEXT NOT NULL,parent TEXT NOT NULL,status TEXT NOT NULL,identity TEXT,
             PRIMARY KEY(generation,path));
         CREATE INDEX IF NOT EXISTS folder_pending ON folders(generation,status,length(path),path);
-        CREATE INDEX IF NOT EXISTS folder_queue_order ON folders(generation,status,length(path),path);
+        CREATE INDEX IF NOT EXISTS folder_parent ON folders(generation,parent,path);
         CREATE TABLE IF NOT EXISTS errors(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
             path TEXT NOT NULL,error TEXT NOT NULL,PRIMARY KEY(generation,path));
         CREATE TABLE IF NOT EXISTS folder_totals(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
@@ -282,4 +288,5 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
             skipped INTEGER NOT NULL,extensions TEXT NOT NULL,complete INTEGER NOT NULL,scanned_at REAL NOT NULL,
             PRIMARY KEY(generation,path));
     ''')
+    db.execute('DROP INDEX IF EXISTS folder_queue_order')
     upgrade_entries(db, cancelled)
