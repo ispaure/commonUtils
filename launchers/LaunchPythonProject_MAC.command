@@ -6,9 +6,9 @@ PROJECT_ROOT="${1:-}"
 CONFIG_FILE="${2:-}"
 PAUSE_ON_EXIT="${3:-false}"
 
-case "${PAUSE_ON_EXIT,,}" in
-    true|1|yes|on) PAUSE_ON_EXIT=true ;;
-    false|0|no|off|"") PAUSE_ON_EXIT=false ;;
+case "$PAUSE_ON_EXIT" in
+    [Tt][Rr][Uu][Ee]|1|[Yy][Ee][Ss]|[Oo][Nn]) PAUSE_ON_EXIT=true ;;
+    [Ff][Aa][Ll][Ss][Ee]|0|[Nn][Oo]|[Oo][Ff][Ff]|"") PAUSE_ON_EXIT=false ;;
     *) echo "ERROR: pause_on_exit must be true or false (received: $PAUSE_ON_EXIT)." >&2; exit 1 ;;
 esac
 UV_INSTALL_DIR_DEFAULT="${HOME:-}/.local/bin"
