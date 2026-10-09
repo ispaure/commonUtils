@@ -10,7 +10,7 @@ import sys
 from tempfile import TemporaryDirectory
 
 
-def cache_directory(*, create=True):
+def _disposable_directory():
     if sys.platform == 'darwin':
         base = Path.home() / 'Library' / 'Caches'
     elif sys.platform == 'win32':
@@ -18,14 +18,19 @@ def cache_directory(*, create=True):
     else:
         configured = Path(os.environ.get('XDG_CACHE_HOME') or Path.home() / '.cache')
         base = configured if configured.is_absolute() else Path.home() / '.cache'
-    folder = base / 'commonUtils'
+    return base / 'commonUtils'
+
+
+def cache_directory(*, create=True):
+    folder = (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Cache'
+              if sys.platform == 'darwin' else _disposable_directory())
     if create:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     return folder
 
 
 def temporary_directory(*, create=True):
-    folder = cache_directory(create=create) / 'Temp'
+    folder = _disposable_directory() / 'Temp'
     if create:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     return folder

@@ -34,7 +34,7 @@ class PersistentIndexTests(unittest.TestCase):
 
     def test_path_defaults_to_cache_on_macos(self):
         with patch('commonUtils._directory_store.sys.platform', 'darwin'), patch.object(Path, 'home', return_value=self.folder):
-            self.assertEqual(directory_index_path(), self.folder / 'Library' / 'Caches' / 'commonUtils' / 'directory-index.sqlite3')
+            self.assertEqual(directory_index_path(), self.folder / 'Library' / 'Application Support' / 'commonUtils' / 'Cache' / 'directory-index.sqlite3')
 
     def test_completed_index_survives_new_instance_without_reenumeration(self):
         original = self.cache.get(self.root)
