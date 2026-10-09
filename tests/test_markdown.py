@@ -55,6 +55,13 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('TAIL_SENTINEL', self.viewer.formatted_editor.toPlainText())
         self.viewer.set_edit_mode('source')
         self.assertIn('TAIL_SENTINEL', self.viewer.editor.toPlainText())
+        for editor in (self.viewer.formatted_editor, self.viewer.editor):
+            self.viewer.set_edit_mode('formatted' if editor is self.viewer.formatted_editor else 'source')
+            tail = editor.document().find('TAIL_SENTINEL')
+            editor.setTextCursor(tail)
+            editor.ensureCursorVisible()
+            self.app.processEvents()
+            self.assertTrue(editor.viewport().rect().intersects(editor.cursorRect(tail)))
 
     def test_rendering_tables_headings_code_and_heading_fragments(self):
         html = self.viewer.browser.document().toHtml()
