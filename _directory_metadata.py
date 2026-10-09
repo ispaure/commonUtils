@@ -77,10 +77,10 @@ class Snapshot:
         matches = sorted(matches, key=keys[sort], reverse=descending)
         return tuple(matches[offset:offset + limit]), len(matches)
 
-    def children(self, path):
+    def children(self, path, limit=None):
         if hasattr(self.entries, 'children'):
-            return self.entries.children(path)
-        return tuple(entry for entry in self.entries if entry.path.parent == path)
+            return self.entries.children(path, limit=limit)
+        return tuple(entry for entry in self.entries if entry.path.parent == path)[:limit]
 
     def entry(self, path):
         if hasattr(self.entries, 'get'):

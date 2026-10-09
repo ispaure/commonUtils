@@ -108,12 +108,12 @@ class FolderStats:
             self.extension_counts[extension] = self.extension_counts.get(extension, 0) + count
 
 
-def scan_folders(root, cancelled=lambda: False, *, report=lambda done, total, message: None):
+def scan_folders(root, cancelled=lambda: False, *, report=lambda done, total, message: None, reuse_for=0):
     """Compatibility API: recursive totals from the shared persistent index."""
     from .directory_index import directory_cache
     from .operations import OperationCancelled
     try:
-        snapshot = directory_cache.get(root, cancelled=cancelled, report=report)
+        snapshot = directory_cache.get(root, cancelled=cancelled, report=report, reuse_for=reuse_for)
         return snapshot.folder_stats(cancelled=cancelled)
     except OperationCancelled:
         return None

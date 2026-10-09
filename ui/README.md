@@ -486,3 +486,27 @@ settings. The INI editor retains explicit saving and existing wheel preferences.
 Selected tabs combine a contrasting surface, bold text and palette accent underline,
 including workspace headers and native grouped dock tabs. Standard selection pairs
 and ordinary/muted text meet WCAG 4.5:1 contrast in both palettes.
+
+## Indexed search in the browser
+
+The search input above the breadcrumbs searches cached names for files and folders
+throughout the current subtree, case-insensitively. Queries run in separate workers
+and never start filesystem scans. Automatic indexing and size collection use the
+same scanner/generation; searches show cached results immediately, poll committed
+partial discoveries while indexing, and label incomplete or paused results.
+Clear the field (or Escape) to restore normal views. Results retain normal selection,
+preview, activation, context actions and clipboard behavior; Show in browser navigates
+to a folder or selects a file in its parent. Paging is 500 rows and sorting is global.
+
+Completed ancestor indices can answer subtree searches immediately and seed a newly
+browsed subtree without re-enumerating unchanged folders. Concurrent UI requests
+reuse a validation completed within two seconds; explicit invalidation bypasses this
+window. Existing explicit DirectoryCache.get calls retain immediate validation.
+The current location and up to 128 indexed immediate children are watched for changes,
+with debounced reconciliation. A 60-second periodic check (up to five minutes for slow
+scans) validates recursive metadata to catch missed events and unwatched descendants.
+Watchers are a latency improvement, not the only consistency mechanism. Watch limits
+are bounded; no watcher is allocated for every entry in a huge tree. Refresh forces
+reconciliation. Disconnected paths retain cached records and show an unavailable
+status. New navigation cancels/supersedes scans and queries; close cooperatively waits
+for workers, and cancelled indexing retains durable checkpoints.

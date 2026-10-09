@@ -67,12 +67,19 @@ class FileActions(qt.QObject):
             set_clipboard_files([item.path for item in selection], move)
 
     def rename_selected(self):
+        if self.browser.index_search.active:
+            paths = self.browser.index_search.selected_paths()
+            if len(paths) == 1:
+                self.rename(self.browser.model.index(str(paths[0])))
+            return
         selection = self.browser.views.selected_rows()
         if len(selection) == 1:
             self.rename(selection[0])
 
     def rename(self, index):
         if not self.busy and not self.browser.stopping and index.isValid():
+            if self.browser.index_search.active:
+                self.browser.index_search.show_in_browser(self.browser.model.filePath(index))
             persistent = qt.QPersistentModelIndex(index)
             qt.QTimer.singleShot(0, self.browser, lambda: self.browser.views.edit_name(qt.QModelIndex(persistent))
                                 if persistent.isValid() else None)

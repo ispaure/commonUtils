@@ -68,3 +68,11 @@ class IndexedSizeTests(unittest.TestCase):
         moved=self.root.with_name('unmounted');self.root.rename(moved)
         with self.assertRaises(NotADirectoryError):self.cache.get(self.root)
         self.assertEqual(self.cache.peek(self.root,partial=False).folder_stats()[self.root].size,10)
+
+    def test_recent_background_requests_coalesce_and_explicit_invalidation_still_checks(self):
+        self.cache.get(self.root, reuse_for=2)
+        with patch.object(self.cache, '_validate', side_effect=AssertionError('Duplicate validation')):
+            self.assertTrue(self.cache.get(self.root, reuse_for=2).reused)
+        (self.root/'plain.txt').write_text('changed content')
+        self.cache.invalidate(self.root/'plain.txt')
+        self.assertEqual(self.cache.get(self.root, reuse_for=2).folder_stats()[self.root].size,22)

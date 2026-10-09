@@ -56,7 +56,7 @@ class BrowserFileActionTests(unittest.TestCase):
 
     def editor(self):
         QTest.qWait(20)
-        editors = [editor for editor in self.browser.findChildren(qt.QLineEdit) if editor.isVisible()]
+        editors = [editor for editor in self.browser.views.findChildren(qt.QLineEdit) if editor.isVisible()]
         self.assertEqual(len(editors), 1)
         return editors[0]
 
@@ -160,7 +160,7 @@ class BrowserFileActionTests(unittest.TestCase):
         with patch('commonUtils.ui.desktop_actions.open_default') as opened:
             QTest.mouseDClick(self.browser.tree.viewport(), qt.Qt.MouseButton.LeftButton, pos=point)
             self.app.processEvents(); opened.assert_called_once_with(self.file)
-        self.assertFalse(any(editor.isVisible() for editor in self.browser.findChildren(qt.QLineEdit)))
+        self.assertFalse(any(editor.isVisible() for editor in self.browser.views.findChildren(qt.QLineEdit)))
 
     def test_rename_invalid_and_existing_names_preserves_files(self):
         other = self.root / 'Other.txt'; other.write_text('existing')
