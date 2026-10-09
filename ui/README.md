@@ -365,9 +365,21 @@ block navigation. These preferences affect discrete page navigation, not ordinar
 file-browser list scrolling.
 
 `FileBrowser(..., calculate_folder_sizes=False)` skips automatic recursive size/count
-scans for large roots. `set_folder_sizes_enabled(True)` starts totals on demand;
-disabling requests cancellation and drops cached totals. The default stays enabled
-for existing consumers. Directory listings and feature actions remain available.
+scans for large roots. `set_folder_sizes_enabled(True)` resumes automatic totals;
+disabling requests cancellation and drops displayed totals. Logistics now enables
+this by default, with a Background sizes pause/resume checkbox. Browsing a different
+location supersedes the previous job and prioritizes that subtree. Refresh explicitly
+reconciles saved metadata. Directory listings and feature actions remain available.
+
+`scan_folders()` preserves its public name and FolderStats return shape, but now
+uses the same SQLite scanner as search and storage. Schema v2 adds persisted folder
+bytes, file/subfolder counts, extension counts, completeness and aggregate timestamps.
+The worker first publishes cached totals, periodically publishes partial aggregates,
+and validates every descendant's metadata before declaring sizes final. Partial sizes
+use a ≥ marker and explicit status; cached values are identified while checking.
+Only displayed model parents are invalidated, avoiding accidental loading of every
+indexed folder on the GUI thread. The storage treemap consumes these saved aggregates
+rather than independently walking the filesystem.
 
 
 ## Document workspaces, discovery and process execution

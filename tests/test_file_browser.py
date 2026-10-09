@@ -447,7 +447,7 @@ class BrowserTests(unittest.TestCase):
         from commonUtils.filesystem import FolderStats
         entered, release = Event(), Event()
         self.browser.set_folder_sizes_enabled(False)
-        def scan(root, cancelled):
+        def scan(root, cancelled, **kwargs):
             entered.set()
             release.wait(5)
             return {root: FolderStats(files=999)}

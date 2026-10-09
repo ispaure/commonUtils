@@ -13,6 +13,7 @@ from ._directory_metadata import Entry, Snapshot, fingerprint
 from .operations import check_cancelled, OperationCancelled
 from .traversal import natural_path_key
 from .storage import cache_directory
+from ._directory_totals import store_folder_stats
 
 
 def directory_index_path():
@@ -50,10 +51,11 @@ class SqlEntries(Sequence):
     The read transaction keeps an older displayed generation valid during rebuilds
     and cleanup. It is released when the owning Snapshot/iterator is collected.
     """
-    def __init__(self, database, generation, *, parent=None):
-        self.connection = sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
+    def __init__(self, database, generation, *, parent=None, connection=None):
+        self.connection = connection or sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         self.connection.execute('PRAGMA query_only=ON')
-        self.connection.execute('BEGIN')
+        if connection is None:
+            self.connection.execute('BEGIN')
         self.generation = generation
         self.parent = parent
         self.lock = RLock()
@@ -140,6 +142,34 @@ class SqlEntries(Sequence):
         matches = tuple(self._rows('AND instr(name_fold,?)>0', (name.casefold(),),
                                    cancelled=cancelled, limit=limit, offset=offset, order=order))
         return matches, total
+
+    def folder_stats(self, paths=None, *, cancelled=lambda: False, stale=False):
+        from .filesystem import FolderStats
+        values = {}
+        with self.lock:
+            if not self.connection.execute("SELECT 1 FROM sqlite_master WHERE name='folder_totals'").fetchone():
+                return values  # An old cache will be upgraded by the next scan.
+            extra = ''
+            parameters = (self.generation,)
+            if paths is not None:
+                paths = tuple(paths)
+                if not paths:
+                    return values
+                extra = ' AND path IN (' + ','.join('?' for _ in paths) + ')'
+                parameters += tuple(str(path) for path in paths)
+            self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
+            try:
+                for row in self.connection.execute('SELECT path,size,files,folders,skipped,extensions,complete,scanned_at '
+                                                   'FROM folder_totals WHERE generation=?' + extra, parameters):
+                    check_cancelled(cancelled)
+                    path, size, files, folders, skipped, extensions, complete, stamp = row
+                    values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale)
+            except sqlite3.OperationalError:
+                check_cancelled(cancelled)
+                raise
+            finally:
+                self.connection.set_progress_handler(None, 0)
+        return values
 
     def __del__(self):
         connection = getattr(self, 'connection', None)
@@ -282,7 +312,7 @@ class DirectoryCache:
     @staticmethod
     def _schema(db):
         version = db.execute('PRAGMA user_version').fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             raise RuntimeError(f'Unsupported directory index version {version}; choose another index file')
         db.executescript('''
             CREATE TABLE IF NOT EXISTS scans(id INTEGER PRIMARY KEY, root TEXT NOT NULL,
@@ -303,7 +333,11 @@ class DirectoryCache:
             CREATE INDEX IF NOT EXISTS folder_queue_order ON folders(generation,status,length(path),path);
             CREATE TABLE IF NOT EXISTS errors(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
                 path TEXT NOT NULL,error TEXT NOT NULL,PRIMARY KEY(generation,path));
-            PRAGMA user_version=1;
+            CREATE TABLE IF NOT EXISTS folder_totals(generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+                path TEXT NOT NULL,size INTEGER NOT NULL,files INTEGER NOT NULL,folders INTEGER NOT NULL,
+                skipped INTEGER NOT NULL,extensions TEXT NOT NULL,complete INTEGER NOT NULL,scanned_at REAL NOT NULL,
+                PRIMARY KEY(generation,path));
+            PRAGMA user_version=2;
         ''')
 
     @staticmethod
@@ -410,10 +444,18 @@ class DirectoryCache:
         finally:
             # Partial entries are saved, but the folder stays pending until a full enumeration finishes.
             db.commit()
+            if not cancelled() and time() - self._totals_last > 2:
+                store_folder_stats(db, generation, root, cancelled)
+                db.commit()
+                self._totals_last = time()
+                report(0, 0, 'Saved progressive folder totals')
 
     def _snapshot(self, db, generation, root, recursive, *, reused=False, resumed=False, complete=True, parent=None,
-                  metadata_checked=True):
-        entries = SqlEntries(self.database, generation, parent=parent)
+                  metadata_checked=True, reader=None, cancelled=lambda: False):
+        if reader is None and not db.execute('SELECT 1 FROM folder_totals WHERE generation=? LIMIT 1', (generation,)).fetchone():
+            store_folder_stats(db, generation, root, cancelled)
+            db.commit()
+        entries = SqlEntries(self.database, generation, parent=parent, connection=reader)
         errors = tuple((Path(path), error) for path, error in db.execute('SELECT path,error FROM errors WHERE generation=?', (generation,)))
         scanned = db.execute('SELECT scanned_at FROM scans WHERE id=?', (generation,)).fetchone()[0]
         directories = SqlDirectories(entries)
@@ -433,6 +475,7 @@ class DirectoryCache:
             dirty = any(mark > checked_revision and (path is None or path == root or path in root.parents or root in path.parents)
                         for path, mark in self._invalidations.items())
         with self._writer(cancelled) as db:
+            self._totals_last = time()
             real_root = root.resolve()
             self._excluded_paths = set()
             for path in (self.database.parent, self.database, self.database.with_suffix('.lock'),
@@ -446,10 +489,10 @@ class DirectoryCache:
             if not recursive and not completed and not building and not refresh and not dirty:
                 full = db.execute('SELECT completed FROM roots WHERE root=? AND recursive=1', (str(root),)).fetchone()
                 if full and full[0] and self._validate(db, full[0], root, cancelled, report, root_only=True, check_files=validate_files):
-                    return self._snapshot(db, full[0], root, False, reused=True, parent=root, metadata_checked=validate_files)
+                    return self._snapshot(db, full[0], root, False, reused=True, parent=root, metadata_checked=validate_files, cancelled=cancelled)
             if completed and not building and not refresh and not dirty:
                 if self._validate(db, completed, root, cancelled, report, check_files=validate_files):
-                    return self._snapshot(db, completed, root, recursive, reused=True, metadata_checked=validate_files)
+                    return self._snapshot(db, completed, root, recursive, reused=True, metadata_checked=validate_files, cancelled=cancelled)
             resumed = bool(building) and not refresh
             if refresh and building:
                 db.execute('DELETE FROM scans WHERE id=?', (building,))
@@ -470,7 +513,7 @@ class DirectoryCache:
                 db.execute('UPDATE roots SET building=NULL WHERE root=? AND recursive=?', (str(root), recursive))
                 db.execute('DELETE FROM scans WHERE id=?', (building,))
                 db.commit()
-                return self._snapshot(db, completed, root, recursive, reused=True)
+                return self._snapshot(db, completed, root, recursive, reused=True, cancelled=cancelled)
             report(0, 0, 'Resuming saved folder checkpoints…' if resumed else 'Updating persistent index…')
             while True:
                 check_cancelled(cancelled)
@@ -482,6 +525,7 @@ class DirectoryCache:
             # Revalidate folders/files changed during this pass before calling it complete.
             valid = self._validate(db, building, root, cancelled, report)
             errors = db.execute('SELECT count(*) FROM errors WHERE generation=?', (building,)).fetchone()[0]
+            store_folder_stats(db, building, root, cancelled)
             db.execute('UPDATE scans SET scanned_at=? WHERE id=?', (time(), building))
             complete = valid and not errors
             if complete:
@@ -492,7 +536,32 @@ class DirectoryCache:
             with self._state_lock:
                 if revision == self._revision and complete:
                     self._validated_roots[(root, recursive)] = revision
-            return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete)
+            return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete, cancelled=cancelled)
+
+    def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
+        """Read cached data immediately, without locks, validation or filesystem scan.
+
+        Call on a worker. Saved metadata is explicitly stale until get() validates it.
+        Disconnected roots can still be read here without deleting their records.
+        """
+        check_cancelled(cancelled)
+        if not self.database.is_file():
+            return None
+        root = Path(root).absolute()
+        db = sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
+        try:
+            db.execute('BEGIN')
+            row = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            if row is None or not (row[0] or row[1] and partial):
+                db.close()
+                return None
+            generation = row[1] if partial and row[1] else row[0]
+            snapshot = self._snapshot(db, generation, root, recursive, complete=generation == row[0],
+                                      metadata_checked=False, reader=db)
+            return snapshot  # Snapshot owns this read transaction, including its lifetime.
+        except BaseException:
+            db.close()
+            raise
 
     def status(self, root, recursive=True):
         """Read saved work for cancellation UI; does not create an index file."""
