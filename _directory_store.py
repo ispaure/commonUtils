@@ -16,6 +16,7 @@ from .operations import check_cancelled, OperationCancelled
 from ._directory_order import _sort_key, _encode_sort_parts
 from .storage import cache_directory
 from ._directory_totals import store_folder_stats
+from ._directory_exclusions import scan_exclusions, is_excluded
 from ._directory_schema import initialize_schema, ensure_folder, copy_entries, write_entries, delete_children, delete_entries, retire_generation
 
 
@@ -52,12 +53,75 @@ class DirectoryCache:
         self._invalidations = {}
         self._validated_roots = {}
         self._validated_times = {}
+        self._session_checked = set()
+        self._priority_folders = {}
 
     def invalidate(self, root=None):
         # Browser refresh runs on the GUI thread. Avoid waiting for a worker or DB.
         with self._state_lock:
             self._revision += 1
             self._invalidations[None if root is None else Path(root).absolute()] = self._revision
+
+    def was_checked_this_session(self, root):
+        """Cheap GUI-safe check; session state is shared by this cache's browsers."""
+        with self._state_lock:
+            return (self.database, Path(root).absolute()) in self._session_checked
+
+    def set_priority_folders(self, owner, paths=()):
+        """Register open views without touching SQLite or waiting for its writer.
+
+        Each owner replaces its request on navigation and removes it on close.
+        Scanners consult the current requests between folders, never mid-folder.
+        """
+        paths = tuple(Path(path).absolute() for path in paths)
+        with self._state_lock:
+            if paths:
+                self._priority_folders[owner] = paths
+            else:
+                self._priority_folders.pop(owner, None)
+
+    def _scan_blocked(self, folder):
+        blocked = getattr(self, '_blocked_scan_folders', set())
+        return folder in blocked or any(parent in blocked for parent in folder.parents)
+
+    @staticmethod
+    def _block_scan_tree(db, generation, folder):
+        text = str(folder)
+        prefix = text.rstrip(os.sep)+os.sep
+        upper = prefix[:-1]+chr(ord(os.sep)+1)
+        db.execute('INSERT OR IGNORE INTO scan_blocked VALUES(?)', (text,))
+        db.execute('INSERT OR IGNORE INTO scan_blocked SELECT path FROM folders '
+                   'WHERE generation=? AND path>=? AND path<?', (generation,prefix,upper))
+
+    def _next_priority_folder(self, db, generation, root, handled, visited):
+        with self._state_lock:
+            targets = tuple(path for paths in self._priority_folders.values() for path in paths)
+        for target in targets:
+            if is_excluded(target, self._excluded_paths):
+                continue
+            if target in handled:
+                continue
+            if target != root and root not in target.parents:
+                continue
+            chain = [target]
+            for ancestor in target.parents:
+                if ancestor == root:
+                    chain.append(root)
+                    break
+                if root not in ancestor.parents:
+                    break
+                chain.append(ancestor)
+            # Missing ancestors must be discovered before the visible folder can
+            # appear in the queue. Prioritize immediate contents, not its whole
+            # subtree: once checked, normal discovery continues elsewhere.
+            for folder in reversed(chain):
+                if folder in visited or self._scan_blocked(folder):
+                    continue
+                if db.execute("SELECT 1 FROM folders WHERE generation=? AND path=? AND status='pending'",
+                              (generation,str(folder))).fetchone():
+                    return folder, folder == target
+            handled.add(target)
+        return None
 
     @contextmanager
     def _writer(self, cancelled, report=lambda done, total, message: None):
@@ -172,6 +236,67 @@ class DirectoryCache:
         finally:
             self.last_metrics['aggregation_seconds'] += perf_counter()-started
 
+    def _repair_exclusions(self, db, generation, root, cancelled, report):
+        """Atomically remove previously cached excluded branches and fix ancestors.
+
+        Indexed membership lookups keep subsequent calls cheap. Savepoint rollback
+        prevents cancellation from publishing removed entries with stale totals.
+        Other generations and existing SQLite readers retain their own membership.
+        """
+        affected = [path for path in self._excluded_paths if db.execute(
+            'SELECT 1 FROM generation_entries g JOIN entry_nodes n ON n.id=g.node_id '
+            'WHERE g.generation=? AND g.parent_id=(SELECT id FROM folder_paths WHERE path=?) AND n.name=? '
+            'UNION ALL SELECT 1 FROM folders WHERE generation=? AND path=? LIMIT 1',
+            (generation, str(path.parent), path.name, generation, str(path))).fetchone()]
+        if not affected:
+            return
+        report(0, 0, 'Removing duplicate or excluded cached branches')
+        dirty_before = self._dirty_totals.copy()
+        db.execute('SAVEPOINT exclusion_repair')
+        try:
+            db.execute('CREATE TEMP TABLE IF NOT EXISTS exclusion_records(id INTEGER PRIMARY KEY)')
+            db.execute('DELETE FROM exclusion_records')
+            for path in affected:
+                check_cancelled(cancelled)
+                prefix = str(path).rstrip(os.sep) + os.sep
+                upper = prefix[:-1] + chr(ord(os.sep) + 1)
+                db.execute('INSERT OR IGNORE INTO exclusion_records '
+                           'SELECT record_id FROM generation_entries WHERE generation=? AND parent_id IN '
+                           '(SELECT id FROM folder_paths WHERE path=? OR (path>=? AND path<?))',
+                           (generation, str(path), prefix, upper))
+                db.execute('INSERT OR IGNORE INTO exclusion_records '
+                           'SELECT g.record_id FROM generation_entries g JOIN entry_nodes n ON n.id=g.node_id '
+                           'WHERE g.generation=? AND g.parent_id=(SELECT id FROM folder_paths WHERE path=?) AND n.name=?',
+                           (generation, str(path.parent), path.name))
+                self._remove_tree(db, generation, str(path))
+                db.execute('DELETE FROM generation_entries WHERE generation=? '
+                           'AND parent_id=(SELECT id FROM folder_paths WHERE path=?) '
+                           'AND node_id IN (SELECT id FROM entry_nodes WHERE parent_id='
+                           '(SELECT id FROM folder_paths WHERE path=?) AND name=?)',
+                           (generation, str(path.parent), str(path.parent), path.name))
+                self._mark_totals_changed(path.parent, root)
+            # Prune only touched, now-unreferenced metadata. Explicit Data scopes
+            # may share these records and must retain them. No full-table vacuum.
+            db.execute('CREATE TEMP TABLE IF NOT EXISTS exclusion_nodes(id INTEGER PRIMARY KEY)')
+            db.execute('DELETE FROM exclusion_nodes')
+            db.execute('INSERT OR IGNORE INTO exclusion_nodes SELECT node_id FROM entry_records '
+                       'WHERE id IN (SELECT id FROM exclusion_records)')
+            db.execute('DELETE FROM entry_records WHERE id IN (SELECT id FROM exclusion_records) '
+                       'AND NOT EXISTS (SELECT 1 FROM generation_entries WHERE record_id=entry_records.id)')
+            db.execute('DELETE FROM entry_nodes WHERE id IN (SELECT id FROM exclusion_nodes) '
+                       'AND NOT EXISTS (SELECT 1 FROM entry_records WHERE node_id=entry_nodes.id)')
+            db.execute('DELETE FROM exclusion_records')
+            db.execute('DELETE FROM exclusion_nodes')
+            self._publish_totals(db, generation, root, cancelled)
+            check_cancelled(cancelled)
+            db.execute('RELEASE exclusion_repair')
+        except BaseException:
+            db.set_progress_handler(None, 0)
+            db.execute('ROLLBACK TO exclusion_repair')
+            db.execute('RELEASE exclusion_repair')
+            self._dirty_totals = dirty_before
+            raise
+
     def _checkpoint(self, db, cancelled, *, force=False):
         if force or cancelled() or self._checkpoint_entries>=4096 or time()-self._checkpoint_at>=.5:
             started = perf_counter()
@@ -191,15 +316,20 @@ class DirectoryCache:
     def _validate_impl(self, db, generation, root, cancelled, report, *, root_only=False, check_files=True):
         unchanged = True
         for (path,) in db.execute('SELECT path FROM errors WHERE generation=?', (generation,)).fetchall():
-            db.execute("UPDATE folders SET status='pending' WHERE generation=? AND (path=? OR path=?)",
-                       (generation, path, str(Path(path).parent)))
+            db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=coalesce("
+                       "(SELECT path FROM folders WHERE generation=? AND path=?),?)",
+                       (generation, generation, path, str(Path(path).parent)))
         rows = db.execute('SELECT path,identity,status FROM folders WHERE generation=?' +
                           (' AND path=?' if root_only else '') + ' ORDER BY path',
                           (generation, str(root)) if root_only else (generation,))
         count = 0
         for text, expected, status in rows:
             check_cancelled(cancelled)
+            if self._scan_blocked(Path(text)):
+                unchanged = False
+                continue
             valid = status == 'done'
+            failed_path = text
             try:
                 valid = valid and self._folder_identity(Path(text), root) == expected
                 if valid and check_files:
@@ -208,10 +338,13 @@ class DirectoryCache:
                         check_cancelled(cancelled)
                         self._checked_entries += 1
                         report(self._checked_entries, 0, f'Checking file metadata · {text}')
+                        failed_path = child
                         if json.dumps(fingerprint(Path(child).lstat())) != identity:
                             valid = False
                             break
-            except OSError:
+            except OSError as error:
+                db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)',
+                           (generation, failed_path, str(error)))
                 valid = False
             if not valid:
                 self._mark_totals_changed(Path(text),root)
@@ -248,7 +381,8 @@ class DirectoryCache:
         prefix = text.rstrip(os.sep)+os.sep
         upper = prefix[:-1]+chr(ord(os.sep)+1)
         db.execute('DELETE FROM errors WHERE generation=? AND path=?',(generation,text))
-        db.execute('DELETE FROM errors WHERE generation=? AND path>=? AND path<? AND instr(substr(path,?),?)=0',
+        db.execute('DELETE FROM errors WHERE generation=? AND path>=? AND path<? AND instr(substr(path,?),?)=0 '
+                   'AND NOT EXISTS (SELECT 1 FROM folders f WHERE f.generation=errors.generation AND f.path=errors.path)',
                    (generation,prefix,upper,len(prefix)+1,os.sep))
         if not checkpoint:
             db.execute('INSERT OR IGNORE INTO reconcile_records SELECT record_id FROM generation_entries '
@@ -279,7 +413,7 @@ class DirectoryCache:
                 for child in children:
                     check_cancelled(cancelled)
                     path = Path(child.path)
-                    if path in self._excluded_paths:
+                    if is_excluded(path, self._excluded_paths):
                         continue
                     try:
                         started = perf_counter()
@@ -312,6 +446,9 @@ class DirectoryCache:
             db.execute('UPDATE folders SET status=?,identity=? WHERE generation=? AND path=?',
                        ('done' if before == after else 'pending', after, generation, text))
         except OSError as error:
+            if db.execute("SELECT 1 FROM sqlite_temp_master WHERE name='scan_blocked'").fetchone():
+                self._blocked_scan_folders.add(folder)
+                self._block_scan_tree(db, generation, folder)
             db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)', (generation, text, str(error)))
             db.execute("UPDATE folders SET status='error' WHERE generation=? AND path=?", (generation, text))
         finally:
@@ -353,7 +490,7 @@ class DirectoryCache:
         for source_text, source in sources:
             check_cancelled(cancelled)
             branch = Path(source_text)
-            if root not in branch.parents:
+            if root not in branch.parents or is_excluded(branch, self._excluded_paths):
                 continue
             report(0, 0, f'Reusing saved branch {branch}')
             folder_exclusions, parameters, excluded_branches = [], [], []
@@ -389,7 +526,7 @@ class DirectoryCache:
         return bool(covered)
 
     def get(self, root, recursive=True, *, refresh=False, cancelled=lambda: False,
-            report=lambda done, total, message: None, validate_files=True, reuse_for=0):
+            report=lambda done, total, message: None, validate_files=True, reuse_for=0, retry_errors=True):
         root = Path(root).absolute()
         if not root.is_dir():
             raise NotADirectoryError(root)
@@ -398,6 +535,7 @@ class DirectoryCache:
         report(0, 0, 'Waiting for index writer…')
         with self._writer(cancelled, report) as db:
             self._discovered_entries = self._checked_entries = 0
+            self._blocked_scan_folders = set()
             self._dirty_totals = set()
             self._checkpoint_entries = 0
             self._checkpoint_at = time()
@@ -409,16 +547,13 @@ class DirectoryCache:
                 dirty = any(mark > checked_revision and (path is None or path == root or path in root.parents or root in path.parents)
                             for path, mark in self._invalidations.items())
             self._totals_last = time()
-            real_root = root.resolve()
-            self._excluded_paths = set()
-            for path in (self.database.parent, self.database, self.database.with_suffix('.lock'),
-                         Path(str(self.database) + '-wal'), Path(str(self.database) + '-shm')):
-                try:
-                    self._excluded_paths.add(root / path.resolve().relative_to(real_root))
-                except ValueError:
-                    pass
+            self._excluded_paths = scan_exclusions(root, self.database)
             db.execute('INSERT OR IGNORE INTO roots(root,recursive) VALUES(?,?)', (str(root), recursive))
             completed, building = db.execute('SELECT completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            for generation in (completed, building):
+                if generation:
+                    self._repair_exclusions(db, generation, root, cancelled, report)
+            db.commit()
             if recursive and not completed and not building and not refresh and reuse_for:
                 # Navigation can read a freshly validated ancestor directly; no work
                 # generation, metadata pass or duplicate subtree rows are needed.
@@ -461,6 +596,7 @@ class DirectoryCache:
                         if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?', (seed, str(root))).fetchone():
                             db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (seed, str(root), ''))
                         imported = self._seed_descendants(db, seed, root, cancelled, report)
+                        self._repair_exclusions(db, seed, root, cancelled, report)
                         if covering[1] or imported:
                             building = seed
                             db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=1', (seed, str(root)))
@@ -506,12 +642,22 @@ class DirectoryCache:
                     # A new higher starting point can reuse independently indexed branches.
                     # Prefer more specific checkpoints when cached scopes overlap.
                     covered = self._seed_descendants(db, building, root, cancelled, report)
+                    self._repair_exclusions(db, building, root, cancelled, report)
                     if covered:
                         resumed = True
                         store_folder_stats(db, building, root, cancelled)
                 db.commit()
                 if resumed:
                     report(0, 0, 'Saved progressive folder totals')
+            db.execute('CREATE TEMP TABLE scan_blocked(path TEXT PRIMARY KEY)')
+            if not retry_errors:
+                # Saved directory failures require explicit retry. Missing work
+                # from cancellation remains eligible for normal resume.
+                self._blocked_scan_folders = {Path(path) for (path,) in db.execute(
+                    'SELECT f.path FROM folders f JOIN errors e ON e.generation=f.generation AND e.path=f.path '
+                    'WHERE f.generation=?', (building,))}
+                for folder in self._blocked_scan_folders:
+                    self._block_scan_tree(db, building, folder)
             # Finish discovering missing branches before rechecking old metadata.
             # Completed folders are validated after discovery, including on resume.
             unchanged = False
@@ -524,54 +670,101 @@ class DirectoryCache:
                 return self._snapshot(db, completed, root, recursive, reused=True, cancelled=cancelled)
             report(0, 0, 'Resuming saved folder checkpoints…' if resumed else 'Updating persistent index…')
             def discover_pending():
+                # A live directory may change on every enumeration. Give each
+                # folder one attempt per pass; retain unstable checkpoints for
+                # explicit retry instead of feeding them back forever.
+                db.execute('CREATE TEMP TABLE IF NOT EXISTS scan_visited(path TEXT PRIMARY KEY)')
+                db.execute('DELETE FROM scan_visited')
+                handled_priorities, visited_priorities = set(), set()
+                attempted = 0
                 while True:
                     check_cancelled(cancelled)
                     # Batches avoid sorting the whole pending tree for every folder.
-                    rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' AND identity IS NULL ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
+                    rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' AND identity IS NULL AND path NOT IN (SELECT path FROM scan_visited) AND path NOT IN (SELECT path FROM scan_blocked) ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
                     if not rows:
-                        rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
+                        rows = db.execute("SELECT path FROM folders WHERE generation=? AND status='pending' AND path NOT IN (SELECT path FROM scan_visited) AND path NOT IN (SELECT path FROM scan_blocked) ORDER BY length(path),path LIMIT 256", (building,)).fetchall()
                     if not rows:
                         break
                     for (path,) in rows:
                         check_cancelled(cancelled)
+                        while priority := self._next_priority_folder(db, building, root, handled_priorities, visited_priorities):
+                            check_cancelled(cancelled)
+                            folder, visible = priority
+                            visited_priorities.add(folder)
+                            db.execute('INSERT OR IGNORE INTO scan_visited VALUES(?)', (str(folder),))
+                            self._scan_folder(db, building, root, recursive, folder, cancelled, report)
+                            attempted += 1
+                            # Publish a visible folder promptly even during a long
+                            # first scan, without changing its original scan root.
+                            if visible:
+                                self._publish_totals(db, building, root, cancelled)
+                                self._checkpoint(db, cancelled, force=True)
+                                report(0, 0, 'Saved progressive folder totals')
                         # A parent reconciliation can remove a previously queued child.
-                        if db.execute("SELECT 1 FROM folders WHERE generation=? AND path=? AND status='pending'", (building, path)).fetchone():
+                        if db.execute("SELECT 1 FROM folders WHERE generation=? AND path=? AND status='pending' AND path NOT IN (SELECT path FROM scan_visited) AND path NOT IN (SELECT path FROM scan_blocked)", (building, path)).fetchone():
+                            db.execute('INSERT OR IGNORE INTO scan_visited VALUES(?)', (path,))
                             self._scan_folder(db, building, root, recursive, Path(path), cancelled, report)
+                            attempted += 1
+                return attempted
             discover_pending()
-            if resumed:
-                self._validate(db, building, root, cancelled, report)
-                discover_pending()
             check_cancelled(cancelled)
-            # Revalidate folders/files changed during this pass before calling it complete.
             valid = self._validate(db, building, root, cancelled, report)
+            if resumed and not valid:
+                # Only a failed verification needs a repair pass and recheck.
+                repaired = discover_pending()
+                if repaired:
+                    valid = self._validate(db, building, root, cancelled, report)
             errors = db.execute('SELECT count(*) FROM errors WHERE generation=?', (building,)).fetchone()[0]
             self._publish_totals(db,building,root,cancelled)
             db.execute('INSERT OR REPLACE INTO folder_checks VALUES(?,?,?)', (building, str(root), time()))
             db.execute('UPDATE scans SET scanned_at=? WHERE id=?', (time(), building))
             complete = valid and not errors
+            with self._state_lock:
+                visible_roots = tuple(path for paths in self._priority_folders.values() for path in paths)
+            checked = [path for path in visible_roots if (path == root or root in path.parents) and
+                           db.execute("SELECT 1 FROM folders WHERE generation=? AND path=?",
+                                      (building,str(path))).fetchone()]
             if complete:
                 db.execute('UPDATE roots SET completed=?,building=NULL WHERE root=? AND recursive=?', (building, str(root), recursive))
                 if completed:
                     retire_generation(db, completed)
             db.commit()
             with self._state_lock:
+                # A finished attempt is terminal even when some folders were
+                # unreadable/unstable. Cancellation never reaches this point.
+                self._session_checked.update((self.database,path) for path in (root,*checked))
                 if revision == self._revision and complete:
                     self._validated_roots[(root, recursive)] = revision
                     self._validated_times[(root, recursive)] = time()
             return self._snapshot(db, building, root, recursive, resumed=resumed, complete=complete, cancelled=cancelled)
 
-    def reconcile_folder(self, root, *, changes=(), full=False, cancelled=lambda: False,
+    def reconcile_folder(self, root, *, changes=(), full=False, once=False, cancelled=lambda: False,
                          report=lambda done, total, message: None):
         """Check visible contents; completed caches update atomically without tree-wide validation.
 
         With full=True, also check every saved descendant for explicit Refresh.
+        With once=True, revisits reuse saved contents after this session's first
+        finished attempt; notifications/explicit changes bypass that shortcut.
         Missing or interrupted indices retain the established resumable full scan.
         Existing readers keep their SQLite transaction while changed rows and parent
         aggregates are updated in the same generation, without copying the tree.
         """
+        root = Path(root).absolute()
+        changes = tuple(changes)
+        if once and not full and not changes and self.was_checked_this_session(root):
+            snapshot = self.peek(root, cancelled=cancelled)
+            if snapshot is not None:
+                report(0, 0, 'Reusing saved index')
+                return snapshot
         from ._directory_reconcile import reconcile_existing
-        snapshot = reconcile_existing(self, Path(root).absolute(), changes, cancelled, report, full=full)
-        return snapshot if snapshot is not None else self.get(root, cancelled=cancelled, report=report)
+        snapshot = reconcile_existing(self, root, changes, cancelled, report, full=full,
+                                      allow_partial=not full and self.was_checked_this_session(root))
+        if snapshot is None:
+            snapshot = self.get(root, cancelled=cancelled, report=report, retry_errors=full)
+        if snapshot.complete:
+            with self._state_lock:
+                self._session_checked.add((self.database, root))
+        return snapshot
 
     def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
         """Read cached data immediately, without locks, validation or filesystem scan.
@@ -606,6 +799,47 @@ class DirectoryCache:
         except BaseException:
             db.close()
             raise
+
+    def index_issues(self, root, *, limit=500, cancelled=lambda: False):
+        """Read scoped diagnostic rows without scanning files or taking a writer lock.
+
+        Query on a worker. Counts cover all recorded issues; returned paths are
+        bounded to limit. Pending checkpoints distinguish unfinished enumeration
+        from folders requiring verification, while recorded errors retain details.
+        """
+        if limit < 1:
+            raise ValueError('limit must be positive')
+        root = Path(root).absolute()
+        empty = {'rows': (), 'counts': {}, 'total': 0, 'partial': False}
+        if not self.database.is_file():
+            return empty
+        with closing(sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True)) as db:
+            db.set_progress_handler(lambda: int(cancelled()), 1000)
+            check_cancelled(cancelled)
+            db.execute('BEGIN')
+            ancestors = (str(root),) + tuple(str(path) for path in root.parents)
+            row = db.execute('SELECT completed,building FROM roots WHERE recursive=1 AND root IN (' +
+                             ','.join('?' for _ in ancestors) + ') AND (completed IS NOT NULL OR building IS NOT NULL) '
+                             'ORDER BY length(root) DESC LIMIT 1', ancestors).fetchone()
+            if row is None:
+                return empty
+            generation = row[1] or row[0]
+            prefix = str(root).rstrip(os.sep) + os.sep
+            upper = prefix[:-1] + chr(ord(os.sep) + 1)
+            query = ("SELECT path,'Scan error' AS kind,error AS reason FROM errors "
+                     "WHERE generation=? AND (path=? OR (path>=? AND path<?)) UNION ALL "
+                     "SELECT f.path,CASE WHEN f.identity IS NULL THEN 'Not fully scanned' ELSE 'Needs recheck' END,"
+                     "CASE WHEN f.identity IS NULL THEN 'New or interrupted folder; enumeration unfinished' "
+                     "ELSE 'Folder changed during scanning or metadata verification did not finish' END "
+                     "FROM folders f WHERE f.generation=? AND f.status!='done' "
+                     "AND (f.path=? OR (f.path>=? AND f.path<?)) "
+                     "AND NOT EXISTS (SELECT 1 FROM errors e WHERE e.generation=f.generation AND e.path=f.path)")
+            params = (generation, str(root), prefix, upper) * 2
+            counts = dict(db.execute('SELECT kind,count(*) FROM (' + query + ') GROUP BY kind', params))
+            rows = tuple((Path(path), kind, reason) for path, kind, reason in db.execute(
+                'SELECT * FROM (' + query + ") ORDER BY CASE kind WHEN 'Scan error' THEN 0 ELSE 1 END,path LIMIT ?", params + (limit,)))
+            check_cancelled(cancelled)
+            return {'rows': rows, 'counts': counts, 'total': sum(counts.values()), 'partial': row[1] is not None}
 
     def status(self, root, recursive=True):
         """Read saved work for cancellation UI; does not create an index file."""
@@ -642,3 +876,5 @@ class DirectoryCache:
                 db.execute('DELETE FROM entry_nodes')
                 db.execute('DELETE FROM folder_paths')
             db.commit()
+            with self._state_lock:
+                self._session_checked.clear()
