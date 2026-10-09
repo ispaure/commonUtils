@@ -34,6 +34,28 @@ class MarkdownTests(unittest.TestCase):
         self.addCleanup(self.viewer.deleteLater)
         self.app.processEvents()
 
+    def test_long_document_and_html_block_keep_tail_in_reading_and_editing(self):
+        text = '# Long\n\n' + 'Paragraph text.\n\n' * 3000 + '<div>\nText\n\nTAIL_SENTINEL'
+        self.first.write_text(text)
+        self.viewer.open_document(self.first)
+        self.viewer.set_editing(False)
+        self.app.processEvents()
+        self.assertIn('TAIL_SENTINEL', self.viewer.browser.toPlainText())
+        doc = self.viewer.browser.document()
+        doc.documentLayout().documentSize()
+        bar = self.viewer.browser.verticalScrollBar()
+        bar.setValue(bar.maximum())
+        self.app.processEvents()
+        bar.setValue(bar.maximum())
+        tail = doc.find('TAIL_SENTINEL')
+        self.assertTrue(self.viewer.browser.viewport().rect().intersects(self.viewer.browser.cursorRect(tail)))
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        self.app.processEvents()
+        self.assertIn('TAIL_SENTINEL', self.viewer.formatted_editor.toPlainText())
+        self.viewer.set_edit_mode('source')
+        self.assertIn('TAIL_SENTINEL', self.viewer.editor.toPlainText())
+
     def test_rendering_tables_headings_code_and_heading_fragments(self):
         html = self.viewer.browser.document().toHtml()
         self.assertIn('<table', html)

@@ -45,7 +45,8 @@ class FormattedMarkdownEdit(qt.QTextEdit):
     def setMarkdown(self, markdown):
         self._highlighter.setDocument(None)
         protected, tokens = protect_escapes(markdown)
-        super().setMarkdown(protected)
+        self.document().setMarkdown(protected,
+            qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         materialize_formats(self)
         restore_escapes(self.document(), tokens)
         self.document().clearUndoRedoStacks()

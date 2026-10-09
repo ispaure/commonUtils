@@ -223,7 +223,10 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTable
                                          if self._loaded_path else qt.QUrl())
         self.properties.refresh(text)
         parts = split_frontmatter(text)
-        self.browser.setMarkdown(render_links(parts.body))
+        # Qt's HTML-block importer can silently discard everything after a div.
+        # Treat embedded HTML as literal Markdown rather than losing authored text.
+        self.browser.document().setMarkdown(render_links(parts.body),
+            qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         # Qt renders headings but does not supply GitHub-style fragment names.
         self.headings = []
         for level, title, anchor, block in _iter_headings(self.browser.document()):
@@ -234,6 +237,8 @@ class MarkdownViewer(MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTable
             fmt.setAnchor(True)
             fmt.setAnchorNames([anchor])
             cursor.mergeCharFormat(fmt)
+        # Force lazy layout to settle before QTextEdit restores its scrollbar.
+        self.browser.document().documentLayout().documentSize()
         self.browser.verticalScrollBar().setValue(scroll)
 
     def _apply_properties(self, updated):
