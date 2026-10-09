@@ -103,7 +103,9 @@ for supported inline spans: hide Markdown markers outside the active span and sh
 them when the caret is inside it or the selection overlaps it. This includes the
 position immediately after the last letter, before the closing marker. Moving or
 selecting does not change the text, dirty flag or undo history. Heading prefixes
-also appear on the active heading. Bold/italic remain styled while their delimiters
+also appear on the active heading. Inactive heading prefixes have zero horizontal
+advance, including their trailing space. Active link text and delimiters are white;
+inactive links retain their normal link styling. Bold/italic remain styled while their delimiters
 are visible; incomplete delimiters remain plain so they can be repaired.
 
 Supported emphasis uses `**`/`__`, `*`/`_` and combined triple markers. Inline code
@@ -225,3 +227,10 @@ and `properties.py` keep mode synchronization, actions, anchors and YAML UI sepa
 FileBrowser explicitly enables editing (`allow_edit=True`) for registered MarkdownFile activation;
 applications may still supply a higher-priority activation handler. Keep feature
 user documentation in the consuming application, not the shared library.
+
+
+Embedded HTML is displayed as literal Markdown in reading and formatted modes.
+Qt's HTML-block importer can otherwise silently discard following paragraphs.
+Reader layout is finalized before restoring scroll position; regression fixtures
+check the final paragraph of long documents in all three modes. Source mode remains
+the choice for exact source preservation and unsupported extensions.
