@@ -95,6 +95,7 @@ class SelectionAction:
     is_available: Callable | None = None
     category: str = 'tools'
     order: int = 100
+    shared_key: str | None = None
 
     def __post_init__(self):
         if not self.id or not self.label:
@@ -104,6 +105,8 @@ class SelectionAction:
         if self.is_available is not None and not callable(self.is_available):
             raise TypeError('Action availability must be callable')
         object.__setattr__(self, 'accepts', _accepts(self.accepts))
+        if self.shared_key is not None and (not isinstance(self.shared_key, str) or not self.shared_key):
+            raise ValueError('shared_key must be a non-empty action identity')
 
 
 @dataclass(frozen=True)
