@@ -109,4 +109,4 @@ class ProcessTests(unittest.TestCase):
         self.wait(window)
         self.assertEqual(window.bar.format(), 'Complete')
         self.assertEqual(window.bar.property('operationState'), 'succeeded')
-        self.assertIn('#36945c', window.bar.styleSheet())
+        self.assertIn('#247a46', window.bar.styleSheet())
