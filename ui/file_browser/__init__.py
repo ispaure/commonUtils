@@ -54,6 +54,7 @@ class FileBrowser(qt.QWidget):
         self._base_folder_fields = folder_fields
         self._extensions = {}
         self.activation_handlers = ()
+        self._scan_windows = []
         self.busy = False
         self.folder_busy = False
         self.calculate_folder_sizes = calculate_folder_sizes
@@ -86,10 +87,30 @@ class FileBrowser(qt.QWidget):
         self.folder_size_slider = self.folder_size_button.slider
         self.folder_size_button.setVisible(False)
         controls.addWidget(self.folder_size_button)
+        self.search_button = qt.QPushButton('Search…')
+        self.search_button.clicked.connect(self.open_search)
+        controls.addWidget(self.search_button)
         self.refresh_button = qt.QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_button)
         return controls
+
+    def open_search(self):
+        from .discovery import SearchDialog
+        return self._open_scan_window(SearchDialog)
+
+    def _open_scan_window(self, kind):
+        if self.stopping or self.navigation.directory is None:
+            return None
+        window = kind(self)
+        self._scan_windows.append(window)
+        window.idle.connect(self._maybe_idle)
+        window.destroyed.connect(lambda: self._scan_windows.remove(window) if window in self._scan_windows else None)
+        window.show()
+        return window
+
+    def _scan_busy(self):
+        return any(window.busy for window in self._scan_windows)
 
     def _create_views(self):
         self.model = BrowserFileSystemModel(self)
@@ -510,19 +531,24 @@ class FileBrowser(qt.QWidget):
 
     def stop(self):
         self.stopping = True
+        for window in tuple(self._scan_windows):
+            window.close()
         self.views.stop()
         self.file_actions.stop()
         if self.folder_busy:
             self.folder_operation.requestInterruption()
-        return self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy
+        return self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy or self._scan_busy()
 
     def _maybe_idle(self):
-        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy):
+        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy or self._scan_busy()):
             self.idle.emit()
 
     def shutdown(self):
         self.stop()
         self.file_actions.wait()
+        for window in self._scan_windows:
+            if window.task.operation is not None:
+                window.task.operation.wait()
         for name in ('operation', 'folder_operation'):
             operation = getattr(self, name, None)
             if operation is not None:
