@@ -3,6 +3,9 @@ from . import pyside as qt
 from weakref import WeakSet
 
 _workspaces = WeakSet()
+_DOCK_AREAS = (qt.Qt.DockWidgetArea.LeftDockWidgetArea |
+               qt.Qt.DockWidgetArea.RightDockWidgetArea |
+               qt.Qt.DockWidgetArea.TopDockWidgetArea)
 
 
 def _tab_button(text, tooltip, parent, callback=None):
@@ -56,7 +59,7 @@ class WorkspaceDock(qt.QDockWidget):
         self.setFeatures(qt.QDockWidget.DockWidgetFeature.DockWidgetClosable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetMovable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
-        self.setAllowedAreas(qt.Qt.DockWidgetArea.LeftDockWidgetArea | qt.Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setAllowedAreas(_DOCK_AREAS)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.tab_header = DockTabHeader(self)
         self.setTitleBarWidget(self.tab_header)
@@ -92,8 +95,7 @@ class Workspace(qt.QMainWindow):
         self._drop_target.setObjectName('workspace.emptyDropTarget')
         self._drop_target.setFeatures(qt.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         self._drop_target.toggleViewAction().setVisible(False)
-        self._drop_target.setAllowedAreas(qt.Qt.DockWidgetArea.LeftDockWidgetArea |
-                                          qt.Qt.DockWidgetArea.RightDockWidgetArea)
+        self._drop_target.setAllowedAreas(_DOCK_AREAS)
         empty_header = qt.QWidget(self._drop_target)
         empty_layout = qt.QHBoxLayout(empty_header)
         empty_layout.setContentsMargins(2, 0, 2, 0)
@@ -230,6 +232,22 @@ class Workspace(qt.QMainWindow):
     def _docking_changed(self, floating):
         qt.QTimer.singleShot(0, self._update_drop_target)
 
+    def _dock_location_changed(self, dock, area):
+        if area == qt.Qt.DockWidgetArea.TopDockWidgetArea:
+            # Wait for Qt to finish its native drop before changing the layout.
+            qt.QTimer.singleShot(0, lambda: dock.workspace._finish_top_docking(dock))
+
+    def _finish_top_docking(self, dock):
+        if (self._closing or dock not in self.docks or dock.isFloating()
+                or self.dockWidgetArea(dock) != qt.Qt.DockWidgetArea.TopDockWidgetArea):
+            return
+        anchor = self._docked_anchor(excluding=dock)
+        if anchor and self.dockWidgetArea(anchor) == qt.Qt.DockWidgetArea.TopDockWidgetArea:
+            # A whole tab group may arrive together. Move its anchor too, so
+            # tabifying cannot put the returning dock back into the top area.
+            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, anchor)
+        self.adopt(dock)
+
     def _docked_anchor(self, excluding=None):
         if self.active_dock is not excluding and self.active_dock and not self.active_dock.isFloating():
             return self.active_dock
@@ -251,6 +269,7 @@ class Workspace(qt.QMainWindow):
         if previous:
             self.tabifyDockWidget(previous, dock)
         dock.topLevelChanged.connect(lambda floating: dock.workspace._docking_changed(floating))
+        dock.dockLocationChanged.connect(lambda area: dock.workspace._dock_location_changed(dock, area))
         dock.visibilityChanged.connect(lambda visible: dock.workspace._activate(dock) if visible else None)
         signal = getattr(view, 'title_changed', None)
         if signal is not None:
