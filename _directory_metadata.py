@@ -6,6 +6,7 @@ import os
 from time import time
 from .operations import check_cancelled
 from .traversal import natural_path_key
+from ._directory_search import search_terms, matches_name
 
 
 @dataclass(frozen=True)
@@ -62,11 +63,11 @@ class Snapshot:
     def search(self, name, *, cancelled=lambda: False):
         if hasattr(self.entries, "search"):
             return self.entries.search(name, cancelled=cancelled)
-        needle = name.casefold()
+        terms = search_terms(name)
         matches = []
         for entry in self.entries:
             check_cancelled(cancelled)
-            if needle in entry.path.name.casefold():
+            if matches_name(entry.path.name, terms):
                 matches.append(entry)
         return tuple(matches)
 
