@@ -48,3 +48,15 @@ class DirectoryIndexTests(unittest.TestCase):
             self.assertFalse(cache.get(root).reused)
             file.unlink()
             self.assertFalse(cache.get(root).reused)
+
+    def test_junction_like_directories_are_listed_without_traversal(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            junction = root / 'junction'
+            junction.mkdir()
+            (junction / 'outside.txt').write_text('excluded')
+            with patch.object(Path, 'is_junction', lambda path: path == junction):
+                snapshot = scan_metadata(root)
+            self.assertEqual(len(snapshot.entries), 1)
+            self.assertTrue(snapshot.entries[0].symlink)
+            self.assertEqual(storage_totals(snapshot)[root], 0)
