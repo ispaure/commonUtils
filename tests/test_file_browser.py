@@ -310,6 +310,24 @@ class BrowserTests(unittest.TestCase):
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
             self.assertEqual(tiles.iconSize().width(), min(71, max(16, tiles.gridSize().width() - 28)))
 
+    def test_column_single_click_opens_file_information(self):
+        from PySide6.QtTest import QTest
+        self.browser.view_selector.setCurrentIndex(2)
+        self.browser.resize(1000, 650)
+        self.wait()
+        columns = self.browser.views.columns
+        index = self.browser.model.index(str(self.path))
+        child = next(view for view in columns.findChildren(qt.QListView)
+                     if view.isVisible() and view.rootIndex() == index.parent())
+        QTest.mouseClick(child.viewport(), qt.Qt.MouseButton.LeftButton,
+                         pos=child.visualRect(index).center())
+        self.wait()
+        self.assertEqual(self.browser.selected_object.path, self.path)
+        self.assertTrue(self.browser.preview_panel.isVisible())
+        self.assertTrue(columns.preview_host.isVisible())
+        self.assertGreater(columns.preview_host.width(), 0)
+        self.assertGreater(self.browser.tabs.count(), 0)
+
     def test_column_files_end_the_trail_with_a_matching_preview_column(self):
         from commonUtils.ui.file_browser.views import ColumnDelegate
         self.browser.view_selector.setCurrentIndex(2)
