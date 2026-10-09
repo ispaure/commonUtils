@@ -49,6 +49,32 @@ class ThemeTests(unittest.TestCase):
         controller.set_mode('system')
         with self.assertRaises(ValueError): controller.set_mode('unknown')
 
+    def test_compact_form_fields_have_room_for_text_in_both_modes(self):
+        controller = apply_theme(self.app, mode='light')
+        host = qt.QWidget()
+        layout = qt.QVBoxLayout(host)
+        controls = [qt.QLineEdit('Metadata'), qt.QComboBox(), qt.QSpinBox()]
+        controls[1].setEditable(True)
+        controls[1].addItem('Publisher')
+        for control in controls:
+            control.setFixedHeight(22)
+            layout.addWidget(control)
+        host.show()
+        try:
+            for mode in ('light', 'dark'):
+                controller.set_mode(mode)
+                self.app.processEvents()
+                for control in controls:
+                    line = control if isinstance(control, qt.QLineEdit) else control.findChild(qt.QLineEdit)
+                    option = qt.QStyleOptionFrame()
+                    option.initFrom(line)
+                    option.rect = line.rect()
+                    text_rect = line.style().subElementRect(qt.QStyle.SubElement.SE_LineEditContents, option, line)
+                    self.assertGreaterEqual(text_rect.height(), line.fontMetrics().height())
+                    self.assertEqual(control.height(), 22)
+        finally:
+            host.close(); host.deleteLater(); self.app.processEvents()
+
     def test_workspace_selected_tabs_keep_accent_in_both_modes(self):
         controller=apply_theme(self.app,mode='light')
         workspace=Workspace(lambda argument:qt.QWidget());workspace.resize(650,300)
