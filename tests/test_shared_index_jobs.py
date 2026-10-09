@@ -48,6 +48,21 @@ class SharedJobTests(unittest.TestCase):
                 self.assertEqual(calls,[root]);self.assertFalse(cancelled)
                 first.deleteLater();second.deleteLater()
 
+    def test_cancel_after_worker_exit_before_queued_finish_completes_handle(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            cache = DirectoryCache(database=root/'index.sqlite3')
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache):
+                handle = FolderOperation(root, lambda *args, **kwargs: {}, self.app)
+                handle.start()
+                job = handle._job
+                self.assertTrue(job.wait(5000))  # Do not deliver queued GUI callbacks yet.
+                self.assertFalse(handle.isFinished())
+                handle.requestInterruption()
+                self.wait(handle.isFinished)
+                self.assertFalse(handle.isRunning())
+                handle.deleteLater()
+
     def test_last_subscriber_cancels_and_waits_for_its_worker(self):
         with TemporaryDirectory() as folder:
             root=Path(folder);cache=DirectoryCache(database=root/'index.sqlite3')
@@ -119,3 +134,29 @@ class SharedJobTests(unittest.TestCase):
                     release.set()
                     self.wait(lambda: first.isFinished() and second.isFinished())
                     first.deleteLater(); second.deleteLater()
+
+    def test_descendant_view_joins_reconcile_scan_without_starting_another_scanner(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder); child = root / 'child'; child.mkdir()
+            cache = DirectoryCache(database=root / 'index.sqlite3')
+            entered, release = Event(), Event(); calls = []
+            def scanner(root, stop, **kwargs):
+                calls.append(root); entered.set()
+                while not release.wait(.01):
+                    if stop(): return None
+                return {}
+            with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache):
+                first = FolderOperation(root, scanner, self.app, request_key=('reconcile', (root,)))
+                second = FolderOperation(child, scanner, self.app, request_key=('reconcile', ()))
+                try:
+                    first.start(); self.wait(entered.is_set); second.start()
+                    self.assertIs(first._job, second._job)
+                    self.assertEqual(second.root, root)
+                    self.assertEqual(second.visible_root, child)
+                    first.requestInterruption(); self.wait(first.isFinished)
+                    self.assertFalse(second._job.isInterruptionRequested())
+                finally:
+                    release.set()
+                    self.wait(lambda: first.isFinished() and second.isFinished())
+                    first.deleteLater(); second.deleteLater()
+            self.assertEqual(calls, [root])

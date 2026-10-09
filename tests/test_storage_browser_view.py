@@ -53,6 +53,78 @@ class StorageViewTests(unittest.TestCase):
             finally:
                 browser.shutdown();browser.close();app.processEvents()
 
+    def test_radial_budget_is_shared_and_deep_selection_reveals_nested_row(self):
+        from types import SimpleNamespace
+        from commonUtils._directory_metadata import Entry
+        from commonUtils.filesystem import FolderStats
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with TemporaryDirectory() as temp:
+            root = Path(temp); big = root/'big'; small = root/'small'
+            deep = small/'deep'; leaf = deep/'leaf'
+            leaf.mkdir(parents=True); big.mkdir()
+            file = leaf/'file.bin'; file.write_bytes(b'12345')
+            children = {root: [Entry(big,True,0,0), Entry(small,True,0,0)],
+                        big: [Entry(big/f'{i}.bin',False,1,0) for i in range(3100)],
+                        small: [Entry(deep,True,0,0)], deep: [Entry(leaf,True,0,0)],
+                        leaf: [Entry(file,False,5,0)]}
+            sizes = {big: 3100, small: 5, deep: 5, leaf: 5}
+            snapshot = SimpleNamespace(complete=True, children=lambda path: children.get(path, []),
+                folder_stats=lambda paths, **kw: {path: FolderStats(size=sizes[path]) for path in paths})
+            browser = FileBrowser(root,calculate_folder_sizes=False); browser.resize(1000,700); browser.show()
+            try:
+                with patch.object(directory_cache,'peek',return_value=snapshot):
+                    browser.view_selector.setCurrentIndex(4)
+                    deadline = time.monotonic()+5
+                    while browser.views.storage.busy or browser.busy:
+                        app.processEvents(); time.sleep(.01)
+                        self.assertLess(time.monotonic(),deadline)
+                    app.processEvents()
+                storage = browser.views.storage
+                self.assertIn(file, [path for path,size,shape in storage.radial.sectors])
+                self.assertLessEqual(sum(map(len,storage.nodes.values())),3000)
+                self.assertIn(small, storage.nodes)
+                storage.radial.selected.emit(file); app.processEvents()
+                row = storage.results.currentItem()
+                self.assertEqual(row.data(0,qt.Qt.ItemDataRole.UserRole),file)
+                self.assertEqual(row.parent().data(0,qt.Qt.ItemDataRole.UserRole),leaf)
+                self.assertTrue(row.parent().isExpanded())
+                self.assertTrue(row.parent().parent().isExpanded())
+                self.assertEqual(browser.selected_objects()[0].path,file)
+                self.assertFalse(storage.results.visualItemRect(row).isEmpty())
+            finally:
+                browser.shutdown(); browser.close(); app.processEvents()
+
+    def test_radial_opens_hidden_unloaded_folders_and_their_descendants(self):
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with TemporaryDirectory() as temp:
+            root = Path(temp); hidden = root/'.Library'; nested = hidden/'Application Support'
+            nested.mkdir(parents=True); (nested/'data.bin').write_bytes(b'abc')
+            directory_cache.get(root)
+            browser = FileBrowser(root,calculate_folder_sizes=False); browser.show()
+            def wait():
+                deadline = time.monotonic()+5
+                while browser.busy or browser.views.storage.busy:
+                    app.processEvents(); time.sleep(.01); self.assertLess(time.monotonic(),deadline)
+                app.processEvents()
+            try:
+                browser.view_selector.setCurrentIndex(4); wait()
+                original = browser.model.index
+                # Reproduce a cached path absent from the filtered/lazy live model.
+                with patch.object(browser.model, 'index', side_effect=lambda path, *args:
+                                  qt.QModelIndex() if str(path) in (str(hidden),str(nested))
+                                  and browser.model.rootPath() != str(path) else original(path,*args)):
+                    browser.views.storage.radial.activated.emit(hidden); wait()
+                    self.assertEqual(browser.navigation.directory,hidden)
+                    self.assertTrue(browser.views.tree.rootIndex().isValid())
+                    browser.views.storage.radial.activated.emit(nested); wait()
+                    self.assertEqual(browser.navigation.directory,nested)
+                    self.assertEqual(browser.views.storage.root,nested)
+                    self.assertEqual(browser.view_selector.currentIndex(),4)
+                browser.navigate(root); wait()
+                self.assertFalse(browser.model.filter() & qt.QDir.Filter.Hidden)
+            finally:
+                browser.shutdown(); browser.close(); app.processEvents()
+
     def test_treemap_reads_one_folder_and_radial_loads_on_demand(self):
         from commonUtils._directory_store import SqlEntries
         app=qt.QApplication.instance() or qt.QApplication([])
@@ -90,3 +162,33 @@ class StorageViewTests(unittest.TestCase):
         self.assertEqual(label.toolTip(),full)
         self.assertLessEqual(label.fontMetrics().horizontalAdvance(shown),label.width())
         self.assertFalse(label.wordWrap());label.close()
+
+    def test_radial_center_double_click_goes_up_and_respects_browser_root(self):
+        from PySide6.QtTest import QTest
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with TemporaryDirectory() as temp:
+            root = Path(temp); folder = root / 'folder'; folder.mkdir()
+            (folder / 'file.txt').write_bytes(b'abc')
+            directory_cache.get(root)
+            browser = FileBrowser(root,calculate_folder_sizes=False)
+            browser.resize(1000,700); browser.show()
+            def wait():
+                deadline = time.monotonic()+5
+                while browser.views.storage.busy or browser.busy:
+                    app.processEvents(); time.sleep(.01)
+                    self.assertLess(time.monotonic(),deadline)
+                app.processEvents()
+            try:
+                browser.view_selector.setCurrentIndex(4); wait()
+                browser.navigate(folder); wait()
+                radial = browser.views.storage.radial
+                center = qt.QPoint(radial.width()//2,radial.height()//2)
+                QTest.mouseDClick(radial,qt.Qt.MouseButton.RightButton,pos=center); wait()
+                self.assertEqual(browser.navigation.directory,folder)
+                QTest.mouseDClick(radial,qt.Qt.MouseButton.LeftButton,pos=center); wait()
+                self.assertEqual(browser.navigation.directory,root)
+                self.assertEqual(browser.view_selector.currentIndex(),4)
+                QTest.mouseDClick(radial,qt.Qt.MouseButton.LeftButton,pos=center); wait()
+                self.assertEqual(browser.navigation.directory,root)
+            finally:
+                browser.shutdown(); browser.close(); app.processEvents()

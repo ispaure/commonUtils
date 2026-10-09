@@ -5,17 +5,46 @@ from .. import pyside as qt
 from ..operations import Operation
 from ...directory_index import directory_cache
 from ...filesystem import format_size
+from ...settings import get_setting
 from .storage import Treemap
 
 
 class RadialMap(Treemap):
+    parent_requested = qt.Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self.nodes = {}
         self.totals = {}
         self.root = None
         self.sectors = []
+        self._zoom = 1.0
+        self._zoom_start = 1.0
+        self._animation = qt.QVariantAnimation(self)
+        self._animation.setDuration(240)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.setEasingCurve(qt.QEasingCurve.Type.OutCubic)
+        self._animation.valueChanged.connect(self._zoom_frame)
         self.setAccessibleName('Radial storage distribution; rings represent nested folders')
+
+    def animate_navigation(self, direction):
+        self._animation.stop()
+        self._zoom = 1.0
+        if (direction and self.isVisible() and
+                get_setting('Storage', 'radial_animations_bool', True)):
+            self._zoom_start = .78 if direction > 0 else 1.22
+            self._zoom = self._zoom_start
+            self._animation.start()
+        self.update()
+
+    def _zoom_frame(self, progress):
+        self._zoom = self._zoom_start + (1.0-self._zoom_start)*progress
+        self.update()
+
+    def hideEvent(self, event):
+        self._animation.stop()
+        self._zoom = 1.0
+        super().hideEvent(event)
 
     def set_items(self, items):
         self.sectors = []
@@ -28,6 +57,11 @@ class RadialMap(Treemap):
         center = qt.QPointF(self.width()/2, self.height()/2)
         radius = max(0, min(self.width(), self.height())/2-12)
         ring = radius/5
+        transform = qt.QTransform()
+        transform.translate(center.x(), center.y())
+        transform.scale(self._zoom, self._zoom)
+        transform.translate(-center.x(), -center.y())
+        painter.setTransform(transform)
         self.sectors = []
         def draw(parent, start, span, depth, hue=0):
             children = self.nodes.get(parent, [])
@@ -53,7 +87,7 @@ class RadialMap(Treemap):
                                       3 if path == self.selected_path else 1))
                 painter.setBrush(qt.QColor.fromHsv(color, 150-depth*15, 155+depth*15))
                 painter.drawPath(shape)
-                self.sectors.append((path,size,shape))
+                self.sectors.append((path,size,transform.map(shape)))
                 draw(path, angle, sweep, depth+1, color)
                 angle += sweep
         draw(self.root, 0, 360, 1)
@@ -63,6 +97,24 @@ class RadialMap(Treemap):
         if not self.sectors:
             painter.drawText(self.rect(), qt.Qt.AlignmentFlag.AlignCenter, 'No file bytes to display')
         painter.end()
+
+    def _in_center(self, point):
+        radius = max(0, min(self.width(), self.height()) / 2 - 12) / 5 * self._zoom
+        return ((point.x() - self.width() / 2) ** 2 +
+                (point.y() - self.height() / 2) ** 2 <= radius ** 2)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self.root is not None and self._in_center(event.position()):
+            self.setToolTip('Double-click to go up one folder')
+
+    def mouseDoubleClickEvent(self, event):
+        if (self.root is not None and event.button() == qt.Qt.MouseButton.LeftButton
+                and self._in_center(event.position())):
+            self.parent_requested.emit()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     def hit(self, point):
         return next(((path,size) for path,size,shape in reversed(self.sectors) if shape.contains(point)), None)
@@ -82,15 +134,17 @@ class StorageView(qt.QWidget):
         self.busy = False
         self.closing = False
         self.pending = False
+        self._navigation_zoom = 0
         self.entries = []
         self.nodes = {}
+        self._rows = {}
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         controls = qt.QHBoxLayout()
         self.chart_selector = qt.QComboBox()
         self.chart_selector.addItems(['Treemap', 'Radial'])
         self.chart_selector.setAccessibleName('Storage visualization')
-        self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 largest chart entries; gaps represent omitted entries. Hover for names and sizes.')
+        self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 chart entries shared across branches. Gaps can represent omitted entries or incomplete sizes; zero-byte folders have no area. Hover for names and sizes.')
         self.chart_selector.hide()  # Compatibility API; the toolbar owns chart buttons.
         self.summary = qt.QLabel('Loading saved sizes…')
         self.summary.setWordWrap(True)
@@ -99,6 +153,7 @@ class StorageView(qt.QWidget):
         self.charts = qt.QStackedWidget()
         self.map = Treemap()
         self.radial = RadialMap()
+        self.radial.parent_requested.connect(self.browser.navigation.up.click)
         for chart in (self.map,self.radial):
             self.charts.addWidget(chart)
             chart.selected.connect(self.select_path)
@@ -109,7 +164,7 @@ class StorageView(qt.QWidget):
         self.results = qt.QTreeWidget()
         self.results.setHeaderLabels(['File or folder', 'Size', 'Share'])
         self.results.headerItem().setToolTip(0, 'Files and folders, ordered largest first')
-        self.results.setRootIsDecorated(False)
+        self.results.setRootIsDecorated(True)
         self.results.setUniformRowHeights(True)
         self.results.header().setSectionResizeMode(0,qt.QHeaderView.ResizeMode.Stretch)
         for column in (1,2):
@@ -148,10 +203,14 @@ class StorageView(qt.QWidget):
         self.selected_path = Path(path)
         blocker = qt.QSignalBlocker(self.results)
         self.results.clearSelection()
-        for row in range(self.results.topLevelItemCount()):
-            item = self.results.topLevelItem(row)
-            if item.data(0,qt.Qt.ItemDataRole.UserRole) == self.selected_path:
-                self.results.setCurrentItem(item); break
+        item = self._rows.get(self.selected_path)
+        if item is not None:
+            parent = item.parent()
+            while parent is not None:
+                parent.setExpanded(True)
+                parent = parent.parent()
+            self.results.setCurrentItem(item)
+            self.results.scrollToItem(item)
         blocker.unblock()
         self._highlight()
         self.selection_changed.emit()
@@ -170,8 +229,12 @@ class StorageView(qt.QWidget):
     def set_root(self, path):
         path = Path(path)
         if path != self.root:
+            previous = self.root
+            self._navigation_zoom = (1 if previous is not None and previous in path.parents else
+                                     -1 if previous is not None and path in previous.parents else 0)
+            self.radial.animate_navigation(0)
             self.root = path; self.selected_path = None
-            self.results.clear(); self.map.set_items([])
+            self.results.clear(); self._rows = {}; self.map.set_items([])
             self.radial.nodes = {}; self.radial.set_items([])
         self.refresh()
 
@@ -197,24 +260,30 @@ class StorageView(qt.QWidget):
         node_totals = {}
         root_entries = []
         budget = 3000
-        def collect(path, depth):
-            nonlocal budget, root_entries
-            if cancelled() or budget <= 0: return
-            children = list(snapshot.children(path))
-            totals = snapshot.folder_stats([entry.path for entry in children if entry.directory],cancelled=cancelled)
-            items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
-                     for entry in children if not entry.symlink]
-            items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
-            node_totals[path] = sum(size for _,size in items)
-            if path == root:
-                root_entries = items
-            nodes[path] = items[:budget]
-            budget -= len(nodes[path])
-            if radial and depth < 4:
+        queue = [root]
+        for depth in range(1, 5 if radial else 2):
+            if not queue or budget <= 0: break
+            # Breadth-first quotas reserve room for later rings. A file-heavy
+            # branch cannot consume every entry before its siblings are loaded.
+            allowance = budget if depth == 4 or not radial else max(1, budget // (5-depth))
+            next_queue = []
+            for index, path in enumerate(queue):
+                if cancelled() or allowance <= 0: break
+                children = list(snapshot.children(path))
+                totals = snapshot.folder_stats([entry.path for entry in children if entry.directory],cancelled=cancelled)
+                items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
+                         for entry in children if not entry.symlink]
+                items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
+                node_totals[path] = sum(size for _,size in items)
+                if path == root:
+                    root_entries = items
+                quota = max(1, allowance // (len(queue)-index)) if radial else len(items)
+                nodes[path] = items[:quota]
+                used = len(nodes[path])
+                budget -= used; allowance -= used
                 directories = {entry.path for entry in children if entry.directory and not entry.symlink}
-                for child,size in nodes[path]:
-                    if child in directories and size: collect(child,depth+1)
-        collect(root,1)
+                next_queue.extend(child for child,size in nodes[path] if child in directories and size)
+            queue = next_queue
         return root_entries,nodes,node_totals,snapshot.complete
 
     def _loaded(self, root, result, error):
@@ -224,16 +293,27 @@ class StorageView(qt.QWidget):
         self.entries,self.nodes,node_totals,complete = result
         self.map.set_items(self.entries)
         self.radial.root = root; self.radial.nodes = self.nodes; self.radial.totals = node_totals; self.radial.set_items(self.entries)
+        self.radial.animate_navigation(self._navigation_zoom)
+        self._navigation_zoom = 0
         blocker = qt.QSignalBlocker(self.results)
         self.results.clear()
         total = sum(size for _,size in self.entries)
-        for path,size in self.entries:
-            item = qt.QTreeWidgetItem([path.name,format_size(size),f'{100*size/total:.1f}%' if total else '0%'])
-            item.setData(0,qt.Qt.ItemDataRole.UserRole,path); item.setToolTip(0,str(path))
-            self.results.addTopLevelItem(item)
+        self._rows = {}
+        def add_rows(items, parent=None):
+            for path,size in items:
+                item = qt.QTreeWidgetItem([path.name,format_size(size),f'{100*size/total:.1f}%' if total else '0%'])
+                item.setData(0,qt.Qt.ItemDataRole.UserRole,path); item.setToolTip(0,str(path))
+                item.setToolTip(2, 'Share of the current folder total')
+                if parent is None: self.results.addTopLevelItem(item)
+                else: parent.addChild(item)
+                self._rows[path] = item
+                add_rows(self.nodes.get(path, ()), item)
+        add_rows(self.entries)
         blocker.unblock()
         self.summary.setText(f'{format_size(total)} · {len(self.entries):,} entries · '+
-                             ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.'))
+                             ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.') +
+                             (' · Four levels; up to 3,000 entries. Gaps may be omitted entries; zero-byte folders have no area.'
+                              if self.chart_selector.currentIndex() == 1 else ''))
         self.select_path(self.selected_path) if self.selected_path else None
 
     def _finished(self):

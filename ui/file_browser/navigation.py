@@ -5,6 +5,23 @@ from .. import pyside as qt
 from .controls import navigation_button
 
 
+class BreadcrumbSeparator(qt.QWidget):
+    """Font-independent chevron, vertically centered on every platform."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedWidth(14)
+        self.setSizePolicy(qt.QSizePolicy.Policy.Fixed, qt.QSizePolicy.Policy.Expanding)
+        self.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+        painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText), 1.5))
+        x, y = self.width()/2, self.height()/2
+        painter.drawLine(qt.QPointF(x-2,y-4), qt.QPointF(x+2,y))
+        painter.drawLine(qt.QPointF(x+2,y), qt.QPointF(x-2,y+4))
+
+
 class BreadcrumbBar(qt.QWidget):
     requested = qt.Signal(object)
 
@@ -14,7 +31,7 @@ class BreadcrumbBar(qt.QWidget):
         self.paths = []
         self.icons = qt.QFileIconProvider()
         self.layout = qt.QHBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setContentsMargins(5, 2, 5, 2)
         self.layout.setSpacing(2)
         self.root_button = qt.QToolButton()
         self.root_button.setAutoRaise(True)
@@ -27,7 +44,10 @@ class BreadcrumbBar(qt.QWidget):
         self.scroll.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setSizePolicy(qt.QSizePolicy.Policy.Expanding, qt.QSizePolicy.Policy.Fixed)
+        self.scroll.viewport().setAutoFillBackground(False)
+        self.scroll.setAutoFillBackground(False)
         self.content = qt.QWidget()
+        self.content.setAutoFillBackground(False)
         self.crumbs = qt.QHBoxLayout(self.content)
         self.crumbs.setContentsMargins(0, 0, 0, 0)
         self.crumbs.setSpacing(2)
@@ -35,6 +55,13 @@ class BreadcrumbBar(qt.QWidget):
         self.layout.addWidget(self.scroll, 1)
         self.setAccessibleName('Folder path')
         self.set_paths([])
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+        painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Mid), 1))
+        painter.setBrush(self.palette().brush(qt.QPalette.ColorRole.AlternateBase))
+        painter.drawRoundedRect(qt.QRectF(self.rect()).adjusted(.5,.5,-.5,-.5), 5, 5)
 
     def set_paths(self, paths):
         self.paths = list(paths)
@@ -50,8 +77,7 @@ class BreadcrumbBar(qt.QWidget):
             self._configure(self.root_button, root)
             self.buttons.append(self.root_button)
             for path in paths[1:]:
-                arrow = qt.QLabel('›')
-                arrow.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
+                arrow = BreadcrumbSeparator(self.content)
                 self.crumbs.addWidget(arrow)
                 button = qt.QToolButton()
                 button.setAutoRaise(True)
@@ -103,12 +129,12 @@ class NavigationBar(qt.QWidget):
         self.breadcrumbs.requested.connect(self.requested)
         self.set_library(None)
 
-    def set_library(self, path):
+    def set_library(self, path, *, directory=None):
         self.library = Path(path) if path is not None else None
         self.directory = None
         self.history = []
         self.position = -1
-        self.set_directory(self.library)
+        self.set_directory(Path(directory) if directory is not None else self.library)
 
     def set_directory(self, path):
         if path is not None:

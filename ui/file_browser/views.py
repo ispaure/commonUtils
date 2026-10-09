@@ -14,6 +14,7 @@ class FileViews(qt.QStackedWidget):
     selection_changed = qt.Signal()
     context_requested = qt.Signal(object)
     activated = qt.Signal(object)
+    path_activated = qt.Signal(object)
     idle = qt.Signal()
     directory_changed = qt.Signal(object)
     directory_opened = qt.Signal(object)
@@ -21,6 +22,8 @@ class FileViews(qt.QStackedWidget):
     def __init__(self, model, tree, parent=None):
         super().__init__(parent)
         self.model = model
+        self._hidden_root = None
+        self._hidden_filter = None
         self.tree = tree
         self.covers = CoverModel(model, self)
         self.tiles = ResponsiveTileView()
@@ -53,7 +56,7 @@ class FileViews(qt.QStackedWidget):
         self.storage = StorageView(parent)
         self.addWidget(self.storage)
         self.storage.selection_changed.connect(self.selection_changed)
-        self.storage.activated.connect(lambda path: self.activated.emit(self.model.index(str(path))))
+        self.storage.activated.connect(self._storage_activated)
         self.storage.context_requested.connect(self._storage_context)
         self.storage.idle.connect(self.idle)
         self.root = None
@@ -62,6 +65,13 @@ class FileViews(qt.QStackedWidget):
         if isinstance(index.model(),qt.QAbstractProxyModel):
             return index.model().mapToSource(index)
         return index
+
+    def _storage_activated(self, path):
+        index = self.model.index(str(path))
+        if index.isValid():
+            self.activated.emit(index)
+        else:
+            self.path_activated.emit(path)
 
     def _storage_context(self, path, position):
         self.context_directory = self.root
@@ -133,7 +143,19 @@ class FileViews(qt.QStackedWidget):
 
     def set_root(self, path):
         self.root = Path(path)
+        if (self._hidden_root is not None and self.root != self._hidden_root
+                and self._hidden_root not in self.root.parents):
+            self.model.setFilter(self._hidden_filter)
+            self._hidden_root = self._hidden_filter = None
         index = self.model.index(str(path))
+        if not index.isValid():
+            # Explicitly opening a hidden folder is valid even when it is
+            # excluded from the parent listing or not loaded by Qt yet.
+            if self._hidden_filter is None:
+                self._hidden_filter = self.model.filter()
+                self._hidden_root = self.root
+            self.model.setFilter(self._hidden_filter | qt.QDir.Filter.Hidden)
+            index = self.model.setRootPath(str(path))
         for view in (self.tree, self.tiles, self.columns):
             blocker = qt.QSignalBlocker(view.selectionModel())
             view.clearSelection()

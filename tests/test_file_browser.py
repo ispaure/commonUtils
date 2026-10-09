@@ -61,19 +61,23 @@ class BrowserTests(unittest.TestCase):
         self.assertFalse(self.browser.busy or self.browser.folder_busy)
 
     def test_search_results_locate_file_and_keep_worker_safe(self):
-        window = self.browser.open_search()
-        window.query.setText('ITEM')
-        window.run_search()
-        deadline = time.monotonic() + 5
-        while window.busy:
-            self.assertLess(time.monotonic(), deadline)
-            self.app.processEvents()
-            time.sleep(.01)
-        self.assertEqual(window.results.topLevelItemCount(), 1)
-        window.locate(self.path)
-        self.assertEqual(self.browser.selected_objects()[0].path, self.path)
-        window.close()
-        self.wait()
+        from commonUtils.directory_index import DirectoryCache
+        support = Path(self.enterContext(TemporaryDirectory()))
+        cache = DirectoryCache(database=support / 'search-fixture.sqlite3')
+        cache.get(self.root, refresh=True)
+        with patch('commonUtils.ui.file_browser.index_search.directory_cache', cache):
+            search = self.browser.open_search()
+            self.browser.search_bar.setText('ITEM')
+            deadline = time.monotonic() + 5
+            while search.busy or search.debounce.isActive():
+                self.assertLess(time.monotonic(), deadline)
+                self.app.processEvents()
+                time.sleep(.01)
+            self.assertEqual(search.results.topLevelItemCount(), 1)
+            self.assertTrue(search.show_in_browser(self.path))
+            self.assertEqual(self.browser.selected_objects()[0].path, self.path)
+            self.assertTrue(self.browser.search_panel.isHidden())
+            self.wait()
 
     def test_storage_totals_treemap_and_drilldown(self):
         folder = self.root / 'large'
@@ -120,7 +124,7 @@ class BrowserTests(unittest.TestCase):
         self.assertNotIn('\\n', text)
         menu = self.browser.context_menu_for(index)
         self.assertEqual([action.text() for action in menu.actions() if not action.isSeparator()],
-                         ['Open in Default App', 'Cut', 'Copy', 'Rename', menu.actions()[-1].text()])
+                         ['Open in Default App', 'Cut', 'Copy', 'Rename', 'Move to Trash / Recycle Bin…', menu.actions()[-1].text()])
         with patch('commonUtils.ui.desktop_actions.open_default') as opened:
             menu.actions()[0].trigger()
             opened.assert_called_once_with(self.path)
@@ -213,7 +217,7 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.browser.model.data(index.siblingAtColumn(1)), '6 B')
         menu = self.browser.context_menu_for(index)
         self.assertEqual([action.text() for action in menu.actions() if not action.isSeparator()][:-1],
-                         ['Open', 'Cut', 'Copy', 'Paste', 'Rename'])
+                         ['Open', 'Cut', 'Copy', 'Paste', 'Rename', 'Move to Trash / Recycle Bin…'])
         self.assertTrue(menu.actions()[-1].text().startswith('Reveal in '))
         menu.deleteLater()
         self.browser._activate(index)
@@ -420,7 +424,14 @@ class BrowserTests(unittest.TestCase):
                                                        pixmap.height() / (tiles.iconSize().height() * ratio)),
                                                    1.0, delta=.03)
                             if icon is icons[0]:
-                                self.assertAlmostEqual(pixmap.width() / pixmap.height(), .5, delta=.03)
+                                # The icon now includes a centered transparent canvas;
+                                # measure the artwork rather than the canvas ratio.
+                                image = pixmap.toImage()
+                                pixels = [(x,y) for y in range(image.height()) for x in range(image.width())
+                                          if image.pixelColor(x,y).alpha() > 128]
+                                width = max(x for x,y in pixels) - min(x for x,y in pixels) + 1
+                                height = max(y for x,y in pixels) - min(y for x,y in pixels) + 1
+                                self.assertAlmostEqual(width / height, .5, delta=.03)
 
     def test_tile_paint_preserves_square_wide_and_portrait_images(self):
         tiles = self.browser.views.tiles
@@ -463,7 +474,11 @@ class BrowserTests(unittest.TestCase):
             option=qt.QStyleOptionViewItem();option.decorationSize=tiles.iconSize()
             tiles.itemDelegate().initStyleOption(option,index)
             image=option.icon.pixmap(tiles.iconSize())
-            self.assertEqual(image.width(),image.height())
+            image = image.toImage()
+            pixels = [(x,y) for y in range(image.height()) for x in range(image.width())
+                      if image.pixelColor(x,y).alpha() > 128]
+            self.assertEqual(max(x for x,y in pixels)-min(x for x,y in pixels),
+                             max(y for x,y in pixels)-min(y for x,y in pixels))
 
     def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
         covers = self.browser.views.covers

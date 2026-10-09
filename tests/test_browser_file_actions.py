@@ -74,6 +74,66 @@ class BrowserFileActionTests(unittest.TestCase):
                                                  qt.QItemSelectionModel.SelectionFlag.Rows)
         self.assertFalse(self.menu(self.file)['Rename'].isEnabled())
 
+    def test_trash_action_removes_selected_folder_only_after_confirmation(self):
+        child = self.folder / 'child.txt'; child.write_text('contents')
+        self.select(self.folder)
+        label = 'Move to Trash / Recycle Bin…'
+        with patch.object(self.browser.file_actions, '_confirm_removal', return_value=False), \
+                patch.object(self.browser.file_actions, '_system_trash') as trash:
+            self.menu(self.folder)[label].trigger()
+            trash.assert_not_called()
+        kept = self.root / '.test-trash'
+        def move(path):
+            path.rename(kept)
+            return True
+        with patch.object(self.browser.file_actions, '_confirm_removal', return_value=True), \
+                patch.object(self.browser.file_actions, '_system_trash', side_effect=move):
+            self.menu(self.folder)[label].trigger(); self.wait()
+        self.assertFalse(self.folder.exists())
+        self.assertEqual((kept / 'child.txt').read_text(), 'contents')
+
+    def test_unavailable_trash_keeps_items_without_automatic_permanent_delete(self):
+        self.select(self.file)
+        with patch.object(self.browser.file_actions, '_confirm_removal', return_value=True) as confirm, \
+                patch.object(self.browser.file_actions, '_system_trash', return_value=False), \
+                patch.object(qt.QMessageBox, 'exec', return_value=0):
+            self.menu(self.file)['Move to Trash / Recycle Bin…'].trigger(); self.wait()
+        self.assertEqual(self.file.read_text(), 'original')
+        self.assertEqual(confirm.call_count, 1)
+
+    def test_delete_key_in_search_field_edits_text_instead_of_files(self):
+        self.select(self.file)
+        self.browser.open_search()
+        self.browser.search_bar.setText('abc')
+        self.browser.search_bar.setFocus(); self.app.processEvents()
+        self.browser.search_bar.setCursorPosition(1)
+        with patch.object(self.browser.file_actions, 'delete') as delete:
+            QTest.keyClick(self.browser.search_bar, qt.Qt.Key.Key_Delete)
+            self.assertEqual(self.browser.search_bar.text(), 'ac')
+            delete.assert_not_called()
+
+    def test_removal_dialog_defaults_to_cancel_and_removed_cut_items_are_pruned(self):
+        from commonUtils.file_removal import removal_plan
+        plan = removal_plan([self.file])
+        inspected = []
+        def cancel_dialog():
+            dialog = self.app.activeModalWidget()
+            inspected.append(dialog.informativeText())
+            self.assertEqual(dialog.defaultButton().text().replace('&', ''), 'Cancel')
+            dialog.defaultButton().click()
+        qt.QTimer.singleShot(0, cancel_dialog)
+        self.assertFalse(self.browser.file_actions._confirm_removal(plan))
+        self.assertIn('network drives', inspected[0])
+        self.select(self.file)
+        set_clipboard_files([self.file, self.folder], move=True)
+        def move(path):
+            path.rename(self.root / '.test-trash-file')
+            return True
+        with patch.object(self.browser.file_actions, '_confirm_removal', return_value=True), \
+                patch.object(self.browser.file_actions, '_system_trash', side_effect=move):
+            self.menu(self.file)['Move to Trash / Recycle Bin…'].trigger(); self.wait()
+        self.assertEqual(clipboard_files()[0], (self.folder,))
+
     def test_copy_paste_and_cut_use_whole_selection_and_clear_only_successful_cut(self):
         self.select(self.file)
         self.menu(self.file)['Copy'].trigger()
