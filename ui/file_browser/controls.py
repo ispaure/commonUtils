@@ -22,7 +22,13 @@ class ViewIcon(qt.QIconEngine):
         color = palette.color(qt.QPalette.ColorGroup.Disabled if mode == qt.QIcon.Mode.Disabled else qt.QPalette.ColorGroup.Active, role)
         painter.setPen(qt.QPen(color, 1.6))
         painter.setBrush(qt.Qt.BrushStyle.NoBrush)
-        if self.mode == 1:
+        if self.mode == 6:
+            painter.drawEllipse(qt.QRectF(3, 3, 12, 12))
+            painter.drawLine(qt.QLineF(13, 13, 21, 21))
+        elif self.mode == 7:
+            painter.drawLine(qt.QLineF(6, 6, 18, 18))
+            painter.drawLine(qt.QLineF(18, 6, 6, 18))
+        elif self.mode == 1:
             for x in (3, 13):
                 for y in (3, 13):
                     painter.drawRoundedRect(qt.QRectF(x, y, 7, 7), 1, 1)

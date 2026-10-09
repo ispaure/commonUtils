@@ -1,4 +1,4 @@
-"""Search results using shared filesystem snapshots and the browser's navigation."""
+"""Shared scan-dialog lifecycle for storage snapshots."""
 from pathlib import Path
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
@@ -8,21 +8,12 @@ from ...operations import OperationCancelled
 from dataclasses import dataclass
 from datetime import datetime
 from ...filesystem import format_datetime
-from ...filesystem import format_size
 
 
 @dataclass
 class PausedScan:
     progress: dict | None
     cancelled: bool = True
-
-
-@dataclass
-class SearchScan:
-    snapshot: object
-    matches: tuple
-    total: int
-    offset: int = 0
 
 
 class ScanDialog(qt.QDialog):
@@ -194,133 +185,3 @@ class ScanDialog(qt.QDialog):
 
     def reject(self):
         self.close()
-
-
-class SearchDialog(ScanDialog):
-    PAGE_SIZE = 500
-    def __init__(self, browser):
-        super().__init__(browser, 'Search files and folders')
-        controls = qt.QHBoxLayout()
-        self.query = qt.QLineEdit()
-        self.query.setPlaceholderText('Partial file or folder name')
-        self.query.setAccessibleName('Search by name')
-        self.recursive = qt.QCheckBox('Include subfolders')
-        self.recursive.setChecked(True)
-        self.search_button = qt.QPushButton('Search')
-        self.search_button.clicked.connect(self.run_search)
-        self.query.returnPressed.connect(self.run_search)
-        self.rescan_button = qt.QPushButton('Rebuild index')
-        self.rescan_button.setToolTip('Start over instead of resuming saved partial work')
-        self.rescan_button.clicked.connect(lambda: self.run_search(refresh=True))
-        for widget in (self.query, self.recursive, self.search_button, self.rescan_button):
-            controls.addWidget(widget)
-        self.layout.insertLayout(1, controls)
-        self.results = qt.QTreeWidget()
-        self.results.setHeaderLabels(['Name', 'Type', 'Size', 'Path'])
-        self.results.setRootIsDecorated(False)
-        self.results.setUniformRowHeights(True)
-        # Sort the full match set in SQL before paging, rather than only visible rows.
-        self._sort_key = 'name'
-        self._descending = False
-        self.results.header().setSectionsClickable(True)
-        self.results.header().setSortIndicatorShown(True)
-        self.results.header().setSortIndicator(0, qt.Qt.SortOrder.AscendingOrder)
-        self.results.header().sortIndicatorChanged.connect(self._sort_changed)
-        self.results.setColumnWidth(0, 230)
-        self.results.itemActivated.connect(lambda item, column: self.locate(item.data(0, qt.Qt.ItemDataRole.UserRole)))
-        self.layout.insertWidget(2, self.results, 1)
-        paging = qt.QHBoxLayout()
-        self.previous_button = qt.QPushButton('Previous results')
-        self.next_button = qt.QPushButton('Next results')
-        self.previous_button.setEnabled(False)
-        self.next_button.setEnabled(False)
-        self.previous_button.clicked.connect(lambda: self.change_page(-1))
-        self.next_button.clicked.connect(lambda: self.change_page(1))
-        paging.addStretch()
-        paging.addWidget(self.previous_button)
-        paging.addWidget(self.next_button)
-        self.layout.insertLayout(3, paging)
-        self.summary.setText('Enter a name and search. Double-click a result to show it in the browser.')
-        if self.shared_index:
-            self.rescan_button.hide()
-            self.summary.setText('Search cached names. Results update as indexing progresses; double-click to show in the browser.')
-
-    def run_search(self, checked=False, *, refresh=False):
-        if self.busy:
-            return
-        self.results.clear()
-        self._query = self.query.text()
-        self.search_button.setEnabled(False)
-        self.query.setEnabled(False)
-        self.recursive.setEnabled(False)
-        self.previous_button.setEnabled(False)
-        self.next_button.setEnabled(False)
-        self.results.header().setEnabled(False)
-        self.scan(self.recursive.isChecked(), refresh=refresh)
-
-    def _completed(self, result, error):
-        if isinstance(result, SearchScan):
-            self._matches = result.matches
-            self._match_count = result.total
-            self._page_offset = result.offset
-            result = result.snapshot
-        self.search_button.setEnabled(True)
-        self.query.setEnabled(True)
-        self.recursive.setEnabled(True)
-        self.results.header().setEnabled(True)
-        super()._completed(result, error)
-        has_page = self.snapshot is not None and self.results.topLevelItemCount() > 0
-        self.previous_button.setEnabled(has_page and self._page_offset > 0)
-        self.next_button.setEnabled(has_page and self._page_offset + len(self._matches) < self._match_count)
-
-    def collect(self, root, recursive, refresh, report, cancelled):
-        snapshot = (super().collect(root, recursive, refresh, report, cancelled) if self.shared_index else
-                    directory_cache.get(root, recursive, refresh=refresh, report=report,
-                                        cancelled=cancelled, validate_files=False))
-        report(0, 0, 'Searching saved index…')
-        matches, total = snapshot.search_page(self._query, limit=self.PAGE_SIZE, cancelled=cancelled,
-                                             sort=self._sort_key, descending=self._descending)
-        return SearchScan(snapshot, matches, total)
-
-    def _sort_changed(self, column, order):
-        if self.busy:
-            return
-        self._sort_key = ('name', 'type', 'size', 'path')[column]
-        self._descending = order == qt.Qt.SortOrder.DescendingOrder
-        if self.snapshot is not None and self.results.topLevelItemCount() > 0:
-            self.change_page(0, reset=True)
-
-    def change_page(self, direction, *, reset=False):
-        if self.busy or self.closing or self.snapshot is None:
-            return
-        snapshot, query = self.snapshot, self._query
-        offset = 0 if reset else max(0, self._page_offset + direction * self.PAGE_SIZE)
-        sort, descending = self._sort_key, self._descending
-        self._clearing = False
-        for widget in (self.search_button, self.query, self.recursive, self.clear_button,
-                       self.previous_button, self.next_button, self.results.header()):
-            widget.setEnabled(False)
-        def work(report, cancelled):
-            try:
-                matches, total = snapshot.search_page(query, offset, self.PAGE_SIZE, cancelled=cancelled,
-                                                     sort=sort, descending=descending)
-                return SearchScan(snapshot, matches, total, offset)
-            except OperationCancelled:
-                return PausedScan(None)
-        self.task.start(work, message='Loading search results…')
-
-    def show_snapshot(self):
-        matches = self._matches
-        self.results.clear()
-        for entry in matches:
-            row = qt.QTreeWidgetItem([entry.path.name, 'Link' if entry.symlink else 'Folder' if entry.directory else 'File',
-                                     '' if entry.directory else format_size(entry.size),
-                                     str(entry.path.relative_to(self.root))])
-            row.setData(0, qt.Qt.ItemDataRole.UserRole, entry.path)
-            row.setToolTip(0, str(entry.path))
-            self.results.addTopLevelItem(row)
-        shown = (f'Results {self._page_offset + 1:,}–{self._page_offset + len(matches):,} of '
-                 f'{self._match_count:,} matches' if matches else '0 matches')
-        self.summary.setText(f'{shown} · {len(self.snapshot.errors)} unreadable entries. '
-                             'Double-click a result to show it in the browser.')
-        self.summary.setToolTip('\n'.join(f'{path}: {error}' for path, error in self.snapshot.errors))

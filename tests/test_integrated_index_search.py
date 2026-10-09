@@ -42,9 +42,36 @@ class IntegratedSearchTests(unittest.TestCase):
         self.app.processEvents()
 
     def search(self, text, expected):
+        self.browser.open_search()
         self.browser.search_bar.setText(text)
         self.wait(lambda:self.browser.index_search.total==expected and not self.browser.index_search.busy
                   and not self.browser.index_search.debounce.isActive())
+
+    def test_inline_search_toggles_below_breadcrumbs_and_restores_browsing(self):
+        from PySide6.QtTest import QTest
+        self.assertTrue(self.browser.search_panel.isHidden())
+        self.assertFalse(self.browser.search_button.isChecked())
+        self.assertFalse(self.browser.search_button.icon().isNull())
+        self.browser.search_button.click()
+        self.assertFalse(self.browser.search_panel.isHidden())
+        self.assertTrue(self.browser.search_bar.hasFocus())
+        self.assertIs(self.browser.search_panel.parentWidget(), self.browser.files_panel)
+        self.assertIs(self.browser.list_stack.parentWidget(), self.browser.files_panel)
+        self.assertLess(self.browser.navigation.mapTo(self.browser, qt.QPoint()).y(),
+                        self.browser.search_panel.mapTo(self.browser, qt.QPoint()).y())
+        self.assertEqual(self.browser._scan_windows, [])
+        for exit_search in (self.browser.close_search_button.click, self.browser.search_button.click,
+                            lambda: QTest.keyClick(self.browser.search_bar, qt.Qt.Key.Key_Escape)):
+            self.search('needle', 1)
+            exit_search()
+            self.app.processEvents()
+            self.assertTrue(self.browser.search_panel.isHidden())
+            self.assertFalse(self.browser.search_button.isChecked())
+            self.assertEqual(self.browser.search_bar.text(), '')
+            self.assertIs(self.browser.list_stack.currentWidget(), self.browser.views)
+            self.assertEqual(self.browser.navigation.directory, self.root)
+        self.browser.open_search()
+        self.assertTrue(self.browser.search_bar.hasFocus())
 
     def test_initial_cache_read_race_does_not_prevent_scan(self):
         import sqlite3

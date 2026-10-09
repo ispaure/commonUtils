@@ -5,6 +5,7 @@ from uuid import uuid4
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
 from ...file_operations import transfer_paths
+from .trash_actions import TrashActionsMixin
 
 OPERATION_MIME = 'application/x-commonutils-file-operation'
 WINDOWS_EFFECT_MIME = 'application/x-qt-windows-mime;value="Preferred DropEffect"'
@@ -36,7 +37,25 @@ def set_clipboard_files(paths, move=False):
     qt.QApplication.clipboard().setMimeData(mime)
 
 
-class FileActions(qt.QObject):
+def prune_cut_clipboard(completed, *, expected=None):
+    """Remove successfully moved/deleted sources from an unchanged cut request."""
+    current = clipboard_files()
+    paths, move, marker = current
+    if not move or (expected is not None and current != expected):
+        return
+    def retained(path):
+        canonical = path.parent.resolve() / path.name
+        return not any(canonical == source or source in canonical.parents for source in completed)
+    remaining = tuple(path for path in paths if retained(path))
+    if remaining == paths:
+        return
+    if remaining:
+        set_clipboard_files(remaining, move=True)
+    else:
+        qt.QApplication.clipboard().clear()
+
+
+class FileActions(TrashActionsMixin, qt.QObject):
     def __init__(self, browser):
         super().__init__(browser)
         self.browser = browser
@@ -55,6 +74,15 @@ class FileActions(qt.QObject):
         rename.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         rename.activated.connect(self.rename_selected)
         self.shortcuts.append(rename)
+        delete = qt.QShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.Delete), browser)
+        delete.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        delete.activated.connect(self.delete_selected)
+        def update_delete_focus(old, current):
+            delete.setEnabled(not isinstance(current, (qt.QLineEdit, qt.QTextEdit, qt.QPlainTextEdit)))
+        qt.QApplication.instance().focusChanged.connect(update_delete_focus)
+        update_delete_focus(None, qt.QApplication.focusWidget())
+        self.destroyed.connect(lambda: qt.QApplication.instance().focusChanged.disconnect(update_delete_focus))
+        self.shortcuts.append(delete)
         browser.model.edit_failed.connect(self._error)
         browser.model.fileRenamed.connect(self._renamed)
 
@@ -94,6 +122,7 @@ class FileActions(qt.QObject):
         if not paths:
             return
         self.clipboard_request = paths, move, marker
+        self._operation_kind = 'transfer'
         self.destination = Path(directory)
         self.browser.model.setReadOnly(True)
         self.task.start(lambda report, cancelled: transfer_paths(paths, directory, move=move,
@@ -102,17 +131,13 @@ class FileActions(qt.QObject):
     def _completed(self, result, error):
         self.browser.model.setReadOnly(False)
         self.task.hide()
+        if self._operation_kind == 'remove':
+            self._removal_completed(result, error)
+            return
         paths, move, marker = self.clipboard_request
-        if result is not None and move and clipboard_files() == self.clipboard_request:
+        if result is not None and move:
             completed = tuple(source for source, target in result.completed)
-            def retained(path):
-                canonical = path.parent.resolve() / path.name
-                return not any(canonical == source or source in canonical.parents for source in completed)
-            remaining = tuple(path for path in paths if retained(path))
-            if remaining:
-                set_clipboard_files(remaining, move=True)
-            else:
-                qt.QApplication.clipboard().clear()
+            prune_cut_clipboard(completed, expected=self.clipboard_request)
         if not self.browser.stopping:
             affected = tuple(path.parent for path in paths)
             if result is not None:

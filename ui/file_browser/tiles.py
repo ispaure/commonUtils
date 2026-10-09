@@ -49,7 +49,20 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
         pixmap = pixmap.scaled(bounds, qt.Qt.AspectRatioMode.KeepAspectRatio,
                                qt.Qt.TransformationMode.SmoothTransformation)
         pixmap.setDevicePixelRatio(ratio)
-        option.icon = qt.QIcon(pixmap)
+        # Give native styles a full-size transparent canvas. Otherwise QIcon's
+        # actualSize() can shrink the decoration rect to a small source image
+        # and position that rect in the corner (notably with Windows styles).
+        canvas = qt.QPixmap(round(view.iconSize().width() * ratio),
+                            round(view.iconSize().height() * ratio))
+        canvas.setDevicePixelRatio(ratio)
+        canvas.fill(qt.Qt.GlobalColor.transparent)
+        painter = qt.QPainter(canvas)
+        target = canvas.deviceIndependentSize()
+        artwork = pixmap.deviceIndependentSize()
+        painter.drawPixmap(qt.QPointF((target.width() - artwork.width()) / 2,
+                                     (target.height() - artwork.height()) / 2), pixmap)
+        painter.end()
+        option.icon = qt.QIcon(canvas)
         # Reserve the same decoration area so captions line up across icon shapes.
         option.decorationSize = view.iconSize()
 
