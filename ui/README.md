@@ -463,7 +463,7 @@ requires a normal zero exit; cancellation and failed starts remain distinct outc
 area using macOS Library/Application Support/commonUtils/Cache, Windows LOCALAPPDATA,
 or Linux XDG_CACHE_HOME (with ~/.cache fallback; relative XDG paths are ignored).
 `temporary_directory()` creates disposable workspaces under macOS
-Library/Caches/commonUtils/Temp, or the persistent area's Temp subdirectory on
+Library/Application Support/commonUtils/Temp, or the persistent area's Temp subdirectory on
 Windows/Linux. `temporary_workspace()` returns a
 private, automatically cleaned TemporaryDirectory there. Use `create=False` for
 side-effect-free path resolution. Persistent caches are never deleted on exit.

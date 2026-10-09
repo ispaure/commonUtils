@@ -28,10 +28,11 @@ class StorageTests(unittest.TestCase):
             with self.subTest(platform=platform, env=env), patch('commonUtils.storage.sys.platform', platform), patch.dict(os.environ, env, clear=True):
                 expected=expected/'commonUtils'
                 persistent = self.home/'Library'/'Application Support'/'commonUtils'/'Cache' if platform == 'darwin' else expected
+                temporary = persistent.parent/'Temp' if platform == 'darwin' else expected/'Temp'
                 self.assertEqual(cache_directory(create=False), persistent)
-                self.assertEqual(temporary_directory(create=False), expected/'Temp')
-                self.assertEqual(temporary_directory(), expected/'Temp')
-                self.assertTrue((expected/'Temp').is_dir())
+                self.assertEqual(temporary_directory(create=False), temporary)
+                self.assertEqual(temporary_directory(), temporary)
+                self.assertTrue(temporary.is_dir())
 
     def test_workspace_cleanup_keeps_persistent_data(self):
         with patch('commonUtils.storage.sys.platform', 'darwin'):
