@@ -52,8 +52,9 @@ class InstalledFeature(qt.QObject):
         if not self.enabled:
             return False
         for activation, accepts in self._activation:
-            if isinstance(item, accepts):
-                activation.handler(self._context((item,)))
+            context = self._context((item,))
+            if isinstance(item, accepts) and (activation.is_available is None or activation.is_available(context)):
+                activation.handler(context)
                 return True
         return False
 

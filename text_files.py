@@ -78,7 +78,7 @@ class TextSnapshot:
             source = self.disk_text.splitlines(keepends=True)
             destination = text.splitlines(keepends=True)
             endings = {}
-            matcher = SequenceMatcher(None, [normalize(line) for line in source], destination, autojunk=False)
+            matcher = SequenceMatcher(None, [normalize(line) for line in source], destination, autojunk=len(source)>2000)
             for block in matcher.get_matching_blocks():
                 for offset in range(block.size):
                     endings[block.b + offset] = source[block.a + offset]
@@ -140,8 +140,12 @@ def write_text_file(path, content, *, expected=None, allow_overwrite=False):
                 raise PermissionError('The file is read-only. Choose Save As to keep your changes.')
             if expected is None and not allow_overwrite:
                 raise FileConflictError('The destination already exists.')
-            if expected is not None and sha256(path.read_bytes()).digest() != sha256(expected).digest():
-                raise FileConflictError('The file changed on disk. Reload it or save your buffer elsewhere.')
+            if expected is not None:
+                if path.stat().st_size != len(expected):
+                    raise FileConflictError('The file changed on disk. Reload it or save your buffer elsewhere.')
+                with path.open('rb') as stream:current=stream.read(len(expected)+1)
+                if sha256(current).digest() != sha256(expected).digest():
+                    raise FileConflictError('The file changed on disk. Reload it or save your buffer elsewhere.')
         elif expected is not None:
             raise FileConflictError('The original file was deleted. Choose Save As to recover your buffer.')
     check()

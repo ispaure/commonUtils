@@ -162,3 +162,12 @@ class BindingTests(unittest.TestCase):
         binding.idle.connect(lambda: notifications.append('idle'))
         binding.controller.idle.emit()
         self.assertEqual(notifications, ['idle'])
+
+
+class ActivationPredicateTests(unittest.TestCase):
+    def test_activation_predicate_is_optional_and_validated(self):
+        from commonUtils.features import FileActivation
+        from commonUtils.fileUtils import File
+        self.assertIsNone(FileActivation(File, lambda context: None).is_available)
+        with self.assertRaises(TypeError):
+            FileActivation(File, lambda context: None, is_available=True)
