@@ -84,3 +84,29 @@ class ProcessTests(unittest.TestCase):
         retry.runner.cancel()
         self.assertFalse(retry.busy)
         self.assertEqual(retry.result.state, 'cancelled')
+
+    def test_known_work_can_reach_100_percent_before_real_completion(self):
+        updates = {'known': ProcessUpdate(10, 10, 'Checking / discovering files…', metrics={'progress_basis': 'bytes'}),
+                   'more': ProcessUpdate(10, 20, 'Transferring…', metrics={'progress_basis': 'bytes'})}
+        window = ProcessProgressWindow('Transfer', context={'operation': 'Copy'},
+            runner=ProcessRunner(parser=updates.get))
+        self.windows.append(window); window.show()
+        window.start(sys.executable, ['-u', '-c',
+            "import time; print('known'); time.sleep(.4); print('more'); time.sleep(.4)"])
+        def wait_for(format):
+            deadline = time.monotonic() + 3
+            while window.bar.format() != format:
+                self.assertLess(time.monotonic(), deadline)
+                self.app.processEvents(); time.sleep(.005)
+        wait_for('100% of known work · Still running')
+        self.assertTrue(window.busy)
+        self.assertIn('Still running', window.state.text())
+        self.assertIn('Scanning or final checks', window.details.text())
+        self.assertNotEqual(window.bar.property('operationState'), 'succeeded')
+        wait_for('Transferred: %p% of known work')
+        self.assertEqual(window.bar.value(), 500)
+        self.assertTrue(window.busy)
+        self.wait(window)
+        self.assertEqual(window.bar.format(), 'Complete')
+        self.assertEqual(window.bar.property('operationState'), 'succeeded')
+        self.assertIn('#36945c', window.bar.styleSheet())
