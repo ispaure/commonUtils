@@ -14,6 +14,26 @@ from commonUtils.operations import OperationCancelled
 
 
 class DirectorySchemaTests(unittest.TestCase):
+    def test_existing_cache_reconciles_one_folder_without_visiting_unrelated_folders(self):
+        with closing(sqlite3.connect(':memory:')) as db:
+            initialize_schema(db)
+            db.execute("INSERT INTO scans VALUES(1,'/files',1,0)")
+            db.executemany("INSERT INTO folders VALUES(1,?,?,'done',NULL)",
+                           [(f'/files/{number}/child', f'/files/{number}') for number in range(20_000)])
+            db.execute('DROP INDEX folder_parent')
+            db.execute('CREATE INDEX folder_queue_order ON folders(generation,status,length(path),path)')
+            messages = []
+            initialize_schema(db, report=lambda done, total, message: messages.append(message))
+            self.assertIn('Optimizing saved index', messages)
+            self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name='folder_queue_order'").fetchone())
+            # A full-generation lookup exceeds this instruction budget; an indexed
+            # immediate-child lookup remains bounded as unrelated folders grow.
+            db.set_progress_handler(lambda: 1, 1000)
+            rows = db.execute('SELECT path FROM folders WHERE generation=? AND parent=?',
+                              (1, '/files/123')).fetchall()
+            db.set_progress_handler(None, 0)
+            self.assertEqual(rows, [('/files/123/child',)])
+
     def legacy(self, database):
         db = sqlite3.connect(database)
         db.execute('PRAGMA journal_mode=WAL')
