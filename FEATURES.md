@@ -5,6 +5,29 @@ owned file types, browser actions, double-click activation, folder fields, optio
 controller construction and initialization metadata. Declarations do not create Qt
 widgets or register formats during discovery.
 
+For a command shared by multiple feature declarations, the optional
+`SelectionAction.shared_key` supplies one browser-menu identity. Declare the
+same key, accepted types and routing behavior on each participating action so
+the command works regardless of which selected type contributes it first.
+Without this field, the usual `<feature id>.<action id>` identity is preserved.
+
+Desktop readers can reuse `commonUtils.ui.reader_menus.ReaderMenus` for
+File/Edit/View/Navigate menus and platform-standard shortcuts. The caller supplies
+callbacks and adds format-specific navigation actions. `RecentFiles` stores up
+to 40 canonical paths atomically under `commonUtils/Cache/Readers/recent.json`;
+menus show at most 12 existing files matching the reader's suffixes. Pass a
+custom history object/path for an isolated application or tests. The history
+stores paths only, and a read/write failure does not prevent reading a file.
+
+`commonUtils.ui.reader_chrome` provides presentation shared by separate readers:
+`reader_button` builds consistently sized, keyboard-accessible controls;
+`ReaderLabel` elides long titles/status visually while retaining full text and a
+tooltip; `ReaderFullscreen(owner, action)` synchronizes the checked action and
+icon with native window state and restores previous maximization. Call `toggle`
+and `leave` from the reader's own commands. It does not install navigation keys
+or choose content formats. Hosts can use the shared margins/spacing constants
+and retain their existing widget handles.
+
 ## Runnable example: add a menu action to a browser
 
 Save this as `project_browser.py` in your consuming project and run
