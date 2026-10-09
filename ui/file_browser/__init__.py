@@ -122,6 +122,15 @@ class FileBrowser(qt.QWidget):
         self.view_selector = ViewModeSelector(self)
         self.view_selector.setAccessibleName('Browser view')
         controls.addWidget(self.view_selector)
+        self.preview_toggle = qt.QToolButton(self)
+        self.preview_toggle.setText('Preview')
+        self.preview_toggle.setCheckable(True)
+        from ...settings import get_setting
+        self.preview_toggle.setChecked(get_setting('FileBrowser', 'preview_enabled', True))
+        self.preview_toggle.setToolTip('Show details when files or folders are selected')
+        self.preview_toggle.setAccessibleName('Show selection preview')
+        self.preview_toggle.toggled.connect(self._preview_toggled)
+        controls.addWidget(self.preview_toggle)
         self.folder_size_button = FolderSizeControl(self)
         self.folder_size_slider = self.folder_size_button.slider
         self.folder_size_button.setVisible(False)
@@ -205,7 +214,7 @@ class FileBrowser(qt.QWidget):
 
     def _create_preview_panel(self):
         self.preview_panel = qt.QWidget()
-        self.preview_panel.setMinimumWidth(280)
+        self.preview_panel.setMinimumWidth(220)
         panel_layout = qt.QVBoxLayout(self.preview_panel)
         header = qt.QHBoxLayout()
         self.heading = qt.QLabel('Files')
@@ -228,7 +237,24 @@ class FileBrowser(qt.QWidget):
         self._empty_preview = qt.QPlainTextEdit()
         self._empty_preview.setReadOnly(True)
         self.splitter.addWidget(self.preview_panel)
-        self.splitter.setSizes([700, 500])
+        self.splitter.setStretchFactor(0, 7)
+        self.splitter.setStretchFactor(1, 3)
+        self.preview_panel.hide()
+
+    def _preview_toggled(self, enabled):
+        self._update_preview_visibility(bool(self.selected_objects()))
+        if enabled:
+            self._selection_changed()
+
+    def _update_preview_visibility(self, selected):
+        """Give selection details roughly 30% on opening; respect manual resizing."""
+        visible = self.preview_toggle.isChecked() and selected
+        opening = visible and self.preview_panel.isHidden()
+        self.preview_panel.setVisible(visible)
+        if opening:
+            width = max(1, self.splitter.width())
+            details = min(max(220, round(width * .3)), max(220, width - 300))
+            self.splitter.setSizes([max(1, width - details), details])
 
     @property
     def preview(self):
@@ -444,10 +470,13 @@ class FileBrowser(qt.QWidget):
             return
         items = self.selected_objects()
         self.selection_changed.emit(items)
+        self._update_preview_visibility(bool(items))
         if self.busy:
             self.refresh_pending = True
             return
         self._clear_details()
+        if not self.preview_toggle.isChecked():
+            return
         if len(items) == 1:
             self.load(items[0])
         elif len(items) > 1:
@@ -627,7 +656,7 @@ class FileBrowser(qt.QWidget):
 
     def _folders_loaded(self, root, result, error=''):
         if error and root == self.navigation.directory and not self.stopping:
-            self.index_status.setText(f'Index unavailable: {error}. Any cached sizes remain available.')
+            self.index_status.setText('Index unavailable. Any cached sizes remain available; refresh to retry.')
             self.index_progress.emit(self.index_status.text())
         if self.calculate_folder_sizes and root == self.navigation.directory and result is not None and not self.folder_pending and not self.stopping:
             self.model.set_folder_totals(result)
@@ -641,6 +670,8 @@ class FileBrowser(qt.QWidget):
                 self._selection_changed()
 
     def _index_progressed(self, message):
+        from .status import private_status
+        message = private_status(message)
         if not self.stopping and self.calculate_folder_sizes:
             self.index_status.setText(message)
             self.index_progress.emit(message)

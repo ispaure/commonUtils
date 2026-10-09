@@ -541,7 +541,10 @@ Absolute paths identify entries; different symlink spellings are separate scopes
 List size sorting compares raw file bytes and cached recursive folder totals; unknown
 sizes stay last in either direction, and newly received totals update the order.
 Logistics workspaces show one indexing line at the bottom of the window, with
-middle-elided paths and full details in its tooltip. Standalone browser widgets retain
+path-free phase names, saved-entry and processed-operation counters, average
+entries per second, and seconds/minutes/hours elapsed. The tooltip also omits paths.
+Elapsed time keeps updating during long database operations. Processed operations
+include discovery and validation; a file can be processed in both phases. Standalone browser widgets retain
 a local bottom status line. Discovery counters are cumulative for the current run;
 they do not reset for each folder. Concurrent UI requests
 reuse a validation completed within 30 seconds; explicit invalidation bypasses this
@@ -563,3 +566,22 @@ and destination plus transfer fields, while keeping raw output behind a collapsi
 Details and logs control. Missing counters remain unknown. The actual exit result
 owns completion, retries/cancellation remain in ProcessRunner, and stopped operations
 clear live speed/ETA/active-transfer display while preserving measured progress.
+
+
+## Selection preview
+
+The Preview button is enabled by default. Details appear only for a nonempty
+selection; clearing selection restores the full browsing area. Opening the pane
+allocates roughly 30% of the available splitter width with a 220 px minimum and
+room for the browser. The splitter remains manually resizable. Switching Preview
+off keeps it hidden for subsequent selections and avoids starting detail loaders.
+Existing explicit `load`, `preview`, `selected_objects`, `selection_changed`, and
+panel extension APIs remain available. `[FileBrowser] preview_enabled=false` in
+the shared INI changes the default for newly created tabs; the button overrides it
+for the current tab.
+
+Transfer percentages are explicitly percentages of work discovered so far. At
+100%, a running process reads **100% of known work · Still running**, with a
+scanning/final-check explanation. Totals can grow and the percentage can decrease.
+Only a successful process exit displays **Complete**, using a green progress bar;
+stopped operations retain their measured progress with a distinct stopped state.

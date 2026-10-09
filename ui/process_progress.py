@@ -29,6 +29,7 @@ class ProcessProgressWindow(qt.QDialog):
         self.state.setWordWrap(True)
         self.bar = qt.QProgressBar()
         self.bar.setRange(0, 0)
+        self.bar.setAccessibleName('Operation progress')
         self.details = qt.QLabel()
         self.details.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.details.setWordWrap(True)
@@ -168,13 +169,21 @@ class ProcessProgressWindow(qt.QDialog):
 
     def _status(self, state, attempt, message):
         self.state.setText(f'{state.capitalize()} · Attempt {attempt}')
-        self.details.setText(message.splitlines()[0] if message else '')
+        detail = message.splitlines()[0] if message else ''
+        if state == 'running' and self.context and self.bar.format() == '100% of known work · Still running':
+            self.state.setText(f'Still running · Attempt {attempt}')
+            detail = 'All work discovered so far is processed. Scanning or final checks may still be running.'
+        self.details.setText(detail)
+        if state == 'running':
+            self.bar.setProperty('operationState', 'running')
+            self.bar.setStyleSheet('')
         if state == 'running' and message == 'Starting process…':
             self.metrics = {}
             for value in self.fields.values(): value.setText('Not reported')
             self.issue.clear(); self.issue.hide(); self.active.clear()
             self.active_status.setText('Active transfer details not reported.')
             self.bar.setRange(0, 0)
+            self.bar.setFormat('Starting…')
         if state in ('retrying', 'failed'):
             self.logs_toggle.setText('Details and logs · diagnostics available')
 
@@ -187,8 +196,15 @@ class ProcessProgressWindow(qt.QDialog):
                                'Checks / files: %p%' if update.metrics else '%p%')
             self.bar.setRange(0, 1000)
             self.bar.setValue(min(1000, max(0, int(update.done / update.total * 1000))))
+            if self.context and update.done >= update.total:
+                self.bar.setFormat('100% of known work · Still running')
+                self.details.setText('All work discovered so far is processed. Scanning or final checks may still be running.')
+            elif self.context:
+                self.bar.setFormat(self.bar.format() + ' of known work')
+            self.bar.setToolTip('Totals can grow as more files are discovered. Completion is confirmed when the process exits successfully.')
         else:
             self.bar.setRange(0, 0)
+            self.bar.setFormat('Discovering / checking files…' if self.context else 'Working…')
 
     def _completed(self, result):
         self.result = result
@@ -198,9 +214,14 @@ class ProcessProgressWindow(qt.QDialog):
         if result.succeeded:
             self.bar.setValue(1000)
             self.bar.setFormat('Complete')
+            self.bar.setProperty('operationState', 'succeeded')
+            self.bar.setStyleSheet('QProgressBar::chunk { background-color: #36945c; }')
+            self.bar.setToolTip('The process exited successfully.')
         else:
             self.bar.setValue(max(0, previous_value) if had_percentage else 0)
             self.bar.setFormat('Stopped at %p%' if had_percentage else result.state.capitalize())
+            self.bar.setProperty('operationState', result.state)
+            self.bar.setStyleSheet('QProgressBar::chunk { background-color: #aa7832; }')
         if self.metrics:
             self.fields['speed'].setText('—')
             self.fields['eta'].setText('—')

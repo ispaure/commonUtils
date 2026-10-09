@@ -1,5 +1,79 @@
-"""Single-line status text that keeps progress counters and elides long paths."""
+"""Path-free indexing presentation shared by standalone and workspace browsers."""
+import re
+from threading import RLock
+from time import monotonic
 from .. import pyside as qt
+
+
+def format_duration(seconds):
+    """Compact elapsed time, retaining seconds even for hour-long operations."""
+    hours, remainder = divmod(max(0, int(seconds)), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f'{hours}h {minutes:02d}m {seconds:02d}s'
+    if minutes:
+        return f'{minutes}m {seconds:02d}s'
+    return f'{seconds}s'
+
+
+def indexing_phase(message):
+    """Never expose scanner-supplied paths or errors in the shared status line."""
+    if message.startswith('Waiting '):
+        return 'Waiting for index writer'
+    if message.startswith('Loading '):
+        return 'Loading saved sizes'
+    if message.startswith('Using recently '):
+        return 'Reusing saved index'
+    if message.startswith('Checking '):
+        return 'Checking indexed files'
+    if message.startswith('Reusing '):
+        return 'Reusing saved index'
+    if message == 'Saved progressive folder totals':
+        return 'Saving folder sizes'
+    return 'Indexing files'
+
+
+_COUNTER = re.compile(r'(?:[\d,]+ (?:saved entries|processed this run|entries/s|entries in this folder)'
+                      r'|(?:\d+h )?(?:\d+m )?\d+s elapsed)\Z')
+
+
+def private_status(message):
+    """Also protect direct progress publishers using the older path-bearing API."""
+    if message.startswith(('Indexing ', 'Checking ', 'Reusing ')) and not message.startswith('Indexing paused'):
+        parts = message.split(' · ')
+        counters = [part for part in parts[1:] if _COUNTER.fullmatch(part)]
+        return ' · '.join([indexing_phase(parts[0])] + counters)
+    return message
+
+
+class IndexProgress:
+    """Thread-safe counters; GUI ticks keep elapsed time live during long SQL work.
+
+    Processed counts include both discovery and validation metadata operations,
+    and never fall back to zero when switching phases. Speed is the run average.
+    """
+    def __init__(self, started_at=None):
+        self.started_at = monotonic() if started_at is None else started_at
+        self.phase = 'Waiting for index writer'
+        self.saved_entries = 0
+        self.counts = {}
+        self.lock = RLock()
+
+    def update(self, done, message, *, saved_entries=None):
+        with self.lock:
+            self.phase = indexing_phase(message)
+            if self.phase in ('Indexing files', 'Checking indexed files'):
+                self.counts[self.phase] = max(done, self.counts.get(self.phase, 0))
+            if saved_entries is not None:
+                self.saved_entries = saved_entries
+
+    def render(self, now=None):
+        with self.lock:
+            elapsed = (monotonic() if now is None else now) - self.started_at
+            processed = sum(self.counts.values())
+            return (f'{self.phase} · {self.saved_entries:,} saved entries'
+                    f' · {processed:,} processed this run · {processed / max(.1, elapsed):,.0f} entries/s'
+                    f' · {format_duration(elapsed)} elapsed')
 
 
 class IndexStatusLabel(qt.QLabel):
@@ -23,14 +97,6 @@ class IndexStatusLabel(qt.QLabel):
         metrics = self.fontMetrics()
         width = max(0,self.contentsRect().width())
         text = self.full_text
-        for prefix in ('Indexing ', 'Checking file metadata · ', 'Checking indexed folder ', 'Reusing saved branch '):
-            if text.startswith(prefix):
-                path, separator, suffix = text[len(prefix):].partition(' · ')
-                tail = separator+suffix
-                remaining = width-metrics.horizontalAdvance(prefix+tail)
-                if remaining > metrics.horizontalAdvance('…'):
-                    text = prefix+metrics.elidedText(path,qt.Qt.TextElideMode.ElideMiddle,remaining)+tail
-                break
         super().setText(metrics.elidedText(text,qt.Qt.TextElideMode.ElideMiddle,width))
 
     def resizeEvent(self, event):
@@ -81,5 +147,5 @@ class WorkspaceIndexStatus(qt.QObject):
         elif running and browser is not None and not browser.folder_busy:
             message += ' · Another tab is indexing'
         self.label.setText(message)
-        self.label.setToolTip('\n'.join(f'{view.view_title}: {item.index_status.text()}' for view,item in browsers))
+        self.label.setToolTip(message)
         self.activity.setVisible(bool(running))

@@ -4,6 +4,7 @@ import sqlite3
 from ..operations import Operation
 from .. import pyside as qt
 from ...directory_index import directory_cache
+from .status import IndexProgress
 
 
 class _IndexJob(Operation):
@@ -16,7 +17,7 @@ class _IndexJob(Operation):
         self._last_update = 0
         self.started_at = monotonic()
         self._last_progress = 0
-        self._phase_times = {}
+        self._status = IndexProgress(self.started_at)
         self.saved_entries = 0
         self.last_progress = "Waiting for index writer…"
         self.last_totals = None
@@ -24,6 +25,15 @@ class _IndexJob(Operation):
         self.subscribers = set()
         self.result = (None, "")
         super().__init__(lambda: self._collect(scanner), parent)
+        self.status_timer = qt.QTimer(self)
+        self.status_timer.setInterval(1000)
+        self.status_timer.timeout.connect(self._tick)
+        self.started.connect(self.status_timer.start)
+        self.finished.connect(self.status_timer.stop)
+
+    def _tick(self):
+        if self.isRunning():
+            self.progress.emit(self._status.render())
 
     def _collect(self, scanner):
         try:
@@ -39,14 +49,10 @@ class _IndexJob(Operation):
 
     def _report(self, done, total, message):
         now = monotonic()
-        phase = 'Discovery' if message.startswith('Indexing ') else 'Validation' if message.startswith('Checking ') else message
-        started = self._phase_times.setdefault(phase, now)
+        self._status.update(done, message, saved_entries=self.saved_entries)
         if now - self._last_progress >= .2 or done == 0:
             self._last_progress = now
-            suffix = f' · {done:,} processed this run · {done/max(.1,now-started):,.0f} entries/s' if done else ''
-            suffix = f' · {self.saved_entries:,} saved entries' + suffix
-            suffix += f' · {now-self.started_at:.0f}s elapsed'
-            self.last_progress = message + suffix
+            self.last_progress = self._status.render(now)
             self.progress.emit(self.last_progress)
         if message == 'Saved progressive folder totals':
             self._cached(force=True)
@@ -57,7 +63,8 @@ class _IndexJob(Operation):
         snapshot = directory_cache.peek(self.root, cancelled=self.isInterruptionRequested)
         if snapshot is not None:
             self.saved_entries = len(snapshot.entries)
-            self.last_progress = f'{self.saved_entries:,} saved entries in this location; loading cached sizes…'
+            self._status.update(0, 'Loading saved sizes…', saved_entries=self.saved_entries)
+            self.last_progress = self._status.render()
             self.progress.emit(self.last_progress)
             totals = snapshot.folder_stats(cancelled=self.isInterruptionRequested)
             self.last_totals = totals
