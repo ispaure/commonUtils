@@ -17,6 +17,7 @@ class _IndexJob(Operation):
         self.started_at = monotonic()
         self._last_progress = 0
         self._phase_times = {}
+        self.saved_entries = 0
         self.last_progress = "Waiting for index writer…"
         self.last_totals = None
         self.last_paths = None
@@ -42,7 +43,8 @@ class _IndexJob(Operation):
         started = self._phase_times.setdefault(phase, now)
         if now - self._last_progress >= .2 or done == 0:
             self._last_progress = now
-            suffix = f' · {done:,} total entries · {done/max(.1,now-started):,.0f} entries/s' if done else ''
+            suffix = f' · {done:,} processed this run · {done/max(.1,now-started):,.0f} entries/s' if done else ''
+            suffix = f' · {self.saved_entries:,} saved entries' + suffix
             suffix += f' · {now-self.started_at:.0f}s elapsed'
             self.last_progress = message + suffix
             self.progress.emit(self.last_progress)
@@ -54,6 +56,9 @@ class _IndexJob(Operation):
             return
         snapshot = directory_cache.peek(self.root, cancelled=self.isInterruptionRequested)
         if snapshot is not None:
+            self.saved_entries = len(snapshot.entries)
+            self.last_progress = f'{self.saved_entries:,} saved entries in this location; loading cached sizes…'
+            self.progress.emit(self.last_progress)
             totals = snapshot.folder_stats(cancelled=self.isInterruptionRequested)
             self.last_totals = totals
             self.updated.emit(self.root, totals)

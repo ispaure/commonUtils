@@ -52,3 +52,24 @@ class IndexEfficiencyTests(unittest.TestCase):
                 before=db.total_changes
                 store_folder_stats(db,generation,root)
                 self.assertEqual(db.total_changes,before)
+
+    def test_new_subtree_reuses_completed_folders_from_partial_ancestor(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            child=root/'a-ready';child.mkdir();(child/'file.txt').write_bytes(b'abc')
+            later=root/'z-later';later.mkdir();(later/'file.txt').write_bytes(b'xyz')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3')
+            cancel=Event();scan=cache._scan_folder
+            def scanning(*args):
+                result=scan(*args)
+                if args[4]==child:cancel.set()
+                return result
+            with patch.object(cache,'_scan_folder',side_effect=scanning):
+                with self.assertRaises(OperationCancelled):cache.get(root,cancelled=cancel.is_set)
+            self.assertEqual(len(cache.peek(child).entries),1)
+            with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Completed subtree enumerated again')):
+                resumed=cache.get(child)
+            self.assertTrue(resumed.complete)
+            self.assertTrue(resumed.resumed)
+            self.assertEqual(resumed.folder_stats()[child].size,3)
+            self.assertIsNotNone(cache.status(root))
