@@ -41,8 +41,9 @@ navigation boundary. The original one-argument API remains folder-scoped.
 Logistics uses the filesystem root for its default page, starts at the user's home
 folder, and indexes that visible scope; creating the page does not launch a `/`
 scan. Windows defaults to C: (falling back to the home drive if unavailable) and
-provides a drive selector. Explicitly opened pages/windows and extra tabs retain
-their isolated folder bounds. Starting at home does not add a synthetic root visit
+provides a drive selector. New tabs in an unconstrained page start at Home and
+retain filesystem navigation. Explicitly opened pages/windows and explicitly
+scoped tabs retain their folder bounds. Starting at home does not add a synthetic root visit
 to Back history.
 
 Cached chart paths missing from Qt's live model activate directly by path. When
@@ -74,6 +75,26 @@ The search bar sits below navigation in the file-list panel, alongside an X that
 clears the query and closes search. Escape and the toggle also close it; Ctrl/Cmd+F
 opens and focuses it. `open_search()` returns the embedded IndexSearch panel;
 there is no standalone search dialog.
+Opening a search-result folder keeps the query and searches that folder's
+descendants. **Show in browser** explicitly exits search and locates the result.
+
+Navigation has its own toolbar row so left/right panes remain usable in smaller
+windows. The inline **Size** slider immediately precedes View and adjusts tiles,
+list icons and column icons. The workspace footer is outside the bordered view
+panes; cached-only reads do not show scan activity.
+
+Workspace tab dragging uses explicit left/right drop zones and a center tab-group
+zone (`commonUtils.ui.workspace_drag`). Closing a worker-only browser tab removes
+it from the visible layout immediately; the workspace retains its hidden dock in
+`_retiring` until its owners report idle. A feature close refusal keeps the tab
+visible. Whole-window shutdown checks both visible and retired owners.
+
+Storage refreshes carry a root/mode/index-revision identity. Repeated mode changes
+reuse loaded data and obsolete results are discarded. Immediate child reads and
+rows are capped at 3,000, while saved root totals remain accurate; the view labels
+this limit. Index progress uses saved file/folder aggregates rather than counting
+every indexed entry. Unchanged totals do not rebuild models or details, and fresh
+folder details replace existing presentation only once ready.
 
 Filename search ignores case, including Unicode case folding. Bare space-separated
 terms must all occur, in any order. Quoted phrases keep adjacent word order, treating
