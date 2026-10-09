@@ -390,12 +390,19 @@ class BrowserTests(unittest.TestCase):
 
     def test_columns_preserve_explicit_multi_selection(self):
         from PySide6.QtTest import QTest
+        folder = self.root/'Folder'; folder.mkdir()
+        (folder/'inside.txt').write_text('inside')
         self.browser.view_selector.setCurrentIndex(2); self.wait()
         columns = self.browser.views.columns
         first = self.browser.model.index(str(self.path))
         second = self.browser.model.index(str(self.root/'other.bin'))
         view = next(view for view in columns.findChildren(qt.QListView)
                     if view.isVisible() and view.rootIndex() == first.parent())
+        directory = self.browser.model.index(str(folder))
+        QTest.mouseClick(view.viewport(),qt.Qt.MouseButton.LeftButton,pos=view.visualRect(directory).center())
+        self.wait()
+        first = self.browser.model.index(str(self.path))
+        second = self.browser.model.index(str(self.root/'other.bin'))
         QTest.mouseClick(view.viewport(),qt.Qt.MouseButton.LeftButton,pos=view.visualRect(first).center())
         self.wait()
         QTest.mouseClick(view.viewport(),qt.Qt.MouseButton.LeftButton,qt.Qt.KeyboardModifier.ControlModifier,

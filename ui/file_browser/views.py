@@ -111,8 +111,16 @@ class FileViews(qt.QStackedWidget):
             qt.QTimer.singleShot(0, self, self._finish_column_selection)
 
     def _column_input(self, modifiers):
-        self._column_extended = bool(modifiers & (qt.Qt.KeyboardModifier.ControlModifier |
-                                     qt.Qt.KeyboardModifier.MetaModifier | qt.Qt.KeyboardModifier.ShiftModifier))
+        extended = bool(modifiers & (qt.Qt.KeyboardModifier.ControlModifier |
+                        qt.Qt.KeyboardModifier.MetaModifier | qt.Qt.KeyboardModifier.ShiftModifier))
+        if extended and not self._column_extended:
+            rows = self.selected_rows()
+            if rows:
+                # Start extending the real selection rather than Qt's retained
+                # trail, including directories from a previously visited branch.
+                self.columns.selectionModel().select(rows[-1], qt.QItemSelectionModel.SelectionFlag.ClearAndSelect |
+                                                     qt.QItemSelectionModel.SelectionFlag.Rows)
+        self._column_extended = extended
 
     def _finish_column_selection(self):
         self._column_selection_pending = False
