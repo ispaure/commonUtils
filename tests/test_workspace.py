@@ -1,7 +1,8 @@
-"""Native empty-workspace docking and detached-view return behavior."""
+"""Compact native tab headers, cooperative closing, docking and view transfers."""
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from unittest.mock import Mock, patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.workspace import Workspace
 
@@ -40,6 +41,116 @@ class WorkspaceTests(unittest.TestCase):
         self.hosts.append(host)
         self.app.processEvents()
         return workspace
+
+    def settle(self):
+        for _ in range(5):
+            self.app.processEvents()
+
+    def tab_bar(self, workspace):
+        return next(bar for bar in workspace.findChildren(qt.QTabBar)
+                    if bar.parent() is workspace and bar.isVisible() and bar.count() > 1)
+
+    def test_single_tab_uses_full_header_with_close_left_and_plus_right(self):
+        workspace = self.create()
+        workspace.empty_new_button.click()
+        self.settle()
+        dock = workspace.active_dock
+        header = dock.tab_header
+        self.assertEqual(workspace.findChildren(qt.QToolBar), [])
+        self.assertGreater(header.width(), workspace.width() * .95)
+        self.assertLess(header.close_button.x(), 5)
+        self.assertGreater(header.new_button.x(), header.width() - 35)
+        header.close_button.click()
+        self.settle()
+        self.assertEqual(workspace.docks, [])
+        self.assertTrue(workspace.empty_new_button.isVisible())
+
+    def test_tabs_share_width_after_resize_and_close_the_clicked_view(self):
+        workspace = self.create()
+        first = workspace.add_view('first')
+        workspace.active_dock.tab_header.new_button.click()
+        self.settle()
+        second = workspace.active_view
+        bar = self.tab_bar(workspace)
+        for width in (900, 600, 1200):
+            workspace.parentWidget().resize(width, 600)
+            self.settle()
+            widths = [bar.tabRect(index).width() for index in range(2)]
+            self.assertEqual(widths[0], widths[1])
+            self.assertLess(abs(sum(widths) - (bar.width() - 32)), 3)
+            self.assertGreaterEqual(bar.workspace_plus.x(), bar.tabRect(1).right())
+        first_index = next(index for index in range(2) if workspace._tab_dock(bar, index).widget() is first)
+        button = bar.tabButton(first_index, qt.QTabBar.ButtonPosition.LeftSide)
+        button.click()
+        self.settle()
+        self.assertEqual(len(workspace.docks), 1)
+        self.assertIs(workspace.active_view, second)
+        self.assertEqual(workspace.active_dock.tab_header.height(), 30)
+
+    def test_tab_context_menu_closes_target_and_cooperative_close_can_refuse(self):
+        workspace = self.create()
+        first = workspace.add_view('first')
+        workspace.add_view('second')
+        self.settle()
+        bar = self.tab_bar(workspace)
+        index = next(index for index in range(2) if workspace._tab_dock(bar, index).widget() is first)
+        pos = bar.tabRect(index).center()
+        event = qt.QContextMenuEvent(qt.QContextMenuEvent.Reason.Mouse, pos, bar.mapToGlobal(pos))
+        actions, callbacks = [], []
+        menu = Mock()
+        menu.addAction.side_effect = lambda title, callback: (actions.append(title), callbacks.append(callback))
+        menu.exec.side_effect = lambda position: callbacks[-1]()
+        with patch('commonUtils.ui.workspace.qt.QMenu', return_value=menu), patch.object(first, 'prepare_close', return_value=False):
+            self.app.sendEvent(bar, event)
+        self.assertEqual(actions, ['Close tab'])
+        self.assertEqual(len(workspace.docks), 2)
+        with patch('commonUtils.ui.workspace.qt.QMenu', return_value=menu):
+            self.app.sendEvent(bar, event)
+        self.settle()
+        self.assertEqual(len(workspace.docks), 1)
+
+    def test_title_changes_and_keyboard_actions_work_without_toolbar(self):
+        workspace = self.create()
+        workspace.new_action.trigger()
+        dock = workspace.active_dock
+        dock.setWindowTitle('Renamed')
+        self.assertEqual(dock.tab_header.title.text(), 'Renamed')
+        workspace.new_action.trigger()
+        self.settle()
+        bar = self.tab_bar(workspace)
+        self.assertIn('Renamed', [bar.tabText(index) for index in range(2)])
+        workspace.close_action.trigger()
+        self.settle()
+        self.assertEqual(len(workspace.docks), 1)
+
+    def test_plus_remains_accessible_when_tabs_overflow(self):
+        workspace = self.create()
+        for _ in range(16):
+            workspace.add_view()
+        self.settle()
+        bar = self.tab_bar(workspace)
+        plus = bar.workspace_plus
+        for name in ('ScrollLeftButton', 'ScrollRightButton'):
+            arrow = bar.findChild(qt.QToolButton, name)
+            self.assertTrue(arrow.isVisible())
+            self.assertFalse(plus.geometry().intersects(arrow.geometry()))
+        plus.click()
+        self.settle()
+        self.assertEqual(len(workspace.docks), 17)
+
+    def test_single_header_keeps_native_double_click_detaching(self):
+        from PySide6.QtTest import QTest
+        workspace = self.create()
+        workspace.add_view()
+        self.settle()
+        dock = workspace.active_dock
+        QTest.mouseDClick(dock.tab_header, qt.Qt.MouseButton.LeftButton,
+                         pos=dock.tab_header.rect().center())
+        self.settle()
+        self.assertTrue(dock.isFloating())
+        workspace.reattach_active()
+        self.settle()
+        self.assertFalse(dock.isFloating())
 
     def test_only_detached_view_has_large_docking_anchor_and_one_click_return(self):
         workspace = self.create()
