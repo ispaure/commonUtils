@@ -54,11 +54,16 @@ class BrowserTests(unittest.TestCase):
 
     def wait(self):
         deadline = time.monotonic() + 5
-        while (self.browser.busy or self.browser.folder_busy or self.browser.views.cover_busy) and time.monotonic() < deadline:
+        stable = 0
+        while time.monotonic() < deadline:
             self.app.processEvents()
+            pending = (self.browser.busy or self.browser.folder_busy or self.browser.views.cover_busy
+                       or self.browser.views._column_selection_pending)
+            stable = 0 if pending else stable + 1
+            if stable >= 2:
+                break
             time.sleep(.01)
-        self.app.processEvents()
-        self.assertFalse(self.browser.busy or self.browser.folder_busy)
+        self.assertFalse(self.browser.busy or self.browser.folder_busy or self.browser.views._column_selection_pending)
 
     def test_search_results_locate_file_and_keep_worker_safe(self):
         from commonUtils.directory_index import DirectoryCache
@@ -327,6 +332,76 @@ class BrowserTests(unittest.TestCase):
         self.assertTrue(columns.preview_host.isVisible())
         self.assertGreater(columns.preview_host.width(), 0)
         self.assertGreater(self.browser.tabs.count(), 0)
+
+    def test_tiles_sort_names_naturally_independent_of_list_sort(self):
+        for name in ('zeta.txt', 'Alpha.txt', 'file10.txt', 'file2.txt'):
+            (self.root/name).write_text('text')
+        for name in ('Folder10', 'Folder2'):
+            (self.root/name).mkdir()
+        self.browser.tree.sortByColumn(3, qt.Qt.SortOrder.DescendingOrder)
+        self.browser.view_selector.setCurrentIndex(1)
+        tiles = self.browser.views.tiles
+        deadline = time.monotonic()+5
+        while tiles.model().rowCount(tiles.rootIndex()) != 8:
+            self.assertLess(time.monotonic(), deadline)
+            self.app.processEvents(); time.sleep(.01)
+        names = [tiles.model().data(tiles.model().index(row,0,tiles.rootIndex())) for row in range(8)]
+        self.assertEqual(names, ['Folder2','Folder10','Alpha.txt','file2.txt','file10.txt','item.project','other.bin','zeta.txt'])
+
+    def test_entering_columns_keeps_opened_folder_in_first_column(self):
+        folder = self.root/'Folder'; folder.mkdir()
+        (folder/'inside.txt').write_text('inside')
+        self.browser.navigate(folder); self.wait()
+        self.browser.view_selector.setCurrentIndex(2); self.wait()
+        columns = self.browser.views.columns
+        self.assertEqual(Path(self.browser.model.filePath(columns.rootIndex())), self.root)
+        self.assertEqual(Path(self.browser.model.filePath(columns.currentIndex())), folder)
+        self.assertEqual(self.browser.navigation.directory, folder)
+        deadline = time.monotonic()+3
+        while not any(view.isVisible() and self.browser.model.filePath(view.rootIndex()) == str(folder)
+                      for view in columns.findChildren(qt.QListView)):
+            self.assertLess(time.monotonic(), deadline)
+            self.app.processEvents(); time.sleep(.01)
+
+    def test_column_file_preview_returns_on_single_click_after_folder_selection(self):
+        from PySide6.QtTest import QTest
+        folder = self.root/'Folder'; folder.mkdir()
+        target = folder/'inside.txt'; target.write_text('inside')
+        self.browser.view_selector.setCurrentIndex(2); self.wait()
+        def click(path):
+            index = self.browser.model.index(str(path))
+            deadline = time.monotonic()+3
+            while True:
+                column = next((view for view in self.browser.views.columns.findChildren(qt.QListView)
+                               if view.isVisible() and view.rootIndex() == index.parent()), None)
+                if column is not None and column.visualRect(index).isValid():
+                    break
+                self.assertLess(time.monotonic(), deadline)
+                self.app.processEvents(); time.sleep(.01)
+                index = self.browser.model.index(str(path))
+            QTest.mouseClick(column.viewport(), qt.Qt.MouseButton.LeftButton, pos=column.visualRect(index).center())
+            self.wait()
+        for path in (self.path, folder, target, self.path):
+            click(path)
+            if path != folder:
+                self.assertEqual(self.browser.selected_object.path, path)
+                self.assertTrue(self.browser.views.columns.preview_host.isVisible())
+                self.assertTrue(self.browser.preview_panel.isVisible())
+
+    def test_columns_preserve_explicit_multi_selection(self):
+        from PySide6.QtTest import QTest
+        self.browser.view_selector.setCurrentIndex(2); self.wait()
+        columns = self.browser.views.columns
+        first = self.browser.model.index(str(self.path))
+        second = self.browser.model.index(str(self.root/'other.bin'))
+        view = next(view for view in columns.findChildren(qt.QListView)
+                    if view.isVisible() and view.rootIndex() == first.parent())
+        QTest.mouseClick(view.viewport(),qt.Qt.MouseButton.LeftButton,pos=view.visualRect(first).center())
+        self.wait()
+        QTest.mouseClick(view.viewport(),qt.Qt.MouseButton.LeftButton,qt.Qt.KeyboardModifier.ControlModifier,
+                         pos=view.visualRect(second).center())
+        self.wait()
+        self.assertEqual({item.path for item in self.browser.selected_objects()}, {self.path,self.root/'other.bin'})
 
     def test_column_files_end_the_trail_with_a_matching_preview_column(self):
         from commonUtils.ui.file_browser.views import ColumnDelegate

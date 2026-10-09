@@ -35,6 +35,7 @@ class ColumnDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
 
 class FolderColumnView(qt.QColumnView):
     column_context_requested = qt.Signal(object, object)
+    selection_input = qt.Signal(object)
     def __init__(self):
         super().__init__()
         self.setIconSize(qt.QSize(16, 16))
@@ -55,12 +56,21 @@ class FolderColumnView(qt.QColumnView):
         self.set_file_preview_visible(False)
 
     def eventFilter(self, watched, event):
+        if event.type() in (qt.QEvent.Type.MouseButtonPress, qt.QEvent.Type.KeyPress):
+            self.selection_input.emit(event.modifiers())
+        if event.type() == qt.QEvent.Type.MouseButtonRelease:
+            qt.QTimer.singleShot(0, self, self._sync_preview_width)
         if event.type() == qt.QEvent.Type.Resize:
             if watched is self.preview_host.viewport():
                 self.preview_container.setMinimumHeight(max(0, watched.height()))
             elif not self.preview_container.isHidden():
                 qt.QTimer.singleShot(0, self, self._sync_preview_width)
         return super().eventFilter(watched, event)
+
+    def currentChanged(self, current, previous):
+        super().currentChanged(current, previous)
+        if hasattr(self, '_preview_requested'):
+            qt.QTimer.singleShot(0, self, self._sync_preview_width)
 
     def _sync_preview_width(self):
         if self._preview_requested:
