@@ -30,7 +30,8 @@ def cache_directory(*, create=True):
 
 
 def temporary_directory(*, create=True):
-    folder = _disposable_directory() / 'Temp'
+    folder = (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Temp'
+              if sys.platform == 'darwin' else _disposable_directory() / 'Temp')
     if create:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     return folder
