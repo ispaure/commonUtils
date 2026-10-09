@@ -7,7 +7,7 @@ from .. import pyside as qt
 from .. import desktop_actions
 from ...dirUtils import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
-from .model import BrowserFileSystemModel
+from .model import BrowserFileSystemModel, ByteSortModel, BrowserTree, _BrowserSelection
 from .details import DetailsPanel
 from .controls import ViewModeSelector, FolderSizeControl
 from .navigation import NavigationBar
@@ -46,6 +46,7 @@ class FileBrowser(qt.QWidget):
     idle = qt.Signal()
     index_updated = qt.Signal(object)
     index_progress = qt.Signal(str)
+    index_state_changed = qt.Signal()
 
     def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True):
         super().__init__(parent)
@@ -77,18 +78,22 @@ class FileBrowser(qt.QWidget):
         self.search_bar.setPlaceholderText('Search this location and its subfolders')
         layout.addWidget(self.search_bar)
         layout.addLayout(self._create_navigation_controls())
-        self.index_status = qt.QLabel()
-        self.index_status.setWordWrap(True)
+        from .status import IndexStatusLabel
+        self.index_status = IndexStatusLabel()
         self.index_status.setTextFormat(qt.Qt.TextFormat.PlainText)
-        layout.addWidget(self.index_status)
         self.index_activity = qt.QProgressBar()
         self.index_activity.setRange(0, 0)
         self.index_activity.setTextVisible(False)
         self.index_activity.setAccessibleName('Background indexing in progress')
         self.index_activity.hide()
-        layout.addWidget(self.index_activity)
         self._create_views()
         layout.addWidget(self.splitter, 1)
+        status_row = qt.QHBoxLayout()
+        status_row.addWidget(self.index_status,1)
+        self.index_activity.setFixedWidth(70)
+        self.index_activity.setMaximumHeight(10)
+        status_row.addWidget(self.index_activity)
+        layout.addLayout(status_row)
         self._create_preview_panel()
         self.file_actions = FileActions(self)
         self._reconcile_pending = False
@@ -126,7 +131,7 @@ class FileBrowser(qt.QWidget):
         controls.addWidget(self.search_button)
         self.storage_button = qt.QPushButton('Storage…')
         self.storage_button.clicked.connect(self.open_storage)
-        controls.addWidget(self.storage_button)
+        self.storage_button.hide() # Legacy dialog API; Storage is now a view.
         self.refresh_button = qt.QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_button)
@@ -157,10 +162,12 @@ class FileBrowser(qt.QWidget):
         self.model = BrowserFileSystemModel(self)
         self.model.setReadOnly(False)
         self.model.setFilter(qt.QDir.Filter.AllDirs | qt.QDir.Filter.Files | qt.QDir.Filter.NoDotAndDotDot)
-        self.tree = qt.QTreeView()
-        self.tree.setModel(self.model)
-        self.tree.expanded.connect(lambda index: self.model.size_parents.add(self.model.filePath(index)))
-        self.tree.collapsed.connect(lambda index: self.model.size_parents.discard(self.model.filePath(index)))
+        self.tree = BrowserTree()
+        self.sort_model = ByteSortModel(self.model,self)
+        self.tree.setModel(self.sort_model)
+        self.tree.setSelectionModel(_BrowserSelection(self.sort_model,self.tree))
+        self.tree.expanded.connect(lambda index: self.model.size_parents.add(self.model.filePath(self.sort_model.mapToSource(index))))
+        self.tree.collapsed.connect(lambda index: self.model.size_parents.discard(self.model.filePath(self.sort_model.mapToSource(index))))
         self.tree.setItemDelegate(FilenameDelegate(self.tree))
         self.tree.setSelectionBehavior(qt.QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree.setAlternatingRowColors(True)
@@ -594,7 +601,7 @@ class FileBrowser(qt.QWidget):
         if root is None or self.stopping:
             return
         self.folder_busy = True
-        self.index_activity.show()
+        self.index_activity.setVisible(not getattr(self, 'workspace_status', False))
         self.folder_pending = False
         self.folder_root = root
         self.index_status.setText('Checking saved sizes and indexing this location…')
@@ -606,6 +613,7 @@ class FileBrowser(qt.QWidget):
         self.folder_operation.completed.connect(lambda result, error: self._folders_loaded(root, result, error))
         self.folder_operation.finished.connect(self._folders_finished)
         self.folder_operation.start()
+        self.index_state_changed.emit()
 
     def _folders_progressed(self, root, result):
         if self.calculate_folder_sizes and root == self.navigation.directory and result and not self.folder_pending and not self.stopping:
@@ -643,6 +651,7 @@ class FileBrowser(qt.QWidget):
     def _folders_finished(self):
         self.folder_busy = False
         self.index_activity.hide()
+        self.index_state_changed.emit()
         elapsed = monotonic() - self.folder_operation.started_at
         self.reconcile_timer.setInterval(max(60_000, min(300_000, int(elapsed * 10_000))))
         self.folder_operation.deleteLater()
@@ -664,14 +673,15 @@ class FileBrowser(qt.QWidget):
         self.file_actions.stop()
         if self.folder_busy:
             self.folder_operation.requestInterruption()
-        return self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy or self._scan_busy()
+        return self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy()
 
     def _maybe_idle(self):
-        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.file_actions.busy or self._scan_busy()):
+        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy()):
             self.idle.emit()
 
     def shutdown(self):
         self.stop()
+        self.views.storage.wait()
         self.file_actions.wait()
         self.index_search.wait()
         for window in self._scan_windows:

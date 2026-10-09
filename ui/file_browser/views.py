@@ -48,19 +48,41 @@ class FileViews(qt.QStackedWidget):
             view.customContextMenuRequested.connect(lambda point, target=view: self._context(target, point))
             view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
             view.doubleClicked.connect(lambda index: self.activated.emit(self.source_index(index)))
+        from .storage_view import StorageView
+        self.storage = StorageView(parent)
+        self.addWidget(self.storage)
+        self.storage.selection_changed.connect(self.selection_changed)
+        self.storage.activated.connect(lambda path: self.activated.emit(self.model.index(str(path))))
+        self.storage.context_requested.connect(self._storage_context)
+        self.storage.idle.connect(self.idle)
         self.root = None
 
     def source_index(self, index):
-        return self.covers.mapToSource(index) if index.model() is self.covers else index
+        if isinstance(index.model(),qt.QAbstractProxyModel):
+            return index.model().mapToSource(index)
+        return index
+
+    def _storage_context(self, path, position):
+        self.context_directory = self.root
+        self.context_position = position
+        self.context_requested.emit(self.model.index(str(path)))
 
     def selected_rows(self):
+        if self.currentIndex() == 3:
+            index = self.model.index(str(self.storage.selected_path)) if self.storage.selected_path else qt.QModelIndex()
+            return [index] if index.isValid() else []
         return list(dict.fromkeys(self.source_index(index) for index in
                                   self.currentWidget().selectionModel().selectedIndexes() if index.column() == 0))
 
     def current_index(self):
+        if self.currentIndex() == 3:
+            rows = self.selected_rows()
+            return rows[0] if rows else qt.QModelIndex()
         return self.source_index(self.currentWidget().currentIndex())
 
     def browsing_directory(self):
+        if self.currentIndex() == 3:
+            return self.root
         selected = self.selected_rows()
         index = self.current_index()
         if not any(index == item for item in selected):
@@ -84,6 +106,9 @@ class FileViews(qt.QStackedWidget):
             self.context_requested.emit(self.source_index(view.indexAt(point)))
 
     def select_source(self, source):
+        if self.currentIndex() == 3:
+            self.storage.select_path(Path(self.model.filePath(source)))
+            return
         view = self.currentWidget()
         index = self.covers.mapFromSource(source) if view is self.tiles else source
         view.selectionModel().setCurrentIndex(index, qt.QItemSelectionModel.SelectionFlag.ClearAndSelect |
@@ -92,6 +117,8 @@ class FileViews(qt.QStackedWidget):
         view.setFocus()
 
     def edit_name(self, source):
+        if self.currentIndex() == 3:
+            self.storage.browser.view_selector.setCurrentIndex(0)
         source = self.source_index(source).siblingAtColumn(0)
         view = self.currentWidget()
         index = self.covers.mapFromSource(source) if view is self.tiles else source
@@ -112,6 +139,7 @@ class FileViews(qt.QStackedWidget):
             view.setCurrentIndex(qt.QModelIndex())
             view.setRootIndex(self.covers.mapFromSource(index) if view is self.tiles else index)
             blocker.unblock()
+        self.storage.set_root(self.root)
         self.tree.collapseAll()
         self.directory_changed.emit(self.root)
         self.selection_changed.emit()
@@ -122,6 +150,13 @@ class FileViews(qt.QStackedWidget):
         if directory != self.root:
             self.set_root(directory)
         self.setCurrentIndex(mode)
+        if mode == 3:
+            self.storage.set_root(directory)
+            if selected:
+                self.storage.select_path(Path(self.model.filePath(selected[-1])))
+            self.directory_changed.emit(self.root)
+            self.selection_changed.emit()
+            return
         selection = self.currentWidget().selectionModel()
         blocker = qt.QSignalBlocker(selection)
         selection.clearSelection()
@@ -191,4 +226,5 @@ class FileViews(qt.QStackedWidget):
     def stop(self):
         self.closing = True
         self.cover_queue.clear()
-        return self.cover_busy
+        storage_busy = self.storage.stop()
+        return self.cover_busy or storage_busy

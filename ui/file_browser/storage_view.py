@@ -1,0 +1,238 @@
+"""Cached storage charts embedded in the browser's navigation and selection flow."""
+from pathlib import Path
+import math
+from .. import pyside as qt
+from ..operations import Operation
+from ...directory_index import directory_cache
+from ...filesystem import format_size
+from .storage import Treemap
+
+
+class RadialMap(Treemap):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.nodes = {}
+        self.totals = {}
+        self.root = None
+        self.sectors = []
+        self.setAccessibleName('Radial storage distribution; rings represent nested folders')
+
+    def set_items(self, items):
+        self.sectors = []
+        super().set_items(items)
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+        painter.fillRect(self.rect(), self.palette().brush(qt.QPalette.ColorRole.Base))
+        center = qt.QPointF(self.width()/2, self.height()/2)
+        radius = max(0, min(self.width(), self.height())/2-12)
+        ring = radius/5
+        self.sectors = []
+        def draw(parent, start, span, depth, hue=0):
+            children = self.nodes.get(parent, [])
+            total = self.totals.get(parent, sum(size for _, size in children))
+            if not total or depth > 4:
+                return
+            angle = start
+            for index, (path, size) in enumerate(children):
+                sweep = span*size/total
+                if sweep <= 0:
+                    continue
+                outer, inner = ring*(depth+1), ring*depth
+                bounds = qt.QRectF(center.x()-outer, center.y()-outer, outer*2, outer*2)
+                inside = qt.QRectF(center.x()-inner, center.y()-inner, inner*2, inner*2)
+                shape = qt.QPainterPath()
+                shape.arcMoveTo(bounds, angle); shape.arcTo(bounds, angle, sweep)
+                radians = math.radians(angle+sweep)
+                shape.lineTo(center.x()+inner*math.cos(radians), center.y()-inner*math.sin(radians))
+                shape.arcTo(inside, angle+sweep, -sweep); shape.closeSubpath()
+                color = (index*47)%360 if depth == 1 else hue
+                painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Highlight)
+                                      if path == self.selected_path else self.palette().color(qt.QPalette.ColorRole.Base),
+                                      3 if path == self.selected_path else 1))
+                painter.setBrush(qt.QColor.fromHsv(color, 150-depth*15, 155+depth*15))
+                painter.drawPath(shape)
+                self.sectors.append((path,size,shape))
+                draw(path, angle, sweep, depth+1, color)
+                angle += sweep
+        draw(self.root, 0, 360, 1)
+        painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
+        painter.drawText(qt.QRectF(center.x()-ring, center.y()-ring, ring*2, ring*2),
+                         qt.Qt.AlignmentFlag.AlignCenter, format_size(sum(size for _,size in self.items)))
+        if not self.sectors:
+            painter.drawText(self.rect(), qt.Qt.AlignmentFlag.AlignCenter, 'No file bytes to display')
+        painter.end()
+
+    def hit(self, point):
+        return next(((path,size) for path,size,shape in reversed(self.sectors) if shape.contains(point)), None)
+
+
+class StorageView(qt.QWidget):
+    selection_changed = qt.Signal()
+    activated = qt.Signal(object)
+    idle = qt.Signal()
+    context_requested = qt.Signal(object, object)
+
+    def __init__(self, browser):
+        super().__init__(browser)
+        self.browser = browser
+        self.root = None
+        self.selected_path = None
+        self.busy = False
+        self.closing = False
+        self.pending = False
+        self.entries = []
+        self.nodes = {}
+        layout = qt.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        controls = qt.QHBoxLayout()
+        self.chart_selector = qt.QComboBox()
+        self.chart_selector.addItems(['Treemap', 'Radial'])
+        self.chart_selector.setAccessibleName('Storage visualization')
+        self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 largest chart entries; gaps represent omitted entries. Hover for names and sizes.')
+        controls.addWidget(self.chart_selector)
+        self.summary = qt.QLabel('Loading saved sizes…')
+        self.summary.setWordWrap(True)
+        controls.addWidget(self.summary,1)
+        layout.addLayout(controls)
+        self.charts = qt.QStackedWidget()
+        self.map = Treemap()
+        self.radial = RadialMap()
+        for chart in (self.map,self.radial):
+            self.charts.addWidget(chart)
+            chart.selected.connect(self.select_path)
+            chart.activated.connect(self.activated)
+            chart.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
+            chart.customContextMenuRequested.connect(lambda point, target=chart: self._chart_context(target,point))
+        self.chart_selector.currentIndexChanged.connect(self.charts.setCurrentIndex)
+        self.results = qt.QTreeWidget()
+        self.results.setHeaderLabels(['File or folder (largest first)', 'Size', 'Share'])
+        self.results.setRootIsDecorated(False)
+        self.results.setUniformRowHeights(True)
+        self.results.header().setSectionResizeMode(0,qt.QHeaderView.ResizeMode.Stretch)
+        for column in (1,2):
+            self.results.header().setSectionResizeMode(column,qt.QHeaderView.ResizeMode.ResizeToContents)
+        self.results.currentItemChanged.connect(lambda row, old: self._selected(row))
+        self.results.itemActivated.connect(lambda row, column: self.activated.emit(row.data(0,qt.Qt.ItemDataRole.UserRole)))
+        self.results.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.results.customContextMenuRequested.connect(self._list_context)
+        splitter = qt.QSplitter(qt.Qt.Orientation.Vertical)
+        splitter.addWidget(self.charts); splitter.addWidget(self.results)
+        splitter.setSizes([500,180]); layout.addWidget(splitter,1)
+        browser.index_updated.connect(lambda path: self.refresh() if path == self.root else None)
+
+    def _selected(self, row):
+        self.selected_path = row.data(0,qt.Qt.ItemDataRole.UserRole) if row else None
+        self._highlight()
+        self.selection_changed.emit()
+
+    def _highlight(self):
+        for chart in (self.map,self.radial):
+            chart.selected_path = self.selected_path
+            chart.update()
+
+    def select_path(self, path):
+        self.selected_path = Path(path)
+        blocker = qt.QSignalBlocker(self.results)
+        self.results.clearSelection()
+        for row in range(self.results.topLevelItemCount()):
+            item = self.results.topLevelItem(row)
+            if item.data(0,qt.Qt.ItemDataRole.UserRole) == self.selected_path:
+                self.results.setCurrentItem(item); break
+        blocker.unblock()
+        self._highlight()
+        self.selection_changed.emit()
+
+    def _chart_context(self, chart, point):
+        item = chart.hit(qt.QPointF(point))
+        if item:
+            self.select_path(item[0]); self.context_requested.emit(item[0],chart.mapToGlobal(point))
+
+    def _list_context(self, point):
+        item = self.results.itemAt(point)
+        if item:
+            self.select_path(item.data(0,qt.Qt.ItemDataRole.UserRole))
+            self.context_requested.emit(self.selected_path,self.results.viewport().mapToGlobal(point))
+
+    def set_root(self, path):
+        path = Path(path)
+        if path != self.root:
+            self.root = path; self.selected_path = None
+            self.results.clear(); self.map.set_items([])
+            self.radial.nodes = {}; self.radial.set_items([])
+        self.refresh()
+
+    def refresh(self):
+        if self.closing or self.browser.views.currentIndex() != 3 or self.root is None:
+            return
+        if self.busy:
+            self.pending = True; return
+        self.busy = True
+        root = self.root
+        self.operation = Operation(lambda: self._collect(root),self)
+        self.operation.completed.connect(lambda result,error: self._loaded(root,result,error))
+        self.operation.finished.connect(self._finished)
+        self.operation.start()
+
+    def _collect(self, root):
+        cancelled = self.operation.isInterruptionRequested
+        snapshot = directory_cache.peek(root,cancelled=cancelled)
+        if snapshot is None:
+            return [],{},{},False
+        totals = snapshot.folder_stats(cancelled=cancelled)
+        nodes = {}
+        node_totals = {}
+        root_entries = []
+        budget = 3000
+        def collect(path, depth):
+            nonlocal budget, root_entries
+            if cancelled() or budget <= 0: return
+            children = list(snapshot.children(path))
+            items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
+                     for entry in children if not entry.symlink]
+            items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
+            node_totals[path] = sum(size for _,size in items)
+            if path == root:
+                root_entries = items
+            nodes[path] = items[:budget]
+            budget -= len(nodes[path])
+            if depth < 4:
+                directories = {entry.path for entry in children if entry.directory and not entry.symlink}
+                for child,size in nodes[path]:
+                    if child in directories and size: collect(child,depth+1)
+        collect(root,1)
+        return root_entries,nodes,node_totals,snapshot.complete
+
+    def _loaded(self, root, result, error):
+        if self.closing or root != self.root: return
+        if error:
+            self.summary.setText(f'Saved sizes unavailable: {error}'); return
+        self.entries,self.nodes,node_totals,complete = result
+        self.map.set_items(self.entries)
+        self.radial.root = root; self.radial.nodes = self.nodes; self.radial.totals = node_totals; self.radial.set_items(self.entries)
+        blocker = qt.QSignalBlocker(self.results)
+        self.results.clear()
+        total = sum(size for _,size in self.entries)
+        for path,size in self.entries:
+            item = qt.QTreeWidgetItem([path.name,format_size(size),f'{100*size/total:.1f}%' if total else '0%'])
+            item.setData(0,qt.Qt.ItemDataRole.UserRole,path); item.setToolTip(0,str(path))
+            self.results.addTopLevelItem(item)
+        blocker.unblock()
+        self.summary.setText(f'{format_size(total)} · {len(self.entries):,} entries · '+
+                             ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.'))
+        self.select_path(self.selected_path) if self.selected_path else None
+
+    def _finished(self):
+        self.busy = False; self.operation.deleteLater()
+        if self.closing: self.idle.emit()
+        elif self.pending:
+            self.pending = False; self.refresh()
+
+    def stop(self):
+        self.closing = True
+        if self.busy: self.operation.requestInterruption()
+        return self.busy
+
+    def wait(self):
+        if self.busy: self.operation.wait()

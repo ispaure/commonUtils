@@ -440,9 +440,13 @@ The database reuses freed space rather than imposing a fixed entry limit.
 Search shows 500 results per page, with all matches available through Previous/Next.
 Column sorting applies to the entire match set before paging.
 Inside a `FileBrowser`, Search and Storage read cached snapshots on workers and
-follow shared background index updates. Opening Storage automatically displays
-its cached treemap; no selection or Analyze step is required. **Refresh view** only
-reloads saved sizes. Rebuild/clear controls are hidden in these managed views.
+follow shared background index updates. Storage is the fourth browser view,
+with Treemap selected by default and a Radial option showing up to four levels
+(maximum 3,000 radial chart nodes; gaps represent omitted entries). Both use saved sizes, normal breadcrumbs/history,
+file previews and context actions; they never launch an independent filesystem scan.
+Partial charts are labeled and refresh as indexing commits progress. The legacy
+Storage dialog API remains available; its **Refresh view** only reloads saved sizes.
+Rebuild/clear controls are hidden in managed dialogs.
 Standalone legacy dialog hosts retain their scan/resume/rebuild APIs and controls.
 The index path appears in the snapshot status tooltip. Dialogs participate in
 browser cancellation/shutdown, and snapshot
@@ -522,8 +526,17 @@ Clear the field (or Escape) to restore normal views. Results retain normal selec
 preview, activation, context actions and clipboard behavior; Show in browser navigates
 to a folder or selects a file in its parent. Paging is 500 rows and sorting is global.
 
-Completed ancestor indices can answer subtree searches immediately and seed a newly
-browsed subtree without re-enumerating unchanged folders. Concurrent UI requests
+Completed and partial ancestor indices can answer subtree searches immediately and
+seed newly browsed subtrees without re-enumerating unchanged folders. A new higher
+starting folder also merges saved child indexes, preferring more specific checkpoints
+when scopes overlap. Discovery fills missing branches before validating reused data.
+Absolute paths identify entries; different symlink spellings are separate scopes.
+List size sorting compares raw file bytes and cached recursive folder totals; unknown
+sizes stay last in either direction, and newly received totals update the order.
+Logistics workspaces show one indexing line at the bottom of the window, with
+middle-elided paths and full details in its tooltip. Standalone browser widgets retain
+a local bottom status line. Discovery counters are cumulative for the current run;
+they do not reset for each folder. Concurrent UI requests
 reuse a validation completed within two seconds; explicit invalidation bypasses this
 window. Existing explicit DirectoryCache.get calls retain immediate validation.
 The current location and up to 128 indexed immediate children are watched for changes,

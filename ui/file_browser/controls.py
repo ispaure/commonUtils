@@ -29,6 +29,11 @@ class ViewIcon(qt.QIconEngine):
             for y in (5, 12, 19):
                 painter.drawEllipse(qt.QPointF(4, y), .8, .8)
                 painter.drawLine(qt.QLineF(9, y, 21, y))
+        elif self.mode == 3:
+            painter.drawRect(qt.QRectF(2, 3, 20, 18))
+            painter.drawLine(qt.QLineF(14, 3, 14, 21))
+            painter.drawLine(qt.QLineF(2, 14, 14, 14))
+            painter.drawLine(qt.QLineF(14, 10, 22, 10))
         else:
             painter.drawRoundedRect(qt.QRectF(2, 4, 20, 16), 1, 1)
             for x in (9, 16):
@@ -56,7 +61,7 @@ class ViewModeSelector(qt.QWidget):
         self.group.setExclusive(True)
         self.buttons = {}
         self._index = 0
-        for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns')):
+        for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns'), (3, 'Storage')):
             button = qt.QToolButton()
             button.setIcon(qt.QIcon(ViewIcon(mode)))
             button.setIconSize(qt.QSize(23, 23))
@@ -74,7 +79,7 @@ class ViewModeSelector(qt.QWidget):
         return self._index
 
     def currentText(self):
-        return ('List', 'Tiles', 'Columns')[self._index]
+        return ('List', 'Tiles', 'Columns', 'Storage')[self._index]
 
     def setCurrentIndex(self, index):
         if index not in self.buttons:
