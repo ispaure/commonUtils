@@ -175,13 +175,20 @@ class IntegratedSearchTests(unittest.TestCase):
     def test_partial_discovery_updates_search_before_scan_finishes_and_close_cancels(self):
         import os
         real = os.scandir
+        browser = self.browser
         for number in range(1100): (self.root / f'progress-{number}.bin').write_bytes(b'x')
         class SlowDirectory:
             def __init__(self, path): self.entries=real(path)
             def __enter__(self): return self
             def __exit__(self, *args): self.entries.close()
             def __iter__(self):
-                for entry in self.entries:
+                for number, entry in enumerate(self.entries):
+                    # Retain a pending tail after a progressive checkpoint;
+                    # unrelated GUI work must not let the scan complete before
+                    # this test requests cancellation.
+                    if number == 1050:
+                        while not browser.stopping:
+                            sleep(.002)
                     sleep(.002)
                     yield entry
         def scandir(path): return SlowDirectory(path) if Path(path)==self.root else real(path)

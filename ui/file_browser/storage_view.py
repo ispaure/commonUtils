@@ -138,6 +138,7 @@ class StorageView(qt.QWidget):
         self._loaded_key = None
         self._request_key = None
         self._last_result = None
+        self._results_cache = {}
         self._navigation_zoom = 0
         self.entries = []
         self.nodes = {}
@@ -238,6 +239,8 @@ class StorageView(qt.QWidget):
     def set_root(self, path):
         path = Path(path)
         if path != self.root:
+            if self.busy:
+                self.operation.requestInterruption()
             self._loaded_key = None
             self._last_result = None
             previous = self.root
@@ -247,6 +250,7 @@ class StorageView(qt.QWidget):
             self.root = path; self.selected_path = None
             self.results.clear(); self._rows = {}; self.map.set_items([])
             self.radial.nodes = {}; self.radial.set_items([])
+            self.summary.setText('Loading saved sizes…')
         self.refresh()
 
     def refresh(self):
@@ -256,52 +260,26 @@ class StorageView(qt.QWidget):
         if key == self._loaded_key or self.busy and key == self._request_key:
             return
         if self.busy:
-            self.pending = True; return
+            self.pending = True
+            self.operation.requestInterruption()
+            return
+        if key in self._results_cache:
+            self._loaded(self.root, self._results_cache[key], '', key=key)
+            return
         self._request_key = key
         self.busy = True
         root = self.root
         radial = self.chart_selector.currentIndex() == 1
-        self.operation = Operation(lambda: self._collect(root,radial=radial),self)
+        operation = Operation(lambda: self._collect(root, radial=radial, cancelled=operation.isInterruptionRequested), self)
+        self.operation = operation
         self.operation.completed.connect(lambda result,error: self._loaded(root,result,error, key=key))
         self.operation.finished.connect(self._finished)
         self.operation.start()
 
-    def _collect(self, root, *, radial=False):
-        cancelled = self.operation.isInterruptionRequested
-        snapshot = directory_cache.peek(root,cancelled=cancelled)
-        if snapshot is None:
-            return [],{},{},False
-        root_stats = snapshot.folder_stats([root], cancelled=cancelled).get(root)
-        nodes = {}
-        node_totals = {}
-        root_entries = []
-        budget = 3000
-        queue = [root]
-        for depth in range(1, 5 if radial else 2):
-            if not queue or budget <= 0: break
-            # Breadth-first quotas reserve room for later rings. A file-heavy
-            # branch cannot consume every entry before its siblings are loaded.
-            allowance = budget if depth == 4 or not radial else max(1, budget // (5-depth))
-            next_queue = []
-            for index, path in enumerate(queue):
-                if cancelled() or allowance <= 0: break
-                # Bound database materialization, GUI rows and chart geometry.
-                children = list(snapshot.children(path, limit=3000))
-                totals = snapshot.folder_stats([entry.path for entry in children if entry.directory],cancelled=cancelled)
-                items = [(entry.path, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
-                         for entry in children if not entry.symlink]
-                items.sort(key=lambda item:(-item[1],item[0].name.casefold()))
-                node_totals[path] = root_stats.size if path == root and root_stats else sum(size for _,size in items)
-                if path == root:
-                    root_entries = items
-                quota = max(1, allowance // (len(queue)-index)) if radial else len(items)
-                nodes[path] = items[:quota]
-                used = len(nodes[path])
-                budget -= used; allowance -= used
-                directories = {entry.path for entry in children if entry.directory and not entry.symlink}
-                next_queue.extend(child for child,size in nodes[path] if child in directories and size)
-            queue = next_queue
-        return root_entries,nodes,node_totals,snapshot.complete
+    def _collect(self, root, *, radial=False, cancelled=None):
+        from .storage_data import collect_storage
+        return collect_storage(directory_cache, root, radial=radial,
+                               cancelled=cancelled or self.operation.isInterruptionRequested)
 
     def _loaded(self, root, result, error, *, key=None):
         if self.closing or root != self.root: return
@@ -309,6 +287,9 @@ class StorageView(qt.QWidget):
             return
         if error:
             self.summary.setText(f'Saved sizes unavailable: {error}'); return
+        self._results_cache[key] = result
+        while len(self._results_cache) > 8:
+            del self._results_cache[next(iter(self._results_cache))]
         self._loaded_key = key
         if self._last_result == (root, result):
             return
