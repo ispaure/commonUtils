@@ -73,3 +73,63 @@ class IndexEfficiencyTests(unittest.TestCase):
             self.assertTrue(resumed.resumed)
             self.assertEqual(resumed.folder_stats()[child].size,3)
             self.assertIsNotNone(cache.status(root))
+
+    def test_parent_imports_disjoint_child_indexes_without_reenumeration(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            children=[root/'a',root/'b']
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3')
+            for child in children:
+                child.mkdir();(child/'file.txt').write_bytes(b'abc');cache.get(child)
+            missing=root/'missing';missing.mkdir();(missing/'new.txt').write_bytes(b'new')
+            scan=cache._scan_folder; scanned=[]
+            def scanning(*args):
+                scanned.append(args[4]);return scan(*args)
+            with patch.object(cache,'_scan_folder',side_effect=scanning):
+                snapshot=cache.get(root)
+            self.assertTrue(snapshot.complete)
+            self.assertEqual(snapshot.folder_stats()[root].size,9)
+            self.assertEqual(scanned,[root,missing])
+            self.assertEqual(len(cache.peek(root).entries),6)
+
+    def test_parent_prefers_specific_child_checkpoint_over_older_ancestor(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            branch=root/'branch';branch.mkdir();child=branch/'child';child.mkdir()
+            old=child/'old.txt';old.write_bytes(b'old')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3');cache.get(branch)
+            old.unlink();(child/'new.txt').write_bytes(b'newer');cache.get(child)
+            scan=cache._scan_folder;scanned=[]
+            def scanning(*args):scanned.append(args[4]);return scan(*args)
+            with patch.object(cache,'_scan_folder',side_effect=scanning):snapshot=cache.get(root)
+            self.assertTrue(snapshot.complete)
+            self.assertEqual(snapshot.folder_stats()[root].size,5)
+            self.assertIsNone(snapshot.entry(old))
+            self.assertNotIn(child,scanned)
+
+    def test_new_subtree_merges_specific_checkpoint_with_older_covering_ancestor(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';root.mkdir()
+            branch=root/'branch';branch.mkdir();child=branch/'child';child.mkdir()
+            old=child/'old.txt';old.write_bytes(b'old')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3');cache.get(root)
+            old.unlink();(child/'new.txt').write_bytes(b'newer');cache.get(child)
+            scan=cache._scan_folder;scanned=[]
+            def scanning(*args):scanned.append(args[4]);return scan(*args)
+            with patch.object(cache,'_scan_folder',side_effect=scanning):snapshot=cache.get(branch)
+            self.assertTrue(snapshot.complete)
+            self.assertEqual(snapshot.folder_stats()[branch].size,5)
+            self.assertIsNone(snapshot.entry(old))
+            self.assertNotIn(child,scanned)
+
+    def test_parent_drops_deleted_deep_cached_branch(self):
+        import shutil
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/'files';child=root/'intermediate'/'child';child.mkdir(parents=True)
+            (child/'old.txt').write_bytes(b'old')
+            cache=DirectoryCache(database=Path(folder)/'cache'/'index.sqlite3');cache.get(child)
+            shutil.rmtree(root/'intermediate')
+            snapshot=cache.get(root)
+            self.assertTrue(snapshot.complete)
+            self.assertEqual(len(snapshot.entries),0)
+            self.assertEqual(snapshot.folder_stats()[root].size,0)

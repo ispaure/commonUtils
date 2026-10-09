@@ -26,7 +26,7 @@ class PersistentIndexTests(unittest.TestCase):
     def pause(self, *, refresh=False, folder='aaa'):
         cancel = Event()
         def report(done, total, message):
-            if message.startswith(f'Indexing {self.root / folder} ·'):
+            if message == f'Indexing {self.root / folder}':
                 cancel.set()
         with self.assertRaises(OperationCancelled):
             self.cache.get(self.root, refresh=refresh, cancelled=cancel.is_set, report=report)

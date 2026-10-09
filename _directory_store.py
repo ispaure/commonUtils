@@ -459,7 +459,7 @@ class DirectoryCache:
                     self._discovered_entries += 1
                     if count % 512 == 0:
                         db.commit()
-                    report(self._discovered_entries, 0, f'Indexing {folder} · {count:,} entries in this folder')
+                    report(self._discovered_entries, 0, f'Indexing {folder}')
             for (old,) in db.execute('SELECT path FROM folders WHERE generation=? AND parent=?', (generation, text)).fetchall():
                 if old not in seen:
                     self._remove_tree(db, generation, old)
@@ -492,6 +492,54 @@ class DirectoryCache:
         directories = SqlDirectories(entries)
         return Snapshot(root, recursive, entries, errors, scanned or time(), directories=directories, reused=reused,
                         validated_at=time(), resumed=resumed, complete=complete, metadata_checked=metadata_checked)
+
+    def _seed_descendants(self, db, generation, root, cancelled, report):
+        """Merge overlapping saved branches, preferring their most specific checkpoint."""
+        sources = db.execute('SELECT root,coalesce(building,completed) FROM roots '
+                             'WHERE recursive=1 AND root!=? AND (building IS NOT NULL OR completed IS NOT NULL) '
+                             'ORDER BY length(root) DESC,root', (str(root),)).fetchall()
+        covered = []
+        for source_text, source in sources:
+            check_cancelled(cancelled)
+            branch = Path(source_text)
+            if root not in branch.parents:
+                continue
+            report(0, 0, f'Reusing saved branch {branch}')
+            entry_exclusions, folder_exclusions, parameters = [], [], []
+            for nested in covered:
+                if branch not in nested.parents:
+                    continue
+                prefix = str(nested).rstrip(os.sep) + os.sep
+                upper = prefix[:-1] + chr(ord(os.sep) + 1)
+                entry_exclusions.append('NOT (path>=? AND path<?)')
+                folder_exclusions.append('NOT (path=? OR (path>=? AND path<?))')
+                parameters.append((str(nested),prefix,upper))
+            entry_where = ''.join(' AND '+clause for clause in entry_exclusions)
+            folder_where = ''.join(' AND '+clause for clause in folder_exclusions)
+            entry_args = tuple(value for group in parameters for value in group[1:])
+            folder_args = tuple(value for group in parameters for value in group)
+            prefix = source_text.rstrip(os.sep) + os.sep
+            upper = prefix[:-1] + chr(ord(os.sep) + 1)
+            db.execute('DELETE FROM entries WHERE generation=? AND path>=? AND path<?'+entry_where,
+                       (generation,prefix,upper)+entry_args)
+            for table in ('folders','errors'):
+                db.execute(f'DELETE FROM {table} WHERE generation=? AND (path=? OR (path>=? AND path<?))'+folder_where,
+                           (generation,source_text,prefix,upper)+folder_args)
+            db.execute('INSERT OR IGNORE INTO entries SELECT ?,path,parent,name_fold,directory,size,modified,symlink,identity,sort_key '
+                       'FROM entries WHERE generation=?'+entry_where, (generation, source)+entry_args)
+            db.execute('INSERT OR IGNORE INTO folders SELECT ?,path,CASE WHEN path=? THEN ? ELSE parent END,status,identity '
+                       'FROM folders WHERE generation=?'+folder_where, (generation, source_text, str(branch.parent), source)+folder_args)
+            db.execute('INSERT OR IGNORE INTO errors SELECT ?,path,error FROM errors WHERE generation=?'+folder_where,
+                       (generation, source)+folder_args)
+            # Link separately indexed deep branches into the new root's queue.
+            # Parent enumeration can then remove a branch that no longer exists.
+            for ancestor in branch.parents:
+                if ancestor == root:
+                    break
+                db.execute("INSERT OR IGNORE INTO folders VALUES(?,?,?,'pending',NULL)",
+                           (generation,str(ancestor),str(ancestor.parent)))
+            covered.append(branch)
+        return bool(covered)
 
     def get(self, root, recursive=True, *, refresh=False, cancelled=lambda: False,
             report=lambda done, total, message: None, validate_files=True, reuse_for=0):
@@ -543,13 +591,18 @@ class DirectoryCache:
                                    'AND (path=? OR (path>=? AND path<?))', (seed, covering[0], str(root), prefix, upper))
                         if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?', (seed, str(root))).fetchone():
                             db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (seed, str(root), ''))
-                        if covering[1]:
+                        imported = self._seed_descendants(db, seed, root, cancelled, report)
+                        if covering[1] or imported:
                             building = seed
                             db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=1', (seed, str(root)))
                         else:
                             completed = seed
                             db.execute('UPDATE roots SET completed=? WHERE root=? AND recursive=1', (seed, str(root)))
+                        if imported:
+                            store_folder_stats(db, seed, root, cancelled)
                         db.commit()
+                        if imported:
+                            report(0, 0, 'Saved progressive folder totals')
             with self._state_lock:
                 recently_checked = time() - self._validated_times.get((root, recursive), 0) < reuse_for
             if completed and not building and not refresh and not dirty and recently_checked:
@@ -579,7 +632,16 @@ class DirectoryCache:
                 else:
                     db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (building, str(root), ''))
                 db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=?', (building, str(root), recursive))
+                if recursive and not completed and not refresh:
+                    # A new higher starting point can reuse independently indexed branches.
+                    # Prefer more specific checkpoints when cached scopes overlap.
+                    covered = self._seed_descendants(db, building, root, cancelled, report)
+                    if covered:
+                        resumed = True
+                        store_folder_stats(db, building, root, cancelled)
                 db.commit()
+                if resumed:
+                    report(0, 0, 'Saved progressive folder totals')
             # Finish discovering missing branches before rechecking old metadata.
             # Completed folders are validated after discovery, including on resume.
             unchanged = False
