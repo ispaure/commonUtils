@@ -326,6 +326,15 @@ Constructing or changing a view never reads file contents; registered thumbnail
 and panel hooks do that work in background operations.
 
 
+## Reader controls
+
+`reader_menus.ReaderMenus` supplies File/Edit/View/Navigate menus and filtered
+recent files for an application's format-specific readers. `reader_chrome`
+supplies matching line icons/buttons, elided single-line titles/status, shared
+spacing and a fullscreen controller that tracks native window-state changes and
+restores maximization. These helpers do not load content or determine how pages
+turn. See [feature authoring](../FEATURES.md) for the contracts.
+
 ## Markdown reader
 
 The [Markdown viewer/editor guide](markdown/README.md) covers preview-only defaults,
@@ -593,3 +602,13 @@ immutable metadata across overlapping roots and generations. Existing absolute
 retains `directory-index.pre-v3.sqlite3` for recovery; freed database pages are reused
 without an automatic full-file rewrite. See [file browser maintenance](file_browser/README.md)
 for module responsibilities, compatibility contracts, storage and test guidance.
+
+## INI settings editor
+
+`commonUtils.ui.ini_editor.INISettingsEditor` displays section tabs and one row
+per key, with a Source tab and explicit saves. It inherits the text editor's
+unsaved-change protection. Ordinary INIs use string fields; pass `typed_keys=True`
+for typed validation, boolean checkboxes and dropdowns. Applications supply the
+path and decide how saved changes apply. See the
+[configuration guide](../configuration/README.md) for conventions and a complete
+embedding example.
