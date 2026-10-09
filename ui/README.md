@@ -345,3 +345,32 @@ interpreting INI sections or keys.
 scans for large roots. `set_folder_sizes_enabled(True)` starts totals on demand;
 disabling requests cancellation and drops cached totals. The default stays enabled
 for existing consumers. Directory listings and feature actions remain available.
+
+
+## Document workspaces, discovery and process execution
+
+`commonUtils.ui.workspace.Workspace(factory)` hosts cooperative document views in
+native Qt dock tabs. Views may provide `view_title`, `title_changed`, `idle`, and
+`prepare_close()`. Each view owns its state. Toolbar actions create/close tabs,
+float docks, split left/right and combine tabs. Dock-title context menus transfer
+views between live workspaces without reconstructing them. Call `prepare_close()`
+before destroying an embedded workspace; it waits for all views' workers.
+
+`commonUtils.directory_index` supplies immutable `Entry`/`Snapshot` metadata,
+case-insensitive partial name search, `storage_totals()`, and a bounded
+`DirectoryCache`. Scans preserve lexical browser roots, avoid traversing links or
+junctions, and report errors. Cache reuse checks file and directory identities
+without re-enumerating unchanged folders. `get(..., refresh=True)` forces a scan;
+`invalidate(root)` invalidates overlapping scopes. Search and storage dialogs are
+owned by their browser and participate in its cancellation/shutdown protocol.
+Snapshot dates remain visible to distinguish results from a live filesystem view.
+Browser modification dates use `filesystem.format_datetime()` consistently.
+
+`commonUtils.ui.process_runner.ProcessRunner` executes argument vectors through
+QProcess with incremental UTF-8 output, actual exit status, cooperative cancellation,
+and optional whole-process retries. A process-specific parser returns
+`ProcessUpdate` objects for stats and internally managed retry attempts.
+`ProcessProgressWindow` presents these signals without owning command-specific
+logic. `open_process()` retains modeless windows, including their final result;
+application hosts call `prepare_close_all(retry_close)` before closing. Success
+requires a normal zero exit; cancellation and failed starts remain distinct outcomes.
