@@ -63,6 +63,8 @@ def theme_stylesheet(c):
             border-bottom: 1px solid {c.border}; padding: 7px; }}
         QPushButton, QComboBox {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border};
             border-radius: 6px; padding: 2px 8px; }}
+        QComboBox, QAbstractSpinBox {{ padding: 1px 8px; border: 1px solid {c.border}; border-radius: 6px;
+            background: {c.surface}; color: {c.text}; }}
         QPushButton:hover, QComboBox:hover, QToolButton:hover {{ background: {c.hover}; }}
         QPushButton:pressed, QPushButton:checked {{ background: {c.accent}; color: {c.selected_text}; }}
         QPushButton:focus, QComboBox:focus, QToolButton:focus {{ border: 1px solid {c.accent}; }}

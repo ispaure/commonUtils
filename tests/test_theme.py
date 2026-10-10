@@ -71,7 +71,8 @@ class ThemeTests(QtTestCase):
                     option.initFrom(line)
                     option.rect = line.rect()
                     text_rect = line.style().subElementRect(qt.QStyle.SubElement.SE_LineEditContents, option, line)
-                    self.assertGreaterEqual(text_rect.height(), line.fontMetrics().height())
+                    self.assertGreaterEqual(text_rect.height(), line.fontMetrics().height(),
+                                            f'{type(control).__name__} in {mode} mode')
                     self.assertEqual(control.height(), 22)
         finally:
             host.close(); host.deleteLater(); self.app.processEvents()
