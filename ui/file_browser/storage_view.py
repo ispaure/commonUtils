@@ -1,6 +1,7 @@
 """Cached storage charts embedded in the browser's navigation and selection flow."""
 from pathlib import Path
 import math
+from bisect import bisect_right
 from .. import pyside as qt
 from ..operations import Operation
 from ...directory_index import directory_cache
@@ -17,6 +18,12 @@ class RadialMap(Treemap):
         self.totals = {}
         self.root = None
         self.sectors = []
+        self._scene = None
+        self._scene_key = None
+        self._scene_revision = 0
+        self._hit_rings = {}
+        from ..cursor_tooltip import CursorTooltip
+        self.hover = CursorTooltip(self)
         self._zoom = 1.0
         self._zoom_start = 1.0
         self._animation = qt.QVariantAnimation(self)
@@ -47,22 +54,24 @@ class RadialMap(Treemap):
         super().hideEvent(event)
 
     def set_items(self, items):
+        self._scene_revision += 1
         self.sectors = []
+        self.hover.hide()
         super().set_items(items)
 
-    def paintEvent(self, event):
-        painter = qt.QPainter(self)
+    def _build_scene(self):
+        ratio = self.devicePixelRatioF()
+        self._scene = qt.QPixmap(max(1, round(self.width() * ratio)), max(1, round(self.height() * ratio)))
+        self._scene.setDevicePixelRatio(ratio)
+        painter = qt.QPainter(self._scene)
+        painter.setFont(self.font())
         painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), self.palette().brush(qt.QPalette.ColorRole.Base))
         center = qt.QPointF(self.width()/2, self.height()/2)
         radius = max(0, min(self.width(), self.height())/2-12)
         ring = radius/5
-        transform = qt.QTransform()
-        transform.translate(center.x(), center.y())
-        transform.scale(self._zoom, self._zoom)
-        transform.translate(-center.x(), -center.y())
-        painter.setTransform(transform)
         self.sectors = []
+        self._hit_rings = {}
         def draw(parent, start, span, depth, hue=0):
             children = self.nodes.get(parent, [])
             total = self.totals.get(parent, sum(size for _, size in children))
@@ -82,17 +91,13 @@ class RadialMap(Treemap):
                 shape.lineTo(center.x()+inner*math.cos(radians), center.y()-inner*math.sin(radians))
                 shape.arcTo(inside, angle+sweep, -sweep); shape.closeSubpath()
                 color = (index*47)%360 if depth == 1 else hue
-                painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Highlight)
-                                      if path == self.selected_path else self.palette().color(qt.QPalette.ColorRole.Base),
-                                      3 if path == self.selected_path else 1))
+                painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Base), 1))
                 painter.setBrush(qt.QColor.fromHsv(color, 150-depth*15, 155+depth*15))
                 painter.drawPath(shape)
-                self.sectors.append((path,size,transform.map(shape)))
+                self.sectors.append((path, size, shape))
+                self._hit_rings.setdefault(depth, []).append((angle, angle + sweep, path, size))
                 draw(path, angle, sweep, depth+1, color)
                 angle += sweep
-        if self.loading:
-            painter.end()
-            return
         draw(self.root, 0, 360, 1)
         painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
         painter.drawText(qt.QRectF(center.x()-ring, center.y()-ring, ring*2, ring*2),
@@ -100,6 +105,33 @@ class RadialMap(Treemap):
         if not self.sectors:
             painter.drawText(self.rect(), qt.Qt.AlignmentFlag.AlignCenter, 'No file bytes to display')
         painter.end()
+        self._sector_paths = {path: shape for path, size, shape in self.sectors}
+        self._hit_starts = {depth: [entry[0] for entry in entries] for depth, entries in self._hit_rings.items()}
+
+    def _ensure_scene(self):
+        key = (self.size(), self.devicePixelRatioF(), self._scene_revision,
+               self.palette().cacheKey(), self.font().toString())
+        if key != self._scene_key:
+            self._build_scene()
+            self._scene_key = key
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        painter.fillRect(self.rect(), self.palette().brush(qt.QPalette.ColorRole.Base))
+        if self.loading:
+            return
+        self._ensure_scene()
+        center = qt.QPointF(self.width() / 2, self.height() / 2)
+        painter.translate(center)
+        painter.scale(self._zoom, self._zoom)
+        painter.translate(-center)
+        painter.drawPixmap(0, 0, self._scene)
+        selected = self._sector_paths.get(self.selected_path)
+        if selected is not None:
+            painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+            painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Highlight), 3))
+            painter.setBrush(qt.Qt.BrushStyle.NoBrush)
+            painter.drawPath(selected)
 
     def _in_center(self, point):
         radius = max(0, min(self.width(), self.height()) / 2 - 12) / 5 * self._zoom
@@ -107,9 +139,14 @@ class RadialMap(Treemap):
                 (point.y() - self.height() / 2) ** 2 <= radius ** 2)
 
     def mouseMoveEvent(self, event):
-        super().mouseMoveEvent(event)
+        if self.loading:
+            self.hover.hide()
+            return
+        item = self.hit(event.position())
+        text = f'{item[0]}\n{format_size(item[1])}' if item else ''
         if self.root is not None and self._in_center(event.position()):
-            self.setToolTip('Double-click to go up one folder')
+            text = 'Double-click to go up one folder'
+        self.hover.show(text, event.globalPosition().toPoint())
 
     def mouseDoubleClickEvent(self, event):
         if (self.root is not None and event.button() == qt.Qt.MouseButton.LeftButton
@@ -120,7 +157,25 @@ class RadialMap(Treemap):
         super().mouseDoubleClickEvent(event)
 
     def hit(self, point):
-        return next(((path,size) for path,size,shape in reversed(self.sectors) if shape.contains(point)), None)
+        if self.loading:
+            return None
+        self._ensure_scene()
+        ring = max(0, min(self.width(), self.height()) / 2 - 12) / 5
+        if not ring:
+            return None
+        dx = (point.x() - self.width() / 2) / self._zoom
+        dy = (point.y() - self.height() / 2) / self._zoom
+        depth = int(math.hypot(dx, dy) / ring)
+        entries = self._hit_rings.get(depth, ())
+        if not entries:
+            return None
+        angle = math.degrees(math.atan2(-dy, dx)) % 360
+        index = bisect_right(self._hit_starts[depth], angle) - 1
+        if index >= 0:
+            start, end, path, size = entries[index]
+            if start <= angle <= end:
+                return path, size
+        return None
 
 
 class StorageView(qt.QWidget):
@@ -242,6 +297,8 @@ class StorageView(qt.QWidget):
     def _set_loading(self, loading):
         for chart in (self.map, self.radial):
             chart.loading = loading
+            if loading and hasattr(chart, "hover"):
+                chart.hover.hide()
             chart.update()
 
     def set_root(self, path):
