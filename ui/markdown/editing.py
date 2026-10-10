@@ -114,12 +114,19 @@ class MarkdownEditingMixin:
         self.editor_toolbar.setVisible(enabled)
         self.properties_button.setVisible(enabled and self.allow_edit)
         self.appearance_button.setVisible(not enabled)
+        self.speech.action.setVisible(not enabled)
+        self.speech.anchor.setVisible(not enabled)
         for action in (self.text_larger_action, self.text_smaller_action, self.text_reset_action):
             action.setEnabled(not enabled)
         self.edit_mode.setVisible(enabled)
         self.replace_text.setEnabled(enabled)
         self.properties.set_editable(enabled and self.edit_mode.currentData() == "formatted")
+        from ..reader_chrome import reader_icon
+        label = 'Read Markdown' if enabled else 'Edit Markdown'
+        self.edit_button.setIcon(reader_icon('read' if enabled else 'edit'))
         self.edit_button.setText('Read' if enabled else 'Edit')
+        self.edit_button.setAccessibleName(label)
+        self.edit_button.setToolTip(label)
         self._update_edit_actions()
         if not enabled:
             self._render_source(self.markdown_text())

@@ -43,16 +43,26 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             fmt.setForeground(self.editor.palette().color(qt.QPalette.ColorRole.PlaceholderText))
         elif collapse:
             # Qt ignores sub-point sizes on some platforms. A one-pixel font
-            # with negative tracking clamps every marker advance to zero.
+            # with tracking matched to each glyph gives markers zero advance.
             font = qt.QFont(self.editor.font())
             font.setPixelSize(1)
-            font.setLetterSpacing(qt.QFont.SpacingType.AbsoluteSpacing, -1)
             fmt.setFont(font)
             fmt.setForeground(qt.QColor('transparent'))
         else:
             fmt.setFontPointSize(0.1)
             fmt.setForeground(qt.QColor('transparent'))
         return fmt
+
+    def _collapsed_markers(self, text, start, end, active):
+        for index in range(start, end):
+            fmt = self._marker_format(active, collapse=True)
+            if not active:
+                font = fmt.font()
+                font.setLetterSpacing(qt.QFont.SpacingType.AbsoluteSpacing, 0)
+                advance = qt.QFontMetricsF(font).horizontalAdvance(text[index])
+                font.setLetterSpacing(qt.QFont.SpacingType.AbsoluteSpacing, -advance)
+                fmt.setFont(font)
+            self.setFormat(_units(text[:index]), _units(text[index]), fmt)
 
     def highlightBlock(self, text):
         block = self.currentBlock()
@@ -83,8 +93,8 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             return
         heading = HEADING.match(text)
         if heading:
-            self.setFormat(0, heading.end(), self._marker_format(
-                self._active(position, position + _units(text) + 1), collapse=True))
+            self._collapsed_markers(text, 0, heading.end(),
+                self._active(position, position + _units(text) + 1))
         links = list(link_spans(text))
         for span in links:
             start, end = _units(text[:span.start]), _units(text[:span.end])
@@ -117,9 +127,8 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
                 combined = self.format(index)
                 combined.merge(fmt)
                 self.setFormat(index, 1, combined)
-            marker_fmt = self._marker_format(active)
-            self.setFormat(start, first - start, marker_fmt)
-            self.setFormat(last, end - last, marker_fmt)
+            self._collapsed_markers(text, span.start, span.content_start, active)
+            self._collapsed_markers(text, span.content_end, span.end, active)
         # Apply last so nested emphasis cannot dim active link delimiters.
         for span in links:
             start, end = _units(text[:span.start]), _units(text[:span.end])
