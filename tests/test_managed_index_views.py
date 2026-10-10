@@ -21,6 +21,7 @@ class ManagedViewTests(QtTestCase):
         self.temp=TemporaryDirectory();self.base=Path(self.temp.name)
         self.root=self.base/'files';self.root.mkdir();(self.root/'item.txt').write_bytes(b'abc')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
+        self.addCleanup(self.cache.close)
         self.patches=[patch(name,self.cache) for name in ('commonUtils.directory_index.directory_cache',
             'commonUtils.ui.file_browser.index_worker.directory_cache','commonUtils.ui.file_browser.index_search.directory_cache',
             'commonUtils.ui.file_browser.discovery.directory_cache')]
@@ -34,6 +35,7 @@ class ManagedViewTests(QtTestCase):
         self.wait(lambda:not self.browser.folder_busy and not self.browser.index_search.busy and all(not d.busy for d in self.dialogs))
         self.app.sendPostedEvents(None,qt.QEvent.Type.DeferredDelete)
         for item in reversed(self.patches):item.stop()
+        self.cache.close()
         self.temp.cleanup()
 
     def wait(self,condition):
@@ -69,4 +71,5 @@ class ManagedViewTests(QtTestCase):
         (self.root/'new.txt').write_bytes(b'12345');self.browser.refresh()
         self.wait(lambda:not self.browser.folder_busy and not storage.busy and not search.busy and
                   storage.totals.get(self.root)==8 and search.results.topLevelItemCount()==1)
-        self.assertIn('up to date',storage.index_status.text())
+        self.assertTrue(storage.snapshot.complete)
+        self.assertIn('checked',storage.index_status.text().lower())

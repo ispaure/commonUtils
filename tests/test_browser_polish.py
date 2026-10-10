@@ -56,7 +56,7 @@ class BrowserPolishTests(QtTestCase):
         separators = bar.findChildren(BreadcrumbSeparator)
         self.assertEqual(len(separators), 2)
         self.assertTrue(all(item.width() == 14 and item.height() > 10 for item in separators))
-        self.assertEqual([button.toolTip() for button in bar.buttons], ['/', '/Users', '/Users/example'])
+        self.assertEqual([button.toolTip() for button in bar.buttons], [str(Path(value)) for value in ('/', '/Users', '/Users/example')])
         bar.grab()  # Exercise palette-aware backdrop and chevron paint paths.
         bar.close()
 

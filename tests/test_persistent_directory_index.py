@@ -19,6 +19,7 @@ class PersistentIndexTests(unittest.TestCase):
         self.root.mkdir()
         self.database = self.folder / 'support' / 'directory-index.sqlite3'
         self.cache = DirectoryCache(database=self.database)
+        self.addCleanup(self.cache.close)
         for name in ('aaa', 'bbb'):
             (self.root / name).mkdir()
             (self.root / name / 'file.txt').write_text(name)
@@ -38,13 +39,13 @@ class PersistentIndexTests(unittest.TestCase):
 
     def test_completed_index_survives_new_instance_without_reenumeration(self):
         original = self.cache.get(self.root)
-        restarted = DirectoryCache(database=self.database)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Unexpected enumeration')):
-            reused = restarted.get(self.root)
-        self.assertTrue(reused.reused)
-        self.assertEqual(reused.scanned_at, original.scanned_at)
-        self.assertEqual(tuple(reused.entries), tuple(original.entries))
-        self.assertEqual(storage_totals(reused)[self.root], 6)
+        with DirectoryCache(database=self.database) as restarted:
+            with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Unexpected enumeration')):
+                reused = restarted.get(self.root)
+            self.assertTrue(reused.reused)
+            self.assertEqual(reused.scanned_at, original.scanned_at)
+            self.assertEqual(tuple(reused.entries), tuple(original.entries))
+            self.assertEqual(storage_totals(reused)[self.root], 6)
 
     def test_cancelled_scan_resumes_completed_folders_after_restart(self):
         saved = self.pause()

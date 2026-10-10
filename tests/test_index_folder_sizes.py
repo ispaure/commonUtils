@@ -17,6 +17,7 @@ class IndexedSizeTests(unittest.TestCase):
         (self.root/'sub'/'nested'/'comic.CBZ').write_bytes(b'1234567')
         (self.root/'plain.txt').write_bytes(b'123')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
+        self.addCleanup(self.cache.close)
 
     def test_aggregates_persist_and_are_shared_by_compatibility_api_and_storage(self):
         snapshot=self.cache.get(self.root)
@@ -27,11 +28,11 @@ class IndexedSizeTests(unittest.TestCase):
         self.assertEqual(storage_totals(snapshot)[self.root],10)
         with patch('commonUtils.directory_index.directory_cache',self.cache):
             self.assertEqual(scan_folders(self.root)[self.root].size,10)
-        restarted=DirectoryCache(database=self.cache.database)
-        with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Cached read scanned')):
-            saved=restarted.peek(self.root)
-            self.assertEqual(saved.folder_stats([self.root])[self.root].size,10)
-            self.assertTrue(saved.folder_stats([self.root])[self.root].stale)
+        with DirectoryCache(database=self.cache.database) as restarted:
+            with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Cached read scanned')):
+                saved=restarted.peek(self.root)
+                self.assertEqual(saved.folder_stats([self.root])[self.root].size,10)
+                self.assertTrue(saved.folder_stats([self.root])[self.root].stale)
 
     def test_nested_in_place_writes_are_validated_without_parent_mtime_assumption(self):
         first=self.cache.get(self.root);stamp=self.root.stat().st_mtime_ns

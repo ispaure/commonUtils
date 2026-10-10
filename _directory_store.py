@@ -7,6 +7,7 @@ import sqlite3
 import stat
 import sys
 from threading import RLock
+from weakref import WeakSet
 from time import sleep, time, perf_counter
 
 from ._directory_scan import DirectoryScan
@@ -57,6 +58,19 @@ class DirectoryCache(DirectoryScan):
         self._session_checked = set()
         self._priority_folders = {}
         self._exclusion_checked = set()
+        self._readers = WeakSet()
+
+    def close(self):
+        """Release this owner's read snapshots before removing its cache files."""
+        for reader in tuple(self._readers):
+            reader.close()
+        self._readers.clear()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def invalidate(self, root=None):
         # Browser refresh runs on the GUI thread. Avoid waiting for a worker or DB.
@@ -133,7 +147,7 @@ class DirectoryCache(DirectoryScan):
             check_cancelled(cancelled)
             self.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             with self.database.with_suffix('.lock').open('a+b') as lock:
-                if sys.platform == 'win32':
+                if os.name == 'nt':
                     import msvcrt
                     lock.seek(0, 2)
                     if not lock.tell():
@@ -143,7 +157,7 @@ class DirectoryCache(DirectoryScan):
                 while True:
                     check_cancelled(cancelled)
                     try:
-                        if sys.platform == 'win32':
+                        if os.name == 'nt':
                             lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
                         else:
                             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -151,7 +165,7 @@ class DirectoryCache(DirectoryScan):
                     except BlockingIOError:
                         sleep(.05)
                     except OSError as error:
-                        if sys.platform != 'win32' or error.errno not in (13, 11, 36):
+                        if os.name != 'nt' or error.errno not in (13, 11, 36):
                             raise
                         sleep(.05)
                 try:
@@ -175,7 +189,7 @@ class DirectoryCache(DirectoryScan):
                     finally:
                         connection.close()
                 finally:
-                    if sys.platform == 'win32':
+                    if os.name == 'nt':
                         lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
                     else:
                         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
@@ -425,7 +439,9 @@ class DirectoryCache(DirectoryScan):
                         continue
                     try:
                         started = perf_counter()
-                        info = child.stat(follow_symlinks=False)
+                        # Windows DirEntry.stat omits file identity fields which
+                        # lstat supplies during later checkpoint validation.
+                        info = path.lstat() if os.name == 'nt' else child.stat(follow_symlinks=False)
                         self.last_metrics['metadata_seconds'] += perf_counter()-started
                         link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and path.is_junction())
                         directory = not link and stat.S_ISDIR(info.st_mode)
@@ -479,6 +495,7 @@ class DirectoryCache(DirectoryScan):
             store_folder_stats(db, generation, root, cancelled)
             db.commit()
         entries = SqlEntries(self.database, generation, parent=parent, connection=reader, scope=scope)
+        self._readers.add(entries)
         errors = tuple((Path(path), error) for path, error in db.execute('SELECT path,error FROM errors WHERE generation=?', (generation,)))
         scanned = db.execute('SELECT scanned_at FROM scans WHERE id=?', (generation,)).fetchone()[0]
         directories = SqlDirectories(entries)
@@ -678,7 +695,7 @@ class DirectoryCache(DirectoryScan):
         """Read saved work for cancellation UI; does not create an index file."""
         if not self.database.exists():
             return None
-        with sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True) as db:
+        with closing(sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True)) as db:
             db.execute('BEGIN')
             row = db.execute('SELECT building FROM roots WHERE root=? AND recursive=?',
                              (str(Path(root).absolute()), recursive)).fetchone()

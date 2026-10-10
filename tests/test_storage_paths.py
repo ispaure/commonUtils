@@ -1,4 +1,5 @@
 """OS conventions, scoped cleanup and WAL-safe index migration."""
+from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
@@ -50,26 +51,27 @@ class StorageTests(unittest.TestCase):
         snapshot=DirectoryCache(database=old).get(root)
         # Open readers keep the source WAL alive; backup must copy logical contents.
         with patch('commonUtils.storage.sys.platform', 'darwin'):
-            new=DirectoryCache()
-            self.assertFalse(new.database.exists())
-            reused=new.get(root)
-            self.assertTrue(reused.reused)
-            self.assertEqual(tuple(reused.entries), tuple(snapshot.entries))
-            self.assertTrue(old.exists())
-            (root/'b.txt').write_text('new')
-            new.get(root)
-            restarted=DirectoryCache().get(root)
-            self.assertEqual(len(restarted.entries), 2)
-            self.assertEqual(len(snapshot.entries), 1)
+            with DirectoryCache() as new:
+                self.assertFalse(new.database.exists())
+                reused=new.get(root)
+                self.assertTrue(reused.reused)
+                self.assertEqual(tuple(reused.entries), tuple(snapshot.entries))
+                self.assertTrue(old.exists())
+                (root/'b.txt').write_text('new')
+                new.get(root)
+                restarted=DirectoryCache().get(root)
+                self.assertEqual(len(restarted.entries), 2)
+                self.assertEqual(len(snapshot.entries), 1)
 
     def test_cancelled_migration_leaves_no_destination_or_temporary(self):
         old=self.home/'old.sqlite3'; old.parent.mkdir(exist_ok=True)
-        with sqlite3.connect(old) as db: db.execute('CREATE TABLE example(value)')
-        new=DirectoryCache(database=self.home/'new.sqlite3'); new._legacy_database=old
-        with self.assertRaises(OperationCancelled): new._migrate_legacy(lambda: True)
-        self.assertFalse(new.database.exists())
-        self.assertFalse(list(self.home.glob('.index-migration-*')))
-        self.assertTrue(old.exists())
+        with closing(sqlite3.connect(old)) as db, db: db.execute('CREATE TABLE example(value)')
+        with DirectoryCache(database=self.home/'new.sqlite3') as new:
+            new._legacy_database=old
+            with self.assertRaises(OperationCancelled): new._migrate_legacy(lambda: True)
+            self.assertFalse(new.database.exists())
+            self.assertFalse(list(self.home.glob('.index-migration-*')))
+            self.assertTrue(old.exists())
 
     def test_macos_migration_prefers_recent_caches_database(self):
         root=self.home/'files'; root.mkdir(); (root/'a.txt').write_text('content')
@@ -79,10 +81,10 @@ class StorageTests(unittest.TestCase):
         recent=self.home/'Library'/'Caches'/'commonUtils'/'directory-index.sqlite3'
         DirectoryCache(database=recent).get(root)
         with patch('commonUtils.storage.sys.platform', 'darwin'):
-            new=DirectoryCache()
-            self.assertEqual(new.database, self.home/'Library'/'Application Support'/'commonUtils'/'Cache'/'directory-index.sqlite3')
-            self.assertEqual(new._legacy_database, recent)
-            with new._writer(lambda: False): pass
-            self.assertEqual(len(new.peek(root).entries), 2)
-            self.assertTrue(recent.exists())
-            self.assertTrue(older.exists())
+            with DirectoryCache() as new:
+                self.assertEqual(new.database, self.home/'Library'/'Application Support'/'commonUtils'/'Cache'/'directory-index.sqlite3')
+                self.assertEqual(new._legacy_database, recent)
+                with new._writer(lambda: False): pass
+                self.assertEqual(len(new.peek(root).entries), 2)
+                self.assertTrue(recent.exists())
+                self.assertTrue(older.exists())

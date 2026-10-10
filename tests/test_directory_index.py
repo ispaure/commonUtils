@@ -1,12 +1,31 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+import sqlite3
 from commonUtils.directory_index import scan_metadata, storage_totals, DirectoryCache
 from unittest.mock import patch
 from commonUtils.operations import OperationCancelled
 
 
 class DirectoryIndexTests(unittest.TestCase):
+    def test_cache_context_keeps_snapshots_stable_then_releases_file_handles(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'files'
+            root.mkdir()
+            source = root / 'note.txt'
+            source.write_bytes(b'old')
+            with DirectoryCache(database=Path(temporary) / 'cache' / 'index.sqlite3') as cache:
+                old = cache.get(root)
+                saved = cache.peek(root)
+                source.write_bytes(b'new contents')
+                current = cache.get(root, refresh=True)
+                self.assertEqual(old.entry(source).size, 3)
+                self.assertEqual(saved.entry(source).size, 3)
+                self.assertEqual(current.entry(source).size, 12)
+            for snapshot in (old, saved, current):
+                with self.assertRaises(sqlite3.ProgrammingError):
+                    snapshot.entries.connection.execute('SELECT 1')
+
     def test_partial_case_insensitive_search_recursion_sizes_and_links(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
@@ -31,8 +50,8 @@ class DirectoryIndexTests(unittest.TestCase):
             file = root / 'nested' / 'file.txt'
             file.write_bytes(b'one')
             with TemporaryDirectory() as index_dir:
-                cache = DirectoryCache(database=Path(index_dir) / 'index.sqlite3')
-                self._check_cache(cache, root, file)
+                with DirectoryCache(database=Path(index_dir) / 'index.sqlite3') as cache:
+                    self._check_cache(cache, root, file)
 
     def _check_cache(self, cache, root, file):
         first = cache.get(root)

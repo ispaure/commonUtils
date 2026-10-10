@@ -103,21 +103,21 @@ class BrowserTests(QtTestCase):
     def test_search_results_locate_file_and_keep_worker_safe(self):
         from commonUtils.directory_index import DirectoryCache
         support = Path(self.enterContext(TemporaryDirectory()))
-        cache = DirectoryCache(database=support / 'search-fixture.sqlite3')
-        cache.get(self.root, refresh=True)
-        with patch('commonUtils.ui.file_browser.index_search.directory_cache', cache):
-            search = self.browser.open_search()
-            self.browser.search_bar.setText('ITEM')
-            deadline = time.monotonic() + 5
-            while search.busy or search.debounce.isActive():
-                self.assertLess(time.monotonic(), deadline)
-                self.app.processEvents()
-                time.sleep(.01)
-            self.assertEqual(search.results.topLevelItemCount(), 1)
-            self.assertTrue(search.show_in_browser(self.path))
-            self.assertEqual(self.browser.selected_objects()[0].path, self.path)
-            self.assertTrue(self.browser.search_panel.isHidden())
-            self.wait()
+        with DirectoryCache(database=support / 'search-fixture.sqlite3') as cache:
+            cache.get(self.root, refresh=True)
+            with patch('commonUtils.ui.file_browser.index_search.directory_cache', cache):
+                search = self.browser.open_search()
+                self.browser.search_bar.setText('ITEM')
+                deadline = time.monotonic() + 5
+                while search.busy or search.debounce.isActive():
+                    self.assertLess(time.monotonic(), deadline)
+                    self.app.processEvents()
+                    time.sleep(.01)
+                self.assertEqual(search.results.topLevelItemCount(), 1)
+                self.assertTrue(search.show_in_browser(self.path))
+                self.assertEqual(self.browser.selected_objects()[0].path, self.path)
+                self.assertTrue(self.browser.search_panel.isHidden())
+                self.wait()
 
     def test_storage_totals_treemap_and_drilldown(self):
         folder = self.root / 'large'
@@ -316,7 +316,7 @@ class BrowserTests(QtTestCase):
         with patch.object(qt.QDir, 'drives', return_value=[qt.QFileInfo(str(drive))]):
             breadcrumbs.drive_menu.aboutToShow.emit()
         actions = breadcrumbs.drive_menu.actions()
-        self.assertEqual(actions[0].text(), str(drive))
+        self.assertEqual(Path(actions[0].text()), drive)
         actions[0].trigger()
         self.assertEqual(opened, [drive])
         with patch.object(qt.QFileDialog, 'getExistingDirectory', return_value=r'\\server\share'):

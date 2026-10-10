@@ -128,47 +128,47 @@ class DirectorySchemaTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / 'files'; child = root / 'child'; child.mkdir(parents=True)
             file = child / 'a.txt'; file.write_bytes(b'abc')
-            cache = DirectoryCache(database=Path(temporary) / 'cache' / 'index.sqlite3')
-            first = cache.get(root)
-            scoped = cache.get(child)
-            with cache._writer(lambda: False) as db:
-                # Root stores a directory + file; child adds a link to the same file record.
-                self.assertEqual(db.execute('SELECT count(*) FROM entry_records').fetchone()[0], 2)
-                self.assertEqual(db.execute('SELECT count(*) FROM generation_entries').fetchone()[0], 3)
-                self.assertEqual(db.execute('SELECT name FROM entry_nodes WHERE name=?', ('a.txt',)).fetchone()[0], 'a.txt')
-                self.assertNotIn(str(root), db.execute('SELECT name FROM entry_nodes WHERE name=?', ('a.txt',)).fetchone()[0])
-            file.write_bytes(b'changed')
-            changed = cache.get(child)
-            self.assertEqual(changed.entry(file).size, 7)
-            self.assertEqual(first.entry(file).size, 3)
-            self.assertEqual(scoped.entry(file).size, 3)
-            with cache._writer(lambda: False) as db:
-                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
-                parent = db.execute('SELECT parent_id FROM folder_paths WHERE path=?', (str(child),)).fetchone()[0]
-                self.assertEqual(db.execute('SELECT path FROM folder_paths WHERE id=?', (parent,)).fetchone()[0], str(root))
-            cache.clear()
-            with cache._writer(lambda: False) as db:
-                self.assertEqual(db.execute('SELECT count(*) FROM entry_records').fetchone()[0], 0)
-                self.assertEqual(db.execute('SELECT count(*) FROM entry_nodes').fetchone()[0], 0)
-                self.assertEqual(db.execute('SELECT count(*) FROM folder_paths').fetchone()[0], 0)
-                self.assertIsNone(cache.peek(root))
-            self.assertEqual(first.entry(file).size, 3)
+            with DirectoryCache(database=Path(temporary) / 'cache' / 'index.sqlite3') as cache:
+                first = cache.get(root)
+                scoped = cache.get(child)
+                with cache._writer(lambda: False) as db:
+                    # Root stores a directory + file; child adds a link to the same file record.
+                    self.assertEqual(db.execute('SELECT count(*) FROM entry_records').fetchone()[0], 2)
+                    self.assertEqual(db.execute('SELECT count(*) FROM generation_entries').fetchone()[0], 3)
+                    self.assertEqual(db.execute('SELECT name FROM entry_nodes WHERE name=?', ('a.txt',)).fetchone()[0], 'a.txt')
+                    self.assertNotIn(str(root), db.execute('SELECT name FROM entry_nodes WHERE name=?', ('a.txt',)).fetchone()[0])
+                file.write_bytes(b'changed')
+                changed = cache.get(child)
+                self.assertEqual(changed.entry(file).size, 7)
+                self.assertEqual(first.entry(file).size, 3)
+                self.assertEqual(scoped.entry(file).size, 3)
+                with cache._writer(lambda: False) as db:
+                    self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                    parent = db.execute('SELECT parent_id FROM folder_paths WHERE path=?', (str(child),)).fetchone()[0]
+                    self.assertEqual(db.execute('SELECT path FROM folder_paths WHERE id=?', (parent,)).fetchone()[0], str(root))
+                cache.clear()
+                with cache._writer(lambda: False) as db:
+                    self.assertEqual(db.execute('SELECT count(*) FROM entry_records').fetchone()[0], 0)
+                    self.assertEqual(db.execute('SELECT count(*) FROM entry_nodes').fetchone()[0], 0)
+                    self.assertEqual(db.execute('SELECT count(*) FROM folder_paths').fetchone()[0], 0)
+                    self.assertIsNone(cache.peek(root))
+                self.assertEqual(first.entry(file).size, 3)
 
     def test_folder_lookup_uses_generation_parent_index_and_scoped_reads_exclude_siblings(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / 'folder9'; root.mkdir()
             for name in ('child', 'child-other'):
                 folder = root / name; folder.mkdir(); (folder / 'file2.txt').write_bytes(b'a')
-            cache = DirectoryCache(database=Path(temporary) / 'cache' / 'index.sqlite3')
-            cache.get(root)
-            scoped = cache.peek(root / 'child')
-            self.assertEqual([entry.path for entry in scoped.entries], [root / 'child' / 'file2.txt'])
-            self.assertEqual(scoped.entry(root / 'child-other' / 'file2.txt'), None)
-            with cache._writer(lambda: False) as db:
-                plan = ' '.join(row[3] for row in db.execute('EXPLAIN QUERY PLAN '
-                    'SELECT path,identity FROM entries WHERE generation=? AND parent=?',
-                    (scoped.entries.generation, str(root / 'child'))))
-                self.assertIn('generation=? AND parent_id=?', plan)
+            with DirectoryCache(database=Path(temporary) / 'cache' / 'index.sqlite3') as cache:
+                cache.get(root)
+                scoped = cache.peek(root / 'child')
+                self.assertEqual([entry.path for entry in scoped.entries], [root / 'child' / 'file2.txt'])
+                self.assertEqual(scoped.entry(root / 'child-other' / 'file2.txt'), None)
+                with cache._writer(lambda: False) as db:
+                    plan = ' '.join(row[3] for row in db.execute('EXPLAIN QUERY PLAN '
+                        'SELECT path,identity FROM entries WHERE generation=? AND parent=?',
+                        (scoped.entries.generation, str(root / 'child'))))
+                    self.assertIn('generation=? AND parent_id=?', plan)
 
     def test_read_only_peek_can_display_a_legacy_index_before_upgrade(self):
         with TemporaryDirectory() as temporary:
@@ -181,17 +181,17 @@ class DirectorySchemaTests(unittest.TestCase):
                 db.execute('INSERT INTO entries VALUES(1,?,?,?,0,3,20,0,?,?)',
                            (str(path), str(root), path.name.casefold(), '[1, 2, 3]', _sort_key(path)))
                 db.commit()
-                cache = DirectoryCache(database=database)
-                before = cache.peek(root)
-                self.assertEqual(len(before.entries), 1)
-                self.assertEqual(before.entry(path).size, 3)
-                self.assertEqual(before.search_page('file')[1], 1)
-                upgrade_entries(db)
-                self.assertEqual(before.entry(path).size, 3)
-                after = cache.peek(root)
-                self.assertEqual(len(after.entries), 1)
-                self.assertTrue(after.entries.compact)
-                self.assertEqual(after.entry(path), before.entry(path))
+                with DirectoryCache(database=database) as cache:
+                    before = cache.peek(root)
+                    self.assertEqual(len(before.entries), 1)
+                    self.assertEqual(before.entry(path).size, 3)
+                    self.assertEqual(before.search_page('file')[1], 1)
+                    upgrade_entries(db)
+                    self.assertEqual(before.entry(path).size, 3)
+                    after = cache.peek(root)
+                    self.assertEqual(len(after.entries), 1)
+                    self.assertTrue(after.entries.compact)
+                    self.assertEqual(after.entry(path), before.entry(path))
 
     def test_schema_one_upgrade_keeps_saved_entries_and_reports_optimization(self):
         with TemporaryDirectory() as temporary:
@@ -213,14 +213,14 @@ class DirectorySchemaTests(unittest.TestCase):
 
     def test_deep_folder_hierarchy_is_iterative_and_interned_once(self):
         with TemporaryDirectory() as temporary:
-            cache = DirectoryCache(database=Path(temporary) / 'index.sqlite3')
-            with cache._writer(lambda: False) as db:
-                path = Path(os.path.abspath(os.sep)) / 'depth'
-                for _ in range(1100):
-                    path = path / 'x'
-                folder_id = ensure_folder(db, path)
-                before = db.total_changes
-                self.assertEqual(ensure_folder(db, path), folder_id)
-                self.assertEqual(db.total_changes, before)
-                self.assertEqual(db.execute('SELECT path FROM folder_paths WHERE id=?', (folder_id,)).fetchone()[0], str(path))
-                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+            with DirectoryCache(database=Path(temporary) / 'index.sqlite3') as cache:
+                with cache._writer(lambda: False) as db:
+                    path = Path(os.path.abspath(os.sep)) / 'depth'
+                    for _ in range(1100):
+                        path = path / 'x'
+                    folder_id = ensure_folder(db, path)
+                    before = db.total_changes
+                    self.assertEqual(ensure_folder(db, path), folder_id)
+                    self.assertEqual(db.total_changes, before)
+                    self.assertEqual(db.execute('SELECT path FROM folder_paths WHERE id=?', (folder_id,)).fetchone()[0], str(path))
+                    self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])

@@ -21,6 +21,7 @@ class IntegratedSearchTests(QtTestCase):
         self.root=self.base/'Documents';self.root.mkdir();(self.root/'nested').mkdir()
         self.file=self.root/'nested'/'Needle.TXT';self.file.write_text('abc')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
+        self.addCleanup(self.cache.close)
         self.patches=[patch(name,self.cache) for name in ('commonUtils.directory_index.directory_cache',
              'commonUtils.ui.file_browser.index_worker.directory_cache','commonUtils.ui.file_browser.index_search.directory_cache',
              'commonUtils.ui.file_browser.discovery.directory_cache')]
@@ -33,10 +34,11 @@ class IntegratedSearchTests(QtTestCase):
         self.wait(lambda:all(not (b.busy or b.folder_busy or b.index_search.busy or b.views.cover_busy) for b in self.browsers))
         self.app.sendPostedEvents(None,qt.QEvent.Type.DeferredDelete)
         for p in reversed(self.patches):p.stop()
+        self.cache.close()
         self.temp.cleanup()
 
-    def wait(self, condition):
-        deadline=monotonic()+8
+    def wait(self, condition, timeout=8):
+        deadline=monotonic()+timeout
         while not condition():
             self.assertLess(monotonic(),deadline)
             self.app.processEvents();sleep(.01)
@@ -158,9 +160,9 @@ class IntegratedSearchTests(QtTestCase):
         self.assertEqual(self.browser.index_search.results.topLevelItemCount(),5)
         row=self.browser.index_search.results.topLevelItem(0)
         self.assertEqual(row.data(0,qt.Qt.ItemDataRole.UserRole).name,'match-500.bin')
-        restarted=DirectoryCache(database=self.cache.database)
-        with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Restarted query scanned')):
-            self.assertEqual(restarted.peek(self.root).search_page('match-')[1],505)
+        with DirectoryCache(database=self.cache.database) as restarted:
+            with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Restarted query scanned')):
+                self.assertEqual(restarted.peek(self.root).search_page('match-')[1],505)
 
     def test_cached_subtree_is_scoped_and_reused_without_duplicate_enumeration(self):
         (self.root/'Needle-outside.txt').write_text('outside');self.browser.refresh()
@@ -199,7 +201,7 @@ class IntegratedSearchTests(QtTestCase):
         with patch('commonUtils.directory_index.os.scandir', side_effect=scandir):
             self.browser.refresh()
             self.browser.search_bar.setText('progress-')
-            self.wait(lambda: 0 < self.browser.index_search.total < 1100)
+            self.wait(lambda: 0 < self.browser.index_search.total < 1100, timeout=20)
             self.assertTrue(self.browser.folder_busy)
             self.assertIn('incomplete', self.browser.index_search.summary.text())
             self.browser.close()

@@ -24,6 +24,7 @@ class DiscoveryIndexUiTests(QtTestCase):
         (self.root / 'nested').mkdir()
         (self.root / 'nested' / 'file.txt').write_text('contents')
         self.cache = DirectoryCache(database=folder / 'support' / 'index.sqlite3')
+        self.addCleanup(self.cache.close)
         self.patch = patch('commonUtils.ui.file_browser.discovery.directory_cache', self.cache)
         self.patch.start(); self.addCleanup(self.patch.stop)
         self.browser = qt.QWidget()
