@@ -45,12 +45,28 @@ class DiffEdit(CodeEdit):
 
     def gutter_width(self):
         if not getattr(self, 'diff_rows', None): return super().gutter_width()
-        digits = max(len(row[0]) for row in self.diff_rows) + max(len(row[1]) for row in self.diff_rows)
-        return self.fontMetrics().horizontalAdvance('9') * digits + 24
+        if not self.line_numbers: return 0
+        metrics = qt.QFontMetrics(self.gutter_font())
+        widest = max(metrics.horizontalAdvance(number) for row in self.diff_rows for number in row[:2])
+        return 2 * (widest + 12)
+
+    def gutter_font(self):
+        font = qt.QFont(self.font())
+        if font.pixelSize() > 0:
+            font.setPixelSize(max(1, round(font.pixelSize() * .85)))
+        else:
+            font.setPointSizeF(max(1, font.pointSizeF() * .85))
+        font.setBold(False)
+        return font
+
+    def update_gutter(self, *args):
+        super().update_gutter(*args)
+        self.gutter.setFixedWidth(self.gutter_width())
 
     def paint_gutter(self, event):
         if not self.diff_rows: return super().paint_gutter(event)
         painter = qt.QPainter(self.gutter)
+        painter.setFont(self.gutter_font())
         painter.fillRect(event.rect(), self.palette().alternateBase())
         block = self.firstVisibleBlock()
         top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
@@ -64,7 +80,8 @@ class DiffEdit(CodeEdit):
                                      qt.QColor(diff_colors(self.palette(), kind)[1]))
                 painter.setPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
                 for x, number in ((0, old), (half, new)):
-                    painter.drawText(x, top, half - 5, height, qt.Qt.AlignmentFlag.AlignRight, number)
+                    painter.drawText(x + 6, top, half - 12, height,
+                                     qt.Qt.AlignmentFlag.AlignRight | qt.Qt.AlignmentFlag.AlignVCenter, number)
             top += height
             block = block.next()
 

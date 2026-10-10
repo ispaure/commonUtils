@@ -17,6 +17,26 @@ class CodeEditorTests(QtTestCase):
         self.editor = CodeEdit()
         self.addCleanup(self.editor.deleteLater)
 
+    def test_diff_gutter_fits_unequal_line_numbers_after_font_changes(self):
+        from types import SimpleNamespace
+        from commonUtils.ui.code_editor.diff_bands import DiffEdit
+        editor = DiffEdit()
+        self.addCleanup(editor.deleteLater)
+        rows = [SimpleNamespace(old='97', new='12345', kind=None)]
+        editor.set_diff(SimpleNamespace(text=' context', lines=rows))
+        editor.resize(500, 200); editor.show()
+        for size in (10, 16, 24):
+            font = qt.QFont(editor.font()); font.setPointSizeF(size)
+            editor.setFont(font)
+            self.app.processEvents()
+            metrics = qt.QFontMetrics(editor.gutter_font())
+            self.assertLess(editor.gutter_font().pointSizeF(), size)
+            self.assertGreaterEqual(editor.gutter.width() // 2 - 12, metrics.horizontalAdvance('12345'))
+            self.assertEqual(editor.gutter.width(), editor.gutter_width())
+            self.assertFalse(editor.grab().isNull())
+        editor.line_numbers = False; editor.update_gutter()
+        self.assertEqual(editor.gutter_width(), 0)
+
     def test_line_edits_are_undoable_and_unicode_offsets_work(self):
         self.editor.setPlainText("😀 one\ntwo\nthree")
         cursor = self.editor.textCursor()
