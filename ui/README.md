@@ -639,3 +639,10 @@ hidden destination. Window dragging and drop placement stay generic; feature
 selection, dirty-document prompts and retained original window ownership belong
 to the application. `document_host.py` supplies optional hosting and original
 window lookup for reusable readers that also work standalone.
+
+Hosted reader close buttons and delayed worker callbacks should use
+`document_host.close_document(window)`: embedded documents receive their own
+close event and retain save/cancel decisions; independent windows close normally.
+Views with no document-close veto may opt into `close_in_background = True` to
+remove their workspace tab immediately, before cooperative shutdown begins.
+Their owners stay alive until `prepare_close()` succeeds after an `idle` signal.

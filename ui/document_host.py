@@ -49,3 +49,20 @@ def document_owner(widget, owner_type):
             return widget
         widget = widget.parentWidget()
     return None
+
+
+def close_document(window):
+    """Dispatch hosted document close locally, without closing its native ancestor.
+
+    Keep document shutdown separate from native window shutdown after embedding.
+    Close handlers still own vetoes, worker retirement and unsaved prompts.
+    """
+    if window.isWindow():
+        return window.close()
+    event = qt.QCloseEvent()
+    qt.QApplication.sendEvent(window, event)
+    if event.isAccepted():
+        window.hide()
+        if window.testAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose):
+            window.deleteLater()
+    return event.isAccepted()

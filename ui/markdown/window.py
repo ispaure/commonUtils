@@ -16,7 +16,8 @@ class MarkdownWindow(qt.QMainWindow):
         for action in (self.viewer.new_action, self.viewer.open_action, self.viewer.save_action, self.viewer.save_as_action):
             file_menu.addAction(action)
         file_menu.addSeparator()
-        file_menu.addAction('Close', self.close, qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
+        from ..document_host import close_document
+        file_menu.addAction('Close', lambda: close_document(self), qt.QKeySequence(qt.QKeySequence.StandardKey.Close))
         self._edit_menu = edit_menu = self.menuBar().addMenu('Edit')
         for action in (self.viewer.undo_action, self.viewer.redo_action, self.viewer.cut_action,
                        self.viewer.copy_action, self.viewer.paste_action, self.viewer.select_all_action,
