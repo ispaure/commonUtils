@@ -11,6 +11,28 @@ from commonUtils.ui.process_progress import ProcessProgressWindow
 
 
 class ProcessTests(unittest.TestCase):
+    def test_optional_host_falls_back_when_hidden_closing_or_destroyed(self):
+        from unittest.mock import Mock
+        from shiboken6 import isValid
+        from commonUtils.ui.process_host import register_process_host, show_process
+        host = qt.QWidget()
+        host.closing = False
+        host.present = Mock()
+        self.addCleanup(lambda: host.deleteLater() if isValid(host) else None)
+        register_process_host(host)
+        window = self.create(); window.hide()
+        host.show(); show_process(window)
+        host.present.assert_called_once_with(window)
+        self.assertFalse(window.isVisible())
+        for closing in (False, True):
+            host.setVisible(closing); host.closing = closing
+            window.hide(); show_process(window)
+            self.assertTrue(window.isVisible())
+        host.deleteLater()
+        self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+        window.hide(); show_process(window)
+        self.assertTrue(window.isVisible())
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.windows = []

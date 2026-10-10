@@ -258,7 +258,8 @@ def open_process(name, program, arguments=(), parent=None, *, parser=None, conte
     window = ProcessProgressWindow(name, parent, runner=ProcessRunner(parser=parser, **runner_options), context=context)
     _windows.append(window)
     window.destroyed.connect(lambda: _windows.remove(window) if window in _windows else None)
-    window.show()
+    from .process_host import show_process
+    show_process(window)
     window.start(program, arguments)
     return window
 
