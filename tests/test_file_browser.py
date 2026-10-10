@@ -66,6 +66,23 @@ class BrowserTests(QtTestCase):
             time.sleep(.01)
         self.assertFalse(self.browser.busy or self.browser.folder_busy or self.browser.views._column_selection_pending)
 
+    def test_parent_destruction_releases_index_priority(self):
+        import gc
+        from commonUtils.directory_index import directory_cache
+        from shiboken6 import isValid
+        for _ in range(20):
+            parent = qt.QWidget()
+            browser = FileBrowser(parent=parent, calculate_folder_sizes=False)
+            owner = browser._index_priority_owner
+            directory_cache.set_priority_folders(owner, (self.root,))
+            self.assertIn(owner, directory_cache._priority_folders)
+            parent.deleteLater()
+            self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            self.assertFalse(isValid(browser))
+            self.assertNotIn(owner, directory_cache._priority_folders)
+            del browser, parent
+            gc.collect()
+
     def test_network_policy_blocks_maps_scans_indexing_and_thumbnails_then_restores_local(self):
         remote = self.root/'share'; remote.mkdir()
         from commonUtils.network_filesystems import is_network_location

@@ -70,8 +70,12 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._changed_paths = set()
         self._index_priority_owner = object()
         from ...directory_index import directory_cache
-        self.destroyed.connect(lambda obj=None, owner=self._index_priority_owner,
-                               cache=directory_cache: cache.set_priority_folders(owner))
+        owner = self._index_priority_owner
+        def release_priority():
+            # Do not request a wrapper for the QObject being destroyed, or
+            # expose captured Python objects as optional Qt slot arguments.
+            directory_cache.set_priority_folders(owner)
+        self.destroyed.connect(release_priority)
         self._full_index_refresh = False
         self.folder_root = None
         self.refresh_pending = False
