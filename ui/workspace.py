@@ -22,7 +22,7 @@ def _tab_button(text, tooltip, parent, callback=None):
 
 
 class DockTabHeader(qt.QWidget):
-    """Single-tab header; ignored title mouse events retain native dock dragging."""
+    """Single-tab header with the same opaque dragging as grouped tab bars."""
     def __init__(self, dock):
         super().__init__(dock)
         layout = qt.QHBoxLayout(self)
@@ -45,21 +45,18 @@ class DockTabHeader(qt.QWidget):
         self._press = None
 
     def mousePressEvent(self, event):
-        if self.parentWidget().isFloating():
-            self._press = None
-            event.ignore()  # Let Qt move the actual detached window.
-            return
         if event.button() == qt.Qt.MouseButton.LeftButton:
-            self._press = event.position().toPoint()
+            self._press = event.globalPosition().toPoint()
             event.accept()
         else:
             event.ignore()
 
     def mouseMoveEvent(self, event):
         if (self._press is not None and event.buttons() & qt.Qt.MouseButton.LeftButton
-                and (event.position().toPoint() - self._press).manhattanLength() >= qt.QApplication.startDragDistance()):
+                and (event.globalPosition().toPoint() - self._press).manhattanLength() >= qt.QApplication.startDragDistance()):
+            origin = self._press
             self._press = None
-            self.parentWidget().workspace.drag_tab(self.parentWidget())
+            self.parentWidget().workspace.begin_window_drag(self.parentWidget(), event.globalPosition().toPoint(), origin)
             event.accept()
         else:
             event.ignore()
@@ -149,6 +146,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self._drop_preview = qt.QRubberBand(qt.QRubberBand.Shape.Rectangle, self)
         self.active_dock = None
         self._closing = False
+        self._window_drag = None
         self._headers_pending = False
         self._drop_target = qt.QDockWidget('Return a detached tab', self)
         self._drop_target.setObjectName('workspace.emptyDropTarget')
@@ -286,9 +284,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                     bar, start, dock = self._drag_press
                     point = event.position().toPoint()
                     if (dock and event.buttons() & qt.Qt.MouseButton.LeftButton
-                            and abs(point.y() - start.y()) >= qt.QApplication.startDragDistance()):
+                            and (point - start).manhattanLength() >= qt.QApplication.startDragDistance()):
                         self._drag_press = None
-                        self.drag_tab(dock)
+                        self.begin_window_drag(dock, event.globalPosition().toPoint(), bar.mapToGlobal(start))
                         return True
         return super().eventFilter(watched, event)
 

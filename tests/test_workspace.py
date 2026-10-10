@@ -19,7 +19,7 @@ class View(qt.QLabel):
 
 
 class WorkspaceTests(unittest.TestCase):
-    def test_drag_uses_the_full_pane_and_floating_header_keeps_native_movement(self):
+    def test_drag_uses_the_full_pane_and_floating_header_tracks_the_press(self):
         workspace = self.create()
         workspace.add_view()
         dock = workspace.active_dock
@@ -34,8 +34,55 @@ class WorkspaceTests(unittest.TestCase):
                               qt.QPointF(80, 10), qt.Qt.MouseButton.LeftButton,
                               qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
         dock.tab_header.mousePressEvent(event)
-        self.assertFalse(event.isAccepted())
-        self.assertIsNone(dock.tab_header._press)
+        self.assertTrue(event.isAccepted())
+        self.assertIsNotNone(dock.tab_header._press)
+
+    def mouse(self, widget, kind, global_point):
+        button = qt.Qt.MouseButton.LeftButton
+        event = qt.QMouseEvent(kind, qt.QPointF(widget.mapFromGlobal(global_point)), qt.QPointF(global_point),
+            button if kind != qt.QEvent.Type.MouseMove else qt.Qt.MouseButton.NoButton,
+            button if kind != qt.QEvent.Type.MouseButtonRelease else qt.Qt.MouseButton.NoButton,
+            qt.Qt.KeyboardModifier.NoModifier)
+        self.app.sendEvent(widget, event)
+        self.settle()
+
+    def test_horizontal_tab_drag_undocks_and_floating_header_snaps_on_both_edges(self):
+        workspace = self.create()
+        workspace.add_view('first'); moving = workspace.active_dock
+        workspace.add_view('second'); self.settle()
+        other = next(dock for dock in workspace.docks if dock is not moving)
+        bar = self.tab_bar(workspace)
+        index = next(i for i in range(bar.count()) if workspace._tab_dock(bar, i) is moving)
+        origin = bar.mapToGlobal(bar.tabRect(index).center())
+        self.mouse(bar, qt.QEvent.Type.MouseButtonPress, origin)
+        self.mouse(bar, qt.QEvent.Type.MouseMove, origin + qt.QPoint(30, 0))
+        self.assertTrue(moving.isFloating())
+        self.assertIsNotNone(workspace._window_drag)
+        outside = workspace.mapToGlobal(workspace.rect().bottomRight() + qt.QPoint(100, 100))
+        self.mouse(moving.tab_header, qt.QEvent.Type.MouseButtonRelease, outside)
+        self.assertTrue(moving.isFloating())
+        for edge in ('left', 'right'):
+            header = moving.tab_header
+            origin = header.mapToGlobal(header.rect().center())
+            self.mouse(header, qt.QEvent.Type.MouseButtonPress, origin)
+            point = workspace.mapToGlobal(qt.QPoint(3 if edge == 'left' else workspace.width() - 3,
+                                                    workspace.height() // 2))
+            self.mouse(header, qt.QEvent.Type.MouseMove, point)
+            self.assertTrue(workspace._drop_preview.isVisible())
+            self.mouse(header, qt.QEvent.Type.MouseButtonRelease, point)
+            self.assertFalse(moving.isFloating())
+            self.assertNotIn(other, workspace.tabifiedDockWidgets(moving))
+            self.assertEqual(moving.x() < other.x(), edge == 'left')
+            self.assertEqual(moving.widget().state, 'first')
+
+    def test_closing_a_dragged_pane_releases_the_drag_controller(self):
+        workspace = self.create(); workspace.add_view('first')
+        dock = workspace.active_dock
+        origin = dock.tab_header.mapToGlobal(dock.tab_header.rect().center())
+        workspace.begin_window_drag(dock, origin + qt.QPoint(30, 0), origin)
+        dock.close(); self.settle()
+        self.mouse(workspace, qt.QEvent.Type.MouseMove, origin)
+        self.assertIsNone(workspace._window_drag)
 
     def test_retired_tab_disappears_before_worker_finishes(self):
         workspace = self.create()
