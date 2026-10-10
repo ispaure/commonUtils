@@ -3,6 +3,7 @@
 from .. import pyside as qt
 from .transforms import TransformCommands
 from .multicursor import MultiCursorCommands
+from .folding import FoldingCommands
 
 
 def monospace_font():
@@ -37,8 +38,11 @@ class LineNumbers(qt.QWidget):
     def paintEvent(self, event):
         self.editor.paint_gutter(event)
 
+    def mousePressEvent(self, event):
+        self.editor.gutter_click(event.position().toPoint())
 
-class CodeEdit(MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
+
+class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
     focused = qt.Signal()
     read_only_changed = qt.Signal(bool)
     preferences_changed = qt.Signal()
@@ -57,6 +61,7 @@ class CodeEdit(MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
         self.search_selections = []
         self.initialize_multicursor()
         self.gutter = LineNumbers(self)
+        self.bind_folding()
         self.blockCountChanged.connect(self.update_gutter)
         self.updateRequest.connect(self._update_request)
         self.cursorPositionChanged.connect(self.highlight_cursor)
@@ -67,7 +72,7 @@ class CodeEdit(MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
 
     def gutter_width(self):
         return (
-            12
+            28
             + self.fontMetrics().horizontalAdvance("9")
             * len(str(max(1, self.blockCount())))
             if self.line_numbers
@@ -112,6 +117,7 @@ class CodeEdit(MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
                     else qt.QPalette.ColorRole.PlaceholderText
                 )
                 painter.setPen(self.palette().color(role))
+                self.draw_fold_marker(painter, block, top)
                 painter.drawText(
                     0,
                     top,
