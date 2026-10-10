@@ -663,3 +663,12 @@ close event and retain save/cancel decisions; independent windows close normally
 Views with no document-close veto may opt into `close_in_background = True` to
 remove their workspace tab immediately, before cooperative shutdown begins.
 Their owners stay alive until `prepare_close()` succeeds after an `idle` signal.
+
+
+## Passive archive contents
+
+`commonUtils.ui.archive_view.ArchiveContents` provides folder navigation,
+filtering, numeric sorting, selection details and text/image presentation. It
+accepts entries and decoded previews and emits preview/extraction/removal requests;
+the owner supplies jobs and credential policy. See the [archive guide](../ARCHIVES.md)
+for a runnable integration outline and responsibility boundaries.
