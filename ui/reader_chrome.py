@@ -5,8 +5,8 @@ handles and supply actions; both text and image readers use the same geometry.
 """
 from . import pyside as qt
 
-READER_MARGINS = (12, 8, 12, 8)
-READER_SPACING = 8
+READER_MARGINS = (8, 2, 8, 3)
+READER_SPACING = 4
 
 
 class ReaderIcon(qt.QIconEngine):
