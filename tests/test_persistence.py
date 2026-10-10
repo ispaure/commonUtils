@@ -29,3 +29,15 @@ class PersistenceTests(unittest.TestCase):
                 atomic_write_bytes(path, b'buffer', overwrite=False)
             self.assertEqual(path.read_bytes(), b'external')
             self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_invalid_json_and_size_limit_preserve_existing_state(self):
+        from commonUtils.persistence import atomic_write_json
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'state.json'
+            atomic_write_json(path, {'label': '😀'})
+            original = path.read_bytes()
+            for data, options in [({'value': float('nan')}, {}), ({'large': 'text'}, {'max_bytes': 2})]:
+                with self.assertRaises(ValueError):
+                    atomic_write_json(path, data, **options)
+                self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(list(Path(directory).iterdir()), [path])

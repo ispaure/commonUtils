@@ -1,7 +1,7 @@
 """Shared desktop reader actions; format-specific navigation stays with callers."""
 import json
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from ..persistence import atomic_write_json
 from threading import RLock
 
 from . import pyside as qt
@@ -38,14 +38,8 @@ class RecentFiles:
         with _history_lock:
             values = [str(path)] + [str(item) for item in self.paths() if item != path]
             self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            text = json.dumps(values[:40], ensure_ascii=False)
-            with NamedTemporaryFile(dir=self.path.parent, delete=False) as stream:
-                staged = Path(stream.name)
-            try:
-                staged.write_text(text, encoding='utf-8')
-                staged.replace(self.path)
-            finally:
-                staged.unlink(missing_ok=True)
+            atomic_write_json(self.path, values[:40], allow_nan=True)
+
 
 
 class ReaderMenus(qt.QObject):

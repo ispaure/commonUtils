@@ -15,7 +15,7 @@ class SessionStoreTests(unittest.TestCase):
             self.assertEqual(store.read(), payload)
             if os.name != "nt":
                 self.assertEqual(store.path.stat().st_mode & 0o777, 0o600)
-            with patch("commonUtils.session_store.os.replace", side_effect=OSError("full")):
+            with patch("commonUtils.persistence.os.replace", side_effect=OSError("full")):
                 with self.assertRaises(OSError):
                     store.write({"version": 1, "documents": []})
             self.assertEqual(store.read(), payload)
