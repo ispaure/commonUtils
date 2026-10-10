@@ -52,7 +52,54 @@ class MarkdownLinkTests(QtTestCase):
             self.assertNotEqual(self.marker_size(), 0.1)
             cursor.movePosition(qt.QTextCursor.MoveOperation.End)
             self.editor.setTextCursor(cursor)
-            self.assertEqual(self.marker_size(), 0.1)
+            formats = self.editor.document().begin().layout().formats()
+            self.assertEqual(formats[0].format.font().pixelSize(), 1)
+
+    def test_paired_local_links_preserve_label_and_target(self):
+        source = '[thing|Show][LinkToFile]'
+        span, = link_spans(source)
+        self.assertEqual(source[span.content_start:span.content_end], 'Show')
+        self.assertEqual(span.target, 'LinkToFile.md')
+        self.assertEqual(render_links(source), '[Show](LinkToFile.md)')
+        self.editor.setMarkdown('## ' + source + '\n\nOther')
+        self.assertIn(source, self.editor.toPlainText())
+        self.assertIn(source, self.editor.document().toMarkdown())
+
+    def test_reference_links_resolve_definitions_and_round_trip(self):
+        source = '## [Website][site]\n\n[site]: https://example.com\n'
+        self.assertIn('[Website](https://example.com)', render_links(source))
+        self.editor.setMarkdown(source)
+        exported = self.editor.document().toMarkdown()
+        self.assertIn('[Website][site]', exported)
+        self.assertIn('[site]: https://example.com', exported)
+
+    def test_hover_reveals_links_and_heading_without_editing_or_moving_caret(self):
+        source = '## [Website](https://example.com)\n\nOther'
+        self.editor.setMarkdown(source)
+        source = self.editor.toPlainText()
+        self.editor.resize(700, 250)
+        self.editor.show()
+        cursor = self.editor.textCursor()
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        self.editor.setTextCursor(cursor)
+        self.app.processEvents()
+        block = self.editor.document().begin()
+        line = block.layout().lineAt(0)
+        self.assertAlmostEqual(line.cursorToX(3)[0], line.cursorToX(4)[0], places=2)
+        hit = qt.QTextCursor(block)
+        hit.setPosition(7)
+        point = self.editor.cursorRect(hit).center()
+        QTest.mouseMove(self.editor.viewport(), point)
+        self.app.processEvents()
+        self.assertGreater(block.layout().lineAt(0).cursorToX(4)[0], 10)
+        self.assertEqual(self.editor.textCursor().position(), cursor.position())
+        self.assertEqual(self.editor.toPlainText(), source)
+        self.assertFalse(self.editor.document().isModified())
+        self.assertFalse(self.editor.document().isUndoAvailable())
+        self.editor.leaveEvent(qt.QEvent(qt.QEvent.Type.Leave))
+        self.app.processEvents()
+        line = block.layout().lineAt(0)
+        self.assertAlmostEqual(line.cursorToX(3)[0], line.cursorToX(4)[0], places=2)
 
     def test_alias_preview_links_navigate_and_keep_edit_permission(self):
         with TemporaryDirectory() as directory:

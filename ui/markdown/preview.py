@@ -2,7 +2,7 @@
 from .. import pyside as qt
 from .syntax import inline_spans, FENCE_OPEN, fence_close, HEADING, fenced_regions
 from .syntax import _units
-from .links import link_spans
+from .links import link_spans, reference_destinations
 from .presentation import monospace_family
 
 
@@ -12,12 +12,14 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
         self.editor = editor
         self._refreshing = False
         self._active_fence_blocks = set()
+        self._references = {}
 
     def refresh_cursor(self):
         if self._refreshing:
             return
         self._refreshing = True
         try:
+            self._references = reference_destinations(self.editor.toPlainText())
             self._active_fence_blocks = set()
             for opening, closing, _, _ in fenced_regions(self.editor.document()):
                 end = closing.position() + _units(closing.text()) if closing else self.editor.document().characterCount()
@@ -29,6 +31,9 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             self._refreshing = False
 
     def _active(self, start, end):
+        hover = self.editor._hover_position
+        if hover is not None and start <= hover < end:
+            return True
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
             return cursor.selectionStart() < end and cursor.selectionEnd() > start
@@ -95,7 +100,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
         if heading:
             self._collapsed_markers(text, 0, heading.end(),
                 self._active(position, position + _units(text) + 1))
-        links = list(link_spans(text))
+        links = list(link_spans(text, self._references))
         for span in links:
             start, end = _units(text[:span.start]), _units(text[:span.end])
             first, last = _units(text[:span.content_start]), _units(text[:span.content_end])
@@ -103,9 +108,9 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             fmt.setForeground(self.editor.palette().color(qt.QPalette.ColorRole.Link))
             fmt.setFontUnderline(True)
             self.setFormat(first, last - first, fmt)
-            marker = self._marker_format(self._active(position + start, position + end))
-            self.setFormat(start, first - start, marker)
-            self.setFormat(last, end - last, marker)
+            active = self._active(position + start, position + end)
+            self._collapsed_markers(text, span.start, span.content_start, active)
+            self._collapsed_markers(text, span.content_end, span.end, active)
         for span in inline_spans(text):
             if any(link.start <= span.start < link.end and not
                    (link.content_start <= span.start and span.end <= link.content_end) for link in links):

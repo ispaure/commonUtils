@@ -2,7 +2,7 @@
 import re
 from .. import pyside as qt
 from .syntax import _units
-from .links import link_spans
+from .links import link_spans, _REFERENCE
 from .syntax import fenced_regions, HEADING, inline_spans, FENCE_OPEN, fence_close
 
 
@@ -55,6 +55,10 @@ class LiveMarkdownDocument(qt.QTextDocument):
             heading = HEADING.match(block.text())
             if heading and block.blockFormat().headingLevel():
                 changes.append((block.position(), heading.end(), ''))
+            if _REFERENCE.fullmatch(block.text()):
+                changes.append((block.position(), _units(block.text()), token(block.text())))
+                block = block.next()
+                continue
             links = list(link_spans(block.text()))
             for span in links:
                 changes.append((block.position() + _units(block.text()[:span.start]),
@@ -173,6 +177,11 @@ def protect_escapes(markdown):
         if opening:
             fence = opening.group(1)
             lines.append(line)
+            continue
+        if _REFERENCE.fullmatch(line.rstrip('\r\n')):
+            key = f'{prefix}{len(tokens)}z'
+            tokens[key] = line.rstrip('\r\n')
+            lines.append(key + line[len(tokens[key]):])
             continue
         # Preserve complete authored links before Qt turns them into native anchors.
         for span in reversed(list(link_spans(line))):
