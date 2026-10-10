@@ -178,7 +178,13 @@ class IntegratedSearchTests(QtTestCase):
     def test_partial_discovery_updates_search_before_scan_finishes_and_close_cancels(self):
         import os
         real = os.scandir
-        browser = self.browser
+        # Retire the existing watcher before adding files. Otherwise its queued
+        # reconciliation can publish a complete generation before the fixture
+        # starts, turning this initial-scan test into an atomic-refresh test.
+        self.browser.shutdown()
+        self.browser.close()
+        self.wait(lambda: not self.browser.folder_busy and not self.browser.busy)
+        browser = None
         for number in range(1100): (self.root / f'progress-{number}.bin').write_bytes(b'x')
         class SlowDirectory:
             def __init__(self, path): self.entries=real(path)
@@ -209,7 +215,9 @@ class IntegratedSearchTests(QtTestCase):
                 return scandir if name == 'scandir' else getattr(os, name)
         with patch('commonUtils._directory_store.os', IndexFilesystem()), patch.object(
                 self.cache, '_checkpoint', side_effect=publish):
-            self.browser.refresh()
+            browser = self.browser = FileBrowser(self.root)
+            self.browsers.append(browser)
+            browser.show()
             self.browser.search_bar.setText('progress-')
             self.wait(lambda: 0 < self.browser.index_search.total < 1100, timeout=20)
             self.assertTrue(self.browser.folder_busy)
