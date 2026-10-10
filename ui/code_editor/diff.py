@@ -25,7 +25,7 @@ def compare_text(left, right, left_name="Original", right_name="Buffer"):
     a, b = left.splitlines(keepends=True), right.splitlines(keepends=True)
     if max(len(left), len(right)) > 1024 * 1024 or max(len(a), len(b)) > 5000:
         raise ValueError("Diff is limited to 1 MiB and 5,000 lines per side.")
-    changes = tuple(Change(i, j, k, l) for tag, i, j, k, l
+    changes = tuple(Change(i, j, k, end) for tag, i, j, k, end
                     in SequenceMatcher(None, a, b, autojunk=True).get_opcodes() if tag != "equal")
     # A visible marker makes final-newline-only changes apparent.
     unified = []

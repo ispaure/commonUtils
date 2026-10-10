@@ -51,7 +51,7 @@ class EditorViews(qt.QWidget):
             self.primary.document().contentsChange.connect(self.secondary._external_multicursor_change)
             self.secondary.bind_folding()
             self.secondary.setFont(source.font())
-            for name in ("indent_width", "use_tabs", "auto_indent", "auto_pairs", "line_numbers", "comment_prefix"):
+            for name in ("indent_width", "use_tabs", "auto_indent", "auto_pairs", "line_numbers", "comment_prefix", "indent_guides"):
                 setattr(self.secondary, name, getattr(source, name))
             self.secondary.setLineWrapMode(source.lineWrapMode())
             self.secondary.setReadOnly(source.isReadOnly())

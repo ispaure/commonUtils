@@ -35,6 +35,7 @@ class CommandPalette(qt.QDialog):
         self.results = qt.QListWidget()
         layout.addWidget(self.query)
         layout.addWidget(self.results)
+        self.query.installEventFilter(self)
         self.query.textChanged.connect(self.refresh)
         self.query.returnPressed.connect(self.run_current)
         self.results.itemActivated.connect(lambda item: self.run_current())
@@ -67,6 +68,9 @@ class CommandPalette(qt.QDialog):
             action.trigger()
 
     def eventFilter(self, obj, event):
+        if obj is self.query and event.type() == qt.QEvent.Type.KeyPress and event.key() in (qt.Qt.Key.Key_Down, qt.Qt.Key.Key_Up):
+            self.keyPressEvent(event)
+            return True
         return super().eventFilter(obj, event)
 
     def keyPressEvent(self, event):
