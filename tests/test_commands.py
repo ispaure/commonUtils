@@ -3,11 +3,25 @@ import os
 import sys
 from threading import Event, Timer
 import unittest
+from unittest.mock import patch
 
 from commonUtils.integrations.wrappers.cmdShellWrapper import run_command, exec_cmd
 
 
 class CommandTests(unittest.TestCase):
+    def test_macos_terminal_keeps_native_shell_in_requested_directory(self):
+        from commonUtils.integrations.wrappers.cmdShellWrapper.terminal import _exec_cmd_new_window_macos
+        import shlex
+        folder = '/tmp/repo with spaces and \'quotes"'
+        with patch('commonUtils.integrations.wrappers.cmdShellWrapper.terminal.subprocess.Popen') as launch:
+            self.assertEqual(_exec_cmd_new_window_macos('pwd', folder), [])
+            script = launch.call_args.args[0][2]
+            expected = ('cd -- ' + shlex.quote(folder) + ' && pwd').replace('\\', '\\\\').replace('"', '\\"')
+            self.assertIn(f'do script "{expected}"', script)
+            self.assertNotIn('bash', script)
+            self.assertEqual(_exec_cmd_new_window_macos('', folder), [])
+            self.assertNotIn('&&', launch.call_args.args[0][2])
+
     def test_exit_status_and_streams_are_preserved(self):
         result = run_command([sys.executable, '-c',
             'import sys; print("out"); print("err", file=sys.stderr); sys.exit(7)'])
