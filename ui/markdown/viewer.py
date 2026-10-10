@@ -1,5 +1,6 @@
 """Reusable Markdown reading/editing, heading navigation and document history."""
 from pathlib import Path
+from ..outline import OutlineEntry, OutlineList
 
 from .. import pyside as qt
 from ..reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button
@@ -173,12 +174,10 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self.toc_popup.setAccessibleName('Markdown table of contents')
         layout = qt.QVBoxLayout(self.toc_popup)
         layout.addWidget(qt.QLabel('Table of contents'))
-        listing = qt.QListWidget()
+        listing = OutlineList()
         listing.setAccessibleName('Document headings')
-        for level, title, anchor in self.headings:
-            item = qt.QListWidgetItem('    ' * (level - 1) + title)
-            item.setData(qt.Qt.ItemDataRole.UserRole, anchor)
-            listing.addItem(item)
+        listing.set_entries(OutlineEntry(anchor, title, anchor, level - 1)
+                            for level, title, anchor in self.headings)
         if not self.headings:
             layout.addWidget(qt.QLabel('This document has no headings.'))
         layout.addWidget(listing)
