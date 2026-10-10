@@ -524,3 +524,25 @@ Floating `WorkspaceDock` panes use regular native window flags, including
 minimize/maximize controls and no transient parent. The inner tab header still
 supports dragging and double-click reattachment. Their cooperative close handler
 and `WA_QuitOnClose=False` preserve the document/worker lifecycle.
+
+## Backend selection and diagnostics
+
+The generic UI lazily selects its backend; applications needing Qt objects should
+explicitly import `commonUtils.ui.pyside` and initialize QApplication once.
+Native UI access does not itself import PySide. The default `ui.use_pyside=True`
+assumes a QApplication already exists when PySide is available; fallback cannot
+recover from Qt aborting because no application exists. For standalone scripts,
+select the native backend explicitly:
+
+```python
+from commonUtils import ui
+from commonUtils.runtime.diagnostics import log, Severity
+
+log(Severity.INFO, 'Example', 'Operation completed')
+ui.use_pyside = False  # Standalone script without a QApplication.
+ui.display_msg_box_ok('Example', 'Operation completed')
+```
+
+`Severity.CRITICAL` raises `DebugException`. Shared Qt workers use
+`noninteractive_logging` so failures cannot open dialogs from the worker thread;
+GUI owners receive and present the error. Callbacks must not prompt or touch widgets.

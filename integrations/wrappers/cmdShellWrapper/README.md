@@ -36,7 +36,7 @@ exit status. A new terminal window returns immediately regardless of
 
 ## Basic Usage
 
-The main public entry point is `exec_cmd()`:
+`exec_cmd()` is the compatibility entry point for shell strings:
 
 ```python
 from commonUtils.integrations.wrappers import cmdShellWrapper
@@ -60,7 +60,7 @@ The `time_out` value is an **idle-output timeout**, not a maximum runtime. A com
 
 ### 📄 `__init__.py`
 
-Provides the main `exec_cmd()` interface and coordinates command execution, output capture, timeout handling, and the supporting modules below.
+Exports `run_command()`, `CommandResult`, `exec_cmd()` and `minimize_console_window()`. Command execution lives in `result.py` and the compatibility adapter in `command.py`.
 
 When output is captured, stdout and stderr are read concurrently so either stream counts as activity for the idle timeout.
 
