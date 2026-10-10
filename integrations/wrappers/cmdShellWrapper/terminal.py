@@ -60,13 +60,13 @@ def _exec_cmd_new_window_macos(command: str, cwd: Optional[str]):
     terminal_command = command
 
     if cwd is not None:
-        terminal_command = f'cd {shlex.quote(cwd)} && {terminal_command}'
+        terminal_command = f'cd -- {shlex.quote(cwd)}' + (f' && {command}' if command else '')
 
-    # Run command via bash, then keep Terminal open.
-    bash_cmd = f"bash -lc {shlex.quote(terminal_command + '; exec bash')}"
+    # Use Terminal's interactive shell. Starting another login shell (or exec'ing
+    # bash afterward) reruns startup scripts and can reset the requested directory.
 
     # Escape for AppleScript string literal.
-    applescript_cmd = bash_cmd.replace('\\', '\\\\').replace('"', '\\"')
+    applescript_cmd = terminal_command.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
 
     applescript = (
         'tell application "Terminal"\n'
