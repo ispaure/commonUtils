@@ -38,6 +38,8 @@ class LineNumbers(qt.QWidget):
 
 
 class CodeEdit(TransformCommands, qt.QPlainTextEdit):
+    focused = qt.Signal()
+    read_only_changed = qt.Signal(bool)
     preferences_changed = qt.Signal()
     zoom_changed = qt.Signal()
 
@@ -389,3 +391,11 @@ class CodeEdit(TransformCommands, qt.QPlainTextEdit):
             self.setTextCursor(cursor)
             return
         super().keyPressEvent(event)
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self.focused.emit()
+
+    def setReadOnly(self, value):
+        super().setReadOnly(value)
+        self.read_only_changed.emit(value)
