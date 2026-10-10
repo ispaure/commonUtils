@@ -84,6 +84,43 @@ class WorkspaceTests(unittest.TestCase):
         self.mouse(workspace, qt.QEvent.Type.MouseMove, origin)
         self.assertIsNone(workspace._window_drag)
 
+    def test_browser_policy_keeps_one_attached_tab_and_closes_split_neighbors(self):
+        workspace = self.create()
+        workspace.keep_one_tab = True
+        workspace.add_view('first'); first = workspace.active_dock
+        self.settle()
+        self.assertFalse(first.tab_header.close_button.isEnabled())
+        self.assertFalse(first.close())
+        self.assertFalse(first.widget().closing)
+        workspace.add_view('second'); second = workspace.active_dock
+        self.settle()
+        bar = self.tab_bar(workspace)
+        for index in range(bar.count()):
+            self.assertTrue(bar.tabButton(index, qt.QTabBar.ButtonPosition.LeftSide).isEnabled())
+        workspace.arrange(second, 'right', anchor=first)
+        self.settle()
+        first.tab_header.close_button.click(); self.settle()
+        self.assertEqual(workspace.docks, [second])
+        self.assertFalse(second.tab_header.close_button.isEnabled())
+        workspace.close_action.trigger(); self.settle()
+        self.assertEqual(workspace.docks, [second])
+        self.assertTrue(workspace.prepare_close())
+        self.assertTrue(second.close())
+        self.settle()
+        self.assertEqual(workspace.docks, [])
+
+    def test_floating_tab_does_not_own_application_quit_or_replace_attached_tab(self):
+        workspace = self.create(); workspace.keep_one_tab = True
+        workspace.add_view('first'); first = workspace.active_dock
+        workspace.add_view('floating'); floating = workspace.active_dock
+        floating.setFloating(True); self.settle()
+        self.assertFalse(first.tab_header.close_button.isEnabled())
+        self.assertTrue(floating.tab_header.close_button.isEnabled())
+        self.assertFalse(floating.testAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose))
+        floating.tab_header.close_button.click(); self.settle()
+        self.assertEqual(workspace.docks, [first])
+        self.assertFalse(first.close())
+
     def test_retired_tab_disappears_before_worker_finishes(self):
         workspace = self.create()
         view = workspace.add_view('busy')

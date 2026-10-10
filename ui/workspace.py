@@ -98,6 +98,8 @@ class WorkspaceDock(qt.QDockWidget):
         super().__init__(title, workspace)
         self.workspace = workspace
         self.setWidget(view)
+        # A floating tab is a document/tool window, never the application's quit owner.
+        self.setAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setFeatures(qt.QDockWidget.DockWidgetFeature.DockWidgetClosable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetMovable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
@@ -120,6 +122,9 @@ class WorkspaceDock(qt.QDockWidget):
         menu.deleteLater()
 
     def closeEvent(self, event):
+        if not self.workspace.can_close_tab(self):
+            event.ignore()
+            return
         if not getattr(self.widget(), 'prepare_close', lambda: True)():
             if getattr(self.widget(), 'can_retire', False):
                 self.workspace.retire_view(self)
@@ -133,11 +138,12 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
     """Views expose prepare_close() and idle; their application state stays in the view."""
     active_changed = qt.Signal(object)
 
-    def __init__(self, factory, parent=None, *, allow_new_tabs=True, dock_group='browser'):
+    def __init__(self, factory, parent=None, *, allow_new_tabs=True, dock_group='browser', keep_one_tab=False):
         super().__init__(parent)
         self.setWindowFlags(qt.Qt.WindowType.Widget)
         self.factory = factory
         self.allow_new_tabs = allow_new_tabs
+        self.keep_one_tab = keep_one_tab
         self.dock_group = dock_group
         self.docks = []
         self._retiring = []
@@ -211,6 +217,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         for dock in self.docks:
             grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
             dock.tab_header.setFixedHeight(0 if grouped else 30)
+            dock.tab_header.close_button.setEnabled(self.can_close_tab(dock))
         for bar in self.findChildren(qt.QTabBar):
             # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
             if bar.parent() is not self or not bar.count() or not self._tab_dock(bar, 0):
@@ -243,6 +250,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                     button.clicked.connect(lambda checked=False, owner=button: owner.dock.close())
                     bar.setTabButton(index, qt.QTabBar.ButtonPosition.LeftSide, button)
                 button.dock = dock
+                button.setEnabled(self.can_close_tab(dock))
             arrows = [bar.findChild(qt.QToolButton, name)
                       for name in ('ScrollLeftButton', 'ScrollRightButton')]
             overflow = all(arrow is not None and arrow.isVisible() for arrow in arrows)
@@ -441,6 +449,13 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         dock.show()
         dock.raise_()
         self._activate(dock)
+
+    def can_close_tab(self, dock):
+        if dock not in self.docks:
+            return False
+        if self._closing or not self.keep_one_tab or dock.isFloating():
+            return True
+        return sum(not item.isFloating() for item in self.docks) > 1
 
     def close_active(self):
         if self.active_dock:
