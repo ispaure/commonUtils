@@ -39,7 +39,7 @@ from ..filesystem import FilesystemObject
 
 class File(FilesystemObject):
     def __init__(self, path: Path):
-        self.path = path
+        self.path = Path(path)
         self.file_name = self.__get_file_name()
         self.name_without_ext = self.__get_name_without_ext()
         self.ext: Union[str, None] = self.__get_ext()
@@ -151,24 +151,45 @@ class File(FilesystemObject):
         cmdShellWrapper.exec_cmd(f'chmod +x "{self.path}"')
 
 
-def move_file(src: Path, dest: Path) -> bool:
-    """
-    Move a file, preserving an existing destination if replacement fails.
+    def copy_file(self, destination: Union[str, Path]) -> "File":
+        """Copy to a destination and return its fresh File snapshot. I/O errors propagate.
 
-    Same-filesystem replacement is atomic. Cross-filesystem moves copy to a
-    temporary location beside the destination before replacing it, then remove
-    the source. Moving a file onto itself is a successful no-op.
-    Returns True if successful, False otherwise.
-    """
-    src = Path(src)
-    dest = Path(dest)
+        The original object is not retargeted; cached metadata remains a snapshot.
+        """
+        source = self.path
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
+        log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
+
+        copyfile(source, destination)
+        return File(destination)
+
+    def rename_file(self, destination: Union[str, Path], force: bool = False) -> "File":
+        """Rename and return a fresh File; preserve destinations unless force=True.
+
+        The original object is not retargeted; cached metadata remains a snapshot.
+        """
+        original_name = self.path
+        new_name = Path(destination)
+        from ..renameUtils import rename_path
+        new_name.parent.mkdir(parents=True, exist_ok=True)
+        log(Severity.DEBUG, 'fileUtils.rename_file', f'Renaming file from "{original_name}" to "{new_name}"')
+        rename_path(original_name, new_name, overwrite=force)
+        return File(new_name)
+
+    def move_file(self, destination: Union[str, Path]) -> "File":
+        """Move with the existing atomic/cross-volume policy and return a fresh File.
+
+        The original object is not retargeted; cached metadata remains a snapshot.
+        """
+        src = self.path
+        dest = Path(destination)
         if not src.is_file():
             raise FileNotFoundError(f'Source is not an existing file: "{src}"')
 
         if dest.exists() and src.samefile(dest):
-            return True
+            return File(dest)
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         log(Severity.DEBUG, 'fileUtils.move_file', f'Moving file from "{src}" to "{dest}"')
@@ -187,11 +208,16 @@ def move_file(src: Path, dest: Path) -> bool:
                 os.replace(staged_file, dest)
             src.unlink()
 
-        return True
+        return File(dest)
 
+
+def move_file(src: Path, dest: Path) -> bool:
+    """Compatibility function: boolean outcome; new callers use File.move_file."""
+    try:
+        File(src).move_file(dest)
+        return True
     except Exception as error:
-        log(Severity.ERROR, 'fileUtils.move_file',
-            f'Error moving file from "{src}" to "{dest}": {error}')
+        log(Severity.ERROR, 'fileUtils.move_file', f'Could not move_file from "{src}" to "{dest}": {error}')
         return False
 
 
@@ -208,50 +234,22 @@ def get_split_character():
 
 
 def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
-    """
-    Renames a file on disk.
-    Existing destinations are preserved unless `force` is True.
-    Forced replacement does not delete the destination before the rename.
-    Returns True if successful, False otherwise.
-    """
-    original_name = Path(original_name)
-    new_name = Path(new_name)
-
+    """Compatibility function: boolean outcome; new callers use File.rename_file."""
     try:
-        from ..renameUtils import rename_path
-        new_name.parent.mkdir(parents=True, exist_ok=True)
-        log(Severity.DEBUG, 'fileUtils.rename_file', f'Renaming file from "{original_name}" to "{new_name}"')
-        rename_path(original_name, new_name, overwrite=force)
+        File(original_name).rename_file(new_name, force=force)
         return True
-
-    except Exception as e:
-        log(Severity.ERROR, 'fileUtils.rename_file',
-            f'Error renaming file from "{original_name}" to "{new_name}": {e}')
+    except Exception as error:
+        log(Severity.ERROR, 'fileUtils.rename_file', f'Could not rename_file from "{original_name}" to "{new_name}": {error}')
         return False
 
 
 def copy_file(source: Union[str, Path], destination: Union[str, Path]) -> bool:
-    """
-    Copy a file from source to destination.
-
-    Returns:
-        True if the file was copied successfully.
-        False if the copy failed.
-    """
-    source = Path(source)
-    destination = Path(destination)
-
+    """Compatibility function: boolean outcome; new callers use File.copy_file."""
     try:
-        # Create the destination directory if necessary
-        make_dir(destination.parent)
-
-        log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
-
-        copyfile(source, destination)
+        File(source).copy_file(destination)
         return True
-
     except (OSError, IOError) as error:
-        log(Severity.ERROR, 'fileUtils.copy_file', f'Failed to copy file from "{source}" to "{destination}": {error}')
+        log(Severity.ERROR, 'fileUtils.copy_file', f'Could not copy_file from "{source}" to "{destination}": {error}')
         return False
 
 
