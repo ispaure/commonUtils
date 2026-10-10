@@ -22,6 +22,9 @@ class DiffEdit(CodeEdit):
     def _refresh_bands(self, *args):
         if self.diff_rows: self.highlight_cursor()
 
+    def colors(self, kind):
+        return getattr(self, 'diff_color_overrides', {}).get(kind, diff_colors(self.palette(), kind))
+
     def setPlainText(self, text):
         # The shared cursor handler runs before our textChanged handler.
         self.diff_rows = []
@@ -77,7 +80,7 @@ class DiffEdit(CodeEdit):
                 old, new, kind = self.diff_rows[block.blockNumber()]
                 if kind in ('add', 'remove', 'hunk'):
                     painter.fillRect(0, top, self.gutter.width(), height,
-                                     qt.QColor(diff_colors(self.palette(), kind)[1]))
+                                     qt.QColor(self.colors(kind)[1]))
                 painter.setPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
                 for x, number in ((0, old), (half, new)):
                     painter.drawText(x + 6, top, half - 12, height,
@@ -98,7 +101,7 @@ class DiffEdit(CodeEdit):
             kind = self.diff_rows[block.blockNumber()][2]
             if kind in ('add', 'remove', 'hunk'):
                 selection = qt.QTextEdit.ExtraSelection()
-                selection.format.setBackground(qt.QColor(diff_colors(self.palette(), kind)[1]))
+                selection.format.setBackground(qt.QColor(self.colors(kind)[1]))
                 selection.format.setProperty(qt.QTextFormat.Property.FullWidthSelection, True)
                 selection.cursor = qt.QTextCursor(block)
                 selections.append(selection)
@@ -119,7 +122,7 @@ class DiffHighlighter(qt.QSyntaxHighlighter):
         kind = rows[index][2] if index < len(rows) else None
         if kind in ('hunk', 'add', 'remove'):
             form = qt.QTextCharFormat()
-            form.setForeground(qt.QColor(diff_colors(self.editor.palette(), kind)[0]))
+            form.setForeground(qt.QColor(self.editor.colors(kind)[0]))
             if kind == 'hunk': form.setFontWeight(qt.QFont.Weight.Bold)
             self.setFormat(0, len(text), form)
 
