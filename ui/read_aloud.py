@@ -5,8 +5,12 @@ stop playback when replacing content. Long documents are split into bounded
 utterances; stopping clears the queue before asking the native engine to stop.
 """
 from collections import deque
+from bisect import bisect_right
+import re
+from time import monotonic
 from . import pyside as qt
-from .reader_chrome import reader_button, reader_icon
+from .icons import set_painted_icon
+from .reader_chrome import ReaderIcon, reader_button
 
 
 def speech_chunks(text, limit=3000):
@@ -35,6 +39,20 @@ def reader_text(widget, *, start=None):
     return cursor.selectedText().replace('\u2029', '\n')
 
 
+def visible_text_start(widget):
+    """Text offset at the top of the visible reading area, independent of caret."""
+    return widget.cursorForPosition(qt.QPoint(1, 1)).position()
+
+
+def _word_ranges(text, base=0):
+    offset, previous = base, 0
+    for word in re.finditer(r'\S+', text):
+        offset += len(text[previous:word.start()].encode('utf-16-le')) // 2
+        end = offset + len(word.group().encode('utf-16-le')) // 2
+        yield offset, end
+        offset, previous = end, word.end()
+
+
 class ReadAloud(qt.QObject):
     positionChanged = qt.Signal(int, int)
 
@@ -54,6 +72,17 @@ class ReadAloud(qt.QObject):
         self.panel = None
         self.pending = deque()
         self._speaking = False
+        self._source_text = ''
+        self._source_base = 0
+        self._word_starts = []
+        self._position = 0
+        self._word_events = deque(maxlen=30)
+        self._utterance_words = []
+        self._utterance_word_index = 0
+        self._native_words = False
+        self.word_timer = qt.QTimer(self)
+        self.word_timer.setSingleShot(True)
+        self.word_timer.timeout.connect(self._estimated_word)
         self.advance = qt.QTimer(self)
         self.advance.setSingleShot(True)
         self.advance.timeout.connect(self._next)
@@ -104,10 +133,16 @@ class ReadAloud(qt.QObject):
             form.addRow(label, widget)
         layout.addLayout(form)
         row = qt.QHBoxLayout()
+        self.back = reader_button(self.panel, 'Back 15 seconds', icon='back15')
+        self.forward = reader_button(self.panel, 'Forward 15 seconds', icon='forward15')
+        for button in (self.back, self.forward):
+            button.setToolTip(button.accessibleName() + ' (approximate text position)')
         self.read = reader_button(self.panel, 'Play', icon='play')
         self.pause = reader_button(self.panel, 'Pause', icon='pause')
         self.stop_button = reader_button(self.panel, 'Stop', icon='stop')
-        for button, callback in ((self.read, self.start), (self.pause, self.toggle_pause), (self.stop_button, self.stop)):
+        for button, callback in ((self.back, lambda: self.skip(-15)), (self.read, self.start),
+                                 (self.pause, self.toggle_pause), (self.stop_button, self.stop),
+                                 (self.forward, lambda: self.skip(15))):
             row.addWidget(button)
             button.clicked.connect(callback)
         layout.addLayout(row)
@@ -135,6 +170,7 @@ class ReadAloud(qt.QObject):
             self.read.setEnabled(False)
             self.pause.setEnabled(False)
             self.stop_button.setEnabled(False)
+            self.back.setEnabled(False); self.forward.setEnabled(False)
         self.panel.resize(380, self.panel.sizeHint().height())
         self._position_panel()
         self.panel.show()
@@ -171,36 +207,89 @@ class ReadAloud(qt.QObject):
     def start(self):
         if self.engine is None:
             return
-        self.stop()
-        text = self.text_provider()
         widget = self.text_widget() if callable(self.text_widget) else self.text_widget
-        self._highlight_widget = widget
         cursor = widget.textCursor() if widget is not None else None
         base = cursor.selectionStart() if cursor is not None and cursor.hasSelection() else (
-            self.start_provider() if self.start_provider else 0)
+            self.start_provider() if self.start_provider else visible_text_start(widget) if widget is not None else 0)
+        text = reader_text(widget, start=0) if widget is not None and not cursor.hasSelection() else self.text_provider()
+        source_base = 0 if widget is not None and not cursor.hasSelection() else base
+        self.stop()
+        self._source_text, self._source_base = text, source_base
+        self._word_starts = [start for start, end in _word_ranges(text, source_base)]
+        self._word_events.clear()
+        self._highlight_widget = widget
+        self._queue_from(base)
+
+    def _queue_from(self, position):
+        self.advance.stop(); self.word_timer.stop()
+        self.pending.clear()
+        self._speaking = False
+        self.engine.stop()
+        self._position = position
+        relative = max(0, position - self._source_base)
+        prefix = self._source_text.encode('utf-16-le')[:relative * 2].decode('utf-16-le', errors='ignore')
+        text = self._source_text[len(prefix):]
         search = 0
-        capable = bool(self.engine.engineCapabilities() & self.speech_type.Capability.WordByWordProgress)
-        for chunk in speech_chunks(text, 3000 if capable else 350):
+        self._native_words = bool(self.engine.engineCapabilities() & self.speech_type.Capability.WordByWordProgress)
+        for chunk in speech_chunks(text, 3000 if self._native_words else 350):
             start = text.find(chunk, search)
-            if start < 0:
-                start = search
-            offset = base + len(text[:start].encode('utf-16-le')) // 2
+            if start < 0: start = search
+            offset = position + len(text[:start].encode('utf-16-le')) // 2
             self.pending.append((chunk, offset))
             search = start + len(chunk)
         if not self.pending:
             self.message.setText('There is no text to read here.')
+            self._clear_highlight()
             return
         self._next()
 
     def _next(self):
         if self.pending:
             text, self._utterance_offset = self.pending.popleft()
-            self._highlight(self._utterance_offset, len(text.encode('utf-16-le')) // 2)
+            self._utterance_words = list(_word_ranges(text, self._utterance_offset))
+            self._utterance_word_index = 0
+            if self._utterance_words:
+                start, end = self._utterance_words[0]
+                self._position = start
+                self._highlight(start, end - start)
             self.engine.say(text)
 
     def _word(self, word, utterance, start, length):
         if self._speaking:
-            self._highlight(self._utterance_offset + start, length)
+            self._native_words = True
+            self.word_timer.stop()
+            self._position = self._utterance_offset + start
+            self._word_events.append((monotonic(), bisect_right(self._word_starts, self._position) - 1))
+            self._highlight(self._position, length)
+
+    def _words_per_second(self):
+        if len(self._word_events) > 3:
+            first, last = self._word_events[0], self._word_events[-1]
+            if last[0] - first[0] > 1 and last[1] > first[1]:
+                return max(1, min(8, (last[1] - first[1]) / (last[0] - first[0])))
+        return max(1, 3 * (1 + self.speed.value()))
+
+    def _estimated_word(self):
+        if not self._speaking or self._native_words:
+            return
+        self._utterance_word_index = min(self._utterance_word_index + 1, len(self._utterance_words) - 1)
+        if self._utterance_words:
+            start, end = self._utterance_words[self._utterance_word_index]
+            self._position = start
+            self._highlight(start, end - start)
+            if self._utterance_word_index + 1 < len(self._utterance_words):
+                self.word_timer.start(round(1000 / self._words_per_second()))
+
+    def skip(self, seconds):
+        """Seek approximately by speech time; native Qt engines expose text, not audio seeking."""
+        if not self._word_starts or self.engine is None:
+            return
+        paused = self.engine.state() == self.speech_type.State.Paused
+        current = max(0, bisect_right(self._word_starts, self._position) - 1)
+        target = max(0, min(len(self._word_starts) - 1, current + round(seconds * self._words_per_second())))
+        self._word_events.clear()
+        self._queue_from(self._word_starts[target])
+        if paused: self.engine.pause()
 
     def _highlight(self, start, length):
         widget = self._highlight_widget
@@ -239,14 +328,21 @@ class ReadAloud(qt.QObject):
         paused = state == states.Paused
         finished = state == states.Ready and self._speaking
         self._speaking = speaking or paused
+        if paused: self._word_events.clear()
         label = 'Resume' if paused else 'Pause'
         self.pause.setText(label)
         self.pause.setToolTip(label)
         self.pause.setAccessibleName(label)
-        self.pause.setIcon(reader_icon('play' if paused else 'pause'))
+        set_painted_icon(self.pause, ReaderIcon, 'play' if paused else 'pause')
         capable = bool(self.engine.engineCapabilities() & self.speech_type.Capability.PauseResume)
         self.pause.setEnabled(capable and (speaking or paused))
         self.stop_button.setEnabled(speaking or paused or bool(self.pending))
+        for button in (self.back, self.forward):
+            button.setEnabled(bool(self._word_starts) and (speaking or paused))
+        if speaking and not self._native_words and self._utterance_words:
+            self.word_timer.start(round(1000 / self._words_per_second()))
+        elif not speaking:
+            self.word_timer.stop()
         self.read.setEnabled(state != states.Error)
         for control in (self.language, self.voice):
             control.setEnabled(not speaking and not paused)
@@ -277,6 +373,7 @@ class ReadAloud(qt.QObject):
                 self.engine.pause()
 
     def stop(self):
+        self.word_timer.stop()
         self.advance.stop()
         self.pending.clear()
         self._speaking = False

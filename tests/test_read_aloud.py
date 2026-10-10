@@ -1,7 +1,7 @@
 """Speech queue/lifetime tests use a silent engine, never the user's speakers."""
 import unittest
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.read_aloud import ReadAloud, reader_text, speech_chunks
+from commonUtils.ui.read_aloud import ReadAloud, reader_text, speech_chunks, visible_text_start
 from PySide6.QtTextToSpeech import QTextToSpeech as Speech
 
 
@@ -46,6 +46,56 @@ class SpeechTests(unittest.TestCase):
         self.assertIsNone(speech.engine)
         speech.show()
         return speech
+
+    def test_speech_starts_at_visible_text_and_highlights_one_word(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.resize(240, 120)
+        widget.setPlainText('\n'.join(f'Line {number} words here' for number in range(80)))
+        widget.show(); self.app.processEvents()
+        widget.verticalScrollBar().setValue(widget.verticalScrollBar().maximum() // 2)
+        base = visible_text_start(widget)
+        self.assertGreater(base, 0)
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show(); speech.start()
+        self.assertTrue(speech.engine.spoken[0].startswith(reader_text(widget, start=base).strip()[:20]))
+        selections = widget.extraSelections()
+        self.assertLess(len(selections[0].cursor.selectedText()), 15)
+        self.assertGreaterEqual(selections[0].cursor.selectionStart(), base)
+        speech._estimated_word()
+        selections = widget.extraSelections()
+        self.assertLess(len(selections[0].cursor.selectedText()), 15)
+
+    def test_skip_moves_both_directions_and_preserves_pause_and_unicode_offsets(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.setPlainText(' '.join(f'word{number}😀' for number in range(200)))
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show(); speech.start()
+        speech.skip(15)
+        self.assertTrue(speech.engine.spoken[-1].startswith('word45😀'))
+        selections = widget.extraSelections()
+        self.assertEqual(selections[0].cursor.selectedText(), 'word45😀')
+        speech.toggle_pause(); speech.skip(-15)
+        self.assertEqual(speech.engine.state(), Speech.State.Paused)
+        self.assertTrue(speech.engine.spoken[-1].startswith('word0😀'))
+        speech.stop()
+        self.assertFalse(speech.word_timer.isActive())
+        self.assertFalse(speech.back.isEnabled())
+        self.assertFalse(speech.forward.isEnabled())
+
+    def test_native_word_progress_never_highlights_the_entire_utterance(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.setPlainText('A long paragraph. ' * 200)
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show()
+        speech.engine.engineCapabilities = lambda: Speech.Capability.WordByWordProgress
+        speech.start()
+        self.assertGreater(len(speech.engine.spoken[0]), 1000)
+        selections = widget.extraSelections()
+        self.assertEqual(selections[0].cursor.selectedText(), 'A')
+        speech.engine.sayingWord.emit('paragraph', 0, 7, 9)
+        selections = widget.extraSelections()
+        self.assertEqual(selections[0].cursor.selectedText(), 'paragraph')
+        self.assertFalse(speech.word_timer.isActive())
 
     def test_queue_pause_and_stop_cancel_scheduled_next_utterance(self):
         speech = self.speech('A sentence. ' * 800)
