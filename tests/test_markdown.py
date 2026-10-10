@@ -8,8 +8,8 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
-from commonUtils.fileTypes.registry import file_from_path
-from commonUtils.fileTypes.markdownType import MarkdownFile
+from commonUtils.formats.registry import file_from_path
+from commonUtils.formats.markdownType import MarkdownFile
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer, open_markdown, _windows
 from commonUtils.ui.file_browser import FileBrowser

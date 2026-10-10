@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from .. import pyside as qt
 from .. import desktop_actions
-from ...dirUtils import Directory
+from ...filesystem.directories import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel, ByteSortModel, BrowserTree, _BrowserSelection
 from .details import DetailsPanel
@@ -69,7 +69,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._index_paused = False
         self._changed_paths = set()
         self._index_priority_owner = object()
-        from ...directory import directory_cache
+        from ...filesystem.index import directory_cache
         self._index_priority_lease = IndexPriorityLease(self, directory_cache, self._index_priority_owner)
         self._full_index_refresh = False
         self.folder_root = None
@@ -159,7 +159,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.preview_toggle.setIconSize(qt.QSize(20, 20))
         self.preview_toggle.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.preview_toggle.setCheckable(True)
-        from ...settings import get_setting
+        from ...configuration.settings import get_setting
         self.preview_toggle.setChecked(get_setting('FileBrowser', 'preview_enabled', True))
         self.preview_toggle.setText('Preview on' if self.preview_toggle.isChecked() else 'Preview off')
         self.preview_toggle.setToolTip('Show selection details, or current-folder properties when nothing is selected')
@@ -382,7 +382,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
 
     def _directory_changed(self, path):
         self._set_network_location(path)
-        from ...directory import directory_cache
+        from ...filesystem.index import directory_cache
         directory_cache.set_priority_folders(self._index_priority_owner, () if self.network_location else (path,))
         self.model.size_parents = {str(path)}
         self.index_search.scope_changed(path)
@@ -391,7 +391,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             self.refresh_folder_totals()
 
     def _set_network_location(self, path):
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         network = is_network_location(path)
         changed = self.network_location != network
         self.network_location = network
@@ -430,7 +430,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         # selection event (which also publishes directory_changed).
         from .index_policy import index_policy
         if not self.network_location and path == self.folder_root and not self.folder_busy and index_policy(path=self.index_settings_path).refresh_on_revisit:
-            from ...directory import directory_cache
+            from ...filesystem.index import directory_cache
             directory_cache.invalidate(path)
             self._changed_paths.add(path)
             self.refresh_folder_totals()
@@ -438,8 +438,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     def _update_watch_paths(self, root, paths):
         if self.stopping or self.network_location or root != self.navigation.directory:
             return
-        from ...directory import directory_cache
-        from ...directory.exclusions import scan_exclusions, is_excluded
+        from ...filesystem.index import directory_cache
+        from ...filesystem.index.exclusions import scan_exclusions, is_excluded
         exclusions = scan_exclusions(root, directory_cache.database)
         expected = {str(path) for path in paths if not is_excluded(path, exclusions)}
         previous = set(self.index_watcher.directories()) | set(self.index_watcher.files())
@@ -454,8 +454,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         path = Path(path)
         if root is None or (path != root and root not in path.parents):
             return
-        from ...directory import directory_cache
-        from ...directory.exclusions import scan_exclusions, is_excluded
+        from ...filesystem.index import directory_cache
+        from ...filesystem.index.exclusions import scan_exclusions, is_excluded
         if is_excluded(Path(path), scan_exclusions(self.navigation.directory, directory_cache.database)):
             return
         directory_cache.invalidate(Path(path))
@@ -758,7 +758,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     def stop(self):
         if self._index_details_dialog is not None:
             self._index_details_dialog.close()
-        from ...directory import directory_cache
+        from ...filesystem.index import directory_cache
         directory_cache.set_priority_folders(self._index_priority_owner)
         self.stopping = True
         self.reconcile_debounce.stop(); self.reconcile_timer.stop()

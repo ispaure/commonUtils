@@ -5,7 +5,7 @@ the returned controller supports system/light/dark selection without restarting.
 """
 from dataclasses import dataclass
 from . import pyside as qt
-from ..settings import get_setting
+from ..configuration.settings import get_setting
 
 
 @dataclass(frozen=True)

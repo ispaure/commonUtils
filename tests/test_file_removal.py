@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock
-from commonUtils.file_removal import removal_plan, remove_items
+from commonUtils.filesystem.removal import removal_plan, remove_items
 
 
 class RemovalTests(unittest.TestCase):

@@ -7,10 +7,10 @@ import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
-from commonUtils.directory import DirectoryCache
-from commonUtils.directory.order import _sort_key
-from commonUtils.directory.schema import upgrade_entries, ensure_folder, initialize_schema
-from commonUtils.operations import OperationCancelled
+from commonUtils.filesystem.index import DirectoryCache
+from commonUtils.filesystem.index.order import _sort_key
+from commonUtils.filesystem.index.schema import upgrade_entries, ensure_folder, initialize_schema
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class DirectorySchemaTests(unittest.TestCase):

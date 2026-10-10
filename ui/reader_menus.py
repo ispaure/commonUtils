@@ -5,7 +5,7 @@ from ..persistence import atomic_write_json
 from threading import RLock
 
 from . import pyside as qt
-from ..storage import cache_directory
+from ..filesystem.storage import cache_directory
 
 _history_lock = RLock()
 

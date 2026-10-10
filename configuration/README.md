@@ -6,7 +6,7 @@ settings visually. Each layer works independently.
 
 | Layer | Import | Responsibility |
 | --- | --- | --- |
-| INI document | `commonUtils.fileTypes.iniType.INIFile` | String values, parsing, formatting preservation and safe saves |
+| INI document | `commonUtils.formats.iniType.INIFile` | String values, parsing, formatting preservation and safe saves |
 | Optional schema | `commonUtils.configuration.ini_schema` | Typed suffixes, list parsing and dropdown choices |
 | Visual editor | `commonUtils.ui.ini_editor.INISettingsEditor` | Section tabs, key rows, validation and explicit saving |
 
@@ -19,7 +19,7 @@ happens after a setting changes. The existing `configUtils` API stays available.
 
 ```python
 from pathlib import Path
-from commonUtils.fileTypes.iniType import INIFile
+from commonUtils.formats.iniType import INIFile
 
 config = INIFile(Path("config.ini")).read()
 name = config.get("General", "name", fallback="")
@@ -37,7 +37,7 @@ Ambiguous formatting raises an error rather than changing unrelated values;
 the editor's Source tab lets you correct it. Coordinate concurrent writers in
 your application: the conflict check is not a cross-process lock.
 
-See [INIFile details](../fileTypes/README.md#initypepy) for the full document API.
+See [INIFile details](../formats/README.md#initypepy) for the full document API.
 
 ## Opt into typed keys
 

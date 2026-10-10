@@ -2,8 +2,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from commonUtils.directory import DirectoryCache, Snapshot
-from commonUtils.operations import OperationCancelled
+from commonUtils.filesystem.index import DirectoryCache, Snapshot
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class SearchTermTests(unittest.TestCase):

@@ -1,6 +1,6 @@
 """Internal same-pane rich Markdown editing and source synchronization."""
 from .. import pyside as qt
-from ...markdownUtils import split_frontmatter
+from ...formats.markdown import split_frontmatter
 from .headings import _iter_headings
 from .syntax import HEADING
 from .extensions import reading_source

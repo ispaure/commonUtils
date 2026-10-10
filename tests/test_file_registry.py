@@ -4,19 +4,18 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from commonUtils.dirUtils import Directory
-from commonUtils.fileUtils import File
-from commonUtils.fileTypes.registry import (FileTypeRegistry, file_from_path,
-    register_file_type, override_file_type, file_types, object_from_path)
+from commonUtils.filesystem.directories import Directory
+from commonUtils.filesystem.files import File
+from commonUtils.formats.registry import FileTypeRegistry, file_from_path, register_file_type, override_file_type, file_types, object_from_path
 
 
 class ProjectFile(File):
     pass
 
 
-from commonUtils.fileTypes.txtType import TXTFile
-from commonUtils.fileTypes.markdownType import MarkdownFile
-from commonUtils.features import Feature, FileType, FileTypeOverride
+from commonUtils.formats.txtType import TXTFile
+from commonUtils.formats.markdownType import MarkdownFile
+from commonUtils.ui.features import Feature, FileType, FileTypeOverride
 
 
 class CustomText(TXTFile):

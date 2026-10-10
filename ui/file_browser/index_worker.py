@@ -4,7 +4,7 @@ import sqlite3
 from threading import Event, RLock
 from ..operations import Operation
 from .. import pyside as qt
-from ...directory import directory_cache
+from ...filesystem.index import directory_cache
 from .status import IndexProgress
 
 

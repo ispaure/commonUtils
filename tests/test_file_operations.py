@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
-from commonUtils import file_operations as operations
+from commonUtils.filesystem import transfers as operations
 
 
 class FileTransferTests(unittest.TestCase):

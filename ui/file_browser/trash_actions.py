@@ -1,6 +1,6 @@
 """Browser removal confirmations and safe Trash / Recycle Bin fallback UX."""
 from .. import pyside as qt
-from ...file_removal import removal_plan, remove_items
+from ...filesystem.removal import removal_plan, remove_items
 
 
 class TrashActionsMixin:

@@ -9,7 +9,7 @@ import fnmatch
 import os
 import re
 import stat
-from ..operations import OperationCancelled
+from ..runtime.operations import OperationCancelled
 
 
 def natural_path_key(path):

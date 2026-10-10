@@ -2,9 +2,9 @@
 from pathlib import Path
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
-from ...directory import directory_cache, Snapshot
+from ...filesystem.index import directory_cache, Snapshot
 from time import time
-from ...operations import OperationCancelled
+from ...runtime.operations import OperationCancelled
 from dataclasses import dataclass
 from datetime import datetime
 from ...filesystem import format_datetime
@@ -78,7 +78,7 @@ class ScanDialog(qt.QDialog):
         return self.task.busy
 
     def scan(self, recursive, *, refresh=False):
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         if is_network_location(self.root):
             self.summary.setText('Scans disabled for network drives')
             return

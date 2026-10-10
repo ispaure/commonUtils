@@ -82,7 +82,7 @@ buffer text to refresh the comparison immediately; callbacks returning `None`
 retain the older reopen-after-apply behavior. The host still owns stale-buffer
 checks, conversion from Python offsets to Qt UTF-16 positions, undo and saving.
 
-`commonUtils.text_merge.merge_text(base, left, right)` builds a Qt-independent,
+`commonUtils.persistence.merge.merge_text(base, left, right)` builds a Qt-independent,
 bounded three-way model. `MergeSession` owns live result ranges and a bounded
 undo/redo history that includes manual edits and resolution decisions. Independent
 and identical changes can be applied together; overlapping edits remain explicit

@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from commonUtils.downloads import DownloadSpec, DownloadCancelled, is_ready, provision
+from commonUtils.runtime.streams.downloads import DownloadSpec, DownloadCancelled, is_ready, provision
 
 
 class Response(BytesIO):
@@ -88,7 +88,7 @@ class DownloadTests(unittest.TestCase):
 
     def test_cancel_during_payload_extraction_preserves_previous_executable(self):
         from threading import Event
-        from commonUtils import downloads
+        from commonUtils.runtime.streams import downloads
         cancelled = Event()
         self.path.parent.mkdir()
         self.path.write_bytes(b'previous executable')

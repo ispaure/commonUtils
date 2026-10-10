@@ -9,17 +9,17 @@ Public entry points: `BrowserDetails`, `BrowserPanel`, `BrowserAction`, `Filesys
 
 [Library overview](../README.md).
 
-`transfers.py` owns the historical `file_operations` implementation; its compatibility
-package preserves existing consumers.
+`transfers.py` owns the historical `file_operations` implementation; the centralized compatibility
+adapter preserves existing consumers.
 
-`removal.py` owns the historical `file_removal` implementation; its compatibility
-package preserves existing consumers.
+`removal.py` owns the historical `file_removal` implementation; the centralized compatibility
+adapter preserves existing consumers.
 
-`traversal.py` owns the historical `traversal` implementation; its compatibility
-package preserves existing consumers.
+`traversal.py` owns the historical `traversal` implementation; the centralized compatibility
+adapter preserves existing consumers.
 
-`network.py` owns the historical `network_filesystems` implementation; its compatibility
-package preserves existing consumers.
+`network.py` owns the historical `network_filesystems` implementation; the centralized compatibility
+adapter preserves existing consumers.
 
 ## API behavior
 
@@ -28,3 +28,14 @@ package preserves existing consumers.
 | `FilesystemObject` | Common read-only information and optional browser behavior for files/folders. |
 | `scan_folders` | Compatibility API: recursive totals from the shared persistent index. |
 | `format_datetime` | Human-readable local date/time, independent of platform strftime flags. |
+
+## Related modules
+
+- `files`: file objects and helpers.
+- `directories`: directory objects and browsing helpers.
+- `links`: symbolic links and shortcuts.
+- `rename`: filename transformations and batch rename policy.
+- `index`: persistent directory metadata, search and reconciliation.
+- `storage`: capacity and storage accounting.
+
+Example: `from commonUtils.filesystem.directories import Directory`.

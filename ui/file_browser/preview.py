@@ -49,7 +49,7 @@ def update_preview_visibility(browser, selected):
     columns = browser.views.columns
     browser.preview_toggle.setVisible(mode in (0, 1))
     if mode == 2:
-        from ...dirUtils import Directory
+        from ...filesystem.directories import Directory
         items = browser.selected_objects()
         visible = len(items) == 1 and not isinstance(items[0], Directory)
         if browser.preview_panel.parentWidget() is not columns.preview_container:

@@ -1,5 +1,5 @@
 """Bounded archive text/image decoding; no launching, prompts or GUI objects."""
-from ..operations import check_cancelled
+from ..runtime.operations import check_cancelled
 from .reading import reader, _members, _name, _stream
 
 

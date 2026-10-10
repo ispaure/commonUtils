@@ -7,7 +7,7 @@ from time import monotonic,sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
-from commonUtils.directory import DirectoryCache
+from commonUtils.filesystem.index import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 from commonUtils.ui.file_browser.storage import StorageDialog

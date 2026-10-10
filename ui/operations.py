@@ -1,6 +1,6 @@
 """Background callbacks with one result/error contract and GUI-owner lifetimes."""
 from . import pyside as qt
-from ..debugUtils import noninteractive_logging
+from ..runtime.diagnostics import noninteractive_logging
 
 
 class ResultWorker(qt.QThread):

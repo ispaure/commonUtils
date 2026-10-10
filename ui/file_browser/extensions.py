@@ -1,7 +1,7 @@
 """Compile a feature declaration into a reversible per-window browser layer."""
 
 from ...filesystem import BrowserAction
-from ...features import ActionContext, resolve_type
+from ..features import ActionContext, resolve_type
 from .. import pyside as qt
 
 

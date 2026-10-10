@@ -4,8 +4,8 @@ from io import BytesIO
 from threading import Event
 import unittest
 
-from commonUtils.operations import OperationCancelled
-from commonUtils.streams import CHUNK_SIZE, copy_stream, stream_signature
+from commonUtils.runtime.operations import OperationCancelled
+from commonUtils.runtime.streams import CHUNK_SIZE, copy_stream, stream_signature
 
 
 class StreamTests(unittest.TestCase):

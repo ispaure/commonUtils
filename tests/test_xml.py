@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
-from commonUtils.fileTypes.xmlType import XMLFile
+from commonUtils.formats.xmlType import XMLFile
 
 
 class XMLTests(unittest.TestCase):

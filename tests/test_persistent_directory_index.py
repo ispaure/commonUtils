@@ -7,8 +7,8 @@ from time import sleep
 import unittest
 from unittest.mock import patch
 
-from commonUtils.directory import DirectoryCache, directory_index_path, storage_totals
-from commonUtils.operations import OperationCancelled
+from commonUtils.filesystem.index import DirectoryCache, directory_index_path, storage_totals
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class PersistentIndexTests(unittest.TestCase):

@@ -150,7 +150,7 @@ class BrowserFileActionTests(QtTestCase):
             delete.assert_not_called()
 
     def test_removal_dialog_defaults_to_cancel_and_removed_cut_items_are_pruned(self):
-        from commonUtils.file_removal import removal_plan
+        from commonUtils.filesystem.removal import removal_plan
         plan = removal_plan([self.file])
         inspected = []
         def cancel_dialog():

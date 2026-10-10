@@ -2,7 +2,7 @@
 
 ZIP/TAR listing, creation, safe extraction, editing, integrity checks and bounded previews. Domain operations have no UI dependencies. Passwords, progress and cancellation are supplied by callers.
 
-See [archive contracts](../ARCHIVES.md) and [ZIP compatibility](../ZIP_ARCHIVES.md).
+See [archive contracts](../docs/ARCHIVES.md) and [ZIP compatibility](../docs/ZIP_ARCHIVES.md).
 
 ## Files
 

@@ -1,6 +1,6 @@
 """Section tabs and key rows backed by an explicit-save source editor."""
 from configparser import Error as ConfigError
-from ..fileTypes.iniType import INIFile
+from ..formats.iniType import INIFile
 from . import pyside as qt
 from .text_editor import TextFileEditor
 from ..configuration.ini_schema import key_type, mode_choices, parse_value, validate_values

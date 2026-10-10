@@ -13,7 +13,7 @@ from .reading import MarkdownReadingMixin
 from .links import render_links
 from .tables import MarkdownTablesMixin
 from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
-from ...markdownUtils import split_frontmatter
+from ...formats.markdown import split_frontmatter
 
 
 class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTablesMixin, qt.QWidget):

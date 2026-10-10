@@ -8,7 +8,7 @@ import zipfile
 
 import pyzipper
 
-from commonUtils import zipUtils
+from commonUtils.archives import legacy as zipUtils
 
 
 class ZipPathTests(unittest.TestCase):

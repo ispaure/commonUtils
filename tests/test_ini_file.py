@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from commonUtils.fileTypes.iniType import INIFile
-from commonUtils.fileTypes.registry import file_from_path
+from commonUtils.formats.iniType import INIFile
+from commonUtils.formats.registry import file_from_path
 
 
 class INIFileTests(unittest.TestCase):

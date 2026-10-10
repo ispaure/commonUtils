@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 import os
 import shutil
 
-from ..operations import check_cancelled
-from ..streams import copy_stream
+from ..runtime.operations import check_cancelled
+from ..runtime.streams import copy_stream
 from .reading import reader, _members, _name, _directory, _stream
 
 

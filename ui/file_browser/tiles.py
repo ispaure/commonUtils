@@ -1,6 +1,6 @@
 """Responsive tile layout with bounded, adjustable icons and thumbnails."""
 
-from ...dirUtils import Directory
+from ...filesystem.directories import Directory
 from .. import pyside as qt
 from .editing import FilenameEditorMixin
 

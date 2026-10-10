@@ -1,5 +1,5 @@
 """Bounded storage graph collection, independent of Qt widget lifetime."""
-from ...operations import check_cancelled
+from ...runtime.operations import check_cancelled
 
 
 def collect_storage(cache, root, *, radial=False, cancelled=lambda: False):
