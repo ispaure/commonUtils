@@ -53,8 +53,12 @@ class MergeWidgetTests(QtTestCase):
 
     def key(self, widget, standard):
         from PySide6.QtTest import QTest
-        widget.window().show(); widget.window().activateWindow(); widget.setFocus()
-        self.app.processEvents()
+        window = widget.window(); window.show(); window.raise_(); window.activateWindow()
+        self.assertTrue(QTest.qWaitForWindowActive(window, 2000))
+        widget.setFocus(); self.app.processEvents()
+        self.assertTrue(widget.hasFocus())
+        # Let Cocoa finish updating native shortcut routing after activation.
+        QTest.qWait(20)
         QTest.keySequence(widget, qt.QKeySequence(qt.QKeySequence.keyBindings(standard)[0]))
         self.app.processEvents()
 
@@ -132,6 +136,7 @@ class MergeWidgetTests(QtTestCase):
             self.key(focus, qt.QKeySequence.StandardKey.Undo)
             self.assertEqual(editor.toPlainText(), expected)
             self.assertEqual(dialog.model.right, expected)
+        dialog.findChild(qt.QTabWidget).setCurrentIndex(1)
         for expected in states[1:]:
             self.key(dialog.unified, qt.QKeySequence.StandardKey.Redo)
             self.assertEqual(editor.toPlainText(), expected)
