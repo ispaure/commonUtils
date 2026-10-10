@@ -192,13 +192,18 @@ class IntegratedSearchTests(QtTestCase):
                     if number == 1050:
                         while not browser.stopping:
                             sleep(.002)
-                    sleep(.002)
                     yield entry
         def scandir(path): return SlowDirectory(path) if Path(path)==self.root else real(path)
         # Initial/partial scans publish durable progress. A completed index's
         # targeted Refresh is atomic and retains the old snapshot until commit.
         self.cache.clear(self.root)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=scandir):
+        checkpoint = self.cache._checkpoint
+        def publish(db, cancelled, **kwargs):
+            # Commit real bounded batches without depending on elapsed sleep
+            # time (short sleeps have coarse granularity on Windows runners).
+            checkpoint(db, cancelled, force=True)
+        with patch('commonUtils.directory_index.os.scandir', side_effect=scandir), patch.object(
+                self.cache, '_checkpoint', side_effect=publish):
             self.browser.refresh()
             self.browser.search_bar.setText('progress-')
             self.wait(lambda: 0 < self.browser.index_search.total < 1100, timeout=20)
