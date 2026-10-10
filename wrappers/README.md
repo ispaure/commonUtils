@@ -15,3 +15,5 @@ Adapters for command execution, PowerShell, EXIF and SQLite. Dependencies remain
 | [sqlWrapper.py](sqlWrapper.py) | `exec_sql_command`, `fetch_sql_table` |
 
 [Parent guide](../README.md)
+
+[Perforce](perforce/README.md) provides the shared file/group/workspace models.
