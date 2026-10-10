@@ -45,6 +45,7 @@ class Treemap(qt.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.items = []
+        self.loading = False
         self.rectangles = []
         self.selected_path = None
         self.setMinimumSize(250, 180)
@@ -59,6 +60,9 @@ class Treemap(qt.QWidget):
     def paintEvent(self, event):
         painter = qt.QPainter(self)
         painter.fillRect(self.rect(), self.palette().brush(qt.QPalette.ColorRole.Base))
+        if self.loading:
+            self.rectangles = []
+            return
         self.rectangles = treemap_rectangles(self.items, qt.QRectF(self.rect()))
         for index, (path, size, rect) in enumerate(self.rectangles):
             painter.fillRect(rect.adjusted(1, 1, -1, -1), qt.QColor.fromHsv((index * 47) % 360, 130, 125))
@@ -73,7 +77,7 @@ class Treemap(qt.QWidget):
                                  qt.Qt.AlignmentFlag.AlignTop | qt.Qt.TextFlag.TextWordWrap,
                                  f'{path.name}\n{format_size(size)}')
                 painter.restore()
-        if not self.rectangles:
+        if not self.rectangles and not self.loading:
             painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
             painter.drawText(self.rect(), qt.Qt.AlignmentFlag.AlignCenter, 'No file bytes to display')
 
