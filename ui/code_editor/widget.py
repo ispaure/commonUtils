@@ -2,6 +2,7 @@
 
 from .. import pyside as qt
 from .transforms import TransformCommands
+from .multicursor import MultiCursorCommands
 
 
 def monospace_font():
@@ -37,7 +38,7 @@ class LineNumbers(qt.QWidget):
         self.editor.paint_gutter(event)
 
 
-class CodeEdit(TransformCommands, qt.QPlainTextEdit):
+class CodeEdit(MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
     focused = qt.Signal()
     read_only_changed = qt.Signal(bool)
     preferences_changed = qt.Signal()
@@ -54,6 +55,7 @@ class CodeEdit(TransformCommands, qt.QPlainTextEdit):
         self.line_numbers = True
         self.comment_prefix = "#"
         self.search_selections = []
+        self.initialize_multicursor()
         self.gutter = LineNumbers(self)
         self.blockCountChanged.connect(self.update_gutter)
         self.updateRequest.connect(self._update_request)
@@ -130,7 +132,7 @@ class CodeEdit(TransformCommands, qt.QPlainTextEdit):
         selection.cursor = self.textCursor()
         selection.cursor.clearSelection()
         self.setExtraSelections(
-            [selection] + self.search_selections + self._matching_brackets()
+            [selection] + self.search_selections + self._matching_brackets() + self.multicursor_selections()
         )
         self.gutter.update()
 
@@ -341,6 +343,8 @@ class CodeEdit(TransformCommands, qt.QPlainTextEdit):
         self.setTextCursor(cursor)
 
     def keyPressEvent(self, event):
+        if self.multi_key(event):
+            return
         if (
             event.key() in (qt.Qt.Key.Key_Tab, qt.Qt.Key.Key_Backtab)
             and not self.isReadOnly()
