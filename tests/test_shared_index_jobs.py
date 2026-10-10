@@ -6,13 +6,14 @@ from threading import Event
 from tempfile import TemporaryDirectory
 from time import monotonic,sleep
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.directory_index import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.index_worker import FolderOperation
 
 
-class SharedJobTests(unittest.TestCase):
+class SharedJobTests(QtTestCase):
     @classmethod
     def setUpClass(cls):cls.app=qt.QApplication.instance() or qt.QApplication([])
 

@@ -1,12 +1,13 @@
 """Painted icon copies survive garbage collection and update with the palette."""
 import gc
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.icons import painted_icon, set_painted_icon
 from commonUtils.ui.reader_chrome import ReaderIcon
 
 
-class IconTests(unittest.TestCase):
+class IconTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 

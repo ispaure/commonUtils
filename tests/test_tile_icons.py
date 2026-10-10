@@ -1,5 +1,6 @@
 """Small raster icons are enlarged and centered independently of native style."""
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.tiles import TileDelegate
 
@@ -9,7 +10,7 @@ class Source(qt.QStandardItemModel):
         return object()
 
 
-class TileIconTests(unittest.TestCase):
+class TileIconTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 

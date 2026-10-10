@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from PySide6.QtTest import QTest
 from commonUtils.ui import pyside as qt
@@ -12,7 +13,7 @@ from commonUtils.ui.markdown.live_edit import FormattedMarkdownEdit
 from commonUtils.ui.markdown.links import link_spans, render_links
 
 
-class MarkdownLinkTests(unittest.TestCase):
+class MarkdownLinkTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.editor = FormattedMarkdownEdit()

@@ -2,13 +2,14 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 
 from PySide6.QtTest import QTest
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown.live_edit import FormattedMarkdownEdit, SourceMarkdownEdit
 
 
-class LiveMarkdownTests(unittest.TestCase):
+class LiveMarkdownTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.editor = FormattedMarkdownEdit()

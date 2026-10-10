@@ -5,13 +5,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import monotonic, sleep
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 from commonUtils.ui.file_browser.status import format_duration, indexing_phase, IndexProgress, private_status
 
 
-class BrowserPresentationTests(unittest.TestCase):
+class BrowserPresentationTests(QtTestCase):
     def test_toolbar_stays_inline_and_split_panes_cannot_shrink_into_overlap(self):
         from commonUtils.ui.workspace import Workspace
         host = qt.QWidget()
@@ -27,8 +28,8 @@ class BrowserPresentationTests(unittest.TestCase):
             host.resize(300, 300)
             for _ in range(10): self.app.processEvents()
             for browser in (first, second):
-                widgets = [browser.navigation, browser.folder_size_button, browser.view_selector,
-                           browser.preview_toggle, browser.view_selector.storage_controls, browser.search_button]
+                widgets = [browser.navigation, browser.search_button, browser.folder_size_button, browser.view_selector,
+                           browser.preview_toggle, browser.view_selector.storage_controls]
                 rects = [qt.QRect(widget.mapTo(browser, qt.QPoint()), widget.size()) for widget in widgets]
                 for left, right in zip(rects, rects[1:]):
                     self.assertLess(left.right(), right.left())

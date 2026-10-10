@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from threading import Event
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.operations import run_batch
@@ -12,7 +13,7 @@ from commonUtils.ui.operation_progress import OperationProgress
 from commonUtils.debugUtils import Severity, log
 
 
-class BatchTests(unittest.TestCase):
+class BatchTests(QtTestCase):
     def test_batch_errors_do_not_prevent_later_items_and_cancel_waits_for_item(self):
         cancel = Event()
         def work(item):
@@ -33,7 +34,7 @@ class BatchTests(unittest.TestCase):
         self.assertFalse(result)
 
 
-class OperationProgressTests(unittest.TestCase):
+class OperationProgressTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.progress = OperationProgress()

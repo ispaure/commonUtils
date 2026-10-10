@@ -1,5 +1,6 @@
 """Speech queue/lifetime tests use a silent engine, never the user's speakers."""
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.read_aloud import ReadAloud, reader_text, speech_chunks, visible_text_start
 from PySide6.QtTextToSpeech import QTextToSpeech as Speech
@@ -33,7 +34,7 @@ class SilentEngine(qt.QObject):
     def resume(self): self.change(Speech.State.Speaking)
 
 
-class SpeechTests(unittest.TestCase):
+class SpeechTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.owner = qt.QWidget()

@@ -13,3 +13,4 @@ __status__ = 'Production'
 
 from .command import exec_cmd
 from .process import minimize_console_window
+from .result import CommandResult, run_command

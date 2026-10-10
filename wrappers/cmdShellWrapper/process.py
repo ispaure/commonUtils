@@ -126,6 +126,20 @@ def _terminate_process_tree_unix(process: subprocess.Popen):
     except Exception:
         pass
 
+    # The parent can exit on SIGTERM while a descendant ignores it and keeps
+    # stdout/stderr open. Kill the remaining group before closing reader streams.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
 
 def close_process_streams(process: subprocess.Popen):
     """Close any open streams belonging to a subprocess."""

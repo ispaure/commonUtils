@@ -2,11 +2,12 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.reader_chrome import ReaderFullscreen, ReaderLabel, reader_button
 
 
-class ReaderChromeTests(unittest.TestCase):
+class ReaderChromeTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 

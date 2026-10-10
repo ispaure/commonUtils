@@ -4,12 +4,13 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.text_editor import TextFileEditor
 
 
-class TextEditorTests(unittest.TestCase):
+class TextEditorTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory(); self.addCleanup(self.temp.cleanup)

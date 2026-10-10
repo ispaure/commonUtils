@@ -2,6 +2,7 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock, patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.workspace import Workspace
@@ -18,7 +19,7 @@ class View(qt.QLabel):
         return True
 
 
-class WorkspaceTests(unittest.TestCase):
+class WorkspaceTests(QtTestCase):
     def test_drag_uses_the_full_pane_and_floating_header_tracks_the_press(self):
         workspace = self.create()
         workspace.add_view()

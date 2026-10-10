@@ -188,7 +188,7 @@ if not exist "%SOURCE_DIR%\uv.lock" (
 )
 
 echo Synchronizing the project environment from uv.lock...
-"%UV_EXE%" sync --locked --no-python-downloads
+"%UV_EXE%" sync --locked --no-dev --no-python-downloads
 set "SYNC_STATUS=%ERRORLEVEL%"
 if not "%SYNC_STATUS%"=="0" (
     popd

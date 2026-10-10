@@ -308,6 +308,26 @@ def plan_renames(paths, rules=None, *, case_sensitive=False, cancelled=lambda: F
     return _validate_entries(entries, case_sensitive)
 
 
+def plan_named_renames(items, *, case_sensitive=False):
+    """Validate explicit (source, filename) pairs with the same safety as rule-based plans.
+
+    Filenames cannot introduce directories. Invalid entries retain their source
+    and report an error; no files are changed until apply_renames succeeds.
+    """
+    entries = []
+    for source, name in items:
+        source = _absolute(source)
+        stamp = ()
+        try:
+            stamp = _stamp(source)
+            error = _name_error(name)
+            target = source if error else source.with_name(name)
+            entries.append(RenameEntry(source, target, stamp, error))
+        except (OSError, ValueError) as error:
+            entries.append(RenameEntry(source, source, stamp, str(error)))
+    return _validate_entries(entries, case_sensitive)
+
+
 def _rename_exclusive(source, target):
     """Publish without replacement, including racing destinations and empty directories."""
     if os.name == 'nt':

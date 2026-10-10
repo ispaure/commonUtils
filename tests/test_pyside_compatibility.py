@@ -3,11 +3,12 @@ import importlib
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock, patch
 from commonUtils.ui import pyside as qt
 
 
-class PySideCompatibilityTests(unittest.TestCase):
+class PySideCompatibilityTests(QtTestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])

@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from time import monotonic, sleep
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.directory_index import DirectoryCache
@@ -13,7 +14,7 @@ from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.storage import StorageDialog
 
 
-class DiscoveryIndexUiTests(unittest.TestCase):
+class DiscoveryIndexUiTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()

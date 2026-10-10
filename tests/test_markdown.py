@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.fileTypes.registry import file_from_path
@@ -14,7 +15,7 @@ from commonUtils.ui.markdown import MarkdownViewer, open_markdown, _windows
 from commonUtils.ui.file_browser import FileBrowser
 
 
-class MarkdownTests(unittest.TestCase):
+class MarkdownTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temporary = TemporaryDirectory()

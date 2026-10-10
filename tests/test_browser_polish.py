@@ -3,13 +3,14 @@ import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.navigation import BreadcrumbBar, BreadcrumbSeparator
 from commonUtils.ui.file_browser.storage_view import RadialMap
 
 
-class BrowserPolishTests(unittest.TestCase):
+class BrowserPolishTests(QtTestCase):
     def test_repeated_slate_hover_paints_keep_option_geometry_fixed(self):
         from commonUtils.ui.file_browser.editing import FilenameDelegate
         from commonUtils.ui.theme import apply_theme

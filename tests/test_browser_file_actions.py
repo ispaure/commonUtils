@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from threading import Event
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from PySide6.QtTest import QTest
 from commonUtils.ui import pyside as qt
@@ -15,7 +16,7 @@ from commonUtils.ui.file_browser.file_actions import clipboard_files, set_clipbo
 from commonUtils.filesystem import BrowserAction
 
 
-class BrowserFileActionTests(unittest.TestCase):
+class BrowserFileActionTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory(); self.addCleanup(self.temp.cleanup)

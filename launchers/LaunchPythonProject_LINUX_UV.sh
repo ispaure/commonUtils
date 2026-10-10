@@ -276,7 +276,7 @@ if [[ ! -e "$SOURCE_DIR/uv.lock" ]]; then
 fi
 
 info "Synchronizing the project environment from uv.lock..."
-if ! uv sync --locked --no-python-downloads; then
+if ! uv sync --locked --no-dev --no-python-downloads; then
     fail "uv sync failed. pyproject.toml and uv.lock may be out of sync, a dependency may not support this platform/Python version, the network may be unavailable, or the existing .venv may be invalid. See uv's error output above."
 fi
 

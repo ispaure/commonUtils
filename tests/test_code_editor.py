@@ -2,12 +2,13 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from PySide6.QtTest import QTest
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.code_editor import CodeEdit
 
 
-class CodeEditorTests(unittest.TestCase):
+class CodeEditorTests(QtTestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])

@@ -4,13 +4,14 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer
 
 
-class MarkdownTableTests(unittest.TestCase):
+class MarkdownTableTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temporary = TemporaryDirectory()
