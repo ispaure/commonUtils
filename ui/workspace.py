@@ -274,9 +274,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self._update_drop_target()
 
     def _sync_document_menus(self, view):
-        if self.isVisible():
-            from .workspace_menus import sync_native_menus
-            sync_native_menus(self.window(), getattr(view, 'document', None))
+        # Adoption activates the first tab before its new container is shown.
+        from .workspace_menus import sync_native_menus
+        sync_native_menus(self.window(), view if isinstance(view, qt.QMainWindow) else getattr(view, 'document', None))
 
     def _schedule_tab_headers(self):
         if not self._headers_pending:

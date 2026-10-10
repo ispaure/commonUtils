@@ -203,8 +203,14 @@ class ResultEdit(CodeEdit):
 
     def contextMenuEvent(self, event):
         menu = self.createStandardContextMenu()
-        menu.insertAction(menu.actions()[0], menu.addAction('Undo merge edit', self.undo))
-        menu.insertAction(menu.actions()[1], menu.addAction('Redo merge edit', self.redo))
+        # Qt's document history is disabled; replace its disabled native entries.
+        for action in menu.actions()[:2]:
+            menu.removeAction(action)
+        anchor = menu.actions()[0]
+        undo = menu.addAction('Undo merge edit', self.undo)
+        redo = menu.addAction('Redo merge edit', self.redo)
+        undo.setEnabled(self.can_undo); redo.setEnabled(self.can_redo)
+        menu.insertAction(anchor, undo); menu.insertAction(anchor, redo)
         menu.exec(event.globalPos())
         menu.deleteLater()
 
@@ -255,6 +261,14 @@ class MergeWidget(qt.QWidget):
         self.find_shortcut.activated.connect(lambda: (self.search.setFocus(), self.search.selectAll()))
         self.result.document().setUndoRedoEnabled(False)
         self.result.undo_requested.connect(self.undo); self.result.redo_requested.connect(self.redo)
+        self.history_actions = []
+        for key, callback in ((qt.QKeySequence.StandardKey.Undo, self.undo),
+                              (qt.QKeySequence.StandardKey.Redo, self.redo)):
+            action = qt.QAction(self)
+            action.setShortcuts(qt.QKeySequence.keyBindings(key))
+            action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            action.triggered.connect(callback); self.addAction(action)
+            self.history_actions.append(action)
         self.result.textChanged.connect(self._edited)
         self.scroll = LinkedScroll(self.editors)
         actions = qt.QHBoxLayout()
@@ -298,6 +312,7 @@ class MergeWidget(qt.QWidget):
         except ValueError as error:
             self.render(); self.status.setText(str(error)); return
         self.changed.emit()
+        self._history_availability()
         self.refresh_timer.start()
 
     def render(self):
@@ -334,8 +349,14 @@ class MergeWidget(qt.QWidget):
         self.scroll.rebuild()
         self.status.setText(f'{self.session.unresolved} unresolved · Change {self.index+1} of {len(model.regions)}')
         self.buttons[0].setEnabled(bool(model.regions)); self.buttons[1].setEnabled(bool(model.regions))
-        self.buttons[3].setEnabled(bool(self.session.history)); self.buttons[4].setEnabled(bool(self.session.future))
+        self._history_availability()
         self.changed.emit()
+
+    def _history_availability(self):
+        self.result.can_undo = bool(self.session.history)
+        self.result.can_redo = bool(self.session.future)
+        for available, button, action in zip((self.result.can_undo, self.result.can_redo), self.buttons[3:5], self.history_actions):
+            button.setEnabled(available); action.setEnabled(available)
 
     def choose(self, index, side):
         if index < 0:

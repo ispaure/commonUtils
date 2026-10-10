@@ -45,8 +45,13 @@ def apply_change(model, index, current):
 
 
 class DiffDialog(qt.QDialog):
-    """Two-way comparison with reusable bands and optional undoable host edits."""
-    def __init__(self, model, parent=None, *, left_name="Original", right_name="Buffer", apply=None, path=None):
+    """Two-way comparison with reusable bands and optional undoable host edits.
+
+    Undo/redo callbacks receive the current model for stale-buffer validation,
+    operate on the host's edit history, and return its resulting text.
+    """
+    def __init__(self, model, parent=None, *, left_name="Original", right_name="Buffer", apply=None, path=None,
+                 undo=None, redo=None):
         super().__init__(parent)
         from .merge import PaneSplitter, LinkedScroll
         from .syntax import SyntaxHighlighter, detect_language
@@ -54,6 +59,8 @@ class DiffDialog(qt.QDialog):
         self.setWindowTitle("Compare — " + left_name + " / " + right_name)
         self.resize(1200, 750)
         self.model, self.apply_callback, self.index = model, apply, -1
+        self.undo_callback, self.redo_callback = undo, redo
+        self.history, self.future = [], []
         self.names = left_name, right_name
         self.editors, self.highlighters = [], []
         layout = qt.QVBoxLayout(self)
@@ -81,6 +88,16 @@ class DiffDialog(qt.QDialog):
             buttons.addWidget(button); self.navigation.append(button)
         self.use_left = qt.QPushButton("Use Left Change"); self.use_left.clicked.connect(self.apply_current)
         buttons.addWidget(self.use_left)
+        self.history_actions = []
+        for label, key, callback in (("Undo", qt.QKeySequence.StandardKey.Undo, self.undo),
+                                     ("Redo", qt.QKeySequence.StandardKey.Redo, self.redo)):
+            action = qt.QAction(label, self)
+            action.setShortcuts(qt.QKeySequence.keyBindings(key))
+            action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            action.triggered.connect(callback); self.addAction(action)
+            button = qt.QPushButton(label); button.clicked.connect(callback)
+            action.changed.connect(lambda action=action, button=button: button.setEnabled(action.isEnabled()))
+            buttons.addWidget(button); self.history_actions.append(action)
         close = qt.QPushButton("Close"); close.clicked.connect(self.close); buttons.addWidget(close)
         layout.addLayout(buttons)
         self.scroll = LinkedScroll(self.editors)
@@ -113,6 +130,8 @@ class DiffDialog(qt.QDialog):
         self.use_left.setEnabled(self.apply_callback is not None and bool(self.model.changes))
         for button in self.navigation:
             button.setEnabled(bool(self.model.changes))
+        self.history_actions[0].setEnabled(self.undo_callback is not None and bool(self.history))
+        self.history_actions[1].setEnabled(self.redo_callback is not None and bool(self.future))
 
     def _pick(self, index):
         self.index = index
@@ -141,7 +160,31 @@ class DiffDialog(qt.QDialog):
                     self.use_left.setEnabled(False)
                     self.status.setText("Change applied. Reopen comparison to review the updated buffer.")
                     return
-                self.model = compare_text(self.model.left, current, *self.names)
+                updated = compare_text(self.model.left, current, *self.names)
+                self.history.append(self.model)
+                while len(self.history) > 100 or sum(len(state.right) for state in self.history) > 16 * 1024 * 1024:
+                    self.history.pop(0)
+                self.future.clear()
+                self.model = updated
             except (ValueError, OSError) as error:
                 self.status.setText(str(error)); return
             self._render(); self.index = min(self.index, len(self.model.changes)-1); self.navigate(0)
+
+    def _restore(self, source, target, callback):
+        if not source or callback is None:
+            return
+        try:
+            current = callback(self.model)
+            if current != source[-1].right:
+                raise ValueError("The buffer history changed. Reopen the diff before undoing or redoing changes.")
+        except (ValueError, OSError, RuntimeError) as error:
+            self.status.setText(str(error)); return
+        target.append(self.model)
+        self.model = source.pop()
+        self._render(); self.index = min(max(self.index, 0), len(self.model.changes)-1); self.navigate(0)
+
+    def undo(self):
+        self._restore(self.history, self.future, self.undo_callback)
+
+    def redo(self):
+        self._restore(self.future, self.history, self.redo_callback)

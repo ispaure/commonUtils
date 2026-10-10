@@ -57,3 +57,26 @@ class MergeModelTests(unittest.TestCase):
         with self.assertRaises(ValueError): session.choose(0, 'unknown')
         with self.assertRaises(ValueError): session.edit('x'* (1024*1024+1))
         self.assertEqual(session.snapshot(), before)
+
+    def test_randomized_resolution_and_manual_history_roundtrips_exact_snapshots(self):
+        randomizer = random.Random(20261010)
+        for scenario in range(100):
+            session = MergeSession(merge_text('a\nb\nc\n', '😀 left\nb\nleft c', 'right\nb\n😀 right c\n'))
+            states = [session.snapshot()]
+            for step in range(30):
+                choice = randomizer.randrange(3)
+                if choice == 0:
+                    session.choose(randomizer.randrange(len(session.model.regions)), randomizer.choice(('left', 'right', 'both', 'base')))
+                elif choice == 1:
+                    position = randomizer.randrange(len(session.text)+1)
+                    session.edit(session.text[:position] + randomizer.choice(('😀', '\n', 'paste\nmore')) + session.text[position:])
+                else:
+                    session.mark_manual(randomizer.randrange(len(session.model.regions)))
+                states.append(session.snapshot())
+            for expected in reversed(states[:-1]):
+                session.undo(); self.assertEqual(session.snapshot(), expected, (scenario, 'undo'))
+            for expected in states[1:]:
+                session.redo(); self.assertEqual(session.snapshot(), expected, (scenario, 'redo'))
+            session.undo(); session.edit(session.text + 'branch')
+            self.assertFalse(session.future)
+            before = session.snapshot(); session.redo(); self.assertEqual(session.snapshot(), before)
