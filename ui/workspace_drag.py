@@ -25,9 +25,7 @@ class DockWindowDrag(qt.QObject):
 
     def target(self, point):
         from .workspace import _workspaces
-        page = getattr(self.workspace, 'page', None)
-        if page is not None and page.window().frameGeometry().contains(point):
-            page.activate()
+        self.workspace.reveal_for_drop(point)
         for workspace in tuple(_workspaces):
             if (isValid(workspace) and workspace.isVisible() and not workspace._closing
                     and workspace.dock_group == self.workspace.dock_group):
