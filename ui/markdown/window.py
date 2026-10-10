@@ -11,6 +11,7 @@ class MarkdownWindow(qt.QMainWindow):
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         allow_edit = bool(allow_edit or qt.QApplication.keyboardModifiers() & qt.Qt.KeyboardModifier.AltModifier)
         self.viewer = MarkdownViewer(parent=self, allow_edit=allow_edit)
+        self.workspace_controls = self.viewer.workspace_controls
         self.setCentralWidget(self.viewer)
         self.viewer.path_changed.connect(lambda path: self._update_title())
         self.viewer.modified_changed.connect(lambda modified: self._update_title())

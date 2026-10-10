@@ -172,6 +172,7 @@ class WorkspaceIndexStatus(qt.QObject):
         super().__init__(workspace)
         self.workspace = workspace
         self.connected = set()
+        self._connections = {}
         bar = workspace.statusBar()
         bar.setSizeGripEnabled(False)
         content = qt.QWidget(bar)
@@ -194,6 +195,11 @@ class WorkspaceIndexStatus(qt.QObject):
         bar.addWidget(content,1)
         bar.setStyleSheet('QStatusBar::item { border: none; }')
         workspace.active_changed.connect(self.refresh)
+        workspace.tabs_changed.connect(self.refresh)
+
+    def _forget(self, browser):
+        self.connected.discard(browser)
+        self._connections.pop(browser, None)
 
     def _refresh_index(self):
         browser = getattr(self.workspace.active_view, 'file_browser', None)
@@ -206,6 +212,17 @@ class WorkspaceIndexStatus(qt.QObject):
             browser.show_index_details()
 
     def refresh(self, *args):
+        from shiboken6 import isValid
+        current = {getattr(dock.widget(), 'file_browser', None) for dock in self.workspace.docks}
+        for previous in tuple(self.connected - current):
+            dock, destroyed = self._connections[previous]
+            if isValid(previous):
+                previous.index_progress.disconnect(self.refresh)
+                previous.index_state_changed.disconnect(self.refresh)
+                previous.destroyed.disconnect(destroyed)
+            if isValid(dock):
+                dock.topLevelChanged.disconnect(self.refresh)
+            self._forget(previous)
         browsers = []
         for dock in self.workspace.docks:
             view = dock.widget()
@@ -227,7 +244,9 @@ class WorkspaceIndexStatus(qt.QObject):
                 browser.index_progress.connect(self.refresh)
                 browser.index_state_changed.connect(self.refresh)
                 dock.topLevelChanged.connect(self.refresh)
-                browser.destroyed.connect(lambda obj=None, owner=browser: self.connected.discard(owner))
+                destroyed = lambda obj=None, owner=browser: self._forget(owner)
+                self._connections[browser] = dock, destroyed
+                browser.destroyed.connect(destroyed)
         active = self.workspace.active_view
         browser = getattr(active,'file_browser',None)
         running = len({item.folder_operation.root for _,item in browsers if item.folder_busy and not item.network_location

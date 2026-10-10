@@ -167,6 +167,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.preview_toggle.toggled.connect(self._preview_toggled)
         controls.addWidget(self.preview_toggle)
         controls.addWidget(self.view_selector.storage_controls)
+        # A host can append local tab controls after the size-map buttons.
+        self.workspace_controls = controls
         self.search_button = qt.QToolButton(self)
         set_painted_icon(self.search_button, ViewIcon, 6)
         self.search_button.setIconSize(qt.QSize(22, 22))

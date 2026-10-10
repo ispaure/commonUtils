@@ -1,0 +1,179 @@
+"""Container ownership, policy boundaries and reversible transfers with real Qt."""
+import unittest
+from unittest.mock import patch
+from shiboken6 import isValid
+from commonUtils.tests.qt_test_case import QtTestCase
+from commonUtils.ui import pyside as qt
+from commonUtils.ui.workspace import Workspace
+from commonUtils.ui.workspace_policy import WorkspacePolicy
+from commonUtils.ui.workspace_drag import tab_mime
+
+
+class View(qt.QWidget):
+    title_changed = qt.Signal(str)
+    def __init__(self, state):
+        super().__init__()
+        self.state = state
+        self.view_title = str(state or 'Untitled')
+        self.workspace_controls = qt.QHBoxLayout(self)
+        self.workspace_controls.addStretch()
+    def prepare_close(self):
+        return True
+
+
+class ContainerTests(QtTestCase):
+    def setUp(self):
+        self.app = qt.QApplication.instance() or qt.QApplication([])
+        self.hosts = []
+
+    def create(self, *, browser=False, group='test'):
+        policy = WorkspacePolicy(allow_last_tab_detach=not browser,
+                                 show_single_tab_in_main=not browser,
+                                 show_single_tab_in_detached=False,
+                                 detached_title='Files: {title}' if browser else 'Documents: {title}')
+        host = qt.QMainWindow()
+        self.hosts.append(host)
+        workspace = Workspace(View, host, policy=policy, keep_one_tab=browser, dock_group=group)
+        host.setCentralWidget(workspace)
+        host.resize(900, 650); host.show()
+        return workspace
+
+    def settle(self):
+        for _ in range(5):
+            self.app.processEvents()
+        self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+
+    def assert_owner(self, dock, owner):
+        self.assertIs(dock.workspace, owner)
+        self.assertIs(dock.parentWidget(), owner)
+        self.assertEqual(sum(dock in workspace.docks for workspace in
+                             [owner.main_workspace, *(w.workspace for w in owner.main_workspace.detached_windows)]), 1)
+
+    def test_browser_single_tab_cannot_detach_or_move_and_header_has_no_row(self):
+        source = self.create(browser=True)
+        source.add_view('first'); dock = source.active_dock
+        self.settle()
+        self.assertEqual(dock.tab_header.height(), 0)
+        self.assertTrue(dock.local_new_button.isVisible())
+        self.assertIsNone(source.detach_active())
+        target = self.create(browser=True)
+        self.assertFalse(target.adopt(dock))
+        self.assert_owner(dock, source)
+        point = source.mapToGlobal(source.rect().center())
+        source.begin_window_drag(dock, point, point)
+        self.assertIsNone(source._window_drag)
+
+    def test_detached_browser_plus_is_local_and_headers_adapt(self):
+        main = self.create(browser=True)
+        main.add_view('main'); main.add_view('floating')
+        window = main.detach_active(); detached = window.workspace
+        self.settle(); dock = detached.active_dock
+        self.assertEqual(len(main.docks), 1)
+        self.assertEqual(dock.tab_header.height(), 0)
+        self.assertFalse(detached.can_move_tab(dock))
+        self.assertFalse(dock.return_button.isVisible())
+        detached.reattach_active()
+        self.assertIs(dock.workspace, detached)
+        dock.local_new_button.click(); self.settle()
+        self.assertEqual(len(main.docks), 1)
+        self.assertEqual(len(detached.docks), 2)
+        bar = next(bar for bar in detached.findChildren(qt.QTabBar) if bar.parent() is detached and bar.count() == 2)
+        self.assertTrue(bar.isVisible())
+        self.assertIsNot(detached.active_dock, dock)
+        detached.close_active(); self.settle()
+        self.assertEqual(detached.docks, [dock])
+        self.assertEqual(dock.tab_header.height(), 0)
+        self.assertTrue(dock.local_new_button.isVisible())
+        self.assertEqual(window.windowTitle(), 'Files: floating')
+        window.close(); self.settle()
+        self.assert_owner(dock, main)
+        self.assertEqual(len(main.docks), 2)
+        self.assertFalse(isValid(window))
+
+    def test_last_main_document_detaches_and_returns_through_visible_control(self):
+        main = self.create(); original = main.add_view('original'); dock = main.active_dock
+        self.settle(); self.assertEqual(dock.tab_header.height(), 30)
+        window = main.detach_active(); self.settle()
+        self.assertEqual(main.docks, [])
+        self.assertTrue(main.empty_new_button.isVisible())
+        self.assertEqual(dock.tab_header.height(), 0)
+        self.assertTrue(dock.return_button.isVisible())
+        self.assert_owner(dock, window.workspace)
+        dock.return_button.click(); self.settle()
+        self.assert_owner(dock, main)
+        self.assertIs(dock.widget(), original)
+        self.assertTrue(isValid(original))
+        self.assertFalse(isValid(window))
+        self.assertEqual(dock.tab_header.height(), 30)
+
+    def test_titles_selection_and_renames_are_local_to_each_window(self):
+        main = self.create()
+        main.add_view('main'); main.add_view('first')
+        window = main.detach_active(); detached = window.workspace
+        second = detached.add_view('second'); self.settle()
+        self.assertEqual(window.windowTitle(), 'Documents: second')
+        second.title_changed.emit('edited *'); self.settle()
+        self.assertEqual(window.windowTitle(), 'Documents: edited *')
+        first = detached.docks[0]; first.raise_(); detached._activate(first); self.settle()
+        self.assertEqual(window.windowTitle(), 'Documents: first')
+        self.assertEqual(main.active_view.state, 'main')
+
+    def test_cancelled_window_drag_restores_layout_and_owner(self):
+        main = self.create(); main.add_view('first'); dock = main.active_dock
+        main.add_view('second'); active = main.active_dock; self.settle()
+        point = dock.tab_header.mapToGlobal(qt.QPoint(40, 15))
+        main.begin_window_drag(dock, point + qt.QPoint(50, 50), point)
+        main._window_drag.finish(point, cancel=True); self.settle()
+        self.assert_owner(dock, main)
+        self.assertFalse(dock.isFloating())
+        self.assertIn(active, main.tabifiedDockWidgets(dock))
+        self.assertIs(main.active_dock, active)
+        self.assertEqual(main.detached_windows, [])
+
+    def test_incompatible_target_and_cancelled_mime_drag_preserve_ownership(self):
+        source = self.create(group='source'); source.add_view('original'); dock = source.active_dock
+        target = self.create(group='other'); self.settle()
+        self.assertFalse(target.adopt(dock))
+        with patch('commonUtils.ui.workspace_drag.qt.QDrag') as drag:
+            drag.return_value.exec.return_value = qt.Qt.DropAction.IgnoreAction
+            source.drag_tab(dock)
+        self.assert_owner(dock, source)
+        self.assertFalse(dock.isFloating())
+        mime = tab_mime(dock)
+        event = qt.QDropEvent(qt.QPointF(20,20), qt.Qt.DropAction.MoveAction, mime,
+                             qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+        self.assertFalse(target.handle_tab_drop(target, event))
+        self.assert_owner(dock, source)
+
+    def test_transfer_failure_rolls_back_source_and_does_not_close_content(self):
+        source = self.create(); view = source.add_view('original'); dock = source.active_dock
+        source.add_view('neighbor'); self.settle()
+        target = self.create()
+        original_add = target.addDockWidget
+        def reject(area, candidate):
+            if candidate is dock:
+                raise RuntimeError('Rejected destination')
+            return original_add(area, candidate)
+        with patch.object(target, 'addDockWidget', side_effect=reject):
+            self.assertFalse(target.adopt(dock))
+        self.settle()
+        self.assert_owner(dock, source)
+        self.assertIs(dock.widget(), view)
+        self.assertTrue(isValid(view))
+        self.assertEqual(target.docks, [])
+        self.assertEqual(len(source.docks), 2)
+
+    def test_repeated_detach_return_leaves_no_windows_or_duplicate_tabs(self):
+        main = self.create(); view = main.add_view('original'); dock = main.active_dock
+        for _ in range(5):
+            window = main.detach_active(); self.settle()
+            self.assertIs(window.workspace.active_view, view)
+            window.workspace.reattach_active(); self.settle()
+            self.assert_owner(dock, main)
+            self.assertEqual(main.docks, [dock])
+            self.assertEqual(main.detached_windows, [])
+            self.assertTrue(isValid(view))
+
+
+if __name__ == '__main__':
+    unittest.main()

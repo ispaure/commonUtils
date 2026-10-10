@@ -90,8 +90,11 @@ zone (`commonUtils.ui.workspace_drag`). Closing a worker-only browser tab remove
 it from the visible layout immediately; the workspace retains its hidden dock in
 `_retiring` until its owners report idle. A feature close refusal keeps the tab
 visible. Whole-window shutdown checks both visible and retired owners.
-Dragging an attached tab shows a full-pane image; detached headers retain Qt's
-native window movement and docking behavior.
+Dragging an attached tab moves the full pane; Escape or a rejected destination
+restores its layout and owner. With an opt-in `WorkspacePolicy`, detached windows
+contain their own tabs, selection, local New action and footer. Single browser
+headers can collapse completely while local controls use the navigation row.
+Legacy workspaces retain native floating-dock windows.
 
 Storage refreshes carry a root/mode/index-revision identity. Repeated mode changes
 reuse loaded data and obsolete results are discarded. Immediate child reads and
