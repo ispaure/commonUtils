@@ -24,6 +24,7 @@ class EventDrivenIndexTests(QtTestCase):
         self.deep = self.child / 'deep'; self.deep.mkdir()
         (self.deep / 'original.txt').write_bytes(b'abc')
         self.cache = DirectoryCache(database=self.base / 'cache' / 'index.sqlite3')
+        self.addCleanup(self.cache.close)
         self.patches = [patch(name, self.cache) for name in (
             'commonUtils.directory_index.directory_cache',
             'commonUtils.ui.file_browser.index_worker.directory_cache',
@@ -37,6 +38,7 @@ class EventDrivenIndexTests(QtTestCase):
         self.wait(lambda: not self.browser.folder_busy)
         self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
         for item in reversed(self.patches): item.stop()
+        self.cache.close()
         self.temp.cleanup()
 
     def wait(self, condition):

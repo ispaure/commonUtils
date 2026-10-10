@@ -55,6 +55,10 @@ class SqlEntries(Sequence):
                 self.parameters += (prefix, prefix[:-1] + chr(ord(os.sep) + 1))
         self._count = None
 
+    def close(self):
+        with self.lock:
+            self.connection.close()
+
     @property
     def count(self):
         with self.lock:

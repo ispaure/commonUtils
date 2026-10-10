@@ -33,6 +33,18 @@ class Snapshot:
     complete: bool = True
     metadata_checked: bool = True
 
+    def close(self):
+        """Release an indexed snapshot's read transaction when its owner is done."""
+        close = getattr(self.entries, 'close', None)
+        if close is not None:
+            close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     def folder_stats(self, paths=None, *, cancelled=lambda: False, children_of=None):
         """Persisted aggregates; requested paths keep browser updates bounded."""
         if hasattr(self.entries, 'folder_stats'):

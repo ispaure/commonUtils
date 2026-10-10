@@ -208,6 +208,7 @@ class ArchiveWorkspaceTests(unittest.TestCase):
                 backend.update_zip(path, remove=['source/hello.txt'])
         self.assertEqual(path.read_bytes(), changed)
 
+    @unittest.skipIf(__import__('os').name == 'nt', 'Unix executable permissions')
     def test_unix_executable_bits_survive_extraction(self):
         script = self.folder / 'run.sh'
         script.write_text('#!/bin/sh\necho hello\n')

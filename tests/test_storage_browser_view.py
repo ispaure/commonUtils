@@ -231,7 +231,8 @@ class StorageViewTests(QtTestCase):
     def test_middle_elision_preserves_counter_and_single_line(self):
         from commonUtils.ui.file_browser.status import IndexStatusLabel
         app=qt.QApplication.instance() or qt.QApplication([])
-        label=IndexStatusLabel();label.resize(720,24)
+        label=IndexStatusLabel()
+        label.resize(2 * label.fontMetrics().horizontalAdvance('last-folder · 2,500 processed this run') + 100,24)
         full='Indexing /Users/example/'+('a-very-long-folder/'*12)+'last-folder · 2,500 processed this run'
         label.setText(full);label.show();app.processEvents()
         shown=qt.QLabel.text(label)

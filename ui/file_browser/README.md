@@ -315,3 +315,14 @@ ring distance and a binary search of angular sectors rather than checking each
 curved path. The pointer-following tooltip is a reusable `ui.cursor_tooltip`
 component, and hides during loading or when the pointer leaves. Chart data remains
 bounded to four levels and 3,000 displayed entries, independent of index size.
+
+### Snapshot ownership on Windows
+
+Indexed snapshots retain a SQLite read transaction so displayed results stay
+stable while another scan publishes a generation. Release a snapshot with
+`snapshot.close()` when its owner is done, or use it as a context manager.
+`DirectoryCache.close()` releases the snapshots owned by that cache; a cache can
+also be used as a context manager. Close readers before removing a temporary
+cache directory, especially on Windows where open SQLite files cannot be removed.
+Do not close a shared cache while other views still use its snapshots. Browser
+workers and tests must finish before their owning temporary resources are removed.

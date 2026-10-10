@@ -1,4 +1,5 @@
 """Navigation stays local; explicit refresh scans deeper and saved branches remain usable."""
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import sqlite3
@@ -26,32 +27,34 @@ class BrowserIndexPolicyTests(QtTestCase):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)/'files'; nested = root/'deep'/'nested'; nested.mkdir(parents=True)
             file = nested/'data.bin'; file.write_bytes(b'abc')
-            cache = DirectoryCache(database=Path(temporary)/'index.sqlite3')
-            visible = cache.reconcile_folder(root, recursive_initial=False)
-            self.assertEqual([entry.path for entry in visible.entries], [root/'deep'])
-            self.assertFalse(visible.complete)
-            self.assertIsNotNone(cache.peek(root))
-            full = cache.reconcile_folder(root, full=True, recursive_initial=False)
-            self.assertIn(file, [entry.path for entry in full.entries])
-            self.assertTrue(full.complete)
+            with DirectoryCache(database=Path(temporary)/'index.sqlite3') as cache:
+                visible = cache.reconcile_folder(root, recursive_initial=False)
+                self.assertEqual([entry.path for entry in visible.entries], [root/'deep'])
+                self.assertFalse(visible.complete)
+                self.assertIsNotNone(cache.peek(root))
+                full = cache.reconcile_folder(root, full=True, recursive_initial=False)
+                self.assertIn(file, [entry.path for entry in full.entries])
+                self.assertTrue(full.complete)
 
     def test_empty_interrupted_root_does_not_mask_saved_ancestor(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)/'files'; child = root/'child'; child.mkdir(parents=True)
             (child/'file.bin').write_bytes(b'abc')
-            cache = DirectoryCache(database=Path(temporary)/'index.sqlite3'); cache.get(root)
-            with sqlite3.connect(cache.database) as db:
-                db.execute('INSERT INTO roots VALUES(?,1,NULL,NULL)', (str(child),))
-            self.assertIsNotNone(cache.peek(child))
-            self.assertEqual(len(cache.peek(child).children(child)), 1)
+            with DirectoryCache(database=Path(temporary)/'index.sqlite3') as cache:
+                cache.get(root)
+                with closing(sqlite3.connect(cache.database)) as db, db:
+                    db.execute('INSERT INTO roots VALUES(?,1,NULL,NULL)', (str(child),))
+                self.assertIsNotNone(cache.peek(child))
+                self.assertEqual(len(cache.peek(child).children(child)), 1)
 
     def test_saved_child_branch_is_visible_in_new_shallow_parent_chart(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)/'files'; child = root/'child'; child.mkdir(parents=True)
             file = child/'data.bin'; file.write_bytes(b'abc')
-            cache = DirectoryCache(database=Path(temporary)/'index.sqlite3'); cache.get(child)
-            cache.reconcile_folder(root, recursive_initial=False)
-            entries, nodes, totals, complete = collect_storage(cache, root, radial=True)
-            self.assertEqual(entries, [(child, 3)])
-            self.assertEqual(nodes[child], [(file, 3)])
-            self.assertFalse(complete)
+            with DirectoryCache(database=Path(temporary)/'index.sqlite3') as cache:
+                cache.get(child)
+                cache.reconcile_folder(root, recursive_initial=False)
+                entries, nodes, totals, complete = collect_storage(cache, root, radial=True)
+                self.assertEqual(entries, [(child, 3)])
+                self.assertEqual(nodes[child], [(file, 3)])
+                self.assertFalse(complete)

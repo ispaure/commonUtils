@@ -5,6 +5,20 @@ from .. import pyside as qt
 
 
 class FilenameEditorMixin:
+    def eventFilter(self, editor, event):
+        if isinstance(editor, qt.QLineEdit) and event.type() == qt.QEvent.Type.FocusIn:
+            length = editor.property('filename_basename_length')
+            if length is not None:
+                qt.QTimer.singleShot(0, editor, lambda: editor.setSelection(0, length))
+        if (isinstance(editor, qt.QLineEdit) and event.type() == qt.QEvent.Type.KeyPress
+                and event.key() in (qt.Qt.Key.Key_Return, qt.Qt.Key.Key_Enter)):
+            # Consume the commit key: after the editor closes, the application's
+            # folder keyboard filter must not interpret it as an Open request.
+            self.commitData.emit(editor)
+            self.closeEditor.emit(editor, qt.QAbstractItemDelegate.EndEditHint.NoHint)
+            return True
+        return super().eventFilter(editor, event)
+
     def createEditor(self, parent, option, index):
         return super().createEditor(parent, option, index) if index.column() == 0 else None
 
@@ -19,6 +33,7 @@ class FilenameEditorMixin:
             basename = editor.text()[:-len(suffix)] if suffix else editor.text()
             # QLineEdit positions use UTF-16 units, including two units per emoji.
             length = len(basename.encode('utf-16-le')) // 2
+            editor.setProperty('filename_basename_length', length)
             editor.setSelection(0, length)
             # The view selects all text when it focuses its new editor; restore
             # basename selection after that native setup has completed.

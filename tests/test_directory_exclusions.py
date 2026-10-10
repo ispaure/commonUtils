@@ -23,6 +23,7 @@ class MacOSExclusionTests(unittest.TestCase):
         (users / 'file').write_bytes(b'12345')
         (self.data / 'duplicate').write_bytes(b'12345')
         self.cache = DirectoryCache(database=base / 'cache' / 'index.sqlite3')
+        self.addCleanup(self.cache.close)
 
     @contextmanager
     def macos(self):

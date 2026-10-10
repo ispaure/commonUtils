@@ -107,9 +107,6 @@ class ByteSortModel(qt.QSortFilterProxyModel):
         self.filesystem = filesystem
         self.setSourceModel(filesystem)
         self.setDynamicSortFilter(True)
-        self.collator = qt.QCollator()
-        self.collator.setNumericMode(True)
-        self.collator.setCaseSensitivity(qt.Qt.CaseSensitivity.CaseInsensitive)
 
     def mapFromSource(self, index):
         if index.isValid() and index.model() is self.filesystem:
@@ -141,7 +138,9 @@ class ByteSortModel(qt.QSortFilterProxyModel):
             a, b = self.filesystem.isDir(left), self.filesystem.isDir(right)
             if a != b:
                 return a
-        return self.collator.compare(self.filesystem.fileName(left), self.filesystem.fileName(right)) < 0
+        # QCollator's C-locale backend ignores numeric mode on headless Linux.
+        from ...traversal import natural_path_key
+        return natural_path_key(self.filesystem.fileName(left)) < natural_path_key(self.filesystem.fileName(right))
 
 
 class _BrowserSelection(qt.QItemSelectionModel):

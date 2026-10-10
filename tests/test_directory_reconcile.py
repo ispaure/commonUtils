@@ -1,4 +1,5 @@
 """Visible-folder updates remain bounded and retain immutable old read snapshots."""
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import os
@@ -17,6 +18,7 @@ class ReconcileTests(unittest.TestCase):
         self.deep = self.child / 'deep'; self.deep.mkdir()
         self.file = self.deep / 'file.txt'; self.file.write_bytes(b'abc')
         self.cache = DirectoryCache(database=base / 'cache' / 'index.sqlite3')
+        self.addCleanup(self.cache.close)
 
     def test_unstable_directory_finishes_partial_instead_of_looping(self):
         identity = self.cache._folder_identity
@@ -98,7 +100,7 @@ class ReconcileTests(unittest.TestCase):
     def test_diagnostics_distinguish_unscanned_and_changed_checkpoints(self):
         self.cache.get(self.root)
         import sqlite3
-        with sqlite3.connect(self.cache.database) as db:
+        with closing(sqlite3.connect(self.cache.database)) as db, db:
             generation = db.execute('SELECT completed FROM roots').fetchone()[0]
             db.execute("UPDATE folders SET status='pending',identity=NULL WHERE generation=? AND path=?",
                        (generation, str(self.deep)))
@@ -143,14 +145,14 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(self.cache.peek(self.root).entry(added).size, 3)
         # A restarted browser preserves failure suppression from disk while
         # resuming other unfinished work. Explicit Refresh still retries.
-        restarted = DirectoryCache(database=self.cache.database)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
-            self.assertFalse(restarted.reconcile_folder(self.root, once=True).complete)
-            self.assertEqual(len(failures), 1)
-            self.assertFalse(restarted.reconcile_folder(self.root, full=True).complete)
-            self.assertEqual(len(failures), 2)
-        self.assertTrue(restarted.reconcile_folder(self.root, full=True).complete)
-        self.assertEqual(restarted.index_issues(self.root)['total'], 0)
+        with DirectoryCache(database=self.cache.database) as restarted:
+            with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+                self.assertFalse(restarted.reconcile_folder(self.root, once=True).complete)
+                self.assertEqual(len(failures), 1)
+                self.assertFalse(restarted.reconcile_folder(self.root, full=True).complete)
+                self.assertEqual(len(failures), 2)
+            self.assertTrue(restarted.reconcile_folder(self.root, full=True).complete)
+            self.assertEqual(restarted.index_issues(self.root)['total'], 0)
 
     def test_completed_navigation_checks_one_folder_without_enumerating_descendants(self):
         first = self.cache.get(self.root)
@@ -272,9 +274,9 @@ class ReconcileTests(unittest.TestCase):
         self.file.write_bytes(b'longer data')
         changed = self.cache.reconcile_folder(self.deep, once=True, changes=(self.file,))
         self.assertEqual(changed.entry(self.file).size, 11)
-        restarted = DirectoryCache(database=self.cache.database)
-        self.file.write_bytes(b'new')
-        self.assertEqual(restarted.reconcile_folder(self.deep, once=True).entry(self.file).size, 3)
+        with DirectoryCache(database=self.cache.database) as restarted:
+            self.file.write_bytes(b'new')
+            self.assertEqual(restarted.reconcile_folder(self.deep, once=True).entry(self.file).size, 3)
 
     def test_initial_scan_prioritizes_missing_ancestors_and_visible_contents(self):
         earlier = self.root / 'a-first'; earlier.mkdir(); (earlier / 'file.txt').write_bytes(b'x')

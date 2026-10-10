@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
+import sys
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
@@ -25,6 +26,12 @@ class MarkdownPresentationTests(QtTestCase):
         self.temp = TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.path = self.root / 'note.md'
+
+    def python_process(self, executable):
+        original = qt.QProcess.start
+        def start(process, program, arguments):
+            return original(process, sys.executable, [str(executable), *arguments])
+        return patch.object(qt.QProcess, 'start', start)
 
     def viewer(self, source, *, edit=False):
         self.path.write_text(source, encoding='utf-8')
@@ -102,7 +109,7 @@ class MarkdownPresentationTests(QtTestCase):
         executable.write_text('#!/usr/bin/env python3\nimport sys,shutil\nshutil.copyfile(' +
             repr(str(self.root / 'fixture.png')) + ',sys.argv[sys.argv.index("-o")+1])\n')
         executable.chmod(0o700)
-        with patch('commonUtils.ui.markdown.diagrams.shutil.which', return_value=str(executable)), \
+        with self.python_process(executable), patch('commonUtils.ui.markdown.diagrams.shutil.which', return_value=str(executable)), \
                 patch('commonUtils.ui.markdown.diagrams.temporary_workspace', side_effect=lambda **kw: TemporaryDirectory(dir=self.root)):
             viewer.render_diagrams()
             deadline = time.monotonic() + 5
@@ -177,7 +184,7 @@ class MarkdownPresentationTests(QtTestCase):
         executable = self.root / 'slow-mmdc'
         executable.write_text('#!/usr/bin/env python3\nimport time\ntime.sleep(5)\n')
         executable.chmod(0o700)
-        with patch('commonUtils.ui.markdown.diagrams.shutil.which', return_value=str(executable)), \
+        with self.python_process(executable), patch('commonUtils.ui.markdown.diagrams.shutil.which', return_value=str(executable)), \
                 patch('commonUtils.ui.markdown.diagrams.temporary_workspace', side_effect=lambda **kw: TemporaryDirectory(dir=self.root)):
             renderer = viewer._diagram_renderer = MermaidRenderer(viewer)
             renderer.timer.setInterval(50)

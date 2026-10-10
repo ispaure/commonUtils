@@ -66,13 +66,14 @@ class TextFilesTests(unittest.TestCase):
             path = Path(folder) / ".env"
             path.write_bytes(b"VAR=1\r\n")
             path.chmod(0o640)
+            expected_mode = path.stat().st_mode & 0o777
             self.assertTrue(is_text_path(path))
             snapshot = read_text_file(path)
             write_text_file(
                 path, snapshot.encode("VAR=2\n"), expected=snapshot.original
             )
             self.assertEqual(path.read_bytes(), b"VAR=2\r\n")
-            self.assertEqual(path.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(path.stat().st_mode & 0o777, expected_mode)
             with self.assertRaises(FileConflictError):
                 write_text_file(path, b"bad", expected=snapshot.original)
             path.chmod(0o444)

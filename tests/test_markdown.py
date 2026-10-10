@@ -235,7 +235,7 @@ class MarkdownTests(QtTestCase):
         destination = directory / 'saved.md'
         self.assertTrue(self.viewer.save_document(destination))
         self.assertEqual(self.viewer.current_path, destination)
-        self.assertEqual(self.viewer.browser.document().baseUrl().toLocalFile(), str(directory) + '/')
+        self.assertEqual(Path(self.viewer.browser.document().baseUrl().toLocalFile()), directory)
         self.assertIn('My changes', destination.read_text())
 
     def test_unsaved_navigation_cancel_discard_and_failed_save(self):
@@ -331,7 +331,7 @@ class MarkdownTests(QtTestCase):
         self.assertIn('<table', viewer.formatted_editor.document().toHtml())
         self.assertFalse(viewer.is_modified)
         viewer.set_edit_mode('source')
-        self.assertEqual(viewer.editor.toPlainText(), original.decode())
+        self.assertEqual(viewer.editor.toPlainText(), original.decode().replace("\r\n", "\n"))
         viewer.set_edit_mode('formatted')
         self.assertTrue(viewer.save_document())
         self.assertEqual(self.first.read_bytes(), original)

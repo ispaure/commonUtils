@@ -54,7 +54,7 @@ def theme_stylesheet(c):
             background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; border-radius: 6px;
             selection-background-color: {c.accent}; selection-color: {c.selected_text};
         }}
-        QLineEdit {{ padding: 2px 5px; }}
+        QLineEdit {{ padding: 1px 5px; }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {c.accent}; }}
         QAbstractItemView::item {{ padding: 4px; margin: 0px; border: none; }}
         QAbstractItemView::item:hover {{ background: {c.hover}; padding: 4px; margin: 0px; border: none; }}

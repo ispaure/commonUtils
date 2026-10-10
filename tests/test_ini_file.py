@@ -19,13 +19,14 @@ class INIFileTests(unittest.TestCase):
     def test_bom_newlines_comments_case_and_literal_values_survive(self):
         self.path.write_bytes(b'\xef\xbb\xbf# note\r\n[Main]\r\nValue = 100% # literal\r\nOther:x\r\n')
         self.path.chmod(0o640)
+        expected_mode = stat.S_IMODE(self.path.stat().st_mode)
         ini = INIFile(self.path).read()
         self.assertEqual(ini.get('Main', 'Value'), '100% # literal')
         self.assertIsNone(ini.get('Main', 'value'))
         ini.set('Main', 'Other', 'new')
         ini.save()
         self.assertEqual(self.path.read_bytes(), b'\xef\xbb\xbf# note\r\n[Main]\r\nValue = 100% # literal\r\nOther:new\r\n')
-        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o640)
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), expected_mode)
 
     def test_add_keys_sections_and_default_inheritance(self):
         self.path.write_text('[Main]\nkey = first\n\n[Next]\nkey = second\n')
