@@ -1,6 +1,7 @@
 """Storage uses saved index data, browser navigation and shared selection."""
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from commonUtils.ui import pyside as qt
@@ -9,7 +10,7 @@ from commonUtils.directory_index import directory_cache
 from unittest.mock import patch
 
 
-class StorageViewTests(unittest.TestCase):
+class StorageViewTests(QtTestCase):
     def test_navigation_stays_blank_until_current_folder_sizes_arrive(self):
         app = qt.QApplication.instance() or qt.QApplication([])
         browser = FileBrowser(calculate_folder_sizes=False)

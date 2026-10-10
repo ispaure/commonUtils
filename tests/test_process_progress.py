@@ -5,12 +5,13 @@ import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.process_runner import ProcessRunner, ProcessUpdate
 from commonUtils.ui.process_progress import ProcessProgressWindow
 
 
-class ProcessTests(unittest.TestCase):
+class ProcessTests(QtTestCase):
     def test_optional_host_falls_back_when_hidden_closing_or_destroyed(self):
         from unittest.mock import Mock
         from shiboken6 import isValid

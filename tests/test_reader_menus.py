@@ -3,12 +3,13 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.reader_menus import ReaderMenus, RecentFiles
 
 
-class ReaderMenuTests(unittest.TestCase):
+class ReaderMenuTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 

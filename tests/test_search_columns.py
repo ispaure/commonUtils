@@ -2,11 +2,12 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.search_columns import configure_search_columns, describe_search_row
 
 
-class SearchColumnTests(unittest.TestCase):
+class SearchColumnTests(QtTestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])

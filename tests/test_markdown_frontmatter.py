@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.markdownUtils import split_frontmatter, parse_properties, replace_property, replace_frontmatter
 from commonUtils.ui import pyside as qt
@@ -18,7 +19,7 @@ HEADER = ('---\n# Important metadata comment\ntitle: "A: title"\n'
           'nested:\n  keep: value\n---\n')
 
 
-class FrontmatterTests(unittest.TestCase):
+class FrontmatterTests(QtTestCase):
     def test_boundaries_start_only_empty_unclosed_and_body_rule(self):
         for text in ('# Heading\n---\nbody', '\n---\ntitle: value\n---\nbody'):
             self.assertFalse(split_frontmatter(text).present)
@@ -78,7 +79,7 @@ class FrontmatterTests(unittest.TestCase):
                 typed_value(kind, text)
 
 
-class FrontmatterWidgetTests(unittest.TestCase):
+class FrontmatterWidgetTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()

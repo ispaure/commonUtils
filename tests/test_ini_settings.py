@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.ui import pyside as qt
@@ -12,7 +13,7 @@ from commonUtils.configuration.ini_schema import key_type, parse_value, string_l
 from commonUtils.fileTypes.iniType import INIFile
 
 
-class SchemaTests(unittest.TestCase):
+class SchemaTests(QtTestCase):
     def test_scalar_list_and_mode_types(self):
         self.assertEqual(key_type('count_list-int'), ('count', 'list-int'))
         self.assertEqual(parse_value('int', '9000000000'), 9000000000)
@@ -34,7 +35,7 @@ class SchemaTests(unittest.TestCase):
             validate_values(INIFile.parse('[S]\nview_mode=c\nview_choices_list-str=[a,b]\n'))
 
 
-class EditorTests(unittest.TestCase):
+class EditorTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()

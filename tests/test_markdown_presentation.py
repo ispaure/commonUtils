@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.ui import pyside as qt
@@ -15,7 +16,7 @@ from commonUtils.ui.markdown.diagrams import MermaidRenderer, safe_diagram
 from commonUtils.ui.theme import apply_theme, theme_palette, SLATE_DARK, SLATE_LIGHT
 
 
-class MarkdownPresentationTests(unittest.TestCase):
+class MarkdownPresentationTests(QtTestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])

@@ -2,6 +2,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.page_wheel import PageWheel
@@ -14,7 +15,7 @@ def wheel(delta, *, pixels=False):
                          qt.Qt.ScrollPhase.ScrollUpdate if pixels else qt.Qt.ScrollPhase.NoScrollPhase, False)
 
 
-class WheelTests(unittest.TestCase):
+class WheelTests(QtTestCase):
     def test_sensitivity_reloads_and_touchpad_cooldown_prevents_bursts(self):
         with TemporaryDirectory() as folder:
             path = Path(folder)/'settings.ini'

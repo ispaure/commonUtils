@@ -4,6 +4,36 @@ The `commonUtils.wrappers.cmdShellWrapper` package provides cross-platform comma
 
 It supports captured command output, detached execution, custom working directories, idle-output timeouts, process-tree cleanup, and launching commands in new terminal windows.
 
+## Commands with explicit outcomes
+
+Use `run_command()` for new callers. It accepts an argument vector and waits for
+completion without a shell:
+
+```python
+from commonUtils.wrappers.cmdShellWrapper import run_command
+
+result = run_command(["tool", "--input", "a file.txt"], timeout=120)
+if not result.success:
+    print(result.returncode, result.stderr, result.timed_out, result.cancelled)
+```
+
+`CommandResult` contains the exit status, separate stdout/stderr line tuples,
+`timed_out`, and `cancelled`. `lines` returns stdout followed by stderr as a list.
+`success` requires exit status zero with neither timeout nor cancellation.
+A missing executable raises `OSError`. A cancelled call does not start a process.
+
+Pass `cancelled=event.is_set` to stop a running process tree. `timeout` limits
+elapsed time; `idle_timeout` limits time without output. Both are disabled unless
+specified. Even a process that closes both output streams remains subject to
+these checks until it exits. New commands are noninteractive (`stdin=DEVNULL`);
+explicitly pass `stdin=None` when inheriting standard input is intentional.
+Shell strings require `shell=True`.
+
+`exec_cmd()` remains a compatibility API: captured calls return output lines and
+retain their historical idle timeout and inherited stdin. It does not expose
+exit status. A new terminal window returns immediately regardless of
+`wait_for_output`; terminal launch acceptance is not command completion.
+
 ## Basic Usage
 
 The main public entry point is `exec_cmd()`:

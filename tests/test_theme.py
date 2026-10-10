@@ -3,6 +3,7 @@ import importlib
 import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.theme import apply_theme, SLATE_LIGHT, SLATE_DARK
 from commonUtils.ui.workspace import Workspace
@@ -17,7 +18,7 @@ def contrast(first, second):
     return (b+.05)/(a+.05)
 
 
-class ThemeTests(unittest.TestCase):
+class ThemeTests(QtTestCase):
     @classmethod
     def setUpClass(cls): cls.app=qt.QApplication.instance() or qt.QApplication([])
 

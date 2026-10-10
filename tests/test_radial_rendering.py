@@ -3,11 +3,12 @@ import math
 from pathlib import Path
 from unittest.mock import patch
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.storage_view import RadialMap
 
 
-class RadialRenderingTests(unittest.TestCase):
+class RadialRenderingTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.chart = RadialMap()

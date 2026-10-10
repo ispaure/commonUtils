@@ -52,3 +52,12 @@ retains its boolean/logging API and parent creation, but consistently refuses
 existing destinations unless `force=True`. Forced replacement uses `os.replace`
 without first deleting the destination. Same-path renames are successful no-ops
 for existing sources; use batch planning for portable case-only renames.
+
+## Names supplied by an application
+
+Use `plan_named_renames([(source_path, new_filename), ...])` when a CSV or another
+application policy supplies the names. It applies the same portable-name,
+case/Unicode collision, existing-destination and source-stamp checks as
+`plan_renames`. New names must stay in the source folder. Inspect `plan.valid`
+and each entry's `error`, then pass the plan to `apply_renames` for rollback and
+an undo receipt. A plan never changes files.

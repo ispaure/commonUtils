@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock, patch
 
 from commonUtils.fileUtils import File
@@ -20,7 +21,7 @@ class ProjectFile(File):
     pass
 
 
-class DeclarationTests(unittest.TestCase):
+class DeclarationTests(QtTestCase):
     def test_invalid_declarations_fail_without_installation(self):
         with self.assertRaises(TypeError):
             FileType(object, 'example')
@@ -42,7 +43,7 @@ class DeclarationTests(unittest.TestCase):
         imported.assert_not_called()
 
 
-class BindingTests(unittest.TestCase):
+class BindingTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()
@@ -164,7 +165,7 @@ class BindingTests(unittest.TestCase):
         self.assertEqual(notifications, ['idle'])
 
 
-class ActivationPredicateTests(unittest.TestCase):
+class ActivationPredicateTests(QtTestCase):
     def test_activation_predicate_is_optional_and_validated(self):
         from commonUtils.features import FileActivation
         from commonUtils.fileUtils import File

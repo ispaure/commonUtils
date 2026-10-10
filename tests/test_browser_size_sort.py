@@ -1,6 +1,7 @@
 """Displayed byte totals drive ordering, independently of formatted labels."""
 import time
 import unittest
+from commonUtils.tests.qt_test_case import QtTestCase
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from commonUtils.ui import pyside as qt
@@ -8,7 +9,7 @@ from commonUtils.ui.file_browser import FileBrowser
 from commonUtils.filesystem import FolderStats
 
 
-class SizeSortTests(unittest.TestCase):
+class SizeSortTests(QtTestCase):
     def test_files_folders_unknown_and_live_totals_sort_numerically(self):
         app = qt.QApplication.instance() or qt.QApplication([])
         with TemporaryDirectory() as temp:
