@@ -304,3 +304,11 @@ caller should connect content replacement to `stop()` and also stop during any
 custom asynchronous shutdown. `reader_text()` prefers a selection and accepts a
 UTF-16 document offset. Bounded utterances advance on Qt's Ready state; clearing
 the queue and its timer prevents playback restarting after cancellation.
+
+
+## Markdown reader
+
+The [Markdown viewer/editor guide](README.md) covers preview-only defaults,
+explicit editing opt-in, typed Markdown formatting, properties, navigation and saving.
+Public imports remain `from commonUtils.ui.markdown import MarkdownViewer, open_markdown`.
+FileBrowser opts into editing; documentation callers get preview-only windows by default.

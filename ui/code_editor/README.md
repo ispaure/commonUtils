@@ -63,3 +63,13 @@ Outside this package, `ui.command_palette` searches/configures caller-owned QAct
 mappings. It imports no application feature modules. `persistence.session.SessionStore`
 provides bounded, atomic, private JSON checkpoints without Qt; callers own record
 schemas, live-instance locking, restoration and worker policy.
+
+
+## Reusable code editing
+
+The optional [code-editor components](README.md) provide a native
+QPlainTextEdit gutter, undoable line commands, bounded asynchronous search and
+palette-aware syntax definitions. They contain no application window or feature
+logic. Qt-independent `commonUtils.persistence.text` supplies strict encoding handling,
+text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
+are unchanged. Applications own their document tabs, settings and save prompts.
