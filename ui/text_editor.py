@@ -81,11 +81,11 @@ class TextFileEditor(qt.QWidget):
             content = self.text.toPlainText().replace('\n', self._newline).encode('utf-8')
             if self._bom:
                 content = b'\xef\xbb\xbf' + content
-            file = qt.QSaveFile(str(self.path))
-            if not file.open(qt.QIODevice.OpenModeFlag.WriteOnly):
-                raise OSError(file.errorString())
-            if file.write(content) != len(content) or not file.commit():
-                raise OSError(file.errorString())
+            from ..persistence import atomic_write_bytes
+            def check():
+                if self.path.read_bytes() != self._original:
+                    raise OSError('The file changed on disk. Reload before saving to preserve those changes.')
+            atomic_write_bytes(self.path, content, validate=check)
             self._original = content
             self.text.document().setModified(False)
             self.save_button.setEnabled(False)
