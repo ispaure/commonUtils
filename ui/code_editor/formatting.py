@@ -55,6 +55,8 @@ def format_text(text, language, width=4):
             def clean(node):
                 if node.nodeType == Node.ELEMENT_NODE and node.getAttribute("xml:space") == "preserve":
                     raise ValueError("XML with xml:space='preserve' can be validated but is not reformatted.")
+                if any(child.nodeType == Node.CDATA_SECTION_NODE for child in node.childNodes):
+                    raise ValueError("XML containing CDATA can be validated but is not reformatted.")
                 elements = any(child.nodeType == Node.ELEMENT_NODE for child in node.childNodes)
                 content = any(child.nodeType in (Node.TEXT_NODE, Node.CDATA_SECTION_NODE)
                               and child.data.strip() for child in node.childNodes)
