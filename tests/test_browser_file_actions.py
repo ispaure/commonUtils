@@ -74,6 +74,34 @@ class BrowserFileActionTests(unittest.TestCase):
                                                  qt.QItemSelectionModel.SelectionFlag.Rows)
         self.assertFalse(self.menu(self.file)['Rename'].isEnabled())
 
+    def test_platform_keys_open_parent_and_leave_editors_alone(self):
+        for platform, modifier in (('darwin', qt.Qt.KeyboardModifier.ControlModifier),
+                                   ('win32', qt.Qt.KeyboardModifier.NoModifier),
+                                   ('linux', qt.Qt.KeyboardModifier.NoModifier)):
+            self.browser.keyboard.platform = platform
+            self.browser.navigate(self.root); self.wait()
+            self.select(self.folder)
+            self.browser.tree.setFocus()
+            QTest.keyClick(self.browser.tree, qt.Qt.Key.Key_Down if platform == 'darwin'
+                           else qt.Qt.Key.Key_Return, modifier)
+            self.wait()
+            self.assertEqual(self.browser.navigation.directory, self.folder)
+            key = qt.Qt.Key.Key_Backspace if platform == 'win32' else qt.Qt.Key.Key_Up
+            up_modifier = modifier if platform != 'linux' else qt.Qt.KeyboardModifier.AltModifier
+            QTest.keyClick(self.browser.tree, key, up_modifier); self.wait()
+            self.assertEqual(self.browser.navigation.directory, self.root)
+        self.browser.keyboard.platform = 'darwin'
+        self.select(self.file); self.browser.tree.setFocus()
+        QTest.keyClick(self.browser.tree, qt.Qt.Key.Key_Return)
+        editor = self.editor()
+        editor.setText('Renamed.txt')
+        QTest.keyClick(editor, qt.Qt.Key.Key_Return); self.wait()
+        self.assertTrue((self.root / 'Renamed.txt').exists())
+        self.browser.open_search()
+        self.browser.search_bar.setText('abc')
+        QTest.keyClick(self.browser.search_bar, qt.Qt.Key.Key_Backspace)
+        self.assertEqual(self.browser.search_bar.text(), 'ab')
+
     def test_trash_action_removes_selected_folder_only_after_confirmation(self):
         child = self.folder / 'child.txt'; child.write_text('contents')
         self.select(self.folder)

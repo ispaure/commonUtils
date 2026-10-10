@@ -116,6 +116,8 @@ class FileBrowser(qt.QWidget):
         layout.addLayout(status_row)
         self._create_preview_panel()
         self.file_actions = FileActions(self)
+        from .keyboard import BrowserKeyboard
+        self.keyboard = BrowserKeyboard(self)
         self._reconcile_pending = False
         self.index_watcher = qt.QFileSystemWatcher(self)
         self.index_watcher.directoryChanged.connect(self._indexed_path_changed)
