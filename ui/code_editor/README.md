@@ -26,7 +26,7 @@ lexer. RegexLexer states propagate between blocks; other lexer families use a
 bounded per-block fallback. Long blocks and large documents skip highlighting.
 See the included Pygments BSD license and the implementation notes in the module.
 
-`commonUtils.text_files` supplies Qt-independent BOM/encoding handling, text/binary
+`commonUtils.persistence.text` supplies Qt-independent BOM/encoding handling, text/binary
 sniffing, normalized text snapshots and atomic conflict-checked byte writes. Use
 explicit codecs for ambiguous legacy encodings and retain snapshots until save.
 No existing File class is changed or automatically coupled to an editor.
@@ -60,6 +60,6 @@ and replacement text; callers convert offsets to Qt positions and own undo/save
 policy. Limits are 1 MiB and 5,000 lines per side.
 
 Outside this package, `ui.command_palette` searches/configures caller-owned QAction
-mappings. It imports no application feature modules. `session_store.SessionStore`
+mappings. It imports no application feature modules. `persistence.session.SessionStore`
 provides bounded, atomic, private JSON checkpoints without Qt; callers own record
 schemas, live-instance locking, restoration and worker policy.

@@ -4,7 +4,7 @@ import math
 from bisect import bisect_right
 from .. import pyside as qt
 from ..operations import Operation
-from ...directory_index import directory_cache
+from ...directory import directory_cache
 from ...filesystem import format_size
 from ...settings import get_setting
 from .storage import Treemap

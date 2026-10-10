@@ -6,7 +6,7 @@ from ..operations import Operation
 class IndexDetailsDialog(qt.QDialog):
     def __init__(self, browser):
         super().__init__(browser)
-        from ...directory_index import directory_cache
+        from ...directory import directory_cache
         self.setWindowTitle('Index details')
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.resize(900, 420)

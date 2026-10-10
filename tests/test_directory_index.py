@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 import sqlite3
-from commonUtils.directory_index import scan_metadata, storage_totals, DirectoryCache
+from commonUtils.directory import scan_metadata, storage_totals, DirectoryCache
 from unittest.mock import patch
 from commonUtils.operations import OperationCancelled
 
@@ -55,7 +55,7 @@ class DirectoryIndexTests(unittest.TestCase):
 
     def _check_cache(self, cache, root, file):
         first = cache.get(root)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Repeated enumeration')):
+        with patch('commonUtils.directory.os.scandir', side_effect=AssertionError('Repeated enumeration')):
             reused = cache.get(root)
             self.assertTrue(reused.reused)
             self.assertEqual(reused.scanned_at, first.scanned_at)

@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import sqlite3
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.ui.file_browser.index_policy import index_policy
 from commonUtils.ui.file_browser.storage_data import collect_storage
 

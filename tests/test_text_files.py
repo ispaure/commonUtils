@@ -2,7 +2,7 @@ import codecs
 from pathlib import Path
 import tempfile
 import unittest
-from commonUtils.text_files import (
+from commonUtils.persistence.text import (
     decode_bytes,
     read_text_file,
     write_text_file,
@@ -19,7 +19,7 @@ class TextFilesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "large.log"
             path.write_bytes(b"x" * 65)
-            with patch("commonUtils.text_files.MAX_BYTES", 64):
+            with patch("commonUtils.persistence.text.MAX_BYTES", 64):
                 with self.assertRaises(ValueError):
                     read_text_file(path)
                 with self.assertRaises(ValueError):

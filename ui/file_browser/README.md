@@ -19,13 +19,13 @@ and imports compatible. File handlers may also be used outside Logistics.
 - `search_columns.py`: responsive Name-first layouts for inline/dialog search results.
 - `navigation.py`, `controls.py`: breadcrumbs, history and presentation controls.
 
-The index backend is separated into `commonUtils._directory_reader` (immutable
-SQLite readers), `_directory_schema` (migration, record interning and membership),
-`_directory_store` (scan scheduling/checkpoints), `_directory_reconcile` (targeted
-completed-index updates), `_directory_totals` (incremental
-aggregation), and `_directory_order` (natural ordering). The old reader/order
-imports remain available from `_directory_store`. Public access continues through
-`commonUtils.directory_index`.
+The index backend is separated into `commonUtils.directory.reader` (immutable
+SQLite readers), `directory.schema` (migration, record interning and membership),
+`directory.store` (scan scheduling/checkpoints), `directory.reconcile` (targeted
+completed-index updates), `directory.totals` (incremental
+aggregation), and `directory.order` (natural ordering). Reader/order
+imports remain available from `directory.store`. Public access uses
+`commonUtils.directory`.
 
 ## State and ownership
 
@@ -104,7 +104,7 @@ Filename search ignores case, including Unicode case folding. Bare space-separat
 terms must all occur, in any order. Quoted phrases keep adjacent word order, treating
 whitespace, underscores and hyphens as equivalent separators; punctuation and
 wildcards otherwise remain literal. Unfinished quotes act as phrases during live
-typing. SQL and detached snapshots share these rules in `_directory_search.py`.
+typing. SQL and detached snapshots share these rules in `directory.search.py`.
 Phrase normalization is a SQLite scalar function at query time, so existing saved
 names need no migration; unquoted keyword queries remain SQL substring predicates.
 Search results give Name the remaining width, keep Type/Size sized to their

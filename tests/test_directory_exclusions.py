@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from commonUtils.directory_index import DirectoryCache, storage_totals
+from commonUtils.directory import DirectoryCache, storage_totals
 from commonUtils.operations import OperationCancelled
 
 
@@ -27,9 +27,9 @@ class MacOSExclusionTests(unittest.TestCase):
 
     @contextmanager
     def macos(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'darwin'), \
-             patch('commonUtils._directory_exclusions.MACOS_ROOT', self.root), \
-             patch('commonUtils._directory_exclusions.MACOS_DATA', self.data):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'darwin'), \
+             patch('commonUtils.directory.exclusions.MACOS_ROOT', self.root), \
+             patch('commonUtils.directory.exclusions.MACOS_DATA', self.data):
             yield
 
     def assert_clean(self, snapshot):
@@ -43,30 +43,30 @@ class MacOSExclusionTests(unittest.TestCase):
             self.assertNotEqual(Path(path), self.data)
             return scan(path)
         with self.macos():
-            with patch('commonUtils._directory_store.os.scandir', side_effect=guarded):
+            with patch('commonUtils.directory.store.os.scandir', side_effect=guarded):
                 self.assert_clean(self.cache.get(self.root))
             explicit = self.cache.reconcile_folder(self.data)
             self.assertEqual(storage_totals(explicit)[self.data], 5)
             self.assert_clean(self.cache.get(self.root))
 
     def test_completed_cache_repaired_without_full_enumeration(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             old = self.cache.get(self.root)
         self.assertEqual(storage_totals(old)[self.root], 10)
-        with self.macos(), patch('commonUtils._directory_store.os.scandir',
+        with self.macos(), patch('commonUtils.directory.store.os.scandir',
                                  side_effect=AssertionError('Unnecessary enumeration')):
             self.assert_clean(self.cache.get(self.root))
         self.assertEqual(storage_totals(old)[self.root], 10)  # Existing read transaction.
         self.assert_clean(self.cache.peek(self.root))
 
     def test_cache_first_repair_does_not_resume_partial_scan_or_walk_files(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             old = self.cache.get(self.root)
         with self.cache._writer(lambda: False) as db:
             db.execute('UPDATE roots SET building=completed,completed=NULL WHERE root=?', (str(self.root),))
             db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=?", (old.entries.generation, str(self.root)))
             db.commit()
-        with self.macos(), patch('commonUtils._directory_store.os.scandir',
+        with self.macos(), patch('commonUtils.directory.store.os.scandir',
                                  side_effect=AssertionError('Cache repair must not enumerate folders')):
             self.cache.repair_cached_exclusions(self.root)
             self.assert_clean(self.cache.peek(self.root))
@@ -75,7 +75,7 @@ class MacOSExclusionTests(unittest.TestCase):
         self.assertEqual(storage_totals(old)[self.root], 10)
 
     def test_cache_first_repair_cancellation_can_be_retried(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)
         with self.macos(), patch.object(self.cache, '_publish_totals', side_effect=OperationCancelled):
             with self.assertRaises(OperationCancelled):
@@ -88,7 +88,7 @@ class MacOSExclusionTests(unittest.TestCase):
     def test_sqlite_interrupted_cleanup_rolls_back_without_masking_cancellation(self):
         for number in range(3000):
             (self.data / f'file{number}').write_bytes(b'x')
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)
         stop = [False]
         def report(done, total, message):
@@ -102,7 +102,7 @@ class MacOSExclusionTests(unittest.TestCase):
         self.assert_clean(self.cache.peek(self.root))
 
     def test_reconciliation_repairs_saved_ancestor_totals(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)
         with self.macos():
             self.cache.reconcile_folder(self.root / 'Users', full=True)
@@ -114,7 +114,7 @@ class MacOSExclusionTests(unittest.TestCase):
             self.assert_clean(self.cache.get(self.root))
 
     def test_repair_preserves_independent_data_cache(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             self.cache.get(self.data)
             self.cache.get(self.root)
         with self.macos():
@@ -130,7 +130,7 @@ class MacOSExclusionTests(unittest.TestCase):
             original(*args, **kwargs)
             if args[4] == self.data:
                 stop[0] = True
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'), \
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'), \
              patch.object(self.cache, '_scan_folder', side_effect=scan):
             with self.assertRaises(OperationCancelled):
                 self.cache.get(self.root, cancelled=lambda: stop[0])
@@ -139,7 +139,7 @@ class MacOSExclusionTests(unittest.TestCase):
             self.assert_clean(self.cache.get(self.root))
 
     def test_cancelled_repair_retains_old_entries_and_totals(self):
-        with patch('commonUtils._directory_exclusions.sys.platform', 'linux'):
+        with patch('commonUtils.directory.exclusions.sys.platform', 'linux'):
             self.cache.get(self.root)
         with self.macos(), patch.object(self.cache, '_publish_totals', side_effect=OperationCancelled):
             with self.assertRaises(OperationCancelled):

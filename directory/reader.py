@@ -10,9 +10,9 @@ import os
 from pathlib import Path
 import sqlite3
 from threading import RLock
-from ._directory_metadata import Entry
-from .operations import check_cancelled, OperationCancelled
-from ._directory_search import search_sql, search_words
+from .metadata import Entry
+from ..operations import check_cancelled, OperationCancelled
+from .search import search_sql, search_words
 
 
 def _entry(row):
@@ -184,7 +184,7 @@ class SqlEntries(Sequence):
         return matches, total
 
     def folder_stats(self, paths=None, *, cancelled=lambda: False, stale=False, children_of=None):
-        from .filesystem import FolderStats
+        from ..filesystem import FolderStats
         values = {}
         with self.lock:
             if not self.connection.execute("SELECT 1 FROM sqlite_master WHERE name='folder_totals'").fetchone():

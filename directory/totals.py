@@ -3,8 +3,8 @@ import json
 import os
 from pathlib import Path
 from time import time
-from .filesystem import FolderStats
-from .operations import check_cancelled
+from ..filesystem import FolderStats
+from ..operations import check_cancelled
 
 
 

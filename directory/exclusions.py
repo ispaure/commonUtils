@@ -1,7 +1,7 @@
 """Traversal exclusions shared by discovery and incremental reconciliation."""
 import sys
 from pathlib import Path
-from .network_filesystems import network_mount_roots
+from ..network_filesystems import network_mount_roots
 
 
 MACOS_ROOT = Path('/')

@@ -7,7 +7,7 @@ from time import monotonic, sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 
@@ -26,7 +26,7 @@ class EventDrivenIndexTests(QtTestCase):
         self.cache = DirectoryCache(database=self.base / 'cache' / 'index.sqlite3')
         self.addCleanup(self.cache.close)
         self.patches = [patch(name, self.cache) for name in (
-            'commonUtils.directory_index.directory_cache',
+            'commonUtils.directory.directory_cache',
             'commonUtils.ui.file_browser.index_worker.directory_cache',
             'commonUtils.ui.file_browser.index_search.directory_cache')]
         for item in self.patches: item.start()
@@ -98,7 +98,7 @@ class EventDrivenIndexTests(QtTestCase):
             if Path(path) == self.deep:
                 raise PermissionError('locked')
             return scan(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             with patch.object(self.cache, 'get', wraps=self.cache.get) as get:
                 self.browser.refresh()
                 self.wait(lambda: not self.browser.folder_busy)
@@ -133,7 +133,7 @@ class EventDrivenIndexTests(QtTestCase):
                 attempts.append(path)
                 raise PermissionError('locked')
             return scan(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             self.browser.refresh(); self.wait(lambda: not self.browser.folder_busy)
             self.assertNotIn(str(self.child), self.browser.index_watcher.directories())
             for _ in range(3):
@@ -158,7 +158,7 @@ class EventDrivenIndexTests(QtTestCase):
             self.assertEqual(self.browser.model.folder_totals[self.child].size, 8)
             self.unwatch()
             second = self.child / 'second.txt'; second.write_bytes(b'xx')
-            with patch('commonUtils._directory_reconcile._changed', side_effect=AssertionError('Revisit rechecked metadata')):
+            with patch('commonUtils.directory.reconcile._changed', side_effect=AssertionError('Revisit rechecked metadata')):
                 self.browser.navigate(self.child)
                 self.wait(lambda: not self.browser.folder_busy)
             self.assertEqual(self.browser.model.folder_totals[self.child].size, 8)

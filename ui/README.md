@@ -412,7 +412,7 @@ New tabs are grouped only with docked views, leaving detached views independent.
 Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.
 
-`commonUtils.directory_index` supplies immutable `Entry`/`Snapshot` metadata,
+`commonUtils.directory` supplies immutable `Entry`/`Snapshot` metadata,
 case-insensitive partial name search, and `storage_totals()`. `DirectoryCache`
 persists completed and partial indices in SQLite, without entry/root count limits.
 `directory_index_path()` defaults to:
@@ -635,7 +635,7 @@ embedding example.
 The optional [code-editor components](code_editor/README.md) provide a native
 QPlainTextEdit gutter, undoable line commands, bounded asynchronous search and
 palette-aware syntax definitions. They contain no application window or feature
-logic. Qt-independent `commonUtils.text_files` supplies strict encoding handling,
+logic. Qt-independent `commonUtils.persistence.text` supplies strict encoding handling,
 text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
 are unchanged. Applications own their document tabs, settings and save prompts.
 

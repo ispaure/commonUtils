@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
-from commonUtils.directory_index import directory_cache
+from commonUtils.directory import directory_cache
 from unittest.mock import patch
 
 
@@ -68,7 +68,7 @@ class StorageViewTests(QtTestCase):
 
     def test_storage_bounds_materialization_of_a_large_folder(self):
         from types import SimpleNamespace
-        from commonUtils._directory_metadata import Entry
+        from commonUtils.directory.metadata import Entry
         app = qt.QApplication.instance() or qt.QApplication([])
         browser = FileBrowser(calculate_folder_sizes=False)
         try:
@@ -133,7 +133,7 @@ class StorageViewTests(QtTestCase):
 
     def test_radial_budget_is_shared_and_deep_selection_reveals_nested_row(self):
         from types import SimpleNamespace
-        from commonUtils._directory_metadata import Entry
+        from commonUtils.directory.metadata import Entry
         from commonUtils.filesystem import FolderStats
         app = qt.QApplication.instance() or qt.QApplication([])
         with TemporaryDirectory() as temp:
@@ -205,7 +205,7 @@ class StorageViewTests(QtTestCase):
                 browser.shutdown(); browser.close(); app.processEvents()
 
     def test_treemap_reads_one_folder_and_radial_loads_on_demand(self):
-        from commonUtils._directory_store import SqlEntries
+        from commonUtils.directory.store import SqlEntries
         app=qt.QApplication.instance() or qt.QApplication([])
         with TemporaryDirectory() as temp:
             root=Path(temp);child=root/'child';child.mkdir();(child/'file.txt').write_bytes(b'abc')

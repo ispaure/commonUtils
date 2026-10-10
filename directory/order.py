@@ -1,5 +1,5 @@
 """Stable natural path keys, shared by index migration and scanning."""
-from .traversal import natural_path_key
+from ..traversal import natural_path_key
 
 
 def _sort_key(path):

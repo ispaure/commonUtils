@@ -68,7 +68,7 @@ class BrowserTests(QtTestCase):
 
     def test_parent_destruction_releases_index_priority(self):
         import gc
-        from commonUtils.directory_index import directory_cache
+        from commonUtils.directory import directory_cache
         from shiboken6 import isValid
         for _ in range(20):
             parent = qt.QWidget()
@@ -90,7 +90,7 @@ class BrowserTests(QtTestCase):
             path = Path(path)
             return path == remote or remote in path.parents
         with patch('commonUtils.network_filesystems.is_network_location', side_effect=network), \
-             patch('commonUtils.directory_index.directory_cache.reconcile_folder') as scan:
+             patch('commonUtils.directory.directory_cache.reconcile_folder') as scan:
             self.browser.set_directory(remote)
             self.wait()
             self.assertTrue(self.browser.network_location)
@@ -118,7 +118,7 @@ class BrowserTests(QtTestCase):
         self.assertTrue(self.browser.view_selector.buttons[3].isEnabled())
 
     def test_search_results_locate_file_and_keep_worker_safe(self):
-        from commonUtils.directory_index import DirectoryCache
+        from commonUtils.directory import DirectoryCache
         support = Path(self.enterContext(TemporaryDirectory()))
         with DirectoryCache(database=support / 'search-fixture.sqlite3') as cache:
             cache.get(self.root, refresh=True)
@@ -692,7 +692,7 @@ class BrowserTests(QtTestCase):
             release.wait(5)
             from unittest.mock import Mock
             return Mock(folder_stats=lambda **kwargs: {root: FolderStats(files=999)})
-        with patch('commonUtils.directory_index.directory_cache.reconcile_folder', side_effect=scan):
+        with patch('commonUtils.directory.directory_cache.reconcile_folder', side_effect=scan):
             try:
                 self.browser.set_folder_sizes_enabled(True)
                 self.assertTrue(entered.wait(2))

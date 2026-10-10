@@ -7,7 +7,7 @@ from time import monotonic, sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 
@@ -22,7 +22,7 @@ class IntegratedSearchTests(QtTestCase):
         self.file=self.root/'nested'/'Needle.TXT';self.file.write_text('abc')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
         self.addCleanup(self.cache.close)
-        self.patches=[patch(name,self.cache) for name in ('commonUtils.directory_index.directory_cache',
+        self.patches=[patch(name,self.cache) for name in ('commonUtils.directory.directory_cache',
              'commonUtils.ui.file_browser.index_worker.directory_cache','commonUtils.ui.file_browser.index_search.directory_cache',
              'commonUtils.ui.file_browser.discovery.directory_cache')]
         for p in self.patches:p.start()
@@ -88,7 +88,7 @@ class IntegratedSearchTests(QtTestCase):
         worker.deleteLater()
 
     def test_recursive_search_queries_sql_without_new_walk_and_preserves_selection_and_clear(self):
-        with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Search traversed filesystem')):
+        with patch('commonUtils.directory.os.scandir',side_effect=AssertionError('Search traversed filesystem')):
             self.search('nEEdLE',1)
             row=self.browser.index_search.results.topLevelItem(0)
             self.assertEqual(row.data(0,qt.Qt.ItemDataRole.UserRole),self.file)
@@ -161,13 +161,13 @@ class IntegratedSearchTests(QtTestCase):
         row=self.browser.index_search.results.topLevelItem(0)
         self.assertEqual(row.data(0,qt.Qt.ItemDataRole.UserRole).name,'match-500.bin')
         with DirectoryCache(database=self.cache.database) as restarted:
-            with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Restarted query scanned')):
+            with patch('commonUtils.directory.os.scandir',side_effect=AssertionError('Restarted query scanned')):
                 self.assertEqual(restarted.peek(self.root).search_page('match-')[1],505)
 
     def test_cached_subtree_is_scoped_and_reused_without_duplicate_enumeration(self):
         (self.root/'Needle-outside.txt').write_text('outside');self.browser.refresh()
         self.wait(lambda:not self.browser.folder_busy)
-        with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Subtree enumerated again')):
+        with patch('commonUtils.directory.os.scandir',side_effect=AssertionError('Subtree enumerated again')):
             sub=self.cache.peek(self.file.parent)
             self.assertEqual(sub.search_page('needle')[1],1)
             self.assertEqual(set(sub.folder_stats()),{self.file.parent})
@@ -213,7 +213,7 @@ class IntegratedSearchTests(QtTestCase):
             # globally also stalls directory previews and GUI filesystem work.
             def __getattr__(self, name):
                 return scandir if name == 'scandir' else getattr(os, name)
-        with patch('commonUtils._directory_store.os', IndexFilesystem()), patch.object(
+        with patch('commonUtils.directory.store.os', IndexFilesystem()), patch.object(
                 self.cache, '_checkpoint', side_effect=publish):
             browser = self.browser = FileBrowser(self.root)
             self.browsers.append(browser)

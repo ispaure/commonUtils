@@ -2,7 +2,7 @@
 from pathlib import Path
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
-from ...directory_index import directory_cache, Snapshot
+from ...directory import directory_cache, Snapshot
 from time import time
 from ...operations import OperationCancelled
 from dataclasses import dataclass

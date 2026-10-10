@@ -10,16 +10,16 @@ from threading import RLock
 from weakref import WeakSet
 from time import sleep, time, perf_counter
 
-from ._directory_scan import DirectoryScan
-from ._directory_metadata import Entry, Snapshot, fingerprint
+from .scan import DirectoryScan
+from .metadata import Entry, Snapshot, fingerprint
 # Keep these long-standing imports available to existing consumers/instrumentation.
-from ._directory_reader import SqlEntries, SqlDirectories, _entry
-from .operations import check_cancelled, OperationCancelled
-from ._directory_order import _sort_key, _encode_sort_parts
-from .storage import cache_directory
-from ._directory_totals import store_folder_stats
-from ._directory_exclusions import scan_exclusions, is_excluded
-from ._directory_schema import initialize_schema, ensure_folder, copy_entries, write_entries, delete_children, delete_entries, retire_generation
+from .reader import SqlEntries, SqlDirectories, _entry
+from ..operations import check_cancelled, OperationCancelled
+from .order import _sort_key, _encode_sort_parts
+from ..storage import cache_directory
+from .totals import store_folder_stats
+from .exclusions import scan_exclusions, is_excluded
+from .schema import initialize_schema, ensure_folder, copy_entries, write_entries, delete_children, delete_entries, retire_generation
 
 
 def directory_index_path():
@@ -220,7 +220,7 @@ class DirectoryCache(DirectoryScan):
 
     @staticmethod
     def _schema(db, cancelled=lambda: False, report=lambda done, total, message: None):
-        """Compatibility entry point; schema ownership lives in _directory_schema."""
+        """Compatibility entry point; schema ownership lives in directory.schema."""
         initialize_schema(db, cancelled, report)
 
     @staticmethod
@@ -575,7 +575,7 @@ class DirectoryCache(DirectoryScan):
             if snapshot is not None:
                 report(0, 0, 'Reusing saved index')
                 return snapshot
-        from ._directory_reconcile import reconcile_existing
+        from .reconcile import reconcile_existing
         snapshot = reconcile_existing(self, root, changes, cancelled, report, full=full,
                                       allow_partial=not full and self.was_checked_this_session(root))
         if snapshot is None:
