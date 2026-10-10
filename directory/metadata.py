@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from pathlib import Path
 import os
 from time import time
-from .operations import check_cancelled
-from .traversal import natural_path_key
-from ._directory_search import search_terms, matches_name
+from ..operations import check_cancelled
+from ..traversal import natural_path_key
+from .search import search_terms, matches_name
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class Snapshot:
         if children_of is not None and paths is not None:
             raise ValueError('Choose explicit paths or immediate child folders')
         # Standalone metadata snapshots retain their public API without a database.
-        from .filesystem import FolderStats
+        from ..filesystem import FolderStats
         stats = {self.root: FolderStats(complete=self.complete, scanned_at=self.scanned_at)}
         ordered = sorted(self.entries, key=lambda entry: len(entry.path.parts), reverse=True)
         for entry in ordered:

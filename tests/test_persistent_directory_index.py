@@ -6,7 +6,7 @@ from threading import Event, Thread
 import unittest
 from unittest.mock import patch
 
-from commonUtils.directory_index import DirectoryCache, directory_index_path, storage_totals
+from commonUtils.directory import DirectoryCache, directory_index_path, storage_totals
 from commonUtils.operations import OperationCancelled
 
 
@@ -34,13 +34,13 @@ class PersistentIndexTests(unittest.TestCase):
         return self.cache.status(self.root)
 
     def test_path_defaults_to_cache_on_macos(self):
-        with patch('commonUtils._directory_store.sys.platform', 'darwin'), patch.object(Path, 'home', return_value=self.folder):
+        with patch('commonUtils.directory.store.sys.platform', 'darwin'), patch.object(Path, 'home', return_value=self.folder):
             self.assertEqual(directory_index_path(), self.folder / 'Library' / 'Application Support' / 'commonUtils' / 'Cache' / 'directory-index.sqlite3')
 
     def test_completed_index_survives_new_instance_without_reenumeration(self):
         original = self.cache.get(self.root)
         with DirectoryCache(database=self.database) as restarted:
-            with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Unexpected enumeration')):
+            with patch('commonUtils.directory.os.scandir', side_effect=AssertionError('Unexpected enumeration')):
                 reused = restarted.get(self.root)
             self.assertTrue(reused.reused)
             self.assertEqual(reused.scanned_at, original.scanned_at)
@@ -56,7 +56,7 @@ class PersistentIndexTests(unittest.TestCase):
         def scandir(path):
             seen.append(Path(path))
             return original(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=scandir):
+        with patch('commonUtils.directory.os.scandir', side_effect=scandir):
             result = DirectoryCache(database=self.database).get(self.root)
         self.assertTrue(result.resumed)
         self.assertTrue(result.complete)
@@ -113,7 +113,7 @@ class PersistentIndexTests(unittest.TestCase):
             if Path(path) == self.root / 'aaa':
                 raise PermissionError('temporarily locked')
             return original(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             result = self.cache.get(self.root)
         self.assertFalse(result.complete)
         self.assertIn('temporarily locked', result.errors[0][1])
@@ -224,7 +224,7 @@ class PersistentIndexTests(unittest.TestCase):
             yield (Child(index) for index in range(count))
         def stat(path, *args, **kwargs):
             return info if path.name.startswith('virtual') else original_stat(path, *args, **kwargs)
-        with patch('commonUtils.directory_index.os.scandir', children), patch.object(Path, 'lstat', stat):
+        with patch('commonUtils.directory.os.scandir', children), patch.object(Path, 'lstat', stat):
             result = self.cache.get(self.root)
             self.assertTrue(result.complete)
             self.assertEqual(len(result.entries), count)

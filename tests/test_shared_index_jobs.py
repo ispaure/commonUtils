@@ -8,7 +8,7 @@ from time import monotonic,sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.index_worker import FolderOperation
 
@@ -116,7 +116,7 @@ class SharedJobTests(QtTestCase):
                     self.wait(stopped.is_set)
 
     def test_saved_count_is_reported_before_loading_totals_and_separate_from_run_count(self):
-        from commonUtils.directory_index import Snapshot
+        from commonUtils.directory import Snapshot
         from commonUtils.ui.file_browser.index_worker import _IndexJob
         with TemporaryDirectory() as folder:
             base=Path(folder);root=base/'files';root.mkdir();(root/'file.txt').write_text('abc')

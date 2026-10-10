@@ -9,7 +9,7 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.storage import StorageDialog
 

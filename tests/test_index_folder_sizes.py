@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 from threading import Event
 import unittest
 from unittest.mock import patch
-from commonUtils.directory_index import DirectoryCache, storage_totals
+from commonUtils.directory import DirectoryCache, storage_totals
 from commonUtils.operations import OperationCancelled
 from commonUtils.filesystem import scan_folders
 
@@ -26,10 +26,10 @@ class IndexedSizeTests(unittest.TestCase):
         self.assertEqual(stats[self.root].extension_counts,{'cbz':1,'txt':1})
         self.assertTrue(stats[self.root].complete)
         self.assertEqual(storage_totals(snapshot)[self.root],10)
-        with patch('commonUtils.directory_index.directory_cache',self.cache):
+        with patch('commonUtils.directory.directory_cache',self.cache):
             self.assertEqual(scan_folders(self.root)[self.root].size,10)
         with DirectoryCache(database=self.cache.database) as restarted:
-            with patch('commonUtils.directory_index.os.scandir',side_effect=AssertionError('Cached read scanned')):
+            with patch('commonUtils.directory.os.scandir',side_effect=AssertionError('Cached read scanned')):
                 saved=restarted.peek(self.root)
                 self.assertEqual(saved.folder_stats([self.root])[self.root].size,10)
                 self.assertTrue(saved.folder_stats([self.root])[self.root].stale)
@@ -51,7 +51,7 @@ class IndexedSizeTests(unittest.TestCase):
         self.assertEqual(stats[self.root / 'sub'].size, 7)
         self.assertEqual(stats[self.root].size, 10)
         self.assertTrue(any('parent_id=' in sql for sql in statements))
-        with patch('commonUtils.directory_index.directory_cache', self.cache):
+        with patch('commonUtils.directory.directory_cache', self.cache):
             self.assertEqual(set(scan_folders(self.root, visible_only=True)), set(stats))
             self.assertIn(self.root / 'sub' / 'nested', scan_folders(self.root))
         scoped = self.cache.peek(self.root / 'sub')
@@ -64,7 +64,7 @@ class IndexedSizeTests(unittest.TestCase):
         def scan(path):
             if Path(path)==self.root/'sub':raise PermissionError('Offline folder')
             return real(path)
-        with patch('commonUtils.directory_index.os.scandir',side_effect=scan):
+        with patch('commonUtils.directory.os.scandir',side_effect=scan):
             partial=self.cache.get(self.root)
         self.assertFalse(partial.complete)
         stats=partial.folder_stats()

@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from commonUtils.directory_index import DirectoryCache, Snapshot
+from commonUtils.directory import DirectoryCache, Snapshot
 from commonUtils.operations import OperationCancelled
 
 

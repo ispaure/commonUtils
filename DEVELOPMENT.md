@@ -70,6 +70,8 @@ can declare type rules, actions, activation and controller ownership together.
 
 | Module/package | Provides |
 | --- | --- |
+| `directory` | Persistent indexing, metadata, search, reconciliation and directory totals |
+| `persistence` | Atomic byte/JSON publication; `text` snapshots and `session` recovery storage |
 | `traversal` | Filtered scans, natural path ordering and cooperative cancellation without link traversal |
 | `renameUtils` | Filename rules, rename plans, no-overwrite batches, cancellation and undo receipts |
 | `fileUtils` | `File`, path metadata, copy/move/rename and user/application-data paths |
@@ -218,3 +220,21 @@ is imposed. `overwrite=False` uses atomic no-clobber creation.
 parent-directory durability. Callers create directories with their own permission
 policy and retain their own schemas. TextSnapshot, Markdown and INI save paths
 continue to own their format-specific rules. `configUtils.py` is unchanged.
+
+## Package layout and compatibility
+
+Directory indexing now lives in `directory/`: `metadata`, `store`, `schema`,
+`scan`, `reader`, `search`, `order`, `totals`, `exclusions` and `reconcile`.
+Import its public API from `commonUtils.directory`; its cache remains process-wide.
+Atomic publication lives in `persistence/`, with text documents in
+`persistence.text` and session recovery in `persistence.session`.
+
+The former public modules `directory_index`, `text_files` and `session_store`
+remain aliases to the canonical modules. Both import paths share module state,
+classes, cache instances and instrumentation. The private `_directory_*` modules
+have moved and no longer exist at the package root. `configUtils.py` retains its
+existing location and implementation.
+
+Logistics uses the canonical imports. BlueHole carries a vendored directory
+package with the same public alias; Ally Tools imports the shared Logistics
+checkout and tests both paths. Other vendored copies must be updated separately.

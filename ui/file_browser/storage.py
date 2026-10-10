@@ -1,7 +1,7 @@
 """Interactive storage treemap and largest-first listing inside the file browser."""
 from .. import pyside as qt
 from .discovery import ScanDialog
-from ...directory_index import storage_totals
+from ...directory import storage_totals
 from ...filesystem import format_size
 from dataclasses import dataclass
 

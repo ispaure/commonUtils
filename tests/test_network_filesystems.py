@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 from commonUtils import network_filesystems as network
-from commonUtils._directory_exclusions import scan_exclusions, is_excluded
+from commonUtils.directory.exclusions import scan_exclusions, is_excluded
 
 
 class NetworkFilesystemTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class NetworkFilesystemTests(unittest.TestCase):
         root = Path('/').absolute()
         remote = root / 'Volumes/Share'
         local = root / 'Volumes/Local'
-        with patch('commonUtils._directory_exclusions.network_mount_roots', return_value=(remote,)):
+        with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=(remote,)):
             excluded = scan_exclusions(root, root / 'private/tmp/index/cache.sqlite')
         self.assertTrue(is_excluded(remote / 'deep/folder', excluded))
         self.assertFalse(is_excluded(local, excluded))
@@ -45,7 +45,7 @@ class NetworkFilesystemTests(unittest.TestCase):
             self.assertFalse(network.is_network_location(local))
 
     def test_new_mount_repairs_saved_sizes_without_enumerating_share(self):
-        from commonUtils.directory_index import DirectoryCache, storage_totals
+        from commonUtils.directory import DirectoryCache, storage_totals
         with TemporaryDirectory() as temporary:
             base = Path(temporary)
             root = base / 'files'; root.mkdir()
@@ -53,12 +53,12 @@ class NetworkFilesystemTests(unittest.TestCase):
             remote = root / 'share'; remote.mkdir()
             (remote / 'cached').write_bytes(b'1234567')
             with DirectoryCache(database=base / 'cache' / 'index.sqlite') as cache:
-                with patch('commonUtils._directory_exclusions.network_mount_roots', return_value=()):
+                with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=()):
                     original = cache.get(root)
                     self.assertEqual(storage_totals(original)[root], 10)
                     cache.repair_cached_exclusions(root)
-                with patch('commonUtils._directory_exclusions.network_mount_roots', return_value=(remote,)), \
-                     patch('commonUtils._directory_store.os.scandir', side_effect=AssertionError('Share enumeration')):
+                with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=(remote,)), \
+                     patch('commonUtils.directory.store.os.scandir', side_effect=AssertionError('Share enumeration')):
                     cache.repair_cached_exclusions(root)
                     self.assertEqual(storage_totals(cache.peek(root))[root], 3)
                     self.assertEqual(storage_totals(original)[root], 10)

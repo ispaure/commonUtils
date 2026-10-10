@@ -2,7 +2,7 @@
 from pathlib import Path
 from .. import pyside as qt
 from ..operations import Operation
-from ...directory_index import directory_cache
+from ...directory import directory_cache
 from ...filesystem import format_size
 from .search_columns import configure_search_columns, describe_search_row
 

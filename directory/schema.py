@@ -9,8 +9,8 @@ from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
-from ._directory_order import _sort_key
-from .operations import check_cancelled
+from .order import _sort_key
+from ..operations import check_cancelled
 
 SCHEMA_VERSION = 3
 

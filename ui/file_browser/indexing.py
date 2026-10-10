@@ -17,7 +17,7 @@ class BrowserIndexing:
     def refresh(self):
         if self.network_location:
             return
-        from ...directory_index import directory_cache
+        from ...directory import directory_cache
         directory_cache.invalidate(self.navigation.directory)
         self._full_index_refresh = True
         self._index_paused = False
@@ -88,7 +88,7 @@ class BrowserIndexing:
             return
         if root is None or self.stopping:
             return
-        from ...directory_index import directory_cache
+        from ...directory import directory_cache
         from ...operations import OperationCancelled
         full = self._full_index_refresh
         paused = self._index_paused
@@ -222,7 +222,7 @@ class BrowserIndexing:
             self._maybe_idle()
         elif (self.folder_operation.visible_root != self.folder_operation.root
               and not self._index_paused and not self.folder_pending and not self._reconcile_pending):
-            from ...directory_index import directory_cache
+            from ...directory import directory_cache
             if not directory_cache.was_checked_this_session(self.navigation.directory):
                 self.refresh_folder_totals()
             else:

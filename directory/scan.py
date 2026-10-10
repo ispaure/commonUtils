@@ -2,10 +2,10 @@
 import os
 from pathlib import Path
 from time import time
-from .operations import check_cancelled
-from ._directory_schema import retire_generation, copy_entries
-from ._directory_exclusions import scan_exclusions
-from ._directory_totals import store_folder_stats
+from ..operations import check_cancelled
+from .schema import retire_generation, copy_entries
+from .exclusions import scan_exclusions
+from .totals import store_folder_stats
 
 
 class DirectoryScan:

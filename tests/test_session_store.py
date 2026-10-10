@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
-from commonUtils.session_store import SessionStore
+from commonUtils.persistence.session import SessionStore
 
 
 class SessionStoreTests(unittest.TestCase):

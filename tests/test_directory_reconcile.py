@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import os
 import unittest
 from unittest.mock import patch
-from commonUtils.directory_index import DirectoryCache
+from commonUtils.directory import DirectoryCache
 from commonUtils.operations import OperationCancelled
 
 
@@ -46,14 +46,14 @@ class ReconcileTests(unittest.TestCase):
             if Path(path) == self.deep:
                 raise PermissionError('locked')
             return scan(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             self.assertFalse(self.cache.reconcile_folder(self.root, once=True).complete)
         added = self.child / 'added.txt'; added.write_bytes(b'12345')
         calls = []
         def recorded(path):
             calls.append(Path(path)); return scan(path)
         with patch.object(self.cache, 'get', side_effect=AssertionError('Full retry')):
-            with patch('commonUtils.directory_index.os.scandir', side_effect=recorded):
+            with patch('commonUtils.directory.os.scandir', side_effect=recorded):
                 result = self.cache.reconcile_folder(self.root, once=True, changes=(added,))
         self.assertEqual(calls, [self.root, self.child])
         self.assertFalse(result.complete)
@@ -81,10 +81,10 @@ class ReconcileTests(unittest.TestCase):
                 raise PermissionError('access denied')
             return scan(path)
         other = self.root / 'other'; other.mkdir()
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             self.cache.get(self.root)
         with patch.object(self.cache, '_writer', side_effect=AssertionError('Diagnostics acquired writer')):
-            with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Diagnostics scanned files')):
+            with patch('commonUtils.directory.os.scandir', side_effect=AssertionError('Diagnostics scanned files')):
                 report = self.cache.index_issues(self.root, limit=1)
                 scoped = self.cache.index_issues(self.child)
         self.assertEqual(report['total'], 2)
@@ -133,7 +133,7 @@ class ReconcileTests(unittest.TestCase):
                 failures.append(path)
                 raise PermissionError('locked')
             return scan(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+        with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
             self.cache.reconcile_folder(self.root, once=True)
             for _ in range(3):
                 self.cache.reconcile_folder(self.root, changes=(self.deep,))
@@ -146,7 +146,7 @@ class ReconcileTests(unittest.TestCase):
         # A restarted browser preserves failure suppression from disk while
         # resuming other unfinished work. Explicit Refresh still retries.
         with DirectoryCache(database=self.cache.database) as restarted:
-            with patch('commonUtils.directory_index.os.scandir', side_effect=unreadable):
+            with patch('commonUtils.directory.os.scandir', side_effect=unreadable):
                 self.assertFalse(restarted.reconcile_folder(self.root, once=True).complete)
                 self.assertEqual(len(failures), 1)
                 self.assertFalse(restarted.reconcile_folder(self.root, full=True).complete)
@@ -157,7 +157,7 @@ class ReconcileTests(unittest.TestCase):
     def test_completed_navigation_checks_one_folder_without_enumerating_descendants(self):
         first = self.cache.get(self.root)
         with patch.object(self.cache, '_validate', side_effect=AssertionError('Full-tree validation')):
-            with patch('commonUtils.directory_index.os.scandir', side_effect=AssertionError('Unchanged folders enumerated')):
+            with patch('commonUtils.directory.os.scandir', side_effect=AssertionError('Unchanged folders enumerated')):
                 checked = self.cache.reconcile_folder(self.child)
         self.assertEqual(checked.entries.generation, first.entries.generation)
         self.assertEqual(len(checked.entries), 2)
@@ -170,7 +170,7 @@ class ReconcileTests(unittest.TestCase):
         calls = []; scan = os.scandir
         def scandir(path):
             calls.append(Path(path)); return scan(path)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=scandir):
+        with patch('commonUtils.directory.os.scandir', side_effect=scandir):
             fresh = self.cache.reconcile_folder(self.deep)
         self.assertEqual(calls, [self.deep])
         self.assertEqual(fresh.entries.generation, previous.entries.generation)
