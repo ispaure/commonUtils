@@ -1,4 +1,5 @@
 """Optional application document host; standalone consumers need no registration."""
+from enum import Enum
 import weakref
 from . import pyside as qt
 from shiboken6 import isValid
@@ -66,3 +67,25 @@ def close_document(window):
         if window.testAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose):
             window.deleteLater()
     return event.isAccepted()
+
+
+class CloseOutcome(Enum):
+    """A close decision, distinct from asynchronous owner retirement."""
+    ACCEPTED = 'accepted'
+    VETOED = 'vetoed'
+    PENDING = 'pending'
+
+
+def request_document_close(window):
+    """Ask an owner to close without inspecting its workers or private state.
+
+    Custom owners expose request_close() and idle. Plain widgets retain their
+    native close veto; legacy prepare_close owners can defer retirement.
+    """
+    request = getattr(window, 'request_close', None)
+    if request is not None:
+        return request()
+    if not getattr(window, 'prepare_close', lambda: True)():
+        return CloseOutcome.PENDING
+    accepted = close_document(window)
+    return CloseOutcome.ACCEPTED if accepted or not document_is_open(window) else CloseOutcome.VETOED
