@@ -211,3 +211,32 @@ class ZipAccessTests(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertEqual(first.read_bytes(), b'first')
         self.assertEqual(second.read_bytes(), b'second')
+
+    def test_creation_compression_options_apply_to_plain_and_aes_streams(self):
+        source = self.root / 'compressible.txt'
+        source.write_bytes((b'abcdefghij' * 10000 + b'klmnopqrst' * 10000) * 5)
+        for password in (None, self.password):
+            sizes = []
+            for level in (1, 9):
+                output = self.root / f'level-{bool(password)}-{level}.zip'
+                access.create_archive([source], output, password=password, compresslevel=level)
+                with access.open_archive(output, password=password) as archive:
+                    self.assertEqual(archive.read(source.name), source.read_bytes())
+                sizes.append(output.stat().st_size)
+            self.assertLess(sizes[1], sizes[0])
+            stored = self.root / f'stored-{bool(password)}.zip'
+            access.create_archive([source], stored, password=password, compression=zipfile.ZIP_STORED)
+            self.assertGreater(stored.stat().st_size, sizes[0])
+            with access.open_archive(stored, password=password) as archive:
+                self.assertEqual(archive.read(source.name), source.read_bytes())
+
+    def test_authentication_honours_cancellation_during_payload_read(self):
+        from commonUtils.operations import OperationCancelled
+        path = self.write('cancel-auth.zip', self.password)
+        calls = 0
+        def cancelled():
+            nonlocal calls
+            calls += 1
+            return calls >= 3
+        with self.assertRaises(OperationCancelled):
+            access.authenticate(path, self.password, all_members=True, cancelled=cancelled)

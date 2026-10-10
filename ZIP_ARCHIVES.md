@@ -95,3 +95,16 @@ Ask for passwords on the GUI thread before starting. Cancellation before publica
 removes staged work; once publication completes, the output is a success even if a
 late request arrives. This policy suits separate ZIP creation. A batch of in-place
 rewrites may instead use `run_batch` and let each current archive finish.
+
+
+## Compression and authentication cancellation
+
+`open_archive` and `create_archive` accept optional `compression` and `compresslevel`
+keywords. Defaults remain DEFLATE and the library's default level. Use
+`compression=zipfile.ZIP_STORED` for no compression, or DEFLATE with a level from 1
+to 9 for speed/size presets. This applies to plain and AES ZIP streams; creation
+still verifies the decrypted bytes before publication.
+
+`authenticate(..., cancelled=callback)` checks cooperative cancellation before
+reading and between payload chunks. Cancellation raises `OperationCancelled`,
+independently of password errors, so a worker can stop during an unlock attempt.
