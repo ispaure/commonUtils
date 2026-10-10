@@ -3,6 +3,19 @@ from datetime import datetime
 from pathlib import Path
 from ...dirUtils import Directory
 from .index_worker import FolderOperation
+from .. import pyside as qt
+
+
+class IndexPriorityLease(qt.QObject):
+    """Release priority through a native QObject slot during parent destruction."""
+    def __init__(self, parent, cache, owner):
+        super().__init__(parent)
+        self.cache, self.owner = cache, owner
+        parent.destroyed.connect(self.release)
+
+    @qt.Slot()
+    def release(self):
+        self.cache.set_priority_folders(self.owner)
 
 
 class BrowserIndexing:

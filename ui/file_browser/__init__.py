@@ -16,7 +16,7 @@ from ..operations import Operation
 from .views import FileViews
 from .editing import FilenameDelegate
 from .file_actions import FileActions, clipboard_files
-from .indexing import BrowserIndexing
+from .indexing import BrowserIndexing, IndexPriorityLease
 
 
 @dataclass(frozen=True)
@@ -70,12 +70,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._changed_paths = set()
         self._index_priority_owner = object()
         from ...directory import directory_cache
-        owner = self._index_priority_owner
-        def release_priority():
-            # Do not request a wrapper for the QObject being destroyed, or
-            # expose captured Python objects as optional Qt slot arguments.
-            directory_cache.set_priority_folders(owner)
-        self.destroyed.connect(release_priority)
+        self._index_priority_lease = IndexPriorityLease(self, directory_cache, self._index_priority_owner)
         self._full_index_refresh = False
         self.folder_root = None
         self.refresh_pending = False
