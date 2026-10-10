@@ -202,7 +202,12 @@ class IntegratedSearchTests(QtTestCase):
             # Commit real bounded batches without depending on elapsed sleep
             # time (short sleeps have coarse granularity on Windows runners).
             checkpoint(db, cancelled, force=True)
-        with patch('commonUtils.directory_index.os.scandir', side_effect=scandir), patch.object(
+        class IndexFilesystem:
+            # Scope the stalled iterator to the indexer. Patching os.scandir
+            # globally also stalls directory previews and GUI filesystem work.
+            def __getattr__(self, name):
+                return scandir if name == 'scandir' else getattr(os, name)
+        with patch('commonUtils._directory_store.os', IndexFilesystem()), patch.object(
                 self.cache, '_checkpoint', side_effect=publish):
             self.browser.refresh()
             self.browser.search_bar.setText('progress-')
