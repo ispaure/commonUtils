@@ -4,6 +4,7 @@ from collections import deque
 from pathlib import Path
 from ...dirUtils import Directory
 from .. import pyside as qt
+from ..entry_views import configure_entry_selection
 from ..operations import Operation
 from .tiles import ResponsiveTileView
 from .columns import FolderColumnView, ColumnDelegate
@@ -52,9 +53,8 @@ class FileViews(qt.QStackedWidget):
         self.columns.selection_input.connect(self._column_input)
         for view in (tree, self.tiles, self.columns):
             self.addWidget(view)
-            view.setSelectionMode(qt.QAbstractItemView.SelectionMode.ExtendedSelection)
+            configure_entry_selection(view)
             view.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
-            view.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             view.customContextMenuRequested.connect(lambda point, target=view: self._context(target, point))
             if view is self.columns:
                 view.selectionModel().selectionChanged.connect(self._queue_column_selection)
