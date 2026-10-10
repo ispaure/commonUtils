@@ -20,5 +20,5 @@ Used by Logistics Archives. Shares generic entry-selection mechanics with the fi
 `commonUtils.ui.archive_view.ArchiveContents` provides folder navigation,
 filtering, numeric sorting, selection details and text/image presentation. It
 accepts entries and decoded previews and emits preview/extraction/removal requests;
-the owner supplies jobs and credential policy. See the [archive guide](../../docs/ARCHIVES.md)
+the owner supplies jobs and credential policy. See the [archive guide](../../archives/README.md)
 for a runnable integration outline and responsibility boundaries.

@@ -41,6 +41,10 @@ class FileViews(qt.QStackedWidget):
         self.tiles.setGridSize(qt.QSize(170, 205))
         self.tiles.setWordWrap(True)
         self.columns = FolderColumnView()
+        # Trim two pixels per row from the shared theme's eight-pixel padding.
+        # Keep this local to filename lists; other workspaces have their own density.
+        for view in (tree, self.columns):
+            view.setStyleSheet('QAbstractItemView::item { padding: 3px 4px; }')
         self.columns.setModel(model)
         self.columns.setColumnWidths([240, 240, 240, 240])
         self.cover_queue = deque()

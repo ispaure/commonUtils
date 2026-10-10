@@ -196,14 +196,9 @@ class SqlEntries(Sequence):
                     raise ValueError('Choose explicit paths or immediate child folders')
                 # The browser needs one level, not every descendant's JSON totals.
                 # Both the address lookup and totals lookup have persistent indexes.
-                if self.compact:
-                    extra = (' AND path IN (SELECT path FROM folder_paths WHERE path=? OR '
-                             'parent_id=(SELECT id FROM folder_paths WHERE path=?))')
-                    parameters += (str(children_of), str(children_of))
-                else:
-                    extra = (' AND (path=? OR path IN (SELECT path FROM folders '
-                             'WHERE generation=? AND parent=?))')
-                    parameters += (str(children_of), self.generation, str(children_of))
+                extra = (f' AND (path=? OR path IN (SELECT e.path FROM {self.table} e '
+                         f'WHERE e.generation=? AND e.{self.parent_filter} AND e.directory=1 AND e.symlink=0))')
+                parameters += (str(children_of), self.generation, str(children_of))
             elif paths is not None:
                 paths = tuple(paths)
                 if not paths:
@@ -226,6 +221,29 @@ class SqlEntries(Sequence):
                     check_cancelled(cancelled)
                     path, size, files, folders, skipped, extensions, complete, stamp = row
                     values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale)
+                if children_of is not None:
+                    # A visible-only scan has empty/incomplete child aggregates.
+                    # Reuse recursive totals saved for an ancestor or for an
+                    # independently indexed child, just as storage_children does.
+                    # Restrict the lookup to this generation's immediate folders
+                    # so removed children and distant descendants stay excluded.
+                    ancestors = tuple(str(path) for path in (Path(children_of), *Path(children_of).parents))
+                    cached = self.connection.execute(
+                        'SELECT c.path,c.size,c.files,c.folders,c.skipped,c.extensions,c.complete,c.scanned_at '
+                        f'FROM {self.table} e JOIN roots r ON r.recursive=1 AND '
+                        f'(r.root IN ({",".join("?" for _ in ancestors)}) OR r.root=e.path) '
+                        'JOIN folder_totals c ON c.generation=coalesce(r.building,r.completed) AND c.path=e.path '
+                        f'WHERE e.generation=? AND e.{self.parent_filter} AND e.directory=1 AND e.symlink=0 AND c.generation!=? '
+                        'ORDER BY c.complete DESC,c.scanned_at DESC',
+                        ancestors + (self.generation, str(children_of), self.generation))
+                    for row in cached:
+                        check_cancelled(cancelled)
+                        path, size, files, folders, skipped, extensions, complete, stamp = row
+                        path = Path(path)
+                        current = values.get(path)
+                        if current is None or not current.complete and (complete or size > current.size):
+                            values[path] = FolderStats(size, files, folders, skipped, json.loads(extensions),
+                                                      bool(complete), stamp, True)
             except sqlite3.OperationalError:
                 check_cancelled(cancelled)
                 raise

@@ -1,6 +1,6 @@
 # XML documents
 
-`fileTypes.xmlType.XMLFile` uses a DOM for structured edits while retaining the
+`formats.xmlType.XMLFile` uses a DOM for structured edits while retaining the
 inherited TXT line operations. The DOM and `line_lst` are independent: editing one
 does not update the other. The existing direct-field methods remain suited to
 formats such as ComicInfo; the explicit-element methods handle nested/repeated data.
@@ -143,5 +143,5 @@ Existing `from_bytes`, `read_xml`, `xml_root`, `get_text`, `set_text` and `to_by
 names/signatures remain unchanged. Invalid XML names and values raise errors;
 unsupported/ambiguous queries are not silently accepted. Direct DOM changes remain
 visible to `to_bytes()`, even when they bypass the helper methods. See
-[file types](../formats/README.md) for inherited operations and
-[workflow recipes](RECIPES.md) for related examples.
+[file types](README.md) for inherited operations and
+[workflow recipes](../ui/operation_progress.md) for related examples.

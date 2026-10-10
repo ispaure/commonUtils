@@ -1,6 +1,6 @@
 # ZIP access
 
-See the [module index](../README.md), [worker/cancellation recipes](RECIPES.md) and
+See the [module index](../README.md), [worker/cancellation recipes](../ui/operation_progress.md) and
 [file-type wrappers](../formats/README.md) for related APIs.
 
 `commonUtils.archives.zip_access` owns archive mechanics. It has no application configuration,
@@ -110,7 +110,7 @@ reading and between payload chunks. Cancellation raises `OperationCancelled`,
 independently of password errors, so a worker can stop during an unlock attempt.
 
 
-The application-independent [archive API](ARCHIVES.md) adds validated TAR support,
+The application-independent [archive API](README.md) adds validated TAR support,
 transactional selected extraction, bounded previews and verified ZIP edits. It
 reuses this module's ZIP operations. Existing low-level extraction callers keep
 their behavior; opt into `archives.extract` for a new staged destination folder.
