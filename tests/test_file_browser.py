@@ -321,7 +321,7 @@ class BrowserTests(QtTestCase):
         self.assertEqual(opened, [drive])
         with patch.object(qt.QFileDialog, 'getExistingDirectory', return_value=r'\\server\share'):
             actions[-1].trigger()
-        self.assertEqual(str(opened[-1]), r'\\server\share')
+        self.assertEqual(opened[-1], Path(r'\\server\share'))
         with patch.object(qt.QFileDialog, 'getExistingDirectory', return_value=''):
             actions[-1].trigger()
         self.assertEqual(len(opened), 2)
@@ -413,7 +413,7 @@ class BrowserTests(QtTestCase):
         self.assertEqual(Path(self.browser.model.filePath(columns.currentIndex())), folder)
         self.assertEqual(self.browser.navigation.directory, folder)
         deadline = time.monotonic()+3
-        while not any(view.isVisible() and self.browser.model.filePath(view.rootIndex()) == str(folder)
+        while not any(view.isVisible() and Path(self.browser.model.filePath(view.rootIndex())) == folder
                       for view in columns.findChildren(qt.QListView)):
             self.assertLess(time.monotonic(), deadline)
             self.app.processEvents(); time.sleep(.01)

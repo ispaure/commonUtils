@@ -32,13 +32,17 @@ class NetworkFilesystemTests(unittest.TestCase):
             self.assertEqual(network._mounted_network_roots(), (Path('/Volumes/Share'),))
 
     def test_network_mounts_and_descendants_are_excluded_from_local_scans(self):
-        with patch('commonUtils._directory_exclusions.network_mount_roots', return_value=(Path('/Volumes/Share'),)):
-            excluded = scan_exclusions(Path('/'), Path('/private/tmp/index/cache.sqlite'))
-        self.assertTrue(is_excluded(Path('/Volumes/Share/deep/folder'), excluded))
-        self.assertFalse(is_excluded(Path('/Volumes/Local'), excluded))
-        with patch.object(network, 'network_mount_roots', return_value=(Path('/Volumes/Share'),)):
-            self.assertTrue(network.is_network_location('/Volumes/Share/folder'))
-            self.assertFalse(network.is_network_location('/Volumes/Local'))
+        root = Path('/').absolute()
+        remote = root / 'Volumes/Share'
+        local = root / 'Volumes/Local'
+        with patch('commonUtils._directory_exclusions.network_mount_roots', return_value=(remote,)):
+            excluded = scan_exclusions(root, root / 'private/tmp/index/cache.sqlite')
+        self.assertTrue(is_excluded(remote / 'deep/folder', excluded))
+        self.assertFalse(is_excluded(local, excluded))
+        with patch.object(network.sys, 'platform', 'darwin'), \
+                patch.object(network, 'network_mount_roots', return_value=(remote,)):
+            self.assertTrue(network.is_network_location(remote / 'folder'))
+            self.assertFalse(network.is_network_location(local))
 
     def test_new_mount_repairs_saved_sizes_without_enumerating_share(self):
         from commonUtils.directory_index import DirectoryCache, storage_totals
