@@ -11,7 +11,8 @@ The `commonUtils.fileTypes` package contains specialized `File` subclasses for c
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
 | `MarkdownFile` | `markdownType.py` | Text-file operations and activation in the shared Markdown reader |
 | `XMLFile` | `xmlType.py` | DOM queries, namespace-aware editing and atomic saving, plus inherited line operations |
-| `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection |
+| `ArchiveFile` | `archiveType.py` | TAR inspection, staged extraction and passive archive details |
+| `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection, with inherited archive details |
 | `DMGFile` | `dmgType.py` | Mount and extract directories from macOS DMG files |
 | `AppImageFile` | `appimageType.py` | AppImage file representation |
 
@@ -332,3 +333,15 @@ The old `configUtils` and `TXTFile` APIs remain unchanged.
 
 The optional [typed-key schema and visual editor](../configuration/README.md)
 are separate layers; INIFile itself never interprets suffixes.
+
+
+## Archive inspection
+
+`ArchiveFile` resolves TAR and compound compressed TAR suffixes without claiming
+ordinary gzip/xz files. `ZIPFile` inherits its **Archive Contents** browser panel.
+The constructor performs no archive reads; the browser's panel worker loads
+counts, unpacked size, protection and a bounded entry-name listing. Encrypted
+headers require no password. `archive_entries()` and
+`extract_to_new_directory(destination, **options)` delegate to the shared
+[archive API](../ARCHIVES.md). Opening applications and password prompts belong
+to installed feature declarations, not these passive file hooks.

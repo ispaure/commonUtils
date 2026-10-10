@@ -108,3 +108,9 @@ still verifies the decrypted bytes before publication.
 `authenticate(..., cancelled=callback)` checks cooperative cancellation before
 reading and between payload chunks. Cancellation raises `OperationCancelled`,
 independently of password errors, so a worker can stop during an unlock attempt.
+
+
+The application-independent [archive API](ARCHIVES.md) adds validated TAR support,
+transactional selected extraction, bounded previews and verified ZIP edits. It
+reuses this module's ZIP operations. Existing low-level extraction callers keep
+their behavior; opt into `archives.extract` for a new staged destination folder.

@@ -120,9 +120,10 @@ def scan_folders(root, cancelled=lambda: False, *, report=lambda done, total, me
         return None
 
 
-def format_size(size):
-    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
-        if size < 1024 or unit == 'TB':
+def format_size(size, *, binary_units=False):
+    units = ('B', 'KiB', 'MiB', 'GiB', 'TiB') if binary_units else ('B', 'KB', 'MB', 'GB', 'TB')
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
             return f'{size:,} B' if unit == 'B' else f'{size:.1f} {unit}'
         size /= 1024
 

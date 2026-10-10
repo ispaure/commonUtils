@@ -14,11 +14,11 @@ __status__ = 'Production'
 from typing import *
 from pathlib import Path
 import zipfile
-from .. import fileUtils
+from .archiveType import ArchiveFile
 from ..debugUtils import *
 
 
-class ZIPFile(fileUtils.File):
+class ZIPFile(ArchiveFile):
     def __init__(self, path: Path):
         # Call the parent (File) initializer
         super().__init__(path)
