@@ -125,6 +125,11 @@ class WorkspaceDock(qt.QDockWidget):
         if not self.workspace.can_close_tab(self):
             event.ignore()
             return
+        if getattr(self.widget(), 'close_in_background', False):
+            self.workspace.retire_view(self)
+            qt.QTimer.singleShot(0, self.workspace, lambda: self.workspace._retry_view_close(self))
+            event.ignore()
+            return
         if not getattr(self.widget(), 'prepare_close', lambda: True)():
             if getattr(self.widget(), 'can_retire', False):
                 self.workspace.retire_view(self)
@@ -216,7 +221,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             return
         for dock in self.docks:
             grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
-            dock.tab_header.setFixedHeight(0 if grouped else 30)
+            height = 0 if grouped else 30
+            if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
+                dock.tab_header.setFixedHeight(height)
             dock.tab_header.close_button.setEnabled(self.can_close_tab(dock))
         for bar in self.findChildren(qt.QTabBar):
             # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
