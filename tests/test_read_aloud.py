@@ -8,6 +8,7 @@ from PySide6.QtTextToSpeech import QTextToSpeech as Speech
 class SilentEngine(qt.QObject):
     stateChanged = qt.Signal(object)
     errorOccurred = qt.Signal(object)
+    sayingWord = qt.Signal(str, int, int, int)
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -102,3 +103,37 @@ class SpeechTests(unittest.TestCase):
         cursor.setPosition(5, qt.QTextCursor.MoveMode.KeepAnchor)
         widget.setTextCursor(cursor)
         self.assertEqual(reader_text(widget, start=6), 'First')
+
+    def test_popup_word_highlighting_preserves_selection_and_unicode_offsets(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.setPlainText('Before 😀\nRead café here.')
+        cursor = widget.textCursor()
+        start = len('Before 😀\n'.encode('utf-16-le')) // 2
+        cursor.setPosition(start)
+        cursor.movePosition(qt.QTextCursor.MoveOperation.End, qt.QTextCursor.MoveMode.KeepAnchor)
+        widget.setTextCursor(cursor)
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show()
+        self.assertTrue(speech.panel.windowFlags() & qt.Qt.WindowType.Popup)
+        speech.engine.engineCapabilities = lambda: Speech.Capability.WordByWordProgress
+        speech.start()
+        speech.engine.sayingWord.emit('café', 0, 5, 4)
+        selections = widget.extraSelections()
+        highlight = selections[0].cursor
+        self.assertEqual(highlight.selectedText(), 'café')
+        self.assertEqual(highlight.selectionStart(), start + 5)
+        self.assertEqual(widget.textCursor().selectedText(), 'Read café here.')
+        speech.stop()
+        self.assertEqual(widget.extraSelections(), [])
+
+    def test_later_utterance_highlight_tracks_source_after_trimmed_whitespace(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.setPlainText('  😀 paragraph.\n' * 400 + 'Last word.')
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show(); speech.start()
+        speech.engine.change(Speech.State.Ready); self.app.processEvents()
+        speech.engine.sayingWord.emit('😀', 0, 0, 2)
+        selections = widget.extraSelections()
+        cursor = selections[0].cursor
+        self.assertEqual(cursor.selectedText(), '😀')
+        self.assertGreater(cursor.selectionStart(), 300)
