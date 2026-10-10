@@ -10,6 +10,28 @@ from unittest.mock import patch
 
 
 class StorageViewTests(unittest.TestCase):
+    def test_navigation_stays_blank_until_current_folder_sizes_arrive(self):
+        app = qt.QApplication.instance() or qt.QApplication([])
+        browser = FileBrowser(calculate_folder_sizes=False)
+        try:
+            storage = browser.views.storage
+            root = Path('/fixture'); child = root / 'child'
+            result = ([], {}, {child: 0}, True)
+            # Hold asynchronous work: stale results must not end the new folder's wait.
+            with patch.object(storage, 'refresh'):
+                storage.set_root(root)
+                storage.set_root(child)
+            self.assertTrue(storage.map.loading)
+            self.assertTrue(storage.radial.loading)
+            self.assertEqual(storage.summary.text(), '')
+            storage._loaded(root, ([], {}, {root: 0}, True), '')
+            self.assertTrue(storage.radial.loading)
+            storage._loaded(child, result, '')
+            self.assertFalse(storage.map.loading)
+            self.assertFalse(storage.radial.loading)
+        finally:
+            browser.shutdown(); browser.close(); browser.deleteLater(); app.processEvents()
+
     def test_rapid_mode_switches_and_revisiting_folder_keep_charts_available(self):
         app = qt.QApplication.instance() or qt.QApplication([])
         with TemporaryDirectory() as temp:

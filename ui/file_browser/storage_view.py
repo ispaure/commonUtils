@@ -90,6 +90,9 @@ class RadialMap(Treemap):
                 self.sectors.append((path,size,transform.map(shape)))
                 draw(path, angle, sweep, depth+1, color)
                 angle += sweep
+        if self.loading:
+            painter.end()
+            return
         draw(self.root, 0, 360, 1)
         painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
         painter.drawText(qt.QRectF(center.x()-ring, center.y()-ring, ring*2, ring*2),
@@ -151,7 +154,7 @@ class StorageView(qt.QWidget):
         self.chart_selector.setAccessibleName('Storage visualization')
         self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 chart entries shared across branches. Gaps can represent omitted entries or incomplete sizes; zero-byte folders have no area. Hover for names and sizes.')
         self.chart_selector.hide()  # Compatibility API; the toolbar owns chart buttons.
-        self.summary = qt.QLabel('Loading saved sizes…')
+        self.summary = qt.QLabel('')
         self.summary.setWordWrap(True)
         controls.addWidget(self.summary,1)
         layout.addLayout(controls)
@@ -236,6 +239,11 @@ class StorageView(qt.QWidget):
             self.select_path(item.data(0,qt.Qt.ItemDataRole.UserRole))
             self.context_requested.emit(self.selected_path,self.results.viewport().mapToGlobal(point))
 
+    def _set_loading(self, loading):
+        for chart in (self.map, self.radial):
+            chart.loading = loading
+            chart.update()
+
     def set_root(self, path):
         path = Path(path)
         if path != self.root:
@@ -250,7 +258,8 @@ class StorageView(qt.QWidget):
             self.root = path; self.selected_path = None
             self.results.clear(); self._rows = {}; self.map.set_items([])
             self.radial.nodes = {}; self.radial.set_items([])
-            self.summary.setText('Loading saved sizes…')
+            self.summary.clear()
+            self._set_loading(True)
         self.refresh()
 
     def refresh(self):
@@ -266,6 +275,7 @@ class StorageView(qt.QWidget):
         if key in self._results_cache:
             self._loaded(self.root, self._results_cache[key], '', key=key)
             return
+        self._set_loading(True)
         self._request_key = key
         self.busy = True
         root = self.root
@@ -285,6 +295,7 @@ class StorageView(qt.QWidget):
         if self.closing or root != self.root: return
         if key is not None and key != (self.root, self.chart_selector.currentIndex(), self._revision):
             return
+        self._set_loading(False)
         if error:
             self.summary.setText(f'Saved sizes unavailable: {error}'); return
         self._results_cache[key] = result
