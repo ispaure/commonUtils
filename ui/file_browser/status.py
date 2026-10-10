@@ -214,13 +214,13 @@ class WorkspaceIndexStatus(qt.QObject):
             browsers.append((view,browser))
             floating = dock.isFloating()
             presentation = (floating, browser.index_incomplete, browser.folder_busy,
-                            getattr(browser, '_loading_cached_only', False), browser._index_paused)
+                            getattr(browser, '_loading_cached_only', False), browser._index_paused, browser.network_location)
             if getattr(browser, '_workspace_presentation', None) != presentation:
                 browser._workspace_presentation = presentation
                 browser.workspace_status = not floating
                 browser.index_status.setVisible(floating)
                 browser.index_details_button.setVisible(floating and browser.index_incomplete)
-                browser.index_activity.setVisible(floating and browser.folder_busy and not presentation[3])
+                browser.index_activity.setVisible(floating and browser.folder_busy and not presentation[3] and not browser.network_location)
                 browser._update_pause_button()
             if browser not in self.connected:
                 self.connected.add(browser)
@@ -230,7 +230,7 @@ class WorkspaceIndexStatus(qt.QObject):
                 browser.destroyed.connect(lambda obj=None, owner=browser: self.connected.discard(owner))
         active = self.workspace.active_view
         browser = getattr(active,'file_browser',None)
-        running = len({item.folder_operation.root for _,item in browsers if item.folder_busy
+        running = len({item.folder_operation.root for _,item in browsers if item.folder_busy and not item.network_location
                        and not getattr(item, '_loading_cached_only', False)})
         message = browser.index_status.text() if browser else 'No folder open.'
         if running > 1: message += f' · {running} indexing locations'
@@ -240,5 +240,6 @@ class WorkspaceIndexStatus(qt.QObject):
         self.label.setToolTip(message)
         self.activity.setVisible(bool(running))
         self.refresh_button.setVisible(browser is not None and not running)
-        self.refresh_button.setEnabled(browser is not None and browser.calculate_folder_sizes)
-        self.details_button.setVisible(browser is not None and browser.index_incomplete)
+        self.refresh_button.setEnabled(browser is not None and browser.calculate_folder_sizes and not browser.network_location)
+        self.refresh_button.setToolTip(browser.refresh_button.toolTip() if browser else 'Refresh index')
+        self.details_button.setVisible(browser is not None and browser.index_incomplete and not browser.network_location)

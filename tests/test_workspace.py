@@ -90,6 +90,7 @@ class WorkspaceTests(unittest.TestCase):
         workspace.add_view('first'); first = workspace.active_dock
         self.settle()
         self.assertFalse(first.tab_header.close_button.isEnabled())
+        self.assertTrue(first.tab_header.close_button.isHidden())
         self.assertFalse(first.close())
         self.assertFalse(first.widget().closing)
         workspace.add_view('second'); second = workspace.active_dock
@@ -102,6 +103,7 @@ class WorkspaceTests(unittest.TestCase):
         first.tab_header.close_button.click(); self.settle()
         self.assertEqual(workspace.docks, [second])
         self.assertFalse(second.tab_header.close_button.isEnabled())
+        self.assertTrue(second.tab_header.close_button.isHidden())
         workspace.close_action.trigger(); self.settle()
         self.assertEqual(workspace.docks, [second])
         self.assertTrue(workspace.prepare_close())
@@ -115,6 +117,7 @@ class WorkspaceTests(unittest.TestCase):
         workspace.add_view('floating'); floating = workspace.active_dock
         floating.setFloating(True); self.settle()
         self.assertFalse(first.tab_header.close_button.isEnabled())
+        self.assertTrue(first.tab_header.close_button.isHidden())
         self.assertTrue(floating.tab_header.close_button.isEnabled())
         self.assertFalse(floating.testAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose))
         floating.tab_header.close_button.click(); self.settle()

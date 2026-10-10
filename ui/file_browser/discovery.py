@@ -78,6 +78,10 @@ class ScanDialog(qt.QDialog):
         return self.task.busy
 
     def scan(self, recursive, *, refresh=False):
+        from ...network_filesystems import is_network_location
+        if is_network_location(self.root):
+            self.summary.setText('Scans disabled for network drives')
+            return
         if self.busy or self.closing:
             return
         root = self.root

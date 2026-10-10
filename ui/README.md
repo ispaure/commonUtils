@@ -448,8 +448,8 @@ The database reuses freed space rather than imposing a fixed entry limit.
 
 Search shows 500 results per page, with all matches available through Previous/Next.
 Column sorting applies to the entire match set before paging.
-Inside a `FileBrowser`, Search and Storage read cached snapshots on workers and
-follow shared background index updates. Storage is the fourth browser view,
+Inside a `FileBrowser`, Search and Size Map read cached snapshots on workers and
+follow shared background index updates. Size Map is the fourth browser view,
 with Treemap selected by default and a Radial option showing up to four levels
 (maximum 3,000 radial chart nodes; gaps represent omitted entries). Both use saved sizes, normal breadcrumbs/history,
 file previews and context actions; they never launch an independent filesystem scan.
@@ -464,6 +464,23 @@ The index path appears in the snapshot status tooltip. Dialogs participate in
 browser cancellation/shutdown, and snapshot
 dates/partial-state labels distinguish indexed results from a live filesystem view.
 Browser modification dates use `filesystem.format_datetime()` consistently.
+
+`network_filesystems` identifies UNC paths, mapped Windows network drives and
+network mount points from local mount metadata. Browsers disable size maps,
+indexing, scans, indexed search and automatic cover/metadata extraction on these
+locations. Shared scan exclusions also omit network mounts nested under a local
+scan root. Normal file browsing and explicit file opening remain available.
+Windows filesystem browsers put the drive/network-location menu in the first
+breadcrumb; scoped folder browsers keep their existing navigation boundary.
+
+`ui.read_aloud.ReadAloud` starts from the visible reading area, or the reader's
+explicit page-start provider. It highlights individual words using native speech
+events where available and estimated timing otherwise. Back/forward controls
+estimate a 15-second jump from speech progress and rate, preserving pause state.
+`ui.icons` renders Python icon painters into native Qt pixmap icons and refreshes
+bound controls when the palette changes, avoiding Python icon-engine ownership
+during native window teardown. The shared docking workspace hides the final
+attached browser tab's close button while allowing documents to close at any time.
 
 Browsers in one application share a worker for the same database and location.
 Each tab can pause its own subscription; the last subscriber cancels the worker.

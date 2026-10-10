@@ -782,18 +782,19 @@ class DirectoryCache:
 
     def repair_cached_exclusions(self, root, *, cancelled=lambda: False,
                                  report=lambda done, total, message: None):
-        """Repair saved macOS root aliases without resuming or validating a scan.
+        """Repair saved excluded branches without resuming or validating a scan.
 
         Cache-first applications call this on their index worker before peek().
-        Ordinary peek() remains read-only. Independent Data scopes are retained.
+        Ordinary peek() remains read-only. Explicit scopes are retained in their
+        own generations; a changed mount table triggers another exclusion check.
         """
         root = Path(root).absolute()
-        from ._directory_exclusions import MACOS_DATA
         exclusions = scan_exclusions(root, self.database)
-        if MACOS_DATA not in exclusions or not self.database.is_file():
+        if not exclusions or not self.database.is_file():
             return
+        key = root, frozenset(exclusions)
         with self._state_lock:
-            if root in self._exclusion_checked:
+            if key in self._exclusion_checked:
                 return
         with self._writer(cancelled, report) as db:
             self._excluded_paths = exclusions
@@ -806,7 +807,7 @@ class DirectoryCache:
                 self._repair_exclusions(db, generation, root, cancelled, report)
             db.commit()
         with self._state_lock:
-            self._exclusion_checked.add(root)
+            self._exclusion_checked.add(key)
 
     def peek(self, root, recursive=True, *, partial=True, cancelled=lambda: False):
         """Read cached data immediately, without locks, validation or filesystem scan.

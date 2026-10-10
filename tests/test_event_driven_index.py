@@ -214,7 +214,9 @@ class EventDrivenIndexTests(unittest.TestCase):
             return result
         with patch.object(self.cache, '_scan_folder', side_effect=scan):
             try:
-                self.browser.set_directory(self.root)
+                # Restart the cleared index explicitly: revisiting an unchanged
+                # folder deliberately does not scan, and watcher timing varies.
+                self.browser.refresh_folder_totals()
                 self.wait(entered.is_set)
                 operation = self.browser.folder_operation
                 job = operation._job
@@ -256,7 +258,7 @@ class EventDrivenIndexTests(unittest.TestCase):
         second = None
         with patch.object(self.cache, '_scan_folder', side_effect=scan):
             try:
-                self.browser.set_directory(self.root); self.wait(entered.is_set)
+                self.browser.refresh_folder_totals(); self.wait(entered.is_set)
                 second = FileBrowser(self.deep); second.show()
                 self.assertIs(second.folder_operation._job, self.browser.folder_operation._job,
                               (second.folder_operation.request_key, self.browser.folder_operation.request_key,

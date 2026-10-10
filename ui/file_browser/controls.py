@@ -2,6 +2,7 @@
 
 import math
 from .. import pyside as qt
+from ..icons import set_painted_icon
 
 
 class ViewIcon(qt.QIconEngine):
@@ -81,17 +82,18 @@ class ViewModeSelector(qt.QWidget):
         self._index = 0
         layout.addWidget(qt.QLabel('View'))
         self.storage_controls = qt.QWidget()
-        self.storage_controls.setAccessibleName('Storage views')
+        self.storage_controls.setAccessibleName('Size map views')
         storage_layout = qt.QHBoxLayout(self.storage_controls)
         storage_layout.setContentsMargins(0, 0, 0, 0)
         storage_layout.setSpacing(2)
         separator = qt.QFrame()
-        separator.setFrameShape(qt.QFrame.Shape.VLine)
+        separator.setFixedSize(1, 16)
+        separator.setStyleSheet('background: palette(mid);')
         storage_layout.addWidget(separator)
-        storage_layout.addWidget(qt.QLabel('Storage'))
+        storage_layout.addWidget(qt.QLabel('Size Map'))
         for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns'), (3, 'Treemap'), (4, 'Radial')):
             button = qt.QToolButton()
-            button.setIcon(qt.QIcon(ViewIcon(5 if mode == 4 else mode)))
+            set_painted_icon(button, ViewIcon, 5 if mode == 4 else mode)
             button.setIconSize(qt.QSize(23, 23))
             button.setCheckable(True)
             button.setAutoRaise(True)
@@ -112,6 +114,8 @@ class ViewModeSelector(qt.QWidget):
     def setCurrentIndex(self, index):
         if index not in self.buttons:
             raise ValueError('Unknown browser view')
+        if not self.buttons[index].isEnabled():
+            return
         self.buttons[index].setChecked(True)
         if index != self._index:
             self._index = index
@@ -150,7 +154,10 @@ def navigation_button(parent, name, icon):
     icons = {qt.QStyle.StandardPixmap.SP_ArrowBack: 'previous',
              qt.QStyle.StandardPixmap.SP_ArrowForward: 'next',
              qt.QStyle.StandardPixmap.SP_ArrowUp: 'up'}
-    button.setIcon(qt.QIcon(ReaderIcon(icons[icon])) if icon in icons else parent.style().standardIcon(icon))
+    if icon in icons:
+        set_painted_icon(button, ReaderIcon, icons[icon])
+    else:
+        button.setIcon(parent.style().standardIcon(icon))
     button.setIconSize(qt.QSize(20, 20))
     button.setAutoRaise(True)
     button.setToolTip(name)
