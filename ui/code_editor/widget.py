@@ -1,6 +1,7 @@
 """Reusable QPlainTextEdit with a gutter and focused code-editing conveniences."""
 
 from .. import pyside as qt
+from .transforms import TransformCommands
 
 
 def monospace_font():
@@ -36,7 +37,7 @@ class LineNumbers(qt.QWidget):
         self.editor.paint_gutter(event)
 
 
-class CodeEdit(qt.QPlainTextEdit):
+class CodeEdit(TransformCommands, qt.QPlainTextEdit):
     preferences_changed = qt.Signal()
     zoom_changed = qt.Signal()
 
