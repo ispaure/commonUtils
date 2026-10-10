@@ -141,6 +141,8 @@ class IndexStatusLabel(qt.QLabel):
         self.setMinimumWidth(0)
 
     def setText(self, text):
+        if self.full_text == text:
+            return
         self.full_text = text
         self.setToolTip(text)
         self._fit()
@@ -211,12 +213,15 @@ class WorkspaceIndexStatus(qt.QObject):
             if browser is None: continue
             browsers.append((view,browser))
             floating = dock.isFloating()
-            browser.workspace_status = not floating
-            browser.index_status.setVisible(floating)
-            browser.index_details_button.setVisible(floating and browser.index_incomplete)
-            browser.index_activity.setVisible(floating and browser.folder_busy and
-                                              not getattr(browser, '_loading_cached_only', False))
-            browser._update_pause_button()
+            presentation = (floating, browser.index_incomplete, browser.folder_busy,
+                            getattr(browser, '_loading_cached_only', False), browser._index_paused)
+            if getattr(browser, '_workspace_presentation', None) != presentation:
+                browser._workspace_presentation = presentation
+                browser.workspace_status = not floating
+                browser.index_status.setVisible(floating)
+                browser.index_details_button.setVisible(floating and browser.index_incomplete)
+                browser.index_activity.setVisible(floating and browser.folder_busy and not presentation[3])
+                browser._update_pause_button()
             if browser not in self.connected:
                 self.connected.add(browser)
                 browser.index_progress.connect(self.refresh)

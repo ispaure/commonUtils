@@ -812,9 +812,11 @@ class FileBrowser(qt.QWidget):
         self.folder_busy = True
         self.index_activity.setVisible(not cached_only and not getattr(self, 'workspace_status', False))
         self.folder_pending = False
+        same_root = self.folder_root == root
         self.folder_root = root
         self._update_pause_button()
-        self.index_status.setText('Loading saved sizes…' if cached_only else 'Checking saved index…')
+        if not cached_only or not same_root:
+            self.index_status.setText('Loading saved sizes…' if cached_only else 'Checking saved index…')
         def scanner(path, cancelled, *, report, reuse_for):
             try:
                 if read_cache:
@@ -892,6 +894,8 @@ class FileBrowser(qt.QWidget):
     def _index_progressed(self, message):
         from .status import private_status
         message = private_status(message)
+        if self.folder_busy and getattr(self, '_loading_cached_only', False):
+            return
         if not self.stopping and self.calculate_folder_sizes and not self._index_paused:
             self.index_status.setText(message)
             self.index_progress.emit(message)
