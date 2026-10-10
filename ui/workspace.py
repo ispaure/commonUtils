@@ -450,6 +450,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         dock.raise_()
         self._activate(dock)
 
+    def reveal_for_drop(self, point):
+        """Host hook to reveal a hidden destination during dragging (global coordinates)."""
+
     def can_close_tab(self, dock):
         if dock not in self.docks:
             return False

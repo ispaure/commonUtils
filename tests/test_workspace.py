@@ -121,6 +121,16 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(workspace.docks, [first])
         self.assertFalse(first.close())
 
+    def test_drag_reveal_hook_does_not_require_an_application_page(self):
+        workspace = self.create()
+        workspace.add_view('first'); dock = workspace.active_dock
+        workspace.add_view('second'); self.settle()
+        point = workspace.mapToGlobal(workspace.rect().center())
+        with patch.object(workspace, 'reveal_for_drop') as reveal:
+            workspace.begin_window_drag(dock, point, point)
+            reveal.assert_called_with(point)
+            workspace._window_drag.finish(point, cancel=True)
+
     def test_retired_tab_disappears_before_worker_finishes(self):
         workspace = self.create()
         view = workspace.add_view('busy')

@@ -621,3 +621,21 @@ palette-aware syntax definitions. They contain no application window or feature
 logic. Qt-independent `commonUtils.text_files` supplies strict encoding handling,
 text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
 are unchanged. Applications own their document tabs, settings and save prompts.
+
+## Reusable docking workspaces
+
+`commonUtils.ui.workspace.Workspace` owns dockable tabs, full-window dragging,
+left/right splits, grouped tab headers, transfer between compatible workspaces,
+and cooperative closing. It imports no Logistics features. Supply a factory
+returning a QWidget, optionally exposing `view_title`, `title_changed`,
+`prepare_close()` and an `idle` signal. A view may set `can_retire` to retain its
+worker owners while its visible tab disappears immediately.
+
+Set `allow_new_tabs=False` for externally created documents and
+`keep_one_tab=True` to protect the final attached browser tab; floating panes can
+still close. `dock_group` restricts transfers to compatible hosts. Override
+`reveal_for_drop(global_point)` if dragging should reveal an application-specific
+hidden destination. Window dragging and drop placement stay generic; feature
+selection, dirty-document prompts and retained original window ownership belong
+to the application. `document_host.py` supplies optional hosting and original
+window lookup for reusable readers that also work standalone.
