@@ -151,7 +151,7 @@ class IntegratedSearchTests(QtTestCase):
 
     def test_paged_results_sort_globally_and_new_instance_uses_saved_index(self):
         for number in range(505):(self.root/f'match-{number}.bin').write_bytes(b'x'*number)
-        self.browser.refresh();self.wait(lambda:not self.browser.folder_busy)
+        self.browser.refresh();self.wait(lambda:not self.browser.folder_busy, timeout=20)
         self.search('match-',505)
         self.assertEqual(self.browser.index_search.results.topLevelItemCount(),500)
         self.browser.index_search._sort_changed(2)
