@@ -61,6 +61,21 @@ class ReaderIcon(qt.QIconEngine):
         elif self.name == 'layout':
             painter.drawRoundedRect(qt.QRectF(3, 4, 18, 16), 1.5, 1.5)
             painter.drawLine(qt.QLineF(12, 4, 12, 20))
+        elif self.name == 'play':
+            painter.drawPolygon([qt.QPointF(7, 4), qt.QPointF(20, 12), qt.QPointF(7, 20)])
+        elif self.name == 'pause':
+            painter.drawRoundedRect(qt.QRectF(6, 4, 4, 16), 1, 1)
+            painter.drawRoundedRect(qt.QRectF(14, 4, 4, 16), 1, 1)
+        elif self.name == 'stop':
+            painter.drawRoundedRect(qt.QRectF(5, 5, 14, 14), 1, 1)
+        elif self.name == 'edit':
+            painter.drawPolygon([qt.QPointF(4, 16), qt.QPointF(16, 4), qt.QPointF(20, 8),
+                                 qt.QPointF(8, 20), qt.QPointF(3, 21)])
+            painter.drawLine(qt.QLineF(13, 7, 17, 11))
+        elif self.name == 'read':
+            painter.drawRoundedRect(qt.QRectF(5, 3, 14, 18), 1, 1)
+            for y in (8, 12, 16):
+                painter.drawLine(qt.QLineF(8, y, 16, y))
         elif self.name == 'close':
             painter.drawLine(qt.QLineF(6, 6, 18, 18))
             painter.drawLine(qt.QLineF(18, 6, 6, 18))

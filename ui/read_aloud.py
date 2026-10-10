@@ -6,6 +6,7 @@ utterances; stopping clears the queue before asking the native engine to stop.
 """
 from collections import deque
 from . import pyside as qt
+from .reader_chrome import reader_button, reader_icon
 
 
 def speech_chunks(text, limit=3000):
@@ -76,7 +77,6 @@ class ReadAloud(qt.QObject):
         self.panel = qt.QDialog(self.owner, qt.Qt.WindowType.Popup)
         self.panel.setWindowTitle('Read aloud')
         self.panel.setModal(False)
-        self.panel.finished.connect(self.stop)
         layout = qt.QVBoxLayout(self.panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -104,9 +104,9 @@ class ReadAloud(qt.QObject):
             form.addRow(label, widget)
         layout.addLayout(form)
         row = qt.QHBoxLayout()
-        self.read = qt.QPushButton('Read')
-        self.pause = qt.QPushButton('Pause')
-        self.stop_button = qt.QPushButton('Stop')
+        self.read = reader_button(self.panel, 'Play', icon='play')
+        self.pause = reader_button(self.panel, 'Pause', icon='pause')
+        self.stop_button = reader_button(self.panel, 'Stop', icon='stop')
         for button, callback in ((self.read, self.start), (self.pause, self.toggle_pause), (self.stop_button, self.stop)):
             row.addWidget(button)
             button.clicked.connect(callback)
@@ -239,7 +239,11 @@ class ReadAloud(qt.QObject):
         paused = state == states.Paused
         finished = state == states.Ready and self._speaking
         self._speaking = speaking or paused
-        self.pause.setText('Resume' if paused else 'Pause')
+        label = 'Resume' if paused else 'Pause'
+        self.pause.setText(label)
+        self.pause.setToolTip(label)
+        self.pause.setAccessibleName(label)
+        self.pause.setIcon(reader_icon('play' if paused else 'pause'))
         capable = bool(self.engine.engineCapabilities() & self.speech_type.Capability.PauseResume)
         self.pause.setEnabled(capable and (speaking or paused))
         self.stop_button.setEnabled(speaking or paused or bool(self.pending))
