@@ -45,83 +45,103 @@ def apply_change(model, index, current):
 
 
 class DiffDialog(qt.QDialog):
-    def __init__(self, model, parent=None, *, left_name="Original", right_name="Buffer", apply=None):
+    """Two-way comparison with reusable bands and optional undoable host edits."""
+    def __init__(self, model, parent=None, *, left_name="Original", right_name="Buffer", apply=None, path=None):
         super().__init__(parent)
+        from .merge import PaneSplitter, LinkedScroll
+        from .syntax import SyntaxHighlighter, detect_language
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle("Compare — " + left_name + " / " + right_name)
-        self.resize(1100, 700)
+        self.resize(1200, 750)
         self.model, self.apply_callback, self.index = model, apply, -1
+        self.names = left_name, right_name
+        self.editors, self.highlighters = [], []
         layout = qt.QVBoxLayout(self)
-        tabs = qt.QTabWidget()
-        sides = qt.QWidget()
-        row = qt.QHBoxLayout(sides)
-        self.editors = []
+        tabs = qt.QTabWidget(); sides = qt.QWidget(); row = qt.QVBoxLayout(sides)
+        self.splitter = PaneSplitter(); row.addWidget(self.splitter)
         for name, text in ((left_name, model.left), (right_name, model.right)):
-            column = qt.QVBoxLayout()
-            column.addWidget(qt.QLabel(name))
-            editor = CodeEdit()
-            editor.setReadOnly(True)
-            editor.setPlainText(text)
-            column.addWidget(editor)
-            row.addLayout(column)
+            host = qt.QWidget(); column = qt.QVBoxLayout(host)
+            label = qt.QLabel(name); label.setTextFormat(qt.Qt.TextFormat.PlainText); column.addWidget(label)
+            editor = CodeEdit(); editor.setReadOnly(True); editor.setPlainText(text)
+            editor.setAccessibleName(name); column.addWidget(editor)
             self.editors.append(editor)
+            self.highlighters.append(SyntaxHighlighter(editor, detect_language(path, text)))
+            self.splitter.addWidget(host)
+        self.bridge = self.splitter.connect_editors(self.editors)[0]
+        self.bridge.picked.connect(self._pick)
         tabs.addTab(sides, "Side by Side")
-        unified = qt.QPlainTextEdit()
-        unified.setReadOnly(True)
-        unified.setFont(self.editors[0].font())
-        unified.setPlainText(model.unified or "No differences")
-        tabs.addTab(unified, "Unified Diff")
+        self.unified = qt.QPlainTextEdit(); self.unified.setReadOnly(True)
+        self.unified.setFont(self.editors[0].font()); tabs.addTab(self.unified, "Unified Diff")
         layout.addWidget(tabs)
-        buttons = qt.QHBoxLayout()
-        self.status = qt.QLabel()
-        buttons.addWidget(self.status, 1)
+        buttons = qt.QHBoxLayout(); self.status = qt.QLabel(); buttons.addWidget(self.status, 1)
+        self.navigation = []
         for label, direction in (("Previous", -1), ("Next", 1)):
             button = qt.QPushButton(label)
-            button.setEnabled(bool(model.changes))
             button.clicked.connect(lambda checked=False, direction=direction: self.navigate(direction))
-            buttons.addWidget(button)
-        self.use_left = qt.QPushButton("Use Left Change")
-        self.use_left.setEnabled(apply is not None and bool(model.changes))
-        self.use_left.clicked.connect(self.apply_current)
+            buttons.addWidget(button); self.navigation.append(button)
+        self.use_left = qt.QPushButton("Use Left Change"); self.use_left.clicked.connect(self.apply_current)
         buttons.addWidget(self.use_left)
-        close = qt.QPushButton("Close")
-        close.clicked.connect(self.close)
-        buttons.addWidget(close)
+        close = qt.QPushButton("Close"); close.clicked.connect(self.close); buttons.addWidget(close)
         layout.addLayout(buttons)
-        self.navigate(1)
+        self.scroll = LinkedScroll(self.editors)
+        self._render(); self.navigate(1)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == qt.QEvent.Type.PaletteChange and hasattr(self, 'scroll'):
+            self._render()
+
+    def _render(self):
+        from .merge import line_offsets, decorate, emphasize
+        left, right = line_offsets(self.model.left), line_offsets(self.model.right)
+        bands = [[], []]; self.bridge.rows = []
+        for change in self.model.changes:
+            a = left[change.left_start], left[change.left_end]
+            b = right[change.right_start], right[change.right_end]
+            kind = 'add' if a[0] == a[1] else 'remove' if b[0] == b[1] else 'modify'
+            bands[0].append((*a, kind)); bands[1].append((*b, kind))
+            self.bridge.rows.append((a, b, kind, '›' if self.apply_callback else '·'))
+        for editor, text, ranges in zip(self.editors, (self.model.left, self.model.right), bands):
+            editor.setPlainText(text); decorate(editor, ranges)
+        for change in self.model.changes:
+            a = left[change.left_start], left[change.left_end]
+            b = right[change.right_start], right[change.right_end]
+            emphasize(self.editors[0], a[0], self.model.right[b[0]:b[1]], self.model.left[a[0]:a[1]])
+            emphasize(self.editors[1], b[0], self.model.left[a[0]:a[1]], self.model.right[b[0]:b[1]])
+        self.unified.setPlainText(self.model.unified or "No differences")
+        self.bridge.update(); self.scroll.rebuild()
+        self.use_left.setEnabled(self.apply_callback is not None and bool(self.model.changes))
+        for button in self.navigation:
+            button.setEnabled(bool(self.model.changes))
+
+    def _pick(self, index):
+        self.index = index
+        self.apply_current() if self.apply_callback else self.navigate(0)
 
     def navigate(self, direction):
         if not self.model.changes:
-            self.status.setText("No differences")
-            return
+            self.index = -1; self.status.setText("No differences"); return
         self.index = (self.index + direction) % len(self.model.changes)
         change = self.model.changes[self.index]
         self.status.setText(f"Change {self.index + 1} of {len(self.model.changes)}")
-        for editor, start, end in zip(self.editors,
-                (change.left_start, change.right_start), (change.left_end, change.right_end)):
-            block = editor.document().findBlockByNumber(min(start, editor.blockCount() - 1))
-            cursor = qt.QTextCursor(block)
-            editor.setTextCursor(cursor)
-            editor.centerCursor()
-            selections = []
-            for line in range(start, max(start + 1, end)):
-                block = editor.document().findBlockByNumber(line)
-                if block.isValid():
-                    selection = qt.QTextEdit.ExtraSelection()
-                    selection.cursor = qt.QTextCursor(block)
-                    selection.format.setProperty(qt.QTextFormat.Property.FullWidthSelection, True)
-                    selection.format.setBackground(editor.palette().brush(qt.QPalette.ColorRole.Highlight))
-                    selection.format.setForeground(editor.palette().brush(qt.QPalette.ColorRole.HighlightedText))
-                    selections.append(selection)
-            editor.search_selections = selections
-            editor.highlight_cursor()
+        self.bridge.active = self.index; self.bridge.update()
+        self.scroll.busy = True
+        try:
+            for editor, start in zip(self.editors, (change.left_start, change.right_start)):
+                block = editor.document().findBlockByNumber(min(start, editor.blockCount()-1))
+                editor.setTextCursor(qt.QTextCursor(block)); editor.centerCursor()
+        finally:
+            self.scroll.busy = False
 
     def apply_current(self):
         if self.apply_callback and self.index >= 0:
             try:
-                self.apply_callback(self.model, self.index)
+                current = self.apply_callback(self.model, self.index)
+                if current is None:
+                    self.use_left.setEnabled(False)
+                    self.status.setText("Change applied. Reopen comparison to review the updated buffer.")
+                    return
+                self.model = compare_text(self.model.left, current, *self.names)
             except (ValueError, OSError) as error:
-                self.status.setText(str(error))
-                return
-            self.use_left.setEnabled(False)
-            self.status.setText("Change applied. Reopen comparison to review the updated buffer.")
+                self.status.setText(str(error)); return
+            self._render(); self.index = min(self.index, len(self.model.changes)-1); self.navigate(0)

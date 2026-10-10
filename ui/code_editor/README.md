@@ -73,3 +73,31 @@ palette-aware syntax definitions. They contain no application window or feature
 logic. Qt-independent `commonUtils.persistence.text` supplies strict encoding handling,
 text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
 are unchanged. Applications own their document tabs, settings and save prompts.
+
+## Diff and merge review
+
+`DiffDialog` now uses resizable panes, syntax highlighting, linked scrolling,
+connecting change bands and per-hunk arrows. Apply callbacks may return the new
+buffer text to refresh the comparison immediately; callbacks returning `None`
+retain the older reopen-after-apply behavior. The host still owns stale-buffer
+checks, conversion from Python offsets to Qt UTF-16 positions, undo and saving.
+
+`commonUtils.text_merge.merge_text(base, left, right)` builds a Qt-independent,
+bounded three-way model. `MergeSession` owns live result ranges and a bounded
+undo/redo history that includes manual edits and resolution decisions. Independent
+and identical changes can be applied together; overlapping edits remain explicit
+choices. Adjacent insertion boundaries are grouped conservatively.
+
+`MergeWidget(model, left_name=..., right_name=..., path=...)` is an embeddable widget
+with independent read-only sources and an editable result. `MergeDialog` supplies
+an optional Apply callback. Use Left, Right, Both (left then right), Keep Base, or
+edit the result and mark the selected change resolved. Apply is available once all
+changes are resolved. Blue marks modifications, green additions, gray deletions,
+and red unresolved conflicts; colors adapt to the palette. The ancestor can be
+shown separately. Cancel discards the merge session without invoking the host.
+
+Inputs should be normalized text snapshots from `persistence.text`. The model
+limits each input/result to 1,048,576 Python characters and 5,000 lines; Git callers
+also bound raw blob bytes. Hunk rendering supplies character emphasis for short
+regions. `diff_bands` provides the extracted unified-patch renderer and dual
+line-number gutter for consumers with patch presentation models.
