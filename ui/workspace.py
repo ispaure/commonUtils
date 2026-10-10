@@ -241,6 +241,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             bar.installEventFilter(self)
             bar.setExpanding(False)
             bar.setMovable(True)
+            self._tab_order_changed(bar)
             bar.setElideMode(qt.Qt.TextElideMode.ElideRight)
             bar.setUsesScrollButtons(True)
             if not hasattr(bar, 'workspace_plus'):
@@ -294,9 +295,11 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         group = [self._tab_dock(bar, index) for index in range(bar.count())]
         group = [dock for dock in group if dock is not None]
         positions = [index for index, dock in enumerate(self.docks) if dock in group]
+        changed = any(self.docks[index] is not dock for index, dock in zip(positions, group))
         for index, dock in zip(positions, group):
             self.docks[index] = dock
-        self._schedule_tab_headers()
+        if changed:
+            self._schedule_tab_headers()
 
     def eventFilter(self, watched, event):
         if isinstance(watched, WorkspaceDock) and self.handle_tab_drop(watched, event):
