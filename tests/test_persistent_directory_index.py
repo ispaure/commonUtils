@@ -2,7 +2,8 @@
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event, Thread
+from threading import Event, Thread, current_thread
+from time import sleep
 import unittest
 from unittest.mock import patch
 
@@ -161,11 +162,11 @@ class PersistentIndexTests(unittest.TestCase):
         self.assertEqual(storage.search('file')[0].size, 15)
 
     def test_waiting_writer_can_cancel_without_disturbing_active_scan(self):
-        entered, release, cancel, finished = Event(), Event(), Event(), Event()
+        entered, release, cancel, finished, blocked = Event(), Event(), Event(), Event(), Event()
         errors = []
         def report(done, total, message):
             if message.startswith('Indexing') and not entered.is_set():
-                entered.set(); release.wait(3)
+                entered.set(); release.wait()
         def scan():
             try:
                 self.cache.get(self.root, report=report)
@@ -173,22 +174,38 @@ class PersistentIndexTests(unittest.TestCase):
                 errors.append(error)
         def waiting_scan():
             try:
-                DirectoryCache(database=self.database).get(self.root, cancelled=cancel.is_set)
+                with DirectoryCache(database=self.database) as cache:
+                    cache.get(self.root, cancelled=cancel.is_set)
             except OperationCancelled:
                 finished.set()
             except Exception as error:
                 errors.append(error)
         worker = Thread(target=scan)
         waiting = Thread(target=waiting_scan)
-        worker.start()
-        try:
-            self.assertTrue(entered.wait(2))
-            waiting.start(); cancel.set()
-            self.assertTrue(finished.wait(2))
-        finally:
-            release.set(); worker.join(3)
-            if waiting.ident is not None:
-                waiting.join(3)
+        def lock_wait(seconds):
+            if current_thread() is waiting:
+                blocked.set()
+            sleep(seconds)
+        # Observe actual OS-lock contention before cancelling. Schema creation can
+        # take more than two seconds on Windows CI; it is not the behavior under test.
+        with patch('commonUtils.directory.store.sleep', side_effect=lock_wait):
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(30), f'Scan did not start: {errors}')
+                waiting.start()
+                self.assertTrue(blocked.wait(30), f'Writer did not wait for the lock: {errors}')
+                self.assertFalse(finished.is_set())
+                cancel.set()
+                self.assertTrue(finished.wait(30), f'Writer did not cancel: {errors}')
+                self.assertFalse(release.is_set())
+            finally:
+                cancel.set()
+                release.set()
+                # Join before TemporaryDirectory cleanup: Windows cannot unlink
+                # the lock file while either worker still has it open.
+                worker.join()
+                if waiting.ident is not None:
+                    waiting.join()
         self.assertEqual(errors, [])
         self.assertIsNone(self.cache.status(self.root))
 
