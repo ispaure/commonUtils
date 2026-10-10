@@ -34,3 +34,20 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
     finally:
         if staged is not None:
             staged.unlink(missing_ok=True)
+
+
+def atomic_write_json(path, payload, *, ensure_ascii=False, allow_nan=False,
+                      max_bytes=None, durable_directory=False):
+    """Serialize and publish JSON; schemas, bounds and directory policy are explicit."""
+    import json
+    content = json.dumps(payload, ensure_ascii=ensure_ascii, allow_nan=allow_nan).encode('utf-8')
+    if max_bytes is not None and len(content) > max_bytes:
+        raise ValueError(f'JSON payload exceeds {max_bytes} bytes.')
+    path = atomic_write_bytes(path, content)
+    if durable_directory and os.name != 'nt':
+        descriptor = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    return path

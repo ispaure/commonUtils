@@ -2,7 +2,7 @@
 import json
 import os
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from .persistence import atomic_write_json
 
 MAX_SESSION_BYTES = 64 * 1024 * 1024
 
@@ -25,25 +25,6 @@ class SessionStore:
         return payload
 
     def write(self, payload):
-        data = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-        if len(data) > MAX_SESSION_BYTES:
-            raise ValueError("Session checkpoint exceeds 64 MiB.")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        try:
-            with NamedTemporaryFile("wb", dir=self.path.parent, delete=False) as stream:
-                temporary = Path(stream.name)
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, self.path)
-            temporary = None
-            if os.name != "nt":
-                descriptor = os.open(self.path.parent, os.O_RDONLY)
-                try:
-                    os.fsync(descriptor)
-                finally:
-                    os.close(descriptor)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        atomic_write_json(self.path, payload, ensure_ascii=True, allow_nan=True,
+                          max_bytes=MAX_SESSION_BYTES, durable_directory=True)
