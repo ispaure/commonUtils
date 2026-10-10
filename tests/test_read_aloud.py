@@ -64,11 +64,15 @@ class SpeechTests(unittest.TestCase):
         self.assertEqual(len(speech.engine.spoken), 2)
         self.assertFalse(speech.pending)
 
-    def test_close_panel_or_reader_stops_and_backend_errors_are_visible(self):
+    def test_dismissing_controls_keeps_playback_until_reader_hides(self):
         speech = self.speech('Some text')
         speech.start()
         speech.panel.close()
-        self.assertEqual(speech.engine.state(), Speech.State.Ready)
+        self.assertEqual(speech.engine.state(), Speech.State.Speaking)
+        self.assertTrue(speech._speaking)
+        for control in (speech.read, speech.pause, speech.stop_button):
+            self.assertEqual(control.toolButtonStyle(), qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+            self.assertFalse(control.icon().isNull())
         speech.show()
         speech.start()
         self.owner.hide()
