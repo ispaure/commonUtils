@@ -135,3 +135,6 @@ schema nor editor automatically renames existing keys or rewrites legacy files.
 Applications can retain compatibility imports or a small wrapper to preserve
 their previous defaults while migrating. New consumers should import the
 commonUtils modules directly.
+
+`settings.py` owns the historical `settings` implementation; its compatibility
+package preserves existing consumers.

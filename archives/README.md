@@ -18,3 +18,6 @@ See [archive contracts](../ARCHIVES.md) and [ZIP compatibility](../ZIP_ARCHIVES.
 | [reading.py](reading.py) | Validated ZIP/TAR readers, header inspection and integrity checks. |
 
 [Parent guide](../README.md)
+
+`zip_access.py` owns the historical `zip_access` implementation; its compatibility
+package preserves existing consumers.
