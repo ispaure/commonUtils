@@ -3,7 +3,7 @@ from pathlib import Path
 from ..outline import OutlineEntry, OutlineList
 
 from .. import pyside as qt
-from ..reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button
+from ..reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button, show_reader_popup
 from .editing import MarkdownEditingMixin
 from .formatted import MarkdownFormattedMixin
 from .properties import MarkdownProperties
@@ -184,12 +184,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         listing.itemClicked.connect(self._select_heading)
         listing.itemActivated.connect(self._select_heading)
         self.toc_popup.resize(min(380, self.width()), min(420, max(140, self.height())))
-        point = self.toc_button.mapToGlobal(qt.QPoint(self.toc_button.width(), self.toc_button.height()))
-        screen = self.toc_button.screen().availableGeometry()
-        x = max(screen.left(), min(point.x() - self.toc_popup.width(), screen.right() - self.toc_popup.width() + 1))
-        y = max(screen.top(), min(point.y(), screen.bottom() - self.toc_popup.height() + 1))
-        self.toc_popup.move(x, y)
-        self.toc_popup.show()
+        show_reader_popup(self.toc_popup, self.toc_button, align_right=True)
         listing.setFocus()
 
     def _select_heading(self, item):

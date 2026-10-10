@@ -5,7 +5,7 @@ from .extensions import reading_source, mermaid_blocks
 from .headings import _iter_headings
 from .links import render_links
 from .presentation import style_document
-from ..reader_chrome import reader_button
+from ..reader_chrome import reader_button, reading_spin, show_reader_popup
 
 
 class MarkdownReadingMixin:
@@ -39,14 +39,8 @@ class MarkdownReadingMixin:
         layout.setSpacing(12)
         layout.addWidget(qt.QLabel('Reading appearance'))
         form = qt.QFormLayout()
-        spin = qt.QSpinBox()
-        spin.setRange(10, 24)
-        spin.setValue(self.reading_size)
-        spin.setSuffix(' pt')
-        spin.setMinimumHeight(32)
-        spin.setKeyboardTracking(False)
-        spin.setAccessibleName('Reading text size')
-        spin.valueChanged.connect(self.set_reading_size)
+        spin = reading_spin(popup, minimum=10, maximum=24, value=self.reading_size,
+                            label='Reading text size', suffix=' pt', changed=self.set_reading_size)
         form.addRow('Text size', spin)
         layout.addLayout(form)
         hint = qt.QLabel('Reading follows the application’s light/dark theme.')
@@ -54,11 +48,7 @@ class MarkdownReadingMixin:
         hint.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
         layout.addWidget(hint)
         popup.resize(300, popup.sizeHint().height())
-        point = self.appearance_button.mapToGlobal(qt.QPoint(self.appearance_button.width(), self.appearance_button.height()))
-        screen = self.appearance_button.screen().availableGeometry()
-        popup.move(max(screen.left(), min(point.x() - popup.width(), screen.right() - popup.width() + 1)),
-                   max(screen.top(), min(point.y(), screen.bottom() - popup.height() + 1)))
-        popup.show()
+        show_reader_popup(popup, self.appearance_button, align_right=True)
         spin.setFocus()
 
     def _render_source(self, text):
