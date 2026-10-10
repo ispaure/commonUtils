@@ -49,6 +49,7 @@ class EditorViews(qt.QWidget):
             self.secondary = CodeEdit()
             self.secondary.setDocument(self.primary.document())
             self.primary.document().contentsChange.connect(self.secondary._external_multicursor_change)
+            self.secondary.bind_folding()
             self.secondary.setFont(source.font())
             for name in ("indent_width", "use_tabs", "auto_indent", "auto_pairs", "line_numbers", "comment_prefix"):
                 setattr(self.secondary, name, getattr(source, name))
