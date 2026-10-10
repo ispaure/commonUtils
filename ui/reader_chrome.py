@@ -206,3 +206,28 @@ class ReaderFullscreen(qt.QObject):
                 self._maximized = bool(event.oldState() & qt.Qt.WindowState.WindowMaximized)
             self.sync()
         return False
+
+
+def reading_spin(parent, *, minimum, maximum, value, label, suffix='', step=1, changed=None):
+    """Consistent reader appearance control; range and change policy are supplied."""
+    spin = qt.QSpinBox(parent)
+    spin.setRange(minimum, maximum)
+    spin.setSingleStep(step)
+    spin.setValue(value)
+    spin.setSuffix(suffix)
+    spin.setAccessibleName(label)
+    spin.setMinimumHeight(32)
+    spin.setKeyboardTracking(False)
+    if changed is not None:
+        spin.valueChanged.connect(changed)
+    return spin
+
+
+def show_reader_popup(popup, anchor, *, align_right=False):
+    """Place a popup below its control, clamped to that control's screen."""
+    point = anchor.mapToGlobal(qt.QPoint(anchor.width() if align_right else 0, anchor.height()))
+    screen = anchor.screen().availableGeometry()
+    x = point.x() - popup.width() if align_right else point.x()
+    popup.move(max(screen.left(), min(x, screen.right() - popup.width() + 1)),
+               max(screen.top(), min(point.y(), screen.bottom() - popup.height() + 1)))
+    popup.show()
