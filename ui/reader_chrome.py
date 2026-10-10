@@ -4,6 +4,7 @@ No format/loading/navigation policy lives here. Hosts retain their public widget
 handles and supply actions; both text and image readers use the same geometry.
 """
 from . import pyside as qt
+from .icons import painted_icon, set_painted_icon
 
 READER_MARGINS = (8, 2, 8, 3)
 READER_SPACING = 4
@@ -61,6 +62,14 @@ class ReaderIcon(qt.QIconEngine):
         elif self.name == 'layout':
             painter.drawRoundedRect(qt.QRectF(3, 4, 18, 16), 1.5, 1.5)
             painter.drawLine(qt.QLineF(12, 4, 12, 20))
+        elif self.name in ('back15', 'forward15'):
+            painter.drawArc(qt.QRectF(3, 3, 18, 18), 50 * 16, 280 * 16)
+            if self.name == 'back15':
+                painter.drawPolyline([qt.QPointF(8, 2), qt.QPointF(3, 5), qt.QPointF(7, 8)])
+            else:
+                painter.drawPolyline([qt.QPointF(16, 2), qt.QPointF(21, 5), qt.QPointF(17, 8)])
+            font = qt.QFont(painter.font()); font.setPixelSize(10); painter.setFont(font)
+            painter.drawText(qt.QRectF(3, 4, 18, 17), qt.Qt.AlignmentFlag.AlignCenter, '15')
         elif self.name == 'play':
             painter.drawPolygon([qt.QPointF(7, 4), qt.QPointF(20, 12), qt.QPointF(7, 20)])
         elif self.name == 'pause':
@@ -91,7 +100,7 @@ class ReaderIcon(qt.QIconEngine):
 
 
 def reader_icon(name):
-    return qt.QIcon(ReaderIcon(name))
+    return painted_icon(ReaderIcon, name)
 
 
 def reader_button(parent, name, *, action=None, icon=None, text=None):
@@ -99,10 +108,10 @@ def reader_button(parent, name, *, action=None, icon=None, text=None):
     button = qt.QToolButton(parent)
     if action is not None:
         if icon:
-            action.setIcon(reader_icon(icon))
+            set_painted_icon(action, ReaderIcon, icon)
         button.setDefaultAction(action)
     elif icon:
-        button.setIcon(reader_icon(icon))
+        set_painted_icon(button, ReaderIcon, icon)
     button.setIconSize(qt.QSize(20, 20))
     button.setAutoRaise(True)
     button.setFocusPolicy(qt.Qt.FocusPolicy.TabFocus)
@@ -159,7 +168,7 @@ class ReaderFullscreen(qt.QObject):
         self.action = action
         self._window = None
         self._maximized = False
-        action.setIcon(reader_icon('fullscreen'))
+        set_painted_icon(action, ReaderIcon, 'fullscreen')
         self.sync()
 
     def window(self):

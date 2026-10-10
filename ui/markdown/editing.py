@@ -1,4 +1,6 @@
 """Internal source-editing actions and safe file operations for MarkdownViewer."""
+from ..icons import set_painted_icon
+from ..reader_chrome import ReaderIcon
 from pathlib import Path
 
 from .. import pyside as qt
@@ -121,9 +123,8 @@ class MarkdownEditingMixin:
         self.edit_mode.setVisible(enabled)
         self.replace_text.setEnabled(enabled)
         self.properties.set_editable(enabled and self.edit_mode.currentData() == "formatted")
-        from ..reader_chrome import reader_icon
         label = 'Read Markdown' if enabled else 'Edit Markdown'
-        self.edit_button.setIcon(reader_icon('read' if enabled else 'edit'))
+        set_painted_icon(self.edit_button, ReaderIcon, 'read' if enabled else 'edit')
         self.edit_button.setText('Read' if enabled else 'Edit')
         self.edit_button.setAccessibleName(label)
         self.edit_button.setToolTip(label)
