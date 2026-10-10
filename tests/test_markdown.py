@@ -35,6 +35,14 @@ class MarkdownTests(QtTestCase):
         self.addCleanup(self.viewer.deleteLater)
         self.app.processEvents()
 
+    def test_new_markdown_window_starts_untitled_and_editable(self):
+        window = open_markdown(None, allow_edit=True)
+        self.assertIsNone(window.viewer.current_path)
+        self.assertTrue(window.viewer.allow_edit)
+        self.assertEqual(window.viewer.editor.toPlainText(), '')
+        self.assertEqual(window.document_editor_name, 'Markdown Editor')
+        window.close(); self.app.processEvents()
+
     def test_edit_read_icons_and_speech_action_visibility(self):
         viewer = MarkdownViewer(allow_edit=True)
         viewer.set_editing(False)

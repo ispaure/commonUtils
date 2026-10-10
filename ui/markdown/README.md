@@ -312,3 +312,9 @@ The [Markdown viewer/editor guide](README.md) covers preview-only defaults,
 explicit editing opt-in, typed Markdown formatting, properties, navigation and saving.
 Public imports remain `from commonUtils.ui.markdown import MarkdownViewer, open_markdown`.
 FileBrowser opts into editing; documentation callers get preview-only windows by default.
+
+### Untitled editor windows
+
+`open_markdown(None, allow_edit=True)` creates an empty, editable Markdown window
+with the usual save/unsaved-change handling. A concrete path opens an existing
+document. The host navigation label is Markdown Editor.
