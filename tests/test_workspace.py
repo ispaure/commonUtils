@@ -20,6 +20,20 @@ class View(qt.QLabel):
 
 
 class WorkspaceTests(QtTestCase):
+    def test_floating_pane_has_normal_window_controls_and_reattaches(self):
+        workspace = self.create()
+        view = workspace.add_view()
+        dock = next(item for item in workspace.docks if item.widget() is view)
+        dock.setFloating(True); dock.show(); self.app.processEvents()
+        self.assertEqual(dock.windowType(), qt.Qt.WindowType.Window)
+        self.assertTrue(dock.windowFlags() & qt.Qt.WindowType.WindowMinMaxButtonsHint)
+        self.assertFalse(dock.windowFlags() & qt.Qt.WindowType.FramelessWindowHint)
+        self.assertIsNone(dock.windowHandle().transientParent())
+        self.assertFalse(dock.testAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose))
+        workspace.adopt(dock); self.app.processEvents()
+        self.assertFalse(dock.isFloating())
+        self.assertIs(dock.widget(), view)
+
     def test_drag_uses_the_full_pane_and_floating_header_tracks_the_press(self):
         workspace = self.create()
         workspace.add_view()

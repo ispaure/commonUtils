@@ -115,12 +115,31 @@ class WorkspaceDock(qt.QDockWidget):
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.tab_header = DockTabHeader(self)
         self.setTitleBarWidget(self.tab_header)
+        self.topLevelChanged.connect(self._native_window)
         register_dock(self)
         self.setAcceptDrops(True)
         self.installEventFilter(workspace)
         view.setProperty('workspaceView', True)
         view.setAttribute(qt.Qt.WidgetAttribute.WA_StyledBackground, True)
         view.setStyleSheet(view.styleSheet() + '\nQWidget[workspaceView="true"] { border: 1px solid palette(mid); border-radius: 5px; }')
+
+    def _native_window(self, floating):
+        if not floating:
+            return
+        # Qt defaults floating docks to tool palettes. A regular window gives
+        # the window manager native borders, snapping and minimize/maximize.
+        geometry = self.geometry()
+        visible = self.isVisible()
+        self.setWindowFlags(qt.Qt.WindowType.Window |
+                            qt.Qt.WindowType.WindowTitleHint |
+                            qt.Qt.WindowType.WindowSystemMenuHint |
+                            qt.Qt.WindowType.WindowMinMaxButtonsHint |
+                            qt.Qt.WindowType.WindowCloseButtonHint)
+        self.setGeometry(geometry)
+        if visible:
+            self.show()
+        if self.windowHandle() is not None:
+            self.windowHandle().setTransientParent(None)
 
     def contextMenuEvent(self, event):
         self.workspace._activate(self)
