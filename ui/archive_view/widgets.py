@@ -44,5 +44,3 @@ class ArchiveItem(qt.QTreeWidgetItem):
             role = int(qt.Qt.ItemDataRole.UserRole) + 1
             return bool(value_less(self.data(column, role), other.data(column, role), missing_last=False))
         return label_less(self.text(column), other.text(column), natural=False)
-
-

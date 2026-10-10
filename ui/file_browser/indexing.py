@@ -245,4 +245,3 @@ class BrowserIndexing:
             self.refresh_folder_totals()
         else:
             self.index_search.refresh()
-
