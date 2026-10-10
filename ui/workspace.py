@@ -227,7 +227,8 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
             if self.active_dock in [self._tab_dock(bar, index) for index in range(bar.count())]:
                 self._activate(self._tab_dock(bar, bar.currentIndex()))
-            width = max(60, (bar.width() - 32) // bar.count())
+            reserve = 32 if self.allow_new_tabs else 0
+            width = max(60, (bar.width() - reserve) // bar.count())
             style = (f'QTabBar::tab {{ width: {width}px; height: 30px; padding: 0px; }} '
                      'QTabBar::scroller { width: 96px; } '
                      'QTabBar::tab:selected { background: palette(base); color: palette(text); '

@@ -147,6 +147,17 @@ class WorkspaceTests(unittest.TestCase):
         self.assertIs(workspace.active_view, second)
         self.assertEqual(workspace.active_dock.tab_header.height(), 30)
 
+    def test_document_tabs_share_the_entire_width_without_a_new_tab_gap(self):
+        workspace = self.create()
+        workspace.allow_new_tabs = False
+        workspace.add_view('first'); workspace.add_view('second')
+        self.settle()
+        bar = self.tab_bar(workspace)
+        for width in (900, 600, 1200):
+            workspace.parentWidget().resize(width, 600); self.settle()
+            self.assertLess(abs(sum(bar.tabRect(i).width() for i in range(2)) - bar.width()), 3)
+            self.assertFalse(bar.workspace_plus.isVisible())
+
     def test_tab_context_menu_closes_target_and_cooperative_close_can_refuse(self):
         workspace = self.create()
         first = workspace.add_view('first')
