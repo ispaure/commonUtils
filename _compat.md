@@ -49,3 +49,50 @@ run Blue Hole's adapter regressions without Blender startup. The layout tests
 cover alias identity, nested packages, reload, lazy dependencies and vendored
 namespace isolation. CI exercises all supported desktop platforms and source
 release packaging.
+
+## Filesystem and operation contracts
+
+- Directory traversal follows directory links while detecting recursive loops.
+  Deleting a Directory that represents a symbolic link or junction removes the
+  link itself, retaining its target.
+- `Directory.delete_contents()` refuses a linked root unless
+  `follow_root_link=True` explicitly permits target-content deletion.
+- `linkUtils.update_symbolic_link()` refuses to replace a real destination unless
+  `allow_destination_deletion=True` is supplied.
+- Cancellation is cooperative. Stream helpers check between chunks; a blocking
+  read must return before cancellation can be observed. The caller owns staging
+  and transaction boundaries.
+- `OperationProgress.completed(result, error)` arrives after worker shutdown.
+  Keep the owner alive until then and route close/Escape to cancellation during work.
+- `run_batch` finishes each item before observing cancellation. Its result records
+  completed items, per-item failures and the unprocessed remainder. An error-free
+  Qt callback can still return a batch containing individual failures.
+- Downloads verify both release and installed hashes before promotion. Applications
+  supply URLs, versions, platform choice and destination; commonUtils does not
+  automatically choose software or install drivers.
+- ZIP creation preserves sources and existing destinations, verifies decrypted
+  content and checks cancellation before publication. Extraction is staged per
+  file, rather than a transaction across the whole archive. See the archive guide.
+- `cmdShellWrapper.exec_cmd(time_out=...)` uses an **idle-output timeout**, not a
+  maximum runtime; ongoing output can keep the command alive.
+
+These contracts are operation-specific. A shared stream copy alone does not make
+a file replacement atomic, and using a progress widget does not make arbitrary
+callbacks cancellable.
+
+## Package layout and compatibility
+
+Directory indexing lives in `filesystem/index/`: `metadata`, `store`, `schema`,
+`scan`, `reader`, `search`, `order`, `totals`, `exclusions` and `reconcile`.
+Import its public API from `commonUtils.filesystem.index`; its cache remains process-wide.
+Atomic publication lives in `persistence/`, with text documents in
+`persistence.text` and session recovery in `persistence.session`.
+
+Historical public paths remain lazy aliases in `_compat.py`. Canonical and legacy
+imports share module state, classes, cache instances and instrumentation, including
+nested submodules. The configuration helper now lives in `configuration/legacy.py`.
+
+Logistics uses the canonical imports and pins this repository as a Git submodule.
+Blue Hole vendors the same implementation as a subtree and uses canonical imports
+under its own package namespace. See [area boundaries](#package-layout) for the
+area boundaries and reconciliation checks.

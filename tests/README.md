@@ -91,3 +91,27 @@ From Logistics, run `QT_QPA_PLATFORM=offscreen PYTHONPATH=Python .venv/bin/pytho
 | [test_zip_paths.py](test_zip_paths.py) | Verify ZIP members remain within the selected extraction directory. |
 
 [Parent guide](../README.md)
+
+## Development and validation
+
+Keep domain-specific file classes, application configuration and platform software
+manifests in the consuming project. Reusable code should preserve established
+public names, arguments and fields so dependent projects can update safely.
+
+From the package's parent directory, run its tests with the project interpreter:
+
+```sh
+QT_QPA_PLATFORM=offscreen python -m unittest discover -s commonUtils/tests -v
+```
+
+For a checkout beneath `Python/`, run from the application's root:
+
+```sh
+QT_QPA_PLATFORM=offscreen PYTHONPATH=Python python -m unittest discover -s Python/commonUtils/tests -v
+```
+
+On PowerShell, set `$env:QT_QPA_PLATFORM = "offscreen"` and the appropriate
+`$env:PYTHONPATH` first. Optional test dependencies must be available. Tests use
+fixtures and mocked integrations; native dialogs, external applications and system
+installation/mount behavior need separate platform validation. Test consumers
+before updating their submodule references.
