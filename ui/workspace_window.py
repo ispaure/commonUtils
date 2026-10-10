@@ -1,15 +1,14 @@
-"""A detached container owns tabs, while closing it restores them to its main host."""
+"""A detached container owns tabs and closes them with its native window."""
 from . import pyside as qt
 
 
 class WorkspaceWindow(qt.QMainWindow):
-    def __init__(self, main, *, allow_new_tabs=None, policy=None, close_returns_tabs=True):
+    def __init__(self, main, *, allow_new_tabs=None, policy=None):
         super().__init__(main.window())
         from .workspace import Workspace
         self.setWindowFlag(qt.Qt.WindowType.Window, True)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
-        self.close_returns_tabs = close_returns_tabs
         self._native_drag = None
         self._title_press = None
         self._native_drag_blocked = False
@@ -85,19 +84,16 @@ class WorkspaceWindow(qt.QMainWindow):
         if self._native_drag is not None:
             self._native_drag.finish(qt.QCursor.pos(), cancel=True)
         main = self.workspace.main_workspace
-        # A container close is not a tab close. Restore content without asking
-        # readers to discard edits or stopping browser workers.
-        if not main._closing and not self.close_returns_tabs:
-            for dock in tuple(self.workspace.docks):
-                dock.close()
-            if self.workspace.docks or self.workspace._retiring:
-                event.ignore()
-                return
-        elif not main._closing:
-            for dock in tuple(self.workspace.docks):
-                if not main.adopt(dock, force=True):
-                    event.ignore()
-                    return
+        if not main._closing:
+            # Closing the whole window may close its last browser tab too.
+            # Keep each view's close handler authoritative for vetoes and workers.
+            keep_one_tab = self.workspace.keep_one_tab
+            self.workspace.keep_one_tab = False
+            try:
+                for dock in tuple(self.workspace.docks):
+                    dock.close()
+            finally:
+                self.workspace.keep_one_tab = keep_one_tab
         if self.workspace.docks or self.workspace._retiring:
             event.ignore()
             return

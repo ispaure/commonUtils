@@ -90,8 +90,9 @@ class ContainerTests(QtTestCase):
             self.assertEqual(bar.height(), 0)
         self.assertEqual(window.windowTitle(), 'Files: floating')
         window.close(); self.settle()
-        self.assert_owner(dock, main)
-        self.assertEqual(len(main.docks), 2)
+        self.assertEqual(len(main.docks), 1)
+        self.assertEqual(main.active_view.state, 'main')
+        self.assertEqual(main.detached_windows, [])
         self.assertFalse(isValid(window))
 
     def test_native_window_drop_returns_last_browser_tab(self):
@@ -108,6 +109,55 @@ class ContainerTests(QtTestCase):
         self.assert_owner(dock, main)
         self.settle()
         self.assertFalse(isValid(window))
+
+    def test_window_close_closes_all_local_tabs_and_preserves_other_windows(self):
+        for browser in (False, True):
+            with self.subTest(browser=browser):
+                main = self.create(browser=browser)
+                main.add_view('main'); attached = main.active_dock
+                main.add_view('other window'); other = main.detach_active()
+                main.add_view('closing window'); window = main.detach_active()
+                window.workspace.add_view('second tab')
+                views = [dock.widget() for dock in window.workspace.docks]
+                with patch.object(views[0], 'prepare_close', return_value=True) as first, \
+                     patch.object(views[1], 'prepare_close', return_value=True) as second:
+                    self.assertTrue(window.close())
+                    first.assert_called_once(); second.assert_called_once()
+                self.settle()
+                self.assertFalse(isValid(window))
+                self.assertEqual(main.docks, [attached])
+                self.assertEqual(main.detached_windows, [other])
+                self.assertEqual(other.workspace.active_view.state, 'other window')
+
+    def test_window_close_veto_keeps_tab_detached_and_can_be_retried(self):
+        main = self.create(browser=True)
+        main.add_view('main'); main.add_view('veto')
+        window = main.detach_active(); workspace = window.workspace
+        dock = workspace.active_dock
+        with patch.object(dock.widget(), 'prepare_close', return_value=False):
+            self.assertFalse(window.close()); self.settle()
+            self.assertTrue(window.isVisible())
+            self.assert_owner(dock, workspace)
+            self.assertTrue(workspace.keep_one_tab)
+            self.assertFalse(workspace._closing)
+        self.assertTrue(window.close()); self.settle()
+        self.assertFalse(isValid(window))
+        self.assertEqual(len(main.docks), 1)
+
+    def test_window_close_waits_for_retiring_worker_before_deleting_container(self):
+        main = self.create(browser=True)
+        main.add_view('main'); main.add_view('busy')
+        window = main.detach_active(); workspace = window.workspace
+        dock = workspace.active_dock; view = dock.widget(); view.can_retire = True
+        with patch.object(view, 'prepare_close', return_value=False):
+            self.assertFalse(window.close()); self.settle()
+            self.assertEqual(workspace.docks, [])
+            self.assertEqual(workspace._retiring, [dock])
+            self.assertTrue(isValid(window))
+            self.assertEqual(len(main.docks), 1)
+        workspace._retry_view_close(dock); self.settle()
+        self.assertFalse(isValid(window))
+        self.assertEqual(main.detached_windows, [])
 
     def test_native_cancel_restores_destination_and_window_geometry(self):
         from commonUtils.ui.workspace_drag import NativeWindowDrag
@@ -228,7 +278,7 @@ class ContainerTests(QtTestCase):
                 # Menus can be built after add_view; activation must still route them.
                 window = workspace.detach_active(); self.settle()
                 self.assertEqual([action.text() for action in window.menuBar().actions()], ['Tools'])
-                window.close(); self.settle()
+                window.dock_to_main(); self.settle()
                 self.assertIs(workspace.active_view, view)
                 if platform != 'darwin':
                     self.assertTrue(view.menuBar().isVisible())
