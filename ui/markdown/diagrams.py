@@ -109,6 +109,8 @@ class MermaidRenderer(qt.QObject):
             size = reader.size()
             if size.isValid() and size.width() * size.height() <= 16_000_000:
                 image = reader.read()
+            # QImageReader retains its source handle on Windows until destroyed.
+            del reader
         if code == 0 and status == qt.QProcess.ExitStatus.NormalExit and not image.isNull() and image.width() * image.height() <= 16_000_000:
             self.images[self.current] = image
             while len(self.images) > 24:

@@ -19,6 +19,7 @@ class SearchTermTests(unittest.TestCase):
         for number, name in enumerate(names):
             (root / name).write_bytes(b'x' * (number + 1))
         indexed = DirectoryCache(database=base / 'cache' / 'index.sqlite3').get(root)
+        self.addCleanup(indexed.close)
         detached = Snapshot(root, True, tuple(indexed.entries), (), indexed.scanned_at)
         self.snapshots = (indexed, detached)
 

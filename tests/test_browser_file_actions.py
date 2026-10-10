@@ -56,10 +56,18 @@ class BrowserFileActionTests(QtTestCase):
         return {action.text(): action for action in menu.actions() if not action.isSeparator()}
 
     def editor(self):
-        QTest.qWait(20)
-        editors = [editor for editor in self.browser.views.findChildren(qt.QLineEdit) if editor.isVisible()]
-        self.assertEqual(len(editors), 1)
-        return editors[0]
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            self.app.processEvents()
+            editors = [editor for editor in self.browser.views.findChildren(qt.QLineEdit) if editor.isVisible()]
+            if len(editors) == 1:
+                editor = editors[0]
+                length = editor.property('filename_basename_length')
+                if (editor.hasFocus() and editor.selectionStart() == 0
+                        and len(editor.selectedText().encode('utf-16-le')) // 2 == length):
+                    return editor
+            time.sleep(.005)
+        self.fail('Filename editor did not finish focusing and selecting its basename')
 
     def test_paste_is_on_folders_and_empty_space_and_rename_requires_single_selection(self):
         self.select(self.file)
