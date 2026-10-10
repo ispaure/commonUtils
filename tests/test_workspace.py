@@ -47,7 +47,7 @@ class WorkspaceTests(QtTestCase):
         self.app.sendEvent(widget, event)
         self.settle()
 
-    def test_horizontal_tab_drag_undocks_and_floating_header_snaps_on_both_edges(self):
+    def test_drag_outside_tab_bar_undocks_and_floating_header_snaps_on_both_edges(self):
         workspace = self.create()
         workspace.add_view('first'); moving = workspace.active_dock
         workspace.add_view('second'); self.settle()
@@ -56,7 +56,7 @@ class WorkspaceTests(QtTestCase):
         index = next(i for i in range(bar.count()) if workspace._tab_dock(bar, i) is moving)
         origin = bar.mapToGlobal(bar.tabRect(index).center())
         self.mouse(bar, qt.QEvent.Type.MouseButtonPress, origin)
-        self.mouse(bar, qt.QEvent.Type.MouseMove, origin + qt.QPoint(30, 0))
+        self.mouse(bar, qt.QEvent.Type.MouseMove, origin + qt.QPoint(30, bar.height() + 20))
         self.assertTrue(moving.isFloating())
         self.assertIsNotNone(workspace._window_drag)
         outside = workspace.mapToGlobal(workspace.rect().bottomRight() + qt.QPoint(100, 100))
@@ -75,6 +75,25 @@ class WorkspaceTests(QtTestCase):
             self.assertNotIn(other, workspace.tabifiedDockWidgets(moving))
             self.assertEqual(moving.x() < other.x(), edge == 'left')
             self.assertEqual(moving.widget().state, 'first')
+
+    def test_horizontal_tab_drag_reorders_without_undocking(self):
+        workspace = self.create()
+        first = workspace.add_view('first')
+        second = workspace.add_view('second')
+        self.settle()
+        bar = self.tab_bar(workspace)
+        self.assertTrue(bar.isMovable())
+        origin = bar.mapToGlobal(bar.tabRect(0).center())
+        target = bar.mapToGlobal(bar.tabRect(1).center())
+        self.mouse(bar, qt.QEvent.Type.MouseButtonPress, origin)
+        self.mouse(bar, qt.QEvent.Type.MouseMove, target)
+        self.mouse(bar, qt.QEvent.Type.MouseButtonRelease, target)
+        self.assertIsNone(workspace._window_drag)
+        self.assertTrue(all(not dock.isFloating() for dock in workspace.docks))
+        self.assertIs(workspace._tab_dock(bar, 0).widget(), second)
+        self.assertEqual([dock.widget() for dock in workspace.docks], [second, first])
+        workspace.docks[0].close(); self.settle()
+        self.assertEqual([dock.widget() for dock in workspace.docks], [first])
 
     def test_closing_a_dragged_pane_releases_the_drag_controller(self):
         workspace = self.create(); workspace.add_view('first')

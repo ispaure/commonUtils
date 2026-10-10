@@ -702,3 +702,8 @@ consume them after finished and retain workers until retirement. Cancellation
 boundaries and error formatting can be supplied by the caller. Operation retains
 its compatibility completed signal; use OperationProgress for finish-safe delivery
 with progress and cancellation controls.
+
+Workspace tab bars use horizontal dragging to reorder panes. Drag outside the
+tab bar to detach and move the whole pane, then drop to tabify or split. The
+workspace keeps its dock order synchronized with native tab order so indexed
+close actions and document lists refer to the visible tab.

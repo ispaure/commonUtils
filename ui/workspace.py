@@ -240,6 +240,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 continue
             bar.installEventFilter(self)
             bar.setExpanding(False)
+            bar.setMovable(True)
             bar.setElideMode(qt.Qt.TextElideMode.ElideRight)
             bar.setUsesScrollButtons(True)
             if not hasattr(bar, 'workspace_plus'):
@@ -248,6 +249,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 bar.setStyle(bar.workspace_style)
                 bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.add_view())
                 bar.currentChanged.connect(self._schedule_tab_headers)
+                bar.tabMoved.connect(lambda source, target, owner=bar: self._tab_order_changed(owner))
                 bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
             if self.active_dock in [self._tab_dock(bar, index) for index in range(bar.count())]:
                 self._activate(self._tab_dock(bar, bar.currentIndex()))
@@ -288,6 +290,14 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             bar.workspace_plus.setVisible(self.allow_new_tabs)
             bar.workspace_plus.raise_()
 
+    def _tab_order_changed(self, bar):
+        group = [self._tab_dock(bar, index) for index in range(bar.count())]
+        group = [dock for dock in group if dock is not None]
+        positions = [index for index, dock in enumerate(self.docks) if dock in group]
+        for index, dock in zip(positions, group):
+            self.docks[index] = dock
+        self._schedule_tab_headers()
+
     def eventFilter(self, watched, event):
         if isinstance(watched, WorkspaceDock) and self.handle_tab_drop(watched, event):
             return True
@@ -312,7 +322,8 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                     bar, start, dock = self._drag_press
                     point = event.position().toPoint()
                     if (dock and event.buttons() & qt.Qt.MouseButton.LeftButton
-                            and (point - start).manhattanLength() >= qt.QApplication.startDragDistance()):
+                            and (point - start).manhattanLength() >= qt.QApplication.startDragDistance()
+                            and not bar.rect().contains(point)):
                         self._drag_press = None
                         self.begin_window_drag(dock, event.globalPosition().toPoint(), bar.mapToGlobal(start))
                         return True
