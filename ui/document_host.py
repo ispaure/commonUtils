@@ -59,14 +59,24 @@ def close_document(window):
     Close handlers still own vetoes, worker retirement and unsaved prompts.
     """
     if window.isWindow():
-        return window.close()
+        accepted = window.close()
+        _close_finished(window, accepted)
+        return accepted
     event = qt.QCloseEvent()
     qt.QApplication.sendEvent(window, event)
+    _close_finished(window, event.isAccepted())
     if event.isAccepted():
         window.hide()
         if window.testAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose):
             window.deleteLater()
     return event.isAccepted()
+
+
+def _close_finished(window, accepted):
+    host = current_document_host()
+    callback = getattr(host, "document_close_finished", None)
+    if callback is not None:
+        callback(window, accepted)
 
 
 class CloseOutcome(Enum):
