@@ -82,6 +82,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.cover_pixmap = qt.QPixmap()
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
         layout.setSizeConstraint(qt.QLayout.SizeConstraint.SetMinimumSize)
         self.search_bar = qt.QLineEdit()
         self.search_bar.setAccessibleName('Search indexed files and folders')
@@ -144,7 +145,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.navigation = NavigationBar(self)
         self.navigation.requested.connect(self.navigate)
         toolbar = qt.QHBoxLayout()
-        toolbar.setSpacing(6)
+        toolbar.setSpacing(5)
         toolbar.addWidget(self.navigation, 1)
         controls = toolbar
         self.view_selector = ViewModeSelector(self)

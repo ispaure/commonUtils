@@ -4,7 +4,7 @@ CommonUtils is shared by exactly two maintained consumers: Logistics (a pinned
 Git submodule) and Blue Hole (a vendored Git subtree). Keep both copies aligned
 when changing the shared API.
 
-The root contains eight implementation areas, `launchers`, `tests`, `docs`, package
+The root contains eight implementation areas, `launchers`, `tests`, package
 initialization, the centralized compatibility adapter, README and license. Place
 new code in the area that owns its responsibility. Do not create a top-level
 package for each helper or compatibility name.
@@ -20,8 +20,10 @@ package for each helper or compatibility name.
 | persistence | Atomic writes, recovery, sessions and text merging |
 | ui | Native/PySide interfaces, browser features, readers and editors |
 
-Modules with multiple implementation files retain their own package. Guides and
-recipes live in `docs`; local READMEs describe the API of each area.
+Modules with multiple implementation files retain their own package. Package guides live in each area’s `README.md`. Module-specific guides
+sit beside the implementation with the same stem, such as `zip_access.md`
+and `xmlType.md`. Keep examples with their owning API; do not recreate a
+central `docs/` folder.
 
 ## Compatibility and reconciliation
 

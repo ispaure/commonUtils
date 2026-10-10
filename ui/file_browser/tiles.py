@@ -6,8 +6,8 @@ from .editing import FilenameEditorMixin
 
 COVER_WIDTH = 142
 COVER_ASPECT_RATIO = 1.375
-CELL_PADDING = 28
-CAPTION_HEIGHT = 44
+CELL_PADDING = 26
+CAPTION_HEIGHT = 41
 
 
 class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):

@@ -105,7 +105,7 @@ comments, processing instructions and namespace declarations survive other edits
 
 `to_bytes()` validates serialization and returns bytes; `write_xml(path=None)`
 adds atomic file saving. Nested/repeated elements, namespace-aware attributes and
-explicit element creation/removal use the methods in the [XML guide](../docs/XML.md).
+explicit element creation/removal use the methods in the [XML guide](xmlType.md).
 Attribute whitespace survives round-trips. Structured edits can change formatting;
 unchanged serialization returns the original bytes. Inherited `read_lines()` and
 `write_lines()` continue to operate independently.
@@ -144,9 +144,9 @@ It currently inherits the standard `File` functionality without adding additiona
 
 ## Usage examples and UI integration
 
-[Workflow recipes](../docs/RECIPES.md#read-and-write-application-data) show text, CSV and
+[Workflow recipes](#read-and-write-application-data) show text, CSV and
 JSON together, including their different write guarantees. The
-[feature guide](../docs/FEATURES.md#runnable-example-add-a-menu-action-to-a-browser)
+[feature guide](../ui/features/README.md#runnable-example-add-a-menu-action-to-a-browser)
 starts with a runnable browser and then adds a custom type, panel and activation.
 File-format classes should remain independent of application configuration and UI
 windows; browser panel loaders may read metadata asynchronously.
@@ -175,7 +175,7 @@ TXT, CSV, JSON, XML, Markdown, ZIP, DMG and AppImage modules register their own 
 Unknown formats remain `File`. Existing directory ordering, recursive traversal and
 extension filters are unchanged; listing does not read file contents.
 
-For new feature integrations, [Adding a feature](../docs/FEATURES.md) uses one
+For new feature integrations, [Adding a feature](../ui/features/README.md) uses one
 `Feature(file_types=[FileType(...)], browser=BrowserExtension(...))` declaration for
 types and browser capabilities. The direct registration API below remains supported.
 
@@ -294,7 +294,7 @@ is restored after exceptions and is local to the calling context. Existing File
 instances and running operations are retained; future resolutions use the new state.
 
 `ZIPFile` supports explicit-password reading/extraction and encryption detection;
-see [ZIP archive APIs](../docs/ZIP_ARCHIVES.md). Configuration and prompts belong to the
+see [ZIP archive APIs](../archives/zip_access.md). Configuration and prompts belong to the
 host application rather than the file-type registry.
 
 
@@ -343,5 +343,38 @@ The constructor performs no archive reads; the browser's panel worker loads
 counts, unpacked size, protection and a bounded entry-name listing. Encrypted
 headers require no password. `archive_entries()` and
 `extract_to_new_directory(destination, **options)` delegate to the shared
-[archive API](../docs/ARCHIVES.md). Opening applications and password prompts belong
+[archive API](../archives/README.md). Opening applications and password prompts belong
 to installed feature declarations, not these passive file hooks.
+
+## Read and write application data
+
+```python
+from pathlib import Path
+from commonUtils.formats.jsonType import JSONFile
+from commonUtils.formats.csvType import CSVFile
+from commonUtils.formats.txtType import TXTFile
+
+settings = JSONFile(Path('state/settings.json'))
+settings.write_json({'enabled': True, 'names': ['Été']}, sort_keys=True)
+assert settings.read_json()['enabled'] is True
+
+rows = CSVFile(Path('state/report.csv'))
+rows.write_csv([['Name', 'Count'], ['Example', '2']])
+assert rows.read_csv()[1] == ['Example', '2']
+
+notes = TXTFile(Path('state/notes.txt'))
+notes.line_lst = ['First line', 'Second line']
+notes.write_lines()
+assert notes.read_lines() == notes.line_lst
+```
+
+These formats create parent directories on write. Only JSON's writer promises
+atomic staging/replacement; text/CSV helpers retain their existing write semantics.
+TXT entries must not contain embedded newlines. JSON rejects non-finite numbers;
+use `compact=True` to omit formatting whitespace. Missing/malformed reads should be
+handled at the application boundary. See [file-type details](README.md).
+
+
+For nested XML, repeated elements, namespace-aware attributes and atomic XML
+saving, see [XML document examples](xmlType.md). Existing simple-field editing remains
+compatible with direct-child formats such as ComicInfo.

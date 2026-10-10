@@ -333,7 +333,7 @@ workers and tests must finish before their owning temporary resources are remove
 
 ## Reusable file browser
 
-**Start here for new extensions:** [Adding a feature](../../docs/FEATURES.md) documents the
+**Start here for new extensions:** [Adding a feature](../features/README.md) documents the
 unified `register() -> Feature(...)` API, including complete action/type wiring,
 handler context, per-window controllers and enable/disable behavior. The APIs below
 also describe the lower-level hooks retained for existing integrations.

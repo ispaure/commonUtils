@@ -58,3 +58,34 @@ class BrowserIndexPolicyTests(QtTestCase):
                 self.assertEqual(entries, [(child, 3)])
                 self.assertEqual(nodes[child], [(file, 3)])
                 self.assertFalse(complete)
+
+    def test_shallow_browser_totals_reuse_saved_children_and_parent(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)/'files'; child = root/'child'; child.mkdir(parents=True)
+            (child/'data.bin').write_bytes(b'abc')
+            with DirectoryCache(database=Path(temporary)/'index.sqlite3') as cache:
+                cache.get(child)
+                visible = cache.reconcile_folder(root, recursive_initial=False)
+                totals = visible.folder_stats(children_of=root)
+                self.assertEqual(totals[child].size, 3)
+                self.assertTrue(totals[child].stale)
+                # A recursively saved parent also supplies child totals after a
+                # local-only startup check, without rewalking its descendants.
+                cache.get(root)
+                visible = cache.reconcile_folder(root, recursive_initial=False)
+                self.assertEqual(visible.folder_stats(children_of=root)[child].size, 3)
+
+    def test_shallow_child_uses_ancestor_cache_but_full_refresh_can_reduce_sizes(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)/'files'; parent = root/'parent'; child = parent/'child'
+            child.mkdir(parents=True); file = child/'data.bin'; file.write_bytes(b'abc')
+            with DirectoryCache(database=Path(temporary)/'index.sqlite3') as cache:
+                cache.get(root)
+                visible = cache.reconcile_folder(parent, recursive_initial=False)
+                self.assertEqual(visible.folder_stats(children_of=parent)[child].size, 3)
+                file.unlink()
+                refreshed = cache.reconcile_folder(parent, full=True)
+                self.assertEqual(refreshed.folder_stats(children_of=parent)[child].size, 0)
+                child.rmdir()
+                visible = cache.reconcile_folder(parent, recursive_initial=False)
+                self.assertNotIn(child, visible.folder_stats(children_of=parent))
