@@ -1,5 +1,6 @@
 """Archive view items and aspect-preserving image display."""
 from .. import pyside as qt
+from ..entry_views import value_less, label_less
 from ...filesystem import format_size
 
 
@@ -41,7 +42,7 @@ class ArchiveItem(qt.QTreeWidgetItem):
             return left[1]
         if column in (1, 2, 3):
             role = int(qt.Qt.ItemDataRole.UserRole) + 1
-            return (self.data(column, role) or 0) < (other.data(column, role) or 0)
-        return self.text(column).casefold() < other.text(column).casefold()
+            return bool(value_less(self.data(column, role), other.data(column, role), missing_last=False))
+        return label_less(self.text(column), other.text(column), natural=False)
 
 

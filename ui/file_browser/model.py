@@ -126,10 +126,10 @@ class ByteSortModel(qt.QSortFilterProxyModel):
     def lessThan(self, left, right):
         if left.column() == 1:
             a, b = self._bytes(left), self._bytes(right)
-            if (a is None) != (b is None):
-                return (a is not None) if self.sortOrder() == qt.Qt.SortOrder.AscendingOrder else (a is None)
-            if a != b:
-                return a < b
+            from ..entry_views import value_less
+            decision = value_less(a, b, descending=self.sortOrder() == qt.Qt.SortOrder.DescendingOrder)
+            if decision is not None:
+                return decision
         elif left.column() == 3:
             a, b = self.filesystem.lastModified(left), self.filesystem.lastModified(right)
             if a != b:
@@ -139,8 +139,8 @@ class ByteSortModel(qt.QSortFilterProxyModel):
             if a != b:
                 return a
         # QCollator's C-locale backend ignores numeric mode on headless Linux.
-        from ...traversal import natural_path_key
-        return natural_path_key(self.filesystem.fileName(left)) < natural_path_key(self.filesystem.fileName(right))
+        from ..entry_views import label_less
+        return label_less(self.filesystem.fileName(left), self.filesystem.fileName(right))
 
 
 class _BrowserSelection(qt.QItemSelectionModel):

@@ -6,6 +6,7 @@ filesystem mutations, executable discovery or Logistics imports.
 """
 from pathlib import PurePosixPath
 from .. import pyside as qt
+from ..entry_views import configure_entry_selection
 from .widgets import ImagePreview, ArchiveItem, size_text
 
 
@@ -57,14 +58,13 @@ class ArchiveContents(qt.QWidget):
         self.files.setHeaderLabels(['Name', 'Size', 'Packed', 'Saved', 'Modified', 'Protection'])
         self.files.setRootIsDecorated(False)
         self.files.setAlternatingRowColors(True)
-        self.files.setSelectionMode(qt.QAbstractItemView.SelectionMode.ExtendedSelection)
+        configure_entry_selection(self.files)
         self.files.setSortingEnabled(True)
         self.files.setAccessibleName('Archive entries')
         self.files.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
         self.files.header().setSectionResizeMode(4, qt.QHeaderView.ResizeMode.ResizeToContents)
         self.files.itemDoubleClicked.connect(self._activate)
         self.files.itemSelectionChanged.connect(self._selection)
-        self.files.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self._context_menu)
         content_layout.addWidget(self.files, 1)
         self.empty = qt.QLabel('<h1>Your archive workbench</h1>'
