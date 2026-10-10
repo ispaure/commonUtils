@@ -111,8 +111,8 @@ class FolderStats:
 def scan_folders(root, cancelled=lambda: False, *, report=lambda done, total, message: None, reuse_for=0,
                  visible_only=False):
     """Compatibility API: recursive totals from the shared persistent index."""
-    from ..directory import directory_cache
-    from ..operations import OperationCancelled
+    from .index import directory_cache
+    from ..runtime.operations import OperationCancelled
     try:
         snapshot = directory_cache.get(root, cancelled=cancelled, report=report, reuse_for=reuse_for)
         return snapshot.folder_stats(cancelled=cancelled, children_of=snapshot.root if visible_only else None)

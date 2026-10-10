@@ -2,9 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from commonUtils.wrappers.perforce import PerforceRuntime, configure_runtime
-from commonUtils.wrappers.perforce import p4_utils
-from commonUtils.wrappers import cmdShellWrapper
+from commonUtils.integrations.wrappers.perforce import PerforceRuntime, configure_runtime
+from commonUtils.integrations.wrappers.perforce import p4_utils
+from commonUtils.integrations.wrappers import cmdShellWrapper
 
 class PerforceTests(unittest.TestCase):
     def tearDown(self):

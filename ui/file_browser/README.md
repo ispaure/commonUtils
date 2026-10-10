@@ -19,13 +19,13 @@ and imports compatible. File handlers may also be used outside Logistics.
 - `search_columns.py`: responsive Name-first layouts for inline/dialog search results.
 - `navigation.py`, `controls.py`: breadcrumbs, history and presentation controls.
 
-The index backend is separated into `commonUtils.directory.reader` (immutable
+The index backend is separated into `commonUtils.filesystem.index.reader` (immutable
 SQLite readers), `directory.schema` (migration, record interning and membership),
 `directory.store` (scan scheduling/checkpoints), `directory.reconcile` (targeted
 completed-index updates), `directory.totals` (incremental
 aggregation), and `directory.order` (natural ordering). Reader/order
 imports remain available from `directory.store`. Public access uses
-`commonUtils.directory`.
+`commonUtils.filesystem.index`.
 
 ## State and ownership
 
@@ -131,7 +131,7 @@ choose **Review permanent deletion…**, then explicitly confirm a second warnin
 that the files/folder contents cannot be recovered through the app. A failed
 trash operation never silently invokes permanent deletion.
 
-`commonUtils.file_removal` provides snapshot plans and worker-safe execution.
+`commonUtils.filesystem.removal` provides snapshot plans and worker-safe execution.
 Filesystem/mount roots are refused; item identity and parent resolution are
 rechecked immediately before each operation. Symlinks are removed themselves,
 without recursively following their targets. The shared operation UI cancels
@@ -333,7 +333,7 @@ workers and tests must finish before their owning temporary resources are remove
 
 ## Reusable file browser
 
-**Start here for new extensions:** [Adding a feature](../../FEATURES.md) documents the
+**Start here for new extensions:** [Adding a feature](../../docs/FEATURES.md) documents the
 unified `register() -> Feature(...)` API, including complete action/type wiring,
 handler context, per-window controllers and enable/disable behavior. The APIs below
 also describe the lower-level hooks retained for existing integrations.
@@ -347,7 +347,7 @@ exposes `item(index)` and `object_for_path(path)` as the data-object interface.
 
 ```python
 from pathlib import Path
-from commonUtils.dirUtils import Directory
+from commonUtils.filesystem.directories import Directory
 from commonUtils.ui.file_browser import FileBrowser
 
 browser = FileBrowser(Directory(Path('/path/to/library')), parent=window)
@@ -387,9 +387,9 @@ Refresh recalculates them; totals and thumbnails remain in memory.
 Specialized File subclasses contribute behavior through GUI-independent hooks:
 
 ```python
-from commonUtils.fileUtils import File
+from commonUtils.filesystem.files import File
 from commonUtils.filesystem import BrowserPanel, BrowserDetails, BrowserAction
-from commonUtils.fileTypes.registry import register_file_type
+from commonUtils.formats.registry import register_file_type
 
 class ProjectFile(File):
     def browser_panels(self):

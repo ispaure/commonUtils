@@ -15,8 +15,8 @@ import zipfile
 import zlib
 
 import pyzipper
-from ..operations import check_cancelled
-from ..streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
+from ..runtime.operations import check_cancelled
+from ..runtime.streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
 
 
 class ArchivePasswordError(RuntimeError):

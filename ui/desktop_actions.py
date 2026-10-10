@@ -3,7 +3,7 @@
 from pathlib import Path
 import subprocess
 from urllib.parse import quote
-from ..osUtils import OS, get_os
+from ..runtime.platform import OS, get_os
 from . import pyside as qt
 
 

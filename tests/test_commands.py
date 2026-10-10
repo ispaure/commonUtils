@@ -4,7 +4,7 @@ import sys
 from threading import Event, Timer
 import unittest
 
-from commonUtils.wrappers.cmdShellWrapper import run_command, exec_cmd
+from commonUtils.integrations.wrappers.cmdShellWrapper import run_command, exec_cmd
 
 
 class CommandTests(unittest.TestCase):

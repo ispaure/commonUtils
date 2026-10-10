@@ -4,8 +4,8 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
-from commonUtils import network_filesystems as network
-from commonUtils.directory.exclusions import scan_exclusions, is_excluded
+from commonUtils.filesystem import network as network
+from commonUtils.filesystem.index.exclusions import scan_exclusions, is_excluded
 
 
 class NetworkFilesystemTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class NetworkFilesystemTests(unittest.TestCase):
             self.assertFalse(network.is_network_location(local))
 
     def test_new_mount_repairs_saved_sizes_without_enumerating_share(self):
-        from commonUtils.directory import DirectoryCache, storage_totals
+        from commonUtils.filesystem.index import DirectoryCache, storage_totals
         with TemporaryDirectory() as temporary:
             base = Path(temporary)
             root = base / 'files'; root.mkdir()

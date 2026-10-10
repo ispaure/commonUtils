@@ -25,8 +25,8 @@ import ctypes
 import shutil
 import subprocess
 
-from ..osUtils import OS, get_os
-from ..wrappers import cmdShellWrapper
+from ..runtime.platform import OS, get_os
+from ..integrations.wrappers import cmdShellWrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------

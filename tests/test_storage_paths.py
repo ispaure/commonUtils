@@ -6,9 +6,9 @@ import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
-from commonUtils.storage import cache_directory, temporary_directory, temporary_workspace
-from commonUtils.directory import DirectoryCache
-from commonUtils.operations import OperationCancelled
+from commonUtils.filesystem.storage import cache_directory, temporary_directory, temporary_workspace
+from commonUtils.filesystem.index import DirectoryCache
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class StorageTests(unittest.TestCase):

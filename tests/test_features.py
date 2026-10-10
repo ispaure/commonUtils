@@ -9,10 +9,10 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock, patch
 
-from commonUtils.fileUtils import File
-from commonUtils.dirUtils import Directory
-from commonUtils.features import Feature, FileType, SelectionAction, FileActivation, BrowserExtension
-from commonUtils.fileTypes.registry import file_types, file_from_path
+from commonUtils.filesystem.files import File
+from commonUtils.filesystem.directories import Directory
+from commonUtils.ui.features import Feature, FileType, SelectionAction, FileActivation, BrowserExtension
+from commonUtils.formats.registry import file_types, file_from_path
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 
@@ -167,8 +167,8 @@ class BindingTests(QtTestCase):
 
 class ActivationPredicateTests(QtTestCase):
     def test_activation_predicate_is_optional_and_validated(self):
-        from commonUtils.features import FileActivation
-        from commonUtils.fileUtils import File
+        from commonUtils.ui.features import FileActivation
+        from commonUtils.filesystem.files import File
         self.assertIsNone(FileActivation(File, lambda context: None).is_available)
         with self.assertRaises(TypeError):
             FileActivation(File, lambda context: None, is_available=True)

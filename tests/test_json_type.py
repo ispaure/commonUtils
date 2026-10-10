@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from commonUtils.fileTypes.jsonType import JSONFile
+from commonUtils.formats.jsonType import JSONFile
 
 
 class JSONFileTests(unittest.TestCase):

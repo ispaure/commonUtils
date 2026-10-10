@@ -3,7 +3,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from unittest.mock import Mock
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.text_merge import merge_text
+from commonUtils.persistence.merge import merge_text
 from commonUtils.ui.code_editor.merge import MergeDialog, MergeWidget
 from commonUtils.ui.code_editor.diff import DiffDialog, compare_text, apply_change
 

@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from commonUtils.settings import get_setting, get_wheel_navigation_settings, WheelNavigationSettings
+from commonUtils.configuration.settings import get_setting, get_wheel_navigation_settings, WheelNavigationSettings
 
 
 class SharedSettingsTests(unittest.TestCase):

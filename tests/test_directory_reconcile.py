@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 import os
 import unittest
 from unittest.mock import patch
-from commonUtils.directory import DirectoryCache
-from commonUtils.operations import OperationCancelled
+from commonUtils.filesystem.index import DirectoryCache
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class ReconcileTests(unittest.TestCase):
@@ -61,7 +61,7 @@ class ReconcileTests(unittest.TestCase):
         self.assertTrue(self.cache.reconcile_folder(self.root, full=True).complete)
 
     def test_resumed_unchanged_index_verifies_metadata_only_once(self):
-        from commonUtils.operations import OperationCancelled
+        from commonUtils.runtime.operations import OperationCancelled
         stop = [False]
         def report(done, total, message):
             if message.startswith('Checking file metadata'):

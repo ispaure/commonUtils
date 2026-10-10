@@ -6,10 +6,10 @@ import sys
 import unittest
 
 from commonUtils import archives
-from commonUtils.fileUtils import File
-from commonUtils.fileTypes.archiveType import ArchiveFile
-from commonUtils.fileTypes.zipType import ZIPFile
-from commonUtils.fileTypes.registry import file_from_path
+from commonUtils.filesystem.files import File
+from commonUtils.formats.archiveType import ArchiveFile
+from commonUtils.formats.zipType import ZIPFile
+from commonUtils.formats.registry import file_from_path
 
 
 class ArchiveTypeTests(unittest.TestCase):

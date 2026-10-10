@@ -143,7 +143,7 @@ or implement the complete YAML specification. Complex input stays raw rather
 than being coerced into basic fields. Arbitrary object constructors are never run.
 
 ```python
-from commonUtils.markdownUtils import split_frontmatter, parse_properties, replace_property
+from commonUtils.formats.markdown import split_frontmatter, parse_properties, replace_property
 
 text = '---\ntitle: "Example"\ntags: [docs]\n---\n# Body\n'
 parts = split_frontmatter(text)

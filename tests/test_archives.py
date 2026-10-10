@@ -7,8 +7,8 @@ import unittest
 import zipfile
 from unittest.mock import patch
 
-from commonUtils.operations import OperationCancelled
-from commonUtils.zip_access import open_archive, archive_manifest, ArchivePasswordError
+from commonUtils.runtime.operations import OperationCancelled
+from commonUtils.archives.zip_access import open_archive, archive_manifest, ArchivePasswordError
 from commonUtils import archives as backend
 
 

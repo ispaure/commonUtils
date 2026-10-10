@@ -9,10 +9,10 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
-from commonUtils.fileUtils import File
-from commonUtils.dirUtils import Directory
+from commonUtils.filesystem.files import File
+from commonUtils.filesystem.directories import Directory
 from commonUtils.filesystem import BrowserPanel, BrowserDetails, BrowserAction
-from commonUtils.fileTypes.registry import register_file_type, file_types
+from commonUtils.formats.registry import register_file_type, file_types
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 
@@ -68,7 +68,7 @@ class BrowserTests(QtTestCase):
 
     def test_parent_destruction_releases_index_priority(self):
         import gc
-        from commonUtils.directory import directory_cache
+        from commonUtils.filesystem.index import directory_cache
         from shiboken6 import isValid
         for _ in range(20):
             parent = qt.QWidget()
@@ -85,7 +85,7 @@ class BrowserTests(QtTestCase):
 
     def test_network_policy_blocks_maps_scans_indexing_and_thumbnails_then_restores_local(self):
         remote = self.root/'share'; remote.mkdir()
-        from commonUtils.network_filesystems import is_network_location
+        from commonUtils.filesystem.network import is_network_location
         def network(path, **kwargs):
             path = Path(path)
             return path == remote or remote in path.parents
@@ -118,7 +118,7 @@ class BrowserTests(QtTestCase):
         self.assertTrue(self.browser.view_selector.buttons[3].isEnabled())
 
     def test_search_results_locate_file_and_keep_worker_safe(self):
-        from commonUtils.directory import DirectoryCache
+        from commonUtils.filesystem.index import DirectoryCache
         support = Path(self.enterContext(TemporaryDirectory()))
         with DirectoryCache(database=support / 'search-fixture.sqlite3') as cache:
             cache.get(self.root, refresh=True)

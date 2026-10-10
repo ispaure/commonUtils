@@ -61,7 +61,7 @@ snippets below assume the application has performed the setup shown next.
 ```python
 from commonUtils.ui import pyside
 
-# Legacy commonUtils.pySideUtils imports resolve to this same module.
+# Legacy commonUtils.ui.pyside imports resolve to this same module.
 # Implementations are grouped into application, widgets, windows, messages and progress.
 q_app = pyside.initialize_q_app()  # Once per process; retain this object.
 ```
@@ -124,7 +124,7 @@ Create one QApplication per process, as shown above. In an existing Qt applicati
 reuse its application rather than call `initialize_q_app()` again. The helper
 configures Fusion style and applies platform-specific setup where required.
 Standalone windows also need an event loop (`q_app.exec()`); see the complete
-[browser example](../FEATURES.md#runnable-example-add-a-menu-action-to-a-browser).
+[browser example](../docs/FEATURES.md#runnable-example-add-a-menu-action-to-a-browser).
 
 ## Dependency
 
@@ -139,7 +139,7 @@ Because the backends are lazily imported, accessing the native UI does not unnec
 
 ## Background work and downloads
 
-Use [the workflow recipes](../RECIPES.md) for complete examples of
+Use [the workflow recipes](../docs/RECIPES.md) for complete examples of
 `OperationProgress`, safe dialog closing, per-item batch cancellation, stream
 progress and verified download prompts. The synchronous legacy progress widgets
 only display progress; callbacks must use an explicit worker to avoid blocking Qt.
@@ -161,7 +161,7 @@ recent files for an application's format-specific readers. `reader_chrome`
 supplies matching line icons/buttons, elided single-line titles/status, shared
 spacing and a fullscreen controller that tracks native window-state changes and
 restores maximization. These helpers do not load content or determine how pages
-turn. See [feature authoring](../FEATURES.md) for the contracts.
+turn. See [feature authoring](../docs/FEATURES.md) for the contracts.
 
 ## Markdown reader
 
@@ -179,7 +179,7 @@ interpreting INI sections or keys.
 
 ## Shared navigation settings
 
-`commonUtils.settings.settings_path()` locates `ui/settings.ini` beside the browser
+`commonUtils.configuration.settings.settings_path()` locates `ui/settings.ini` beside the browser
 package. Logistics exposes this file under **Settings → commonUtils** using the
 plain-text editor. Saves apply to existing comic readers on the next wheel event.
 `get_setting(section, key, default, minimum=None, maximum=None)` reads bool, int,
@@ -237,7 +237,7 @@ New tabs are grouped only with docked views, leaving detached views independent.
 Call `prepare_close()`
 before destroying an embedded workspace; it waits for all views' workers.
 
-`commonUtils.directory` supplies immutable `Entry`/`Snapshot` metadata,
+`commonUtils.filesystem.index` supplies immutable `Entry`/`Snapshot` metadata,
 case-insensitive partial name search, and `storage_totals()`. `DirectoryCache`
 persists completed and partial indices in SQLite, without entry/root count limits.
 `directory_index_path()` defaults to:
@@ -341,7 +341,7 @@ requires a normal zero exit; cancellation and failed starts remain distinct outc
 
 ## Shared temporary storage
 
-`commonUtils.storage.cache_directory()` resolves/creates the persistent cache
+`commonUtils.filesystem.storage.cache_directory()` resolves/creates the persistent cache
 area using macOS Library/Application Support/commonUtils/Cache, Windows LOCALAPPDATA,
 or Linux XDG_CACHE_HOME (with ~/.cache fallback; relative XDG paths are ignored).
 `temporary_directory()` creates disposable workspaces under macOS

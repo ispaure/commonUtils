@@ -117,7 +117,7 @@ class BreadcrumbBar(qt.QWidget):
         button.setText(path.name or path.as_posix())
         button.setToolTip(str(path))
         button.setAccessibleName(f'Go to folder {path.name or path}')
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         button.setIcon(self.icons.icon(qt.QFileIconProvider.IconType.Folder) if is_network_location(path)
                        else self.icons.icon(qt.QFileInfo(str(path))))
         button.setIconSize(qt.QSize(18, 18))

@@ -1,6 +1,6 @@
 """Entry-view mechanics independent of physical paths or archive member identities."""
 from . import pyside as qt
-from ..traversal import natural_path_key
+from ..filesystem.traversal import natural_path_key
 
 
 def configure_entry_selection(view):

@@ -1,7 +1,7 @@
 """Properties panel for Markdown YAML frontmatter; no application/vault state."""
 from datetime import date, datetime
 from collections.abc import Mapping, Sequence
-from ...markdownUtils import split_frontmatter, parse_properties, replace_property, replace_frontmatter, parse_property_value, RawYAML
+from ...formats.markdown import split_frontmatter, parse_properties, replace_property, replace_frontmatter, parse_property_value, RawYAML
 from .. import pyside as qt
 
 

@@ -14,8 +14,8 @@ class PySideCompatibilityTests(QtTestCase):
         cls.app = qt.QApplication.instance() or qt.QApplication([])
 
     def test_historical_paths_share_one_module(self):
-        from commonUtils import pySideUtils
-        from commonUtils.pySideUtils import Window, QApplication, OS, get_os
+        from commonUtils.ui import pyside as pySideUtils
+        from commonUtils.ui.pyside import Window, QApplication, OS, get_os
         self.assertIs(pySideUtils, qt)
         self.assertIs(importlib.import_module('commonUtils.pySideUtils'), qt)
         self.assertIs(Window, qt.Window)

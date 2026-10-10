@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import errno
 import os
 import shutil
-from ..renameUtils import rename_path
+from .rename import rename_path
 
 
 @dataclass(frozen=True)

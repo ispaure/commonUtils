@@ -6,9 +6,9 @@ import tarfile
 import zipfile
 import unicodedata
 
-from ..operations import check_cancelled
-from ..streams import stream_signature
-from ..zip_access import open_archive, validate_members, archive_manifest
+from ..runtime.operations import check_cancelled
+from ..runtime.streams import stream_signature
+from .zip_access import open_archive, validate_members, archive_manifest
 from .models import Entry
 
 

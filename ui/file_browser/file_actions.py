@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 from .. import pyside as qt
 from ..operation_progress import OperationProgress
-from ...file_operations import transfer_paths
+from ...filesystem.transfers import transfer_paths
 from .trash_actions import TrashActionsMixin
 
 OPERATION_MIME = 'application/x-commonutils-file-operation'

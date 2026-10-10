@@ -12,8 +12,8 @@ import re
 import shutil
 
 from .. import pyside as qt
-from ...storage import temporary_workspace
-from ...markdownUtils import split_frontmatter
+from ...filesystem.storage import temporary_workspace
+from ...formats.markdown import split_frontmatter
 from .extensions import mermaid_blocks
 
 

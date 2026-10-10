@@ -1,7 +1,7 @@
 """Three-way resolution invariants, live ranges, Unicode and reversible edits."""
 import random
 import unittest
-from commonUtils.text_merge import MergeSession, merge_text
+from commonUtils.persistence.merge import MergeSession, merge_text
 
 
 class MergeModelTests(unittest.TestCase):

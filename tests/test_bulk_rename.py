@@ -7,7 +7,7 @@ import errno
 import os
 import unittest
 from unittest.mock import patch
-from commonUtils import renameUtils as rename
+from commonUtils.filesystem import rename as rename
 
 
 class BulkRenameTests(unittest.TestCase):
@@ -230,7 +230,7 @@ class BulkRenameTests(unittest.TestCase):
 
     def test_planning_reads_source_metadata_once(self):
         path = self.file('a.txt')
-        from commonUtils import renameUtils
+        from commonUtils.filesystem import rename as renameUtils
         original = Path.lstat
         calls = []
         def tracked(path, *args, **kwargs):
@@ -242,7 +242,7 @@ class BulkRenameTests(unittest.TestCase):
         self.assertEqual(calls.count(path), 1)
 
     def test_single_rename_explicit_overwrite_and_failed_replacement(self):
-        from commonUtils.fileUtils import rename_file
+        from commonUtils.filesystem.files import rename_file
         source, target = self.file('source.txt', 'source'), self.file('target.txt', 'target')
         self.assertFalse(rename_file(source, target))
         self.assertEqual(source.read_text(), 'source')

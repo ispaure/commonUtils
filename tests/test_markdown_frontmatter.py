@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
-from commonUtils.markdownUtils import split_frontmatter, parse_properties, replace_property, replace_frontmatter
+from commonUtils.formats.markdown import split_frontmatter, parse_properties, replace_property, replace_frontmatter
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer
 from commonUtils.ui.markdown.properties import typed_value, property_type

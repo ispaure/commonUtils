@@ -1,7 +1,7 @@
 """Ask before provisioning software and keep downloads off the GUI thread."""
 from . import pyside as qt
 from .operation_progress import OperationProgress
-from ..downloads import is_ready, provision, DownloadCancelled
+from ..runtime.streams.downloads import is_ready, provision, DownloadCancelled
 
 
 class _DownloadDialog(qt.QDialog):

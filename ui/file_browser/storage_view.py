@@ -4,9 +4,9 @@ import math
 from bisect import bisect_right
 from .. import pyside as qt
 from ..operations import Operation
-from ...directory import directory_cache
+from ...filesystem.index import directory_cache
 from ...filesystem import format_size
-from ...settings import get_setting
+from ...configuration.settings import get_setting
 from .storage import Treemap
 
 
@@ -320,7 +320,7 @@ class StorageView(qt.QWidget):
         self.refresh()
 
     def refresh(self):
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         if (self.closing or self.browser.views.currentIndex() != 3 or self.root is None
                 or is_network_location(self.root)):
             return

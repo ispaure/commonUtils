@@ -13,11 +13,11 @@ class PackageCompatibilityTests(unittest.TestCase):
                 legacy = importlib.import_module('commonUtils.' + old)
                 canonical = importlib.import_module('commonUtils.' + new)
                 self.assertIs(legacy, canonical)
-        from commonUtils import directory, directory_index
+        from commonUtils.filesystem import index as directory, index as directory_index
         self.assertIs(directory.directory_cache, directory_index.directory_cache)
 
     def test_moved_writer_and_scanner_work_together(self):
-        from commonUtils.directory import scan_metadata
+        from commonUtils.filesystem.index import scan_metadata
         from commonUtils.persistence import atomic_write_bytes
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'sample.txt'

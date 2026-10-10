@@ -1,7 +1,7 @@
 """Shared wheel gestures for discrete page readers; settings reload on each event."""
 from time import monotonic
 from . import pyside as qt
-from ..settings import get_wheel_navigation_settings
+from ..configuration.settings import get_wheel_navigation_settings
 
 
 class PageWheel:

@@ -2,8 +2,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from commonUtils.operations import OperationCancelled
-from commonUtils.traversal import scan_directory
+from commonUtils.runtime.operations import OperationCancelled
+from commonUtils.filesystem.traversal import scan_directory
 
 
 class TraversalTests(unittest.TestCase):

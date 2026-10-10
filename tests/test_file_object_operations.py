@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
-from commonUtils import fileUtils
+from commonUtils.filesystem import files as fileUtils
 
 class FileObjectOperationTests(unittest.TestCase):
     def setUp(self):

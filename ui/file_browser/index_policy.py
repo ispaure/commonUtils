@@ -1,6 +1,6 @@
 """Refresh rules read at each request; applications may supply their own INI."""
 from dataclasses import dataclass
-from ...settings import get_setting
+from ...configuration.settings import get_setting
 
 
 @dataclass(frozen=True)

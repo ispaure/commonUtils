@@ -1,6 +1,6 @@
 """Shared native-style filename editors for lists, tiles and folder columns."""
 
-from ...dirUtils import Directory
+from ...filesystem.directories import Directory
 from .. import pyside as qt
 
 

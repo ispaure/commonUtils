@@ -3,10 +3,10 @@
 from collections import OrderedDict
 from pathlib import Path
 from .. import pyside as qt
-from ...dirUtils import Directory
-from ...fileTypes.registry import file_types, object_from_path
+from ...filesystem.directories import Directory
+from ...formats.registry import file_types, object_from_path
 from ...filesystem import format_size, format_datetime
-from ...file_operations import validate_name
+from ...filesystem.transfers import validate_name
 
 
 class BrowserFileSystemModel(qt.QFileSystemModel):

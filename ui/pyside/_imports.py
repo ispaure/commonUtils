@@ -14,8 +14,11 @@ import os
 import ctypes
 
 # Common utilities
-from ... import logUtils, fileUtils, debugUtils, steamUtils
-from ...osUtils import *
+from ...runtime import logging as logUtils
+from ...filesystem import files as fileUtils
+from ...runtime import diagnostics as debugUtils
+from ...integrations import steam as steamUtils
+from ...runtime.platform import *
 
 # PySide6 (Qt) modules
 from PySide6.QtCore import *

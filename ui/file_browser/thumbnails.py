@@ -2,7 +2,7 @@
 
 from collections import OrderedDict
 import math
-from ...dirUtils import Directory
+from ...filesystem.directories import Directory
 from .. import pyside as qt
 from .model import ByteSortModel
 

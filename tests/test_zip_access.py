@@ -8,8 +8,9 @@ from unittest.mock import patch
 import zipfile
 import pyzipper
 
-from commonUtils import zipUtils, zip_access as access
-from commonUtils.fileTypes.zipType import ZIPFile
+from commonUtils.archives import legacy as zipUtils
+from commonUtils.archives import zip_access as access
+from commonUtils.formats.zipType import ZIPFile
 
 
 class ZipAccessTests(unittest.TestCase):
@@ -231,7 +232,7 @@ class ZipAccessTests(unittest.TestCase):
                 self.assertEqual(archive.read(source.name), source.read_bytes())
 
     def test_authentication_honours_cancellation_during_payload_read(self):
-        from commonUtils.operations import OperationCancelled
+        from commonUtils.runtime.operations import OperationCancelled
         path = self.write('cancel-auth.zip', self.password)
         calls = 0
         def cancelled():

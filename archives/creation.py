@@ -5,9 +5,9 @@ import os
 import tarfile
 import zipfile
 
-from ..operations import check_cancelled
-from ..streams import stream_signature
-from ..zip_access import create_archive, directory_entries
+from ..runtime.operations import check_cancelled
+from ..runtime.streams import stream_signature
+from .zip_access import create_archive, directory_entries
 from .reading import reader
 
 

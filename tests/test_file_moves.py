@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from commonUtils import fileUtils
+from commonUtils.filesystem import files as fileUtils
 
 
 class FileMoveTests(unittest.TestCase):

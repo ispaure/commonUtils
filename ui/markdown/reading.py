@@ -1,6 +1,6 @@
 """Reading presentation and optional diagrams, independent of editing/IO."""
 from .. import pyside as qt
-from ...markdownUtils import split_frontmatter
+from ...formats.markdown import split_frontmatter
 from .extensions import reading_source, mermaid_blocks
 from .headings import _iter_headings
 from .links import render_links

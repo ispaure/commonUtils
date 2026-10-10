@@ -2,7 +2,7 @@
 
 from collections import deque
 from pathlib import Path
-from ...dirUtils import Directory
+from ...filesystem.directories import Directory
 from .. import pyside as qt
 from ..entry_views import configure_entry_selection
 from ..operations import Operation
@@ -220,7 +220,7 @@ class FileViews(qt.QStackedWidget):
         self.directory_opened.emit(self.root)
 
     def set_mode(self, mode):
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         if mode >= 3 and self.root is not None and is_network_location(self.root):
             return
         chart_mode = max(0, mode - 3)
@@ -277,7 +277,7 @@ class FileViews(qt.QStackedWidget):
             self.tiles.viewport().update()
 
     def _request_cover(self, path):
-        from ...network_filesystems import is_network_location
+        from ...filesystem.network import is_network_location
         if self.closing or is_network_location(path):
             return
         qt.QTimer.singleShot(0, lambda: self._enqueue_cover(path))

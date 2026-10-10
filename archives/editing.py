@@ -3,10 +3,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import os
 
-from ..operations import check_cancelled
-from ..streams import copy_stream
-from ..zip_access import (authenticate, copy_member_info, _name_key, open_archive,
-                         archive_manifest, create_archive)
+from ..runtime.operations import check_cancelled
+from ..runtime.streams import copy_stream
+from .zip_access import authenticate, copy_member_info, _name_key, open_archive, archive_manifest, create_archive
 
 
 def update_zip(path, *, sources=(), remove=(), password=None,

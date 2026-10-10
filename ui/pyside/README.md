@@ -1,6 +1,6 @@
 # PySide backend
 
-Qt application setup, windows, common widgets, messages and progress dialogs. This is the canonical PySide backend; `commonUtils.pySideUtils` is a compatibility alias.
+Qt application setup, windows, common widgets, messages and progress dialogs. This is the canonical PySide backend; `commonUtils.ui.pyside` is a compatibility alias.
 
 Create a `QApplication` before creating widgets. Requires PySide6. Import `from commonUtils.ui import pyside as qt`.
 

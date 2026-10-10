@@ -2,9 +2,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 import sqlite3
-from commonUtils.directory import scan_metadata, storage_totals, DirectoryCache
+from commonUtils.filesystem.index import scan_metadata, storage_totals, DirectoryCache
 from unittest.mock import patch
-from commonUtils.operations import OperationCancelled
+from commonUtils.runtime.operations import OperationCancelled
 
 
 class DirectoryIndexTests(unittest.TestCase):
