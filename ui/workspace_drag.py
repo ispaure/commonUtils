@@ -18,6 +18,7 @@ class DockWindowDrag(qt.QObject):
         self.original_floating = dock.isFloating()
         self.original_active = workspace.active_dock
         self._finished = False
+        self._restore_destination = None
         self.hotspot = dock.mapFromGlobal(origin)
         self.hotspot.setY(max(15, self.hotspot.y()))
         size = dock.size()
@@ -30,8 +31,9 @@ class DockWindowDrag(qt.QObject):
 
     def target(self, point):
         from .workspace import _workspaces
-        self.workspace.reveal_for_drop(point)
-        for workspace in tuple(_workspaces):
+        self.preview_destination(point)
+        candidates = sorted(tuple(_workspaces), key=lambda owner: owner is not self.workspace.main_workspace)
+        for workspace in candidates:
             if (isValid(workspace) and workspace.isVisible() and not workspace._closing
                     and workspace.dock_group == self.workspace.dock_group
                     and self.dock.workspace.can_move_tab(self.dock, destination=workspace)):
@@ -40,6 +42,21 @@ class DockWindowDrag(qt.QObject):
                     anchor, placement, preview = workspace._drop_location(local, self.dock)
                     return workspace, anchor, placement, preview
         return None
+
+    def preview_destination(self, point):
+        main = self.workspace.main_workspace
+        inside = main.window().frameGeometry().contains(point)
+        if not inside and self._restore_destination is not None:
+            self._restore_destination()
+            self._restore_destination = None
+        elif inside and self._restore_destination is None:
+            self._restore_destination = self.workspace.reveal_for_drop(point)
+
+    def finish_destination(self, committed):
+        if self._restore_destination is not None:
+            restore, self._restore_destination = self._restore_destination, None
+            if not committed:
+                restore()
 
     def clear_preview(self):
         from .workspace import _workspaces
@@ -98,6 +115,7 @@ class DockWindowDrag(qt.QObject):
                 self.original_active.raise_()
                 self.workspace._activate(self.original_active)
             self.workspace._update_drop_target()
+        self.finish_destination(bool(target and completed and target[0] is self.workspace.main_workspace))
         self.deleteLater()
 
     def eventFilter(self, watched, event):
@@ -218,3 +236,81 @@ class WorkspaceDragMixin:
     def dropEvent(self, event):
         if not self.handle_tab_drop(self, event):
             event.ignore()
+
+
+class NativeWindowDrag(DockWindowDrag):
+    """Observe OS title-bar moves without replacing the platform's window dragging."""
+    def __init__(self, window, geometry):
+        qt.QObject.__init__(self, window)
+        self.window = window
+        self.workspace = window.workspace
+        self._restore_destination = None
+        self.original_geometry = qt.QRect(geometry)
+        self._finished = False
+        self.timer = qt.QTimer(self)
+        self.timer.setInterval(30)
+        self.timer.timeout.connect(self.poll)
+        qt.QApplication.instance().installEventFilter(self)
+        self.timer.start()
+
+    def target(self, point):
+        main = self.workspace.main_workspace
+        self.preview_destination(point)
+        if (main.isVisible() and not main._closing and self.workspace.docks
+                and main.rect().contains(main.mapFromGlobal(point))):
+            dock = self.workspace.active_dock or self.workspace.docks[0]
+            anchor, placement, preview = main._drop_location(main.mapFromGlobal(point), dock)
+            return main, anchor, placement, preview
+        return None
+
+    def move(self, point):
+        self.clear_preview()
+        target = self.target(point)
+        if target:
+            owner, _, _, preview = target
+            owner._drop_preview.setGeometry(preview)
+            owner._drop_preview.show()
+            owner._drop_preview.raise_()
+
+    def poll(self):
+        point = qt.QCursor.pos()
+        from .workspace_cocoa import left_button_pressed
+        if left_button_pressed():
+            self.move(point)
+        else:
+            self.finish(point)
+
+    def finish(self, point, *, cancel=False):
+        if self._finished:
+            return
+        self._finished = True
+        self.timer.stop()
+        qt.QApplication.instance().removeEventFilter(self)
+        target = None if cancel else self.target(point)
+        self.clear_preview()
+        committed = False
+        if target:
+            main, anchor, placement, _ = target
+            docks = tuple(self.workspace.docks)
+            capacity = main.policy.max_tabs if main.policy else None
+            if capacity is None or len(main.docks) + len(docks) <= capacity:
+                for dock in docks:
+                    if not main.adopt(dock, placement=placement, anchor=anchor):
+                        break
+                    anchor, placement = dock, 'tabs'
+                    committed = True
+        self.finish_destination(committed)
+        if cancel:
+            self.window._native_drag_blocked = True
+            self.window.setGeometry(self.original_geometry)
+        self.window._native_drag = None
+        self.deleteLater()
+
+    def eventFilter(self, watched, event):
+        if event.type() == qt.QEvent.Type.KeyPress and event.key() == qt.Qt.Key.Key_Escape:
+            self.finish(qt.QCursor.pos(), cancel=True)
+            return True
+        if event.type() in (qt.QEvent.Type.MouseButtonRelease, qt.QEvent.Type.NonClientAreaMouseButtonRelease):
+            if event.button() == qt.Qt.MouseButton.LeftButton:
+                self.finish(event.globalPosition().toPoint())
+        return False

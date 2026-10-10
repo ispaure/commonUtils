@@ -61,11 +61,11 @@ class MarkdownWindow(qt.QMainWindow):
 _windows = set()
 
 
-def open_markdown(path, *, parent=None, allow_edit=False):
+def open_markdown(path, *, parent=None, allow_edit=False, detached=False, allow_new_tabs=True):
     """Open a preview window; allow_edit=True or holding Alt starts editing. Requires Qt app."""
     window = MarkdownWindow(path, parent, allow_edit=allow_edit)
     _windows.add(window)
     window.destroyed.connect(lambda: _windows.discard(window))
     from ..document_host import show_document
-    show_document(window)
+    show_document(window, detached=detached, allow_new_tabs=allow_new_tabs)
     return window

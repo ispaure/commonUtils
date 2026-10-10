@@ -8,6 +8,7 @@ class WorkspacePolicy:
     show_single_tab_in_main: bool = True
     show_single_tab_in_detached: bool = True
     detached_title: str = '{title}'
+    max_tabs: int | None = None
 
 
 def header_visible(policy, count, detached):

@@ -99,7 +99,7 @@ class INISettingsEditor(TextFileEditor):
                     self.fields[section, key] = control
                 scroll.setWidget(body)
                 self.sections.addTab(scroll, section)
-            self.status.setText('Edit settings, then Save. Source remains available for advanced edits.')
+            self.status.setText('')
             self._source_dirty = False
         except (ConfigError, ValueError) as error:
             self.status.setText(f'Cannot display settings: {error}. Correct the INI in Source.')
