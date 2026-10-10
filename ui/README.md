@@ -28,6 +28,27 @@ and rolls back layout/ownership if the destination fails. Closing a detached
 container restores its tabs to its main workspace without closing the views.
 Constructors without a policy retain the existing native floating-dock behavior.
 
+Detached title bars support returning the whole container through drag-and-drop
+or their context menu. `drop_reveal` on the main workspace can temporarily reveal
+its destination and return a callback that restores the previous view on an
+abandoned drag. The last detached tab can always return home; the last main tab
+still follows `allow_last_tab_detach`. Hidden tab headers have zero height.
+`WorkspacePolicy(max_tabs=1)` rejects both creation and incoming transfers beyond
+one tab; `allow_new_tabs=False` removes the creation controls and shortcut.
+
+`show_document(window, detached=True, allow_new_tabs=False)` opens an isolated
+single-document container when a host is registered. `open_markdown` accepts the
+same fields. These containers close their document through its normal close
+handler, including unsaved-change vetoes. Ordinary detached containers still
+return their tabs when the window closes. On macOS the active document's menus
+are presented in the native top-level window's system menu bar.
+
+`settings_sections.ScopedSettings` groups retained panels into Application Settings
+and Personal. `SettingsSection` identifies scope and section; a lone custom panel
+appears directly, while `nested=True` keeps an INI files section visible even when
+it is the only section. Removing/restoring sections preserves widgets, selections
+and unsaved editor buffers. Storage policy and writes stay with the application.
+
 Generic `outline` and `entry_views` widgets keep domain identities opaque.
 `notifications` owns result history and presentation; workers stay in their
 feature or document. See the API reference for these contracts.

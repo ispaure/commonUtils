@@ -23,6 +23,10 @@ class TextEditorTests(QtTestCase):
         self.editor.text.moveCursor(qt.QTextCursor.MoveOperation.End)
         self.editor.text.insertPlainText('other=new\n')
 
+    def test_idle_editor_has_no_instruction_banner(self):
+        self.assertEqual(self.editor.status.text(), '')
+        self.assertTrue(self.editor.status.isHidden())
+
     def test_atomic_save_preserves_bom_crlf_and_exact_text(self):
         self.edit()
         self.assertTrue(self.editor.is_modified)

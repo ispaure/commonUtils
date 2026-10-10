@@ -3,6 +3,12 @@ from pathlib import Path
 from . import pyside as qt
 
 
+class _EditorStatus(qt.QLabel):
+    def setText(self, text):
+        super().setText(text)
+        self.setVisible(bool(text))
+
+
 class TextFileEditor(qt.QWidget):
     saved = qt.Signal(object)
 
@@ -23,13 +29,15 @@ class TextFileEditor(qt.QWidget):
         self.text.setFont(qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont))
         self.text.setAccessibleName(f'Text editor for {self.path.name}')
         layout.addWidget(self.text, 1)
-        self.status = qt.QLabel()
+        self.status = _EditorStatus()
+        self.status.hide()
         self.status.setWordWrap(True)
         self.status.setTextFormat(qt.Qt.TextFormat.PlainText)
         layout.addWidget(self.status)
         buttons = qt.QHBoxLayout()
         self.reload_button = qt.QPushButton('Reload')
         self.save_button = qt.QPushButton('Save')
+        self.save_button.setToolTip('Save changes to this file')
         buttons.addWidget(self.reload_button)
         buttons.addStretch()
         buttons.addWidget(self.save_button)
@@ -67,7 +75,7 @@ class TextFileEditor(qt.QWidget):
         self.text.setPlainText(text)
         self.text.document().setModified(False)
         self.save_button.setEnabled(False)
-        self.status.setText('Edit this file as plain text. Save explicitly to apply changes.')
+        self.status.setText('')
         return True
 
     def save(self):

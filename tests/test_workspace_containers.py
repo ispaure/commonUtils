@@ -70,10 +70,8 @@ class ContainerTests(QtTestCase):
         self.settle(); dock = detached.active_dock
         self.assertEqual(len(main.docks), 1)
         self.assertEqual(dock.tab_header.height(), 0)
-        self.assertFalse(detached.can_move_tab(dock))
-        self.assertFalse(dock.return_button.isVisible())
-        detached.reattach_active()
-        self.assertIs(dock.workspace, detached)
+        self.assertTrue(detached.can_move_tab(dock))
+        self.assertTrue(dock.return_button.isVisible())
         dock.local_new_button.click(); self.settle()
         self.assertEqual(len(main.docks), 1)
         self.assertEqual(len(detached.docks), 2)
@@ -84,11 +82,53 @@ class ContainerTests(QtTestCase):
         self.assertEqual(detached.docks, [dock])
         self.assertEqual(dock.tab_header.height(), 0)
         self.assertTrue(dock.local_new_button.isVisible())
+        if isValid(bar):
+            self.assertEqual(bar.height(), 0)
         self.assertEqual(window.windowTitle(), 'Files: floating')
         window.close(); self.settle()
         self.assert_owner(dock, main)
         self.assertEqual(len(main.docks), 2)
         self.assertFalse(isValid(window))
+
+    def test_native_window_drop_returns_last_browser_tab(self):
+        from commonUtils.ui.workspace_drag import NativeWindowDrag
+        main = self.create(browser=True)
+        main.add_view('main'); main.add_view('detached')
+        window = main.detach_active(); self.settle()
+        dock = window.workspace.active_dock
+        point = main.mapToGlobal(main.rect().center())
+        drag = NativeWindowDrag(window, window.geometry())
+        window._native_drag = drag
+        drag.move(point)
+        drag.finish(point)
+        self.assert_owner(dock, main)
+        self.settle()
+        self.assertFalse(isValid(window))
+
+    def test_native_cancel_restores_destination_and_window_geometry(self):
+        from commonUtils.ui.workspace_drag import NativeWindowDrag
+        main = self.create(); main.add_view('detached')
+        window = main.detach_active(); self.settle()
+        restored = []
+        main.drop_reveal = lambda: lambda: restored.append(True)
+        geometry = window.geometry()
+        drag = NativeWindowDrag(window, geometry)
+        window._native_drag = drag
+        drag.move(main.mapToGlobal(main.rect().center()))
+        window.move(window.pos() + qt.QPoint(60, 60))
+        drag.finish(qt.QCursor.pos(), cancel=True)
+        self.assertEqual(restored, [True])
+        self.assertEqual(window.geometry(), geometry)
+        self.assertEqual(len(window.workspace.docks), 1)
+
+    def test_title_bar_command_returns_whole_container(self):
+        main = self.create(browser=True)
+        main.add_view('main'); main.add_view('detached')
+        window = main.detach_active()
+        window.workspace.add_view('another')
+        self.assertTrue(window.dock_to_main())
+        self.assertEqual(len(main.docks), 3)
+        self.assertEqual(window.workspace.docks, [])
 
     def test_last_main_document_detaches_and_returns_through_visible_control(self):
         main = self.create(); original = main.add_view('original'); dock = main.active_dock

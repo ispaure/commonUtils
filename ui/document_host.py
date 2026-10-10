@@ -28,10 +28,13 @@ def document_creation_scope(origin):
     return scope(origin) if scope is not None else nullcontext()
 
 
-def show_document(window):
+def show_document(window, *, detached=False, allow_new_tabs=True):
     host = current_document_host()
     if host is not None and host.window().isVisible() and not host.closing:
-        host.present(window)
+        if detached or not allow_new_tabs:
+            host.present(window, detached=detached, allow_new_tabs=allow_new_tabs)
+        else:
+            host.present(window)
     else:
         window.showNormal() if window.isMinimized() else window.show()
         window.raise_()
