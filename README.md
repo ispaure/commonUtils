@@ -75,6 +75,46 @@ and each area's README for specific requirements.
 | Regression tests | [Tests](tests/README.md) |
 | Module details, behavior and tests | [Developer reference](DEVELOPMENT.md) |
 
+## Package map
+
+See [root layout decisions](ROOT_LAYOUT.md) for the relocation rationale.
+
+- [appUtils](appUtils/README.md)
+- [archives](archives/README.md)
+- [configuration](configuration/README.md)
+- [debugUtils](debugUtils/README.md)
+- [dirUtils](dirUtils/README.md)
+- [directory](directory/README.md)
+- [downloads](downloads/README.md)
+- [features](features/README.md)
+- [fileTypes](fileTypes/README.md)
+- [fileUtils](fileUtils/README.md)
+- [file_operations](file_operations/README.md)
+- [file_removal](file_removal/README.md)
+- [filesystem](filesystem/README.md)
+- [launchers](launchers/README.md)
+- [linkUtils](linkUtils/README.md)
+- [logUtils](logUtils/README.md)
+- [marcUtils](marcUtils/README.md)
+- [markdownUtils](markdownUtils/README.md)
+- [network_filesystems](network_filesystems/README.md)
+- [operations](operations/README.md)
+- [osUtils](osUtils/README.md)
+- [persistence](persistence/README.md)
+- [renameUtils](renameUtils/README.md)
+- [settings](settings/README.md)
+- [spreadsheetUtils](spreadsheetUtils/README.md)
+- [steamUtils](steamUtils/README.md)
+- [storage](storage/README.md)
+- [streams](streams/README.md)
+- [tests](tests/README.md)
+- [traversal](traversal/README.md)
+- [ui](ui/README.md)
+- [webUtils](webUtils/README.md)
+- [wrappers](wrappers/README.md)
+- [zipUtils](zipUtils/README.md)
+- [zip_access](zip_access/README.md)
+
 ## License
 
 [MIT](LICENSE.md). Copyright © 2020–2026 Marc-André Voyer.
