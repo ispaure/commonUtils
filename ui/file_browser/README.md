@@ -308,3 +308,10 @@ up, Command-Down/Command-O opens the selection, and Return renames. Windows and
 Linux use Enter to open, F2 to rename, and Alt-Up to go up. Windows also accepts
 Backspace to go up. Alt-Left/Right traverse history. Text fields and inline
 filename editors retain their own keyboard handling.
+
+Radial rendering caches one device-resolution scene until chart data, dimensions,
+font or palette change. Selection and navigation zoom reuse it. Hit testing uses
+ring distance and a binary search of angular sectors rather than checking each
+curved path. The pointer-following tooltip is a reusable `ui.cursor_tooltip`
+component, and hides during loading or when the pointer leaves. Chart data remains
+bounded to four levels and 3,000 displayed entries, independent of index size.
