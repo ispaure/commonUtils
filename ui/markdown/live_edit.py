@@ -1,5 +1,6 @@
 """Same-pane Markdown syntax, paired selections and cursor-sensitive preview."""
 from .. import pyside as qt
+from ..text_commands import wrap_selection
 from .syntax import _units
 from .links import link_spans
 from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
@@ -16,15 +17,7 @@ class SourceMarkdownEdit(qt.QPlainTextEdit):
                 and not event.modifiers() & (qt.Qt.KeyboardModifier.ControlModifier |
                                             qt.Qt.KeyboardModifier.MetaModifier |
                                             qt.Qt.KeyboardModifier.AltModifier)):
-            marker = event.text()
-            start = cursor.selectionStart()
-            text = cursor.selectedText().replace('\u2029', '\n')
-            cursor.beginEditBlock()
-            cursor.insertText(marker + text + marker)
-            cursor.setPosition(start + 1)
-            cursor.setPosition(start + 1 + _units(text), qt.QTextCursor.MoveMode.KeepAnchor)
-            cursor.endEditBlock()
-            self.setTextCursor(cursor)
+            wrap_selection(self, event.text())
             event.accept()
             return
         super().keyPressEvent(event)
@@ -57,15 +50,7 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         self._highlighter.refresh_cursor()
 
     def _wrap_selection(self, marker):
-        cursor = self.textCursor()
-        start = cursor.selectionStart()
-        text = cursor.selectedText().replace('\u2029', '\n')
-        cursor.beginEditBlock()
-        cursor.insertText(marker + text + marker, qt.QTextCharFormat())
-        cursor.setPosition(start + len(marker))
-        cursor.setPosition(start + len(marker) + _units(text), qt.QTextCursor.MoveMode.KeepAnchor)
-        cursor.endEditBlock()
-        self.setTextCursor(cursor)
+        wrap_selection(self, marker, reset_format=True)
 
     def apply_inline_format(self, marker):
         cursor = self.textCursor()

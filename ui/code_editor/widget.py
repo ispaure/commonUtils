@@ -1,6 +1,7 @@
 """Reusable QPlainTextEdit with a gutter and focused code-editing conveniences."""
 
 from .. import pyside as qt
+from ..text_commands import wrap_selection
 from .transforms import TransformCommands
 from .multicursor import MultiCursorCommands
 from .folding import FoldingCommands
@@ -392,13 +393,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
             )
         ):
             closing = {"(": ")", "[": "]", "{": "}", '"': '"', "'": "'"}[event.text()]
-            cursor = self.textCursor()
-            selected = cursor.selectedText().replace("\u2029", "\n")
-            cursor.beginEditBlock()
-            cursor.insertText(event.text() + selected + closing)
-            cursor.movePosition(qt.QTextCursor.MoveOperation.PreviousCharacter)
-            cursor.endEditBlock()
-            self.setTextCursor(cursor)
+            wrap_selection(self, event.text(), closing, keep_selected=False)
             return
         super().keyPressEvent(event)
 
