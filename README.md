@@ -52,23 +52,9 @@ setup and more examples. If you're using Logistics, its launcher handles setup.
 
 ## Dependencies
 
-The project using commonUtils installs the packages it needs. Requirements vary
-by module; there is no single install command for every tool.
-
-| What you're using | What you need |
-| --- | --- |
-| Desktop widgets, file browser and Qt workers | `PySide6` |
-| Shared ZIP tools and built-in file-type registration | `pyzipper` |
-| External archive extraction | `patool`, plus a system extractor for the format |
-| EXIF tools | `piexif` |
-| Platform-specific tools | The relevant application or system command, such as PowerShell, `hdiutil` or Flatpak |
-
-INI parsing and typed-setting validation use Python's standard library. Their
-visual editor also needs `PySide6`. Some modules load dependencies when imported;
-for example, built-in file-type registration loads ZIP support. See the
-[dependency and platform notes](DEVELOPMENT.md#optional-dependencies-and-platforms)
-for details. Create a `QApplication` before using Qt widgets; standalone scripts
-can use the native dialog backend instead.
+Consumers install the optional dependencies required by their chosen modules.
+See [development and platform setup](DEVELOPMENT.md#optional-dependencies-and-platforms)
+and each area's README for specific requirements.
 
 ## Guides
 
@@ -79,10 +65,14 @@ can use the native dialog backend instead.
 | Examples of background work, downloads and cancellation | [Recipes](RECIPES.md) |
 | Batch renaming | [Rename tools](RENAME.md) |
 | File formats and custom file types | [File types](fileTypes/README.md) |
-| ZIP archives | [Archive guide](ZIP_ARCHIVES.md) |
+| Archive operations | [Archives](archives/README.md) |
 | XML documents | [XML guide](XML.md) |
 | Desktop widgets and readers | [UI guide](ui/README.md) |
-| Commands and processes | [Command wrapper](wrappers/cmdShellWrapper/README.md) |
+| External tools and processes | [Wrappers](wrappers/README.md) |
+| Directory indexing | [Directory](directory/README.md) |
+| Atomic publication, text and recovery | [Persistence](persistence/README.md) |
+| Project bootstrap scripts | [Launchers](launchers/README.md) |
+| Regression tests | [Tests](tests/README.md) |
 | Module details, behavior and tests | [Developer reference](DEVELOPMENT.md) |
 
 ## License

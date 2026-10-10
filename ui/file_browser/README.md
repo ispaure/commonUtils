@@ -326,3 +326,256 @@ also be used as a context manager. Close readers before removing a temporary
 cache directory, especially on Windows where open SQLite files cannot be removed.
 Do not close a shared cache while other views still use its snapshots. Browser
 workers and tests must finish before their owning temporary resources are removed.
+
+
+## Reusable file browser
+
+**Start here for new extensions:** [Adding a feature](../../FEATURES.md) documents the
+unified `register() -> Feature(...)` API, including complete action/type wiring,
+handler context, per-window controllers and enable/disable behavior. The APIs below
+also describe the lower-level hooks retained for existing integrations.
+
+`commonUtils.ui.file_browser.FileBrowser` is an embeddable PySide widget for
+folder/file browsing, selection, list/tile/column views, Back/Forward/Up navigation,
+a clickable folder breadcrumb bar, information tabs, thumbnails and context menus. It uses
+`File`/`Directory` objects resolved by the shared process-wide file registry.
+`QFileSystemModel` supplies filesystem watching and Qt indexes; its browser adapter
+exposes `item(index)` and `object_for_path(path)` as the data-object interface.
+
+```python
+from pathlib import Path
+from commonUtils.dirUtils import Directory
+from commonUtils.ui.file_browser import FileBrowser
+
+browser = FileBrowser(Directory(Path('/path/to/library')), parent=window)
+layout.addWidget(browser)
+```
+
+List, Tiles and Columns are selected using exclusive palette-aware icon buttons.
+Tile cells divide the viewport width evenly, adjusting cover size before adding
+columns. Resize, navigation and filesystem updates lay out items immediately.
+Folder-only directories use compact square cells; in mixed directories, folder
+icons occupy half the cover width by default. The tile-only **Size** menu adjusts
+folder icons from 25% to 100%; this preference stays with the browser widget.
+Tiles reserve a scrollbar gutter so scrolling cannot change the column count.
+Column view uses small chevrons, stops at files and leaves unused space in the
+current palette's window color. Preview content belongs to the adjacent panels,
+without an extra empty file column.
+
+Create a QApplication before the widget. Project-specific controls, such as a
+library dropdown, belong outside this widget. `set_directory(Directory_or_Path)`
+sets its navigation boundary; `navigate(path)` moves within that root. The path
+bar starts with that root and includes only descendant folders, never selected
+files. Each folder is clickable. Compact native arrow buttons provide Back,
+Forward and Up, with tooltips and accessible names; existing navigation shortcuts
+remain available. The root stays pinned at the left; longer paths
+scroll their descendants while Back, Forward and Up remain available. The right
+panel remains visible and always provides **File Information** for a selected
+file/folder: path, name, extension/size where applicable, modification time,
+creation time when the filesystem exposes one, readability, and link targets.
+Details use compact aligned label/value rows, muted labels, selectable plain-text
+values and wrapping for long paths/descriptions. Information tabs scroll vertically.
+Preview icons come from the same per-path system icon provider as the file listing;
+folder previews use a compact icon area instead of reserving cover-image space.
+Unix change time is not mislabeled as creation time. Folder totals/counts are
+calculated asynchronously without reading file contents or following links.
+Refresh recalculates them; totals and thumbnails remain in memory.
+
+Specialized File subclasses contribute behavior through GUI-independent hooks:
+
+```python
+from commonUtils.fileUtils import File
+from commonUtils.filesystem import BrowserPanel, BrowserDetails, BrowserAction
+from commonUtils.fileTypes.registry import register_file_type
+
+class ProjectFile(File):
+    def browser_panels(self):
+        return (BrowserPanel('project.details', 'Project Information', self.load_details),)
+
+    def load_details(self):
+        return BrowserDetails(fields=(('Title', 'Example'),))
+
+    def browser_actions(self, context):
+        return (BrowserAction('project.edit', 'Edit Project Data',
+                              lambda ctx: ctx.invoke('project.edit', ctx.selection),
+                              source='Project'),)
+
+register_file_type(ProjectFile, 'project')
+browser = FileBrowser(Path('/path/to/library'),
+    services={'project.edit': edit_selected_project_files})
+```
+
+Context menus put built-in Open/Reveal actions first, then group contributed actions
+under their `BrowserAction.source` feature name. Supply a user-facing name such as
+`Comics` or `Project`; older descriptors without a source appear under `Extensions`.
+Actions also expose the source through a tooltip and QAction property. Contributions
+are collected from every selected object and each action provider, deduplicated by
+key, and retain provider order within each feature group. Right-clicking an item
+outside the selection uses only that item. Action callbacks receive the captured
+selection; features decide which selected objects they support.
+
+Applications can install reversible browser extensions with
+`browser.install_extension(owner, services={...}, action_providers=(...), folder_fields=...)`.
+`set_extension_enabled(owner, False)` removes that layer's handlers/providers/fields;
+`True` restores it. `remove_extension(owner)` removes its registration permanently.
+Layers preserve install order and restore underlying handlers after disabling a
+later overlapping layer. The browser refreshes previews and totals after changes.
+These APIs manage browser capabilities, not controller/worker lifetimes; the host
+retains those objects until existing jobs and windows finish.
+
+Register types during application startup, before the first listing/browser use.
+This is a guideline, not enforced. The registration remains available throughout
+that process to every subsequent resolver and `Directory.list_files()` call.
+Existing File instances retain their class; the browser re-resolves cached objects
+when the registry revision changes. Domain classes live in the consuming project.
+
+Panel loaders return `BrowserDetails(fields, thumbnail, message, payload)` and run
+on a worker thread; do not access widgets from them. Generic information stays
+available even if a contributed panel fails. Every applicable contributed panel
+appears alongside File Information as a tab; panels cannot be interactively hidden. Optional `payload` lets the application retain
+its loaded domain document through the `details_loaded` signal.
+
+Action callbacks and `browser_activate(context)` run on the GUI thread.
+`BrowserContext.selection` contains File/Directory objects; `context.widget` is the
+browser, and `context.invoke(name, *args)` calls an application-supplied service.
+Return True from activation when the type handles double-clicks; False uses the
+default application. Implement `browser_has_thumbnail = True` and
+`browser_thumbnail(size) -> bytes` to provide tile images without a format-specific
+branch in the browser. Thumbnail hooks run off the GUI thread and use a bounded
+128-item cache. The size argument is a physical-pixel bounding box, including the
+display scale; return enough pixels within that box for sharp high-DPI rendering.
+The tile **Size** control applies to folder icons, application icons and thumbnails.
+All render within the selected bounds, preserve their aspect ratio, and keep captions
+aligned. Extra viewport space widens the cells without enlarging the icons.
+Cached covers are regenerated when a larger icon size or higher display scale requires
+more pixels. Selected-panel thumbnails likewise retain physical resolution. Constructors and detection rules should stay cheap and avoid
+loading full metadata until requested.
+
+Every browser enables Cut, Copy, Paste and inline Rename by default, with native
+clipboard shortcuts and F2. A slow second click edits the selected filename;
+the basename is selected without its extension. Paste appears on folders and empty
+view backgrounds, targeting that folder; it is omitted for individual files.
+Transfers run in the background, preserve links, and use numbered copy names for
+collisions instead of overwriting. Cut entries leave the clipboard only after
+successful moves. Cancellation stops between items.
+
+Menus order opening, clipboard actions, Rename, contributed tools and OS-specific
+Reveal. `BrowserAction(category='rename')` places a command beside Rename;
+`order` (default 100) orders commands and their feature groups. Directory menus
+include Open; file menus offer default-application opening. Double-clicking a folder
+navigates into it.
+An optional `action_providers=(provider,)` argument allows application-level actions
+for Directory objects or mixed selections; providers receive `(item, context)` and
+return BrowserAction descriptors. `folder_fields(directory, stats)` may contribute
+additional count fields using `stats.extension_counts`, without hardcoding project
+formats into shared folder scanning.
+
+Useful integration methods/signals: `selected_objects()`, `context_menu_for(index)`,
+`refresh()`, `refresh_item(path)`, `selection_changed(objects)`, `details_loaded(result)`
+and `refreshed()`. Actions should call refresh_item after saving their data.
+Panel preferences are local to the widget. Neither selections nor file metadata
+are persisted by the shared browser.
+
+Close owners safely: `stop()` cancels queued work and returns whether workers are
+still finishing. If True, hide/defer owner destruction until the `idle` signal;
+otherwise close normally. `shutdown()` waits for workers during application exit.
+Do not delete a browser while a panel/thumbnail operation is running.
+
+
+### File browser organization
+
+| Module | Responsibility |
+| --- | --- |
+| `file_browser/__init__.py` | Browser integration, context actions, panel loading and worker lifecycle. |
+| `file_browser/model.py` | Qt filesystem indexes resolved to registered File/Directory objects. |
+| `file_browser/views.py` | Selection and location shared across views; thumbnail worker scheduling. |
+| `file_browser/tiles.py` | Immediate grid layout, compact folder cells and folder-icon sizing. |
+| `file_browser/columns.py` | Column trails, small chevrons and preview-column compatibility. |
+| `file_browser/thumbnails.py` | Bounded thumbnail cache, invalidation and physical-pixel requirements. |
+| `file_browser/controls.py` | View icons, folder-size menu and navigation buttons. |
+| `file_browser/navigation.py` | Root-bounded breadcrumbs and Back/Forward history. |
+| `file_browser/details.py` | Aligned, selectable information fields. |
+| `ui/operations.py` | Generic background callbacks and completion signals, shared by browser and non-browser UI. |
+
+Tile sizing uses logical pixels for layout and physical pixels for rendering.
+The folder-size control changes system folder icons without shrinking covers in
+mixed directories. Folder-only directories also use tighter cells and rows.
+Constructing or changing a view never reads file contents; registered thumbnail
+and panel hooks do that work in background operations.
+
+
+
+
+## Indexed search in the browser
+
+The search input above the breadcrumbs searches cached names for files and folders
+throughout the current subtree, case-insensitively. Queries run in separate workers
+and never start filesystem scans. Automatic indexing and size collection use the
+same scanner/generation; searches show cached results immediately, poll committed
+partial discoveries while indexing, and label incomplete or paused results.
+Clear the field (or Escape) to restore normal views. Results retain normal selection,
+preview, activation, context actions and clipboard behavior; Show in browser navigates
+to a folder or selects a file in its parent. Paging is 500 rows and sorting is global.
+
+Completed and partial ancestor indices can answer subtree searches immediately and
+seed newly browsed subtrees without re-enumerating unchanged folders. A new higher
+starting folder also merges saved child indexes, preferring more specific checkpoints
+when scopes overlap. Discovery fills missing branches before validating reused data.
+Absolute paths identify entries; different symlink spellings are separate scopes.
+List size sorting compares raw file bytes and cached recursive folder totals; unknown
+sizes stay last in either direction, and newly received totals update the order.
+Logistics workspaces show one indexing line at the bottom of the window, with
+path-free phase names, saved-entry and processed-operation counters, average
+entries per second, and seconds/minutes/hours elapsed. The tooltip also omits paths.
+Elapsed time keeps updating during long database operations. Processed operations
+include discovery and validation; a file can be processed in both phases. Standalone browser widgets retain
+a local bottom status line. Discovery counters are cumulative for the current run;
+they do not reset for each folder. Concurrent UI requests
+reuse a validation completed within 30 seconds; explicit invalidation bypasses this
+window. A newly opened subtree can read a freshly validated ancestor directly,
+without copying a generation or rechecking every descendant. Existing explicit DirectoryCache.get calls retain immediate validation.
+The current location and up to 128 indexed immediate children are watched for changes,
+with debounced reconciliation. A 60-second periodic check (up to five minutes for slow
+scans) validates recursive metadata to catch missed events and unwatched descendants.
+Watchers are a latency improvement, not the only consistency mechanism. Watch limits
+are bounded; no watcher is allocated for every entry in a huge tree. Refresh forces
+reconciliation. Disconnected paths retain cached records and show an unavailable
+status. New navigation cancels/supersedes scans and queries; close cooperatively waits
+for workers, and cancelled indexing retains durable checkpoints.
+
+`ProcessUpdate.metrics` optionally carries structured counters through the existing
+ProcessRunner progress signal; its older positional fields remain unchanged.
+`ProcessProgressWindow` / `open_process(..., context=...)` can show operation source
+and destination plus transfer fields, while keeping raw output behind a collapsible
+Details and logs control. Missing counters remain unknown. The actual exit result
+owns completion, retries/cancellation remain in ProcessRunner, and stopped operations
+clear live speed/ETA/active-transfer display while preserving measured progress.
+
+
+
+
+## Selection preview
+
+The Preview button is enabled by default. Details appear only for a nonempty
+selection; clearing selection restores the full browsing area. Opening the pane
+allocates roughly 30% of the available splitter width with a 220 px minimum and
+room for the browser. The splitter remains manually resizable. Switching Preview
+off keeps it hidden for subsequent selections and avoids starting detail loaders.
+Existing explicit `load`, `preview`, `selected_objects`, `selection_changed`, and
+panel extension APIs remain available. `[FileBrowser] preview_enabled=false` in
+the shared INI changes the default for newly created tabs; the button overrides it
+for the current tab.
+
+Transfer percentages are explicitly percentages of work discovered so far. At
+100%, a running process reads **100% of known work · Still running**, with a
+scanning/final-check explanation. Totals can grow and the percentage can decrease.
+Only a successful process exit displays **Complete**, using a green progress bar;
+stopped operations retain their measured progress with a distinct stopped state.
+
+
+The schema-3 directory index interns filenames by parent folder ID and shares
+immutable metadata across overlapping roots and generations. Existing absolute
+`Entry.path` APIs and resumable checkpoints are preserved. A transactional upgrade
+retains `directory-index.pre-v3.sqlite3` for recovery; freed database pages are reused
+without an automatic full-file rewrite. See [file browser maintenance](README.md)
+for module responsibilities, compatibility contracts, storage and test guidance.
