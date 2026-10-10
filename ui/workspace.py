@@ -1,6 +1,8 @@
 """Reusable Qt dock-backed document tabs with cooperative view shutdown."""
 from . import pyside as qt
 from weakref import WeakSet
+from shiboken6 import isValid
+from .workspace_policy import WorkspacePolicy, header_visible
 from .workspace_drag import WorkspaceDragMixin, register_dock
 
 _workspaces = WeakSet()
@@ -42,7 +44,7 @@ class DockTabHeader(qt.QWidget):
         self.title.setMinimumWidth(0)
         self.title.setSizePolicy(qt.QSizePolicy.Policy.Ignored, qt.QSizePolicy.Policy.Preferred)
         self.title.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.new_button = _tab_button('+', 'New tab', self, lambda: dock.workspace.add_view())
+        self.new_button = _tab_button('+', 'New tab', self, lambda: dock.workspace.request_new_view())
         self.new_button.setVisible(dock.workspace.allow_new_tabs)
         layout.addWidget(self.close_button)
         layout.addWidget(self.title, 1)
@@ -79,8 +81,7 @@ class DockTabHeader(qt.QWidget):
     def mouseDoubleClickEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton:
             dock = self.parentWidget()
-            dock.setFloating(not dock.isFloating())
-            dock.show()
+            dock.workspace.toggle_detach(dock)
             event.accept()
         else:
             event.ignore()
@@ -102,6 +103,22 @@ class DockTabHeader(qt.QWidget):
 
 
 class WorkspaceDock(qt.QDockWidget):
+    owner_changed = qt.Signal(object)
+
+    @property
+    def is_detached(self):
+        return self.workspace.is_detached or self.isFloating()
+
+    def setFloating(self, floating):
+        # Opt-in containers also honor policy through the historical entry point.
+        if self.workspace.policy is None:
+            return super().setFloating(floating)
+        if floating:
+            return self.workspace.detach_dock(self)
+        if self.workspace.is_detached:
+            return self.workspace.main_workspace.adopt(self)
+        return super().setFloating(False)
+
     def __init__(self, workspace, view, title):
         super().__init__(title, workspace)
         self.workspace = workspace
@@ -111,12 +128,15 @@ class WorkspaceDock(qt.QDockWidget):
         self.setFeatures(qt.QDockWidget.DockWidgetFeature.DockWidgetClosable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetMovable |
                          qt.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        if workspace.policy is not None:
+            self.setFeatures(self.features() & ~qt.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
         self.setAllowedAreas(_DOCK_AREAS)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.tab_header = DockTabHeader(self)
         self.setTitleBarWidget(self.tab_header)
         self.topLevelChanged.connect(self._native_window)
         register_dock(self)
+        self.setObjectName('workspace.tab.' + self.drag_id)
         self.setAcceptDrops(True)
         self.installEventFilter(workspace)
         view.setProperty('workspaceView', True)
@@ -144,7 +164,7 @@ class WorkspaceDock(qt.QDockWidget):
     def contextMenuEvent(self, event):
         self.workspace._activate(self)
         menu = qt.QMenu(self)
-        menu.addAction('Close tab', self.close)
+        self.workspace.populate_tab_menu(menu, self)
         menu.exec(event.globalPos())
         menu.deleteLater()
 
@@ -169,11 +189,20 @@ class WorkspaceDock(qt.QDockWidget):
 class Workspace(WorkspaceDragMixin, qt.QMainWindow):
     """Views expose prepare_close() and idle; their application state stays in the view."""
     active_changed = qt.Signal(object)
+    tabs_changed = qt.Signal()
 
-    def __init__(self, factory, parent=None, *, allow_new_tabs=True, dock_group='browser', keep_one_tab=False):
+    def __init__(self, factory, parent=None, *, allow_new_tabs=True, dock_group='browser', keep_one_tab=False,
+                 policy=None, main_workspace=None, new_view=None, setup_container=None):
         super().__init__(parent)
         self.setWindowFlags(qt.Qt.WindowType.Widget)
         self.factory = factory
+        self.policy = policy
+        self.main_workspace = main_workspace or self
+        self.is_detached = main_workspace is not None
+        self.new_view = new_view
+        self.setup_container = setup_container
+        self.detached_windows = []
+        self._transferring = False
         self.allow_new_tabs = allow_new_tabs
         self.keep_one_tab = keep_one_tab
         self.dock_group = dock_group
@@ -195,7 +224,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         empty_layout = qt.QHBoxLayout(empty_header)
         empty_layout.setContentsMargins(2, 0, 2, 0)
         empty_layout.addStretch()
-        self.empty_new_button = _tab_button('+', 'New tab', empty_header, lambda: self.add_view())
+        self.empty_new_button = _tab_button('+', 'New tab', empty_header, lambda: self.request_new_view())
         self.empty_new_button.setVisible(allow_new_tabs)
         empty_layout.addWidget(self.empty_new_button)
         empty_header.setFixedHeight(30)
@@ -214,7 +243,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         qt.QApplication.instance().focusChanged.connect(self._focus_changed)
         self.setTabPosition(qt.Qt.DockWidgetArea.AllDockWidgetAreas, qt.QTabWidget.TabPosition.North)
         self.new_action = qt.QAction('New tab', self)
-        self.new_action.triggered.connect(lambda: self.add_view())
+        self.new_action.triggered.connect(lambda: self.request_new_view())
         self.addAction(self.new_action)
         self.new_action.setShortcut(qt.QKeySequence(qt.QKeySequence.StandardKey.AddTab))
         self.new_action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
@@ -248,7 +277,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             return
         for dock in self.docks:
             grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
-            height = 0 if grouped else 30
+            visible = self.policy is None or header_visible(self.policy, len(self.docks), self.is_detached)
+            height = 30 if visible and not grouped else 0
+            self._refresh_view_controls(dock, not visible)
             if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
                 dock.tab_header.setFixedHeight(height)
             dock.tab_header.close_button.setVisible(self.can_close_tab(dock))
@@ -267,7 +298,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 bar.workspace_style = _DockTabStyle()
                 bar.workspace_style.setParent(bar)
                 bar.setStyle(bar.workspace_style)
-                bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.add_view())
+                bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.request_new_view())
                 bar.currentChanged.connect(self._schedule_tab_headers)
                 bar.tabMoved.connect(lambda source, target, owner=bar: self._tab_order_changed(owner))
                 bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
@@ -331,7 +362,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 if dock:
                     event.accept()
                     menu = qt.QMenu(watched)
-                    menu.addAction('Close tab', dock.close)
+                    self.populate_tab_menu(menu, dock)
                     menu.exec(event.globalPos())
                     menu.deleteLater()
                     return True
@@ -361,7 +392,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         Run after native docking completes: changing dock layout inside Qt's
         topLevelChanged signal would disturb an in-progress native drop.
         """
-        floating = [dock for dock in self.docks if dock.isFloating()]
+        floating = [dock for dock in self.all_docks if dock.is_detached] if self.policy is not None else [dock for dock in self.docks if dock.isFloating()]
         self._schedule_tab_headers()
         self.reattach_action.setEnabled(bool(floating) and not self._closing)
         if self._closing or any(not dock.isFloating() for dock in self.docks):
@@ -398,6 +429,94 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
     def active_view(self):
         return self.active_dock.widget() if self.active_dock else None
 
+    @property
+    def all_docks(self):
+        main = self.main_workspace
+        return list(main.docks) + [dock for window in main.detached_windows
+                                   if isValid(window) for dock in window.workspace.docks]
+
+    def request_new_view(self):
+        if not self.allow_new_tabs or self._closing:
+            return None
+        return self.new_view(self) if self.new_view is not None else self.add_view()
+
+    def _refresh_view_controls(self, dock, single):
+        layout = getattr(dock.widget(), 'workspace_controls', None)
+        if layout is None:
+            return
+        if not hasattr(dock, 'workspace_buttons'):
+            dock.workspace_buttons = qt.QWidget(dock.widget())
+            row = qt.QHBoxLayout(dock.workspace_buttons)
+            row.setContentsMargins(0, 0, 0, 0)
+            dock.return_button = _tab_button('↩', 'Dock to Main Window', dock.workspace_buttons,
+                                            lambda: dock.workspace.main_workspace.adopt(dock))
+            dock.local_new_button = _tab_button('+', 'New tab', dock.workspace_buttons,
+                                                lambda: dock.workspace.request_new_view())
+            row.addWidget(dock.return_button)
+            row.addWidget(dock.local_new_button)
+            layout.addWidget(dock.workspace_buttons)
+        dock.return_button.setVisible(self.is_detached and self.can_move_tab(dock))
+        dock.local_new_button.setVisible(self.allow_new_tabs)
+        dock.workspace_buttons.setVisible(single and (self.allow_new_tabs or self.is_detached))
+        controls_widget = getattr(dock.widget(), 'workspace_controls_widget', None)
+        if controls_widget is not None:
+            controls_widget.setVisible(single and (self.allow_new_tabs or self.is_detached))
+
+    def populate_tab_menu(self, menu, dock):
+        action = menu.addAction('Close tab', dock.close)
+        if self.policy is not None:
+            action.setEnabled(self.can_close_tab(dock))
+        if self.policy is not None:
+            if self.is_detached:
+                menu.addAction('Dock to Main Window', lambda: self.main_workspace.adopt(dock)).setEnabled(self.can_move_tab(dock))
+            else:
+                menu.addAction('Detach tab', lambda: self.detach_dock(dock)).setEnabled(self.can_move_tab(dock))
+
+    def can_move_tab(self, dock, *, destination=None):
+        if self._closing or dock not in self.docks:
+            return False
+        if destination is self:
+            return True
+        return self.policy is None or self.policy.allow_last_tab_detach or len(self.docks) > 1
+
+    def toggle_detach(self, dock):
+        if self.policy is None:
+            dock.setFloating(not dock.isFloating())
+            dock.show()
+        elif self.is_detached:
+            self.main_workspace.adopt(dock)
+        else:
+            self.detach_dock(dock)
+
+    def detach_dock(self, dock):
+        if not self.can_move_tab(dock):
+            return None
+        if self.policy is None:
+            dock.setFloating(True)
+            dock.show()
+            return dock
+        from .workspace_window import WorkspaceWindow
+        main = self.main_workspace
+        window = WorkspaceWindow(main)
+        main.detached_windows.append(window)
+        window.destroyed.connect(lambda: main.detached_windows.remove(window)
+                                 if window in main.detached_windows else None)
+        if not window.workspace.adopt(dock):
+            window.deleteLater()
+            return None
+        window.show()
+        window.raise_()
+        window.update_title()
+        return window
+
+    def _cleanup_empty_container(self):
+        if self.is_detached and not self.docks and not self._retiring and not self._transferring:
+            qt.QTimer.singleShot(0, self, self._close_empty_container)
+
+    def _close_empty_container(self):
+        if not self.docks and not self._retiring and not self._transferring:
+            self.window().close()
+
     def add_view(self, argument=None):
         if self._closing:
             return None
@@ -412,6 +531,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         dock.topLevelChanged.connect(lambda floating: dock.workspace._docking_changed(floating))
         dock.dockLocationChanged.connect(lambda area: dock.workspace._dock_location_changed(dock, area))
         dock.visibilityChanged.connect(lambda visible: dock.workspace._activate(dock) if visible else None)
+        dock.windowTitleChanged.connect(lambda title: dock.workspace.tabs_changed.emit())
         signal = getattr(view, 'title_changed', None)
         if signal is not None:
             signal.connect(dock.setWindowTitle)
@@ -422,9 +542,12 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         dock.raise_()
         self._activate(dock)
         self._update_drop_target()
+        self.tabs_changed.emit()
         return view
 
     def _activate(self, dock):
+        if self._transferring:
+            return
         if dock in self.docks and dock is not self.active_dock:
             # Repolishing can emit visibility/focus changes for an obscured dock.
             # Qt's selected native tab remains the authority for that group.
@@ -446,14 +569,17 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
 
     def detach_active(self):
         if self.active_dock:
-            self.active_dock.setFloating(True)
-            self.active_dock.show()
+            return self.detach_dock(self.active_dock)
 
     def reattach_active(self):
-        dock = self.active_dock if self.active_dock and self.active_dock.isFloating() else next(
-            (item for item in reversed(self.docks) if item.isFloating()), None)
+        if self.policy is not None:
+            dock = self.active_dock if self.is_detached else next(
+                (item for item in reversed(self.all_docks) if item.workspace is not self), None)
+        else:
+            dock = self.active_dock if self.active_dock and self.active_dock.isFloating() else next(
+                (item for item in reversed(self.docks) if item.isFloating()), None)
         if dock:
-            self.adopt(dock)
+            self.main_workspace.adopt(dock)
 
     def arrange(self, dock, placement, anchor=None):
         if dock is None or dock not in self.docks:
@@ -461,7 +587,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         other = anchor if anchor is not dock else None
         other = other or self._docked_anchor(excluding=dock)
         self._hide_drop_target()
-        dock.setFloating(False)
+        qt.QDockWidget.setFloating(dock, False)
         if other is None:
             self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         elif placement == 'tabs':
@@ -481,35 +607,101 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         dock.raise_()
         self._activate(dock)
 
-    def adopt(self, dock):
-        """Transfer the actual view, retaining history, controllers and running jobs."""
-        if self._closing:
-            return
+    def adopt(self, dock, *, force=False, placement='tabs', anchor=None):
+        """Transfer an existing dock atomically; rollback restores its previous owner.
+
+        force is reserved for explicit return/container close, so a last browser
+        tab can return home without permitting its source to become orphaned.
+        """
+        if (not isValid(self) or self._closing or not isValid(dock) or not isValid(dock.workspace)
+                or dock.workspace._closing or placement not in ('tabs', 'left', 'right')
+                or (anchor is not None and (anchor not in self.docks or anchor is dock))
+                or self.dock_group != dock.workspace.dock_group):
+            return False
         source = dock.workspace
-        if source is not self:
-            source.remove_view(dock)
-            dock.removeEventFilter(source)
-            dock.installEventFilter(self)
-            dock.workspace = self
-            dock.setParent(self)
-            self.docks.append(dock)
-        previous = self._docked_anchor(excluding=dock)
-        self._hide_drop_target()
-        self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
-        dock.setFloating(False)
-        if previous and previous is not dock:
-            self.tabifyDockWidget(previous, dock)
+        if dock not in source.docks or (source is not self and not force
+                                       and not source.can_move_tab(dock, destination=self)):
+            return False
+        if source is self:
+            state, active = self.saveState(), self.active_dock
+            try:
+                self.arrange(dock, placement, anchor=anchor)
+            except Exception:
+                self.restoreState(state)
+                self.active_dock = active
+                return False
+            self._update_drop_target()
+            return True
+        index, active = source.docks.index(dock), source.active_dock
+        state = source.saveState()
+        destination_state = self.saveState()
+        floating, geometry = dock.isFloating(), dock.geometry()
+        previous = self._docked_anchor()
+        source._transferring = self._transferring = True
+        try:
+            # Suppress Qt's transient visibility changes while ownership changes.
+            with qt.QSignalBlocker(dock):
+                source.removeDockWidget(dock)
+                source.docks.remove(dock)
+                dock.removeEventFilter(source)
+                dock.setParent(self)
+                dock.workspace = self
+                dock.installEventFilter(self)
+                self.docks.append(dock)
+                self._hide_drop_target()
+                self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+                qt.QDockWidget.setFloating(dock, False)
+                if previous and placement == 'tabs':
+                    self.tabifyDockWidget(previous, dock)
+                if placement != 'tabs':
+                    self.arrange(dock, placement, anchor=anchor or previous)
+                if dock.parentWidget() is not self or dock not in self.docks:
+                    raise RuntimeError('Destination did not retain the tab')
+        except Exception:
+            if dock in self.docks:
+                self.docks.remove(dock)
+            self.removeDockWidget(dock)
+            self.restoreState(destination_state)
+            dock.removeEventFilter(self)
+            dock.setParent(source)
+            dock.workspace = source
+            dock.installEventFilter(source)
+            if dock not in source.docks:
+                source.docks.insert(index, dock)
+            source.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+            source.restoreState(state)
+            qt.QDockWidget.setFloating(dock, floating)
+            dock.setGeometry(geometry)
+            source.active_dock = active
+            dock.show()
+            return False
+        finally:
+            source._transferring = self._transferring = False
+            source._update_drop_target()
+            self._update_drop_target()
+        if source.active_dock is dock:
+            source.active_dock = source.docks[min(index, len(source.docks)-1)] if source.docks else None
+            if source.active_dock:
+                source.active_dock.raise_()
+            source.active_changed.emit(source.active_view)
         dock.show()
         dock.raise_()
         self._activate(dock)
+        dock.owner_changed.emit(self)
+        source.tabs_changed.emit()
+        self.tabs_changed.emit()
+        source._cleanup_empty_container()
+        return True
 
     def reveal_for_drop(self, point):
         """Host hook to reveal a hidden destination during dragging (global coordinates)."""
+        if self.is_detached:
+            self.main_workspace.reveal_for_drop(point)
 
     def can_close_tab(self, dock):
         if dock not in self.docks:
             return False
-        if self._closing or not self.keep_one_tab or dock.isFloating():
+        if self._closing or not self.keep_one_tab or (self.policy is None and dock.isFloating()):
             return True
         return sum(not item.isFloating() for item in self.docks) > 1
 
@@ -522,6 +714,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             if getattr(dock.widget(), 'prepare_close', lambda: True)():
                 self._retiring.remove(dock)
                 dock.deleteLater()
+                self._cleanup_empty_container()
                 if self._closing:
                     self.window().close()
             return
@@ -541,6 +734,8 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 self.active_dock.raise_()
             self.active_changed.emit(self.active_view)
         self._update_drop_target()
+        self.tabs_changed.emit()
+        self._cleanup_empty_container()
 
     def retire_view(self, dock):
         """Remove the visible tab immediately, retaining its worker owners until idle."""
@@ -554,6 +749,10 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self._closing = True
         self._update_drop_target()
         ready = True
+        windows = self.detached_windows if self.main_workspace is self else []
+        for window in tuple(windows):
+            if isValid(window) and not window.workspace.prepare_close():
+                ready = False
         for dock in tuple(self.docks + self._retiring):
             if not getattr(dock.widget(), 'prepare_close', lambda: True)():
                 ready = False

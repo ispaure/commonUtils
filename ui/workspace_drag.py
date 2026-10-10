@@ -13,10 +13,15 @@ class DockWindowDrag(qt.QObject):
     def __init__(self, workspace, dock, point, origin):
         super().__init__(workspace)
         self.workspace, self.dock = workspace, dock
+        self.original_state = workspace.saveState()
+        self.original_geometry = dock.geometry()
+        self.original_floating = dock.isFloating()
+        self.original_active = workspace.active_dock
+        self._finished = False
         self.hotspot = dock.mapFromGlobal(origin)
         self.hotspot.setY(max(15, self.hotspot.y()))
         size = dock.size()
-        dock.setFloating(True)
+        qt.QDockWidget.setFloating(dock, True)
         dock.resize(size)
         dock.show(); dock.raise_()
         dock.tab_header.grabMouse()
@@ -28,7 +33,8 @@ class DockWindowDrag(qt.QObject):
         self.workspace.reveal_for_drop(point)
         for workspace in tuple(_workspaces):
             if (isValid(workspace) and workspace.isVisible() and not workspace._closing
-                    and workspace.dock_group == self.workspace.dock_group):
+                    and workspace.dock_group == self.workspace.dock_group
+                    and self.dock.workspace.can_move_tab(self.dock, destination=workspace)):
                 local = workspace.mapFromGlobal(point)
                 if workspace.rect().contains(local):
                     anchor, placement, preview = workspace._drop_location(local, self.dock)
@@ -52,19 +58,46 @@ class DockWindowDrag(qt.QObject):
         self.dock.raise_()
 
     def finish(self, point, *, cancel=False):
+        if self._finished:
+            return
+        self._finished = True
         qt.QApplication.instance().removeEventFilter(self)
         alive = isValid(self.dock) and self.dock in self.workspace.docks
         target = None if cancel or not alive else self.target(point)
         self.clear_preview()
-        if isValid(self.dock.tab_header):
+        if isValid(self.dock) and isValid(self.dock.tab_header):
             self.dock.tab_header.releaseMouse()
         self.workspace._window_drag = None
+        completed = False
         if target:
             workspace, anchor, placement, preview = target
-            if self.dock.workspace is not workspace:
-                workspace.adopt(self.dock)
-            workspace.arrange(self.dock, placement, anchor=anchor)
-            workspace._update_drop_target()
+            if workspace.adopt(self.dock, placement=placement, anchor=anchor):
+                workspace._update_drop_target()
+                completed = True
+        elif alive and not cancel:
+            from .workspace import _workspaces
+            # An incompatible/closing workspace is a rejected destination, not
+            # empty desktop space. Do not detach on an invalid drop.
+            occupied = any(isValid(owner) and owner.isVisible()
+                           and owner.rect().contains(owner.mapFromGlobal(point))
+                           for owner in tuple(_workspaces))
+            if not occupied:
+                if self.workspace.policy is not None:
+                    window = self.workspace.detach_dock(self.dock)
+                    if window:
+                        window.move(point - self.hotspot)
+                        completed = True
+                else:
+                    completed = True
+        if alive and not completed and self.dock.workspace is self.workspace:
+            self.workspace.restoreState(self.original_state)
+            qt.QDockWidget.setFloating(self.dock, self.original_floating)
+            self.dock.setGeometry(self.original_geometry)
+            self.dock.show()
+            if self.original_active in self.workspace.docks:
+                self.original_active.raise_()
+                self.workspace._activate(self.original_active)
+            self.workspace._update_drop_target()
         self.deleteLater()
 
     def eventFilter(self, watched, event):
@@ -99,27 +132,25 @@ def tab_mime(dock):
 
 class WorkspaceDragMixin:
     def begin_window_drag(self, dock, point, origin):
-        if self._closing:
+        if self._closing or not self.can_move_tab(dock):
             return
+        if self._window_drag is not None:
+            self._window_drag.finish(point, cancel=True)
         self._window_drag = DockWindowDrag(self, dock, point, origin)
 
     def drag_tab(self, dock):
+        if not self.can_move_tab(dock):
+            return
         drag = qt.QDrag(self)
         drag.setMimeData(tab_mime(dock))
         drag.setPixmap(dock.grab())
         point = dock.mapFromGlobal(qt.QCursor.pos())
         drag.setHotSpot(qt.QPoint(max(0, min(point.x(), dock.width() - 1)),
                                 max(0, min(point.y(), dock.height() - 1))))
-        result = drag.exec(qt.Qt.DropAction.MoveAction)
+        # IgnoreAction includes Escape and rejected targets. Ownership stays put;
+        # desktop detachment is handled by the explicit window-drag controller.
+        drag.exec(qt.Qt.DropAction.MoveAction)
         self._drop_preview.hide()
-        if result == qt.Qt.DropAction.IgnoreAction and not qt.QApplication.mouseButtons():
-            from .workspace import _workspaces
-            point = qt.QCursor.pos()
-            if not any(isValid(workspace) and workspace.isVisible() and qt.QRect(workspace.mapToGlobal(qt.QPoint()), workspace.size()).contains(point)
-                       for workspace in tuple(_workspaces)):
-                dock.setFloating(True)
-                dock.move(point - qt.QPoint(40, 15))
-                dock.show()
 
     def _drop_dock(self, event):
         if not event.mimeData().hasFormat(MIME) or self._closing:
@@ -127,7 +158,8 @@ class WorkspaceDragMixin:
         key = bytes(event.mimeData().data(MIME)).decode('ascii', errors='ignore')
         dock = _docks.get(key)
         return dock if (dock is not None and isValid(dock) and isValid(dock.workspace) and dock in dock.workspace.docks
-                        and dock.workspace.dock_group == self.dock_group) else None
+                        and dock.workspace.dock_group == self.dock_group
+                        and dock.workspace.can_move_tab(dock, destination=self)) else None
 
     def _drop_location(self, point, moving):
         target = next((dock for dock in self.docks if dock is not moving
@@ -161,9 +193,9 @@ class WorkspaceDragMixin:
         event.accept()
         if kind == qt.QEvent.Type.Drop:
             self._drop_preview.hide()
-            if dock.workspace is not self:
-                self.adopt(dock)
-            self.arrange(dock, placement, anchor=target)
+            if not self.adopt(dock, placement=placement, anchor=target):
+                event.ignore()
+                return True
             self._update_drop_target()
         else:
             self._drop_preview.setGeometry(preview)

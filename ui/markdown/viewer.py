@@ -38,6 +38,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         layout.setContentsMargins(*READER_MARGINS)
         layout.setSpacing(READER_SPACING)
         toolbar = qt.QHBoxLayout()
+        self.workspace_controls = toolbar
         toolbar.setSpacing(READER_SPACING)
         self.back_button = reader_button(self, 'Back', icon='previous')
         self.forward_button = reader_button(self, 'Forward', icon='next')
