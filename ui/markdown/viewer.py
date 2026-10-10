@@ -127,8 +127,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         toolbar.addWidget(self.diagrams_button)
         self._build_reading_appearance(toolbar)
         from ..read_aloud import ReadAloud, reader_text
-        self.speech = ReadAloud(self, lambda: reader_text(self.browser))
-        toolbar.addWidget(reader_button(self, 'Read aloud', action=self.speech.action, text='Read aloud'))
+        self.speech = ReadAloud(self, lambda: reader_text(self.browser), text_widget=self.browser)
+        self.speech.anchor = reader_button(self, 'Read aloud', action=self.speech.action, text='Read aloud')
+        toolbar.addWidget(self.speech.anchor)
         self.browser.textChanged.connect(self.speech.stop)
         self.edit_button.toggled.connect(self.speech.stop)
         self.edit_button.toggled.connect(lambda editing: self.speech.action.setEnabled(not editing))

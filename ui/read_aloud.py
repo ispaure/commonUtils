@@ -35,12 +35,20 @@ def reader_text(widget, *, start=None):
 
 
 class ReadAloud(qt.QObject):
-    def __init__(self, owner, text_provider, *, engine_factory=None, scope='the current document'):
+    positionChanged = qt.Signal(int, int)
+
+    def __init__(self, owner, text_provider, *, engine_factory=None, scope='the current document',
+                 text_widget=None, start_provider=None):
         super().__init__(owner)
         self.owner = owner
         self.text_provider = text_provider
         self.scope = scope
         self.engine_factory = engine_factory
+        self.text_widget = text_widget
+        self.start_provider = start_provider
+        self._highlight_widget = None
+        self._utterance_offset = 0
+        self.anchor = None
         self.engine = None
         self.panel = None
         self.pending = deque()
@@ -61,16 +69,25 @@ class ReadAloud(qt.QObject):
 
     def show(self):
         if self.panel is not None:
+            self._position_panel()
             self.panel.show()
             self.panel.raise_()
             return
-        self.panel = qt.QDialog(self.owner)
+        self.panel = qt.QDialog(self.owner, qt.Qt.WindowType.Popup)
         self.panel.setWindowTitle('Read aloud')
         self.panel.setModal(False)
         self.panel.finished.connect(self.stop)
         layout = qt.QVBoxLayout(self.panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
+        heading = qt.QHBoxLayout()
+        heading.addWidget(qt.QLabel('Read aloud'), 1)
+        dismiss = qt.QToolButton(self.panel)
+        dismiss.setText('×')
+        dismiss.setAccessibleName('Close read aloud')
+        dismiss.clicked.connect(self.panel.close)
+        heading.addWidget(dismiss)
+        layout.addLayout(heading)
         self.message = qt.QLabel('Reads selected text, or ' + self.scope + '.')
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
@@ -101,6 +118,8 @@ class ReadAloud(qt.QObject):
                 raise RuntimeError('No system speech engine is installed.')
             self.engine = (self.engine_factory or QTextToSpeech)(self)
             self.engine.stateChanged.connect(self._state_changed)
+            if hasattr(self.engine, 'sayingWord'):
+                self.engine.sayingWord.connect(self._word)
             self.engine.errorOccurred.connect(lambda *args: self._error())
             for locale in self.engine.availableLocales():
                 self.language.addItem(locale.nativeLanguageName() + ' — ' + locale.name(), locale)
@@ -117,7 +136,15 @@ class ReadAloud(qt.QObject):
             self.pause.setEnabled(False)
             self.stop_button.setEnabled(False)
         self.panel.resize(380, self.panel.sizeHint().height())
+        self._position_panel()
         self.panel.show()
+
+    def _position_panel(self):
+        anchor = self.anchor or self.owner
+        point = anchor.mapToGlobal(qt.QPoint(anchor.width(), anchor.height() if self.anchor else 48))
+        screen = anchor.screen().availableGeometry()
+        self.panel.move(max(screen.left(), min(point.x() - self.panel.width(), screen.right() - self.panel.width())),
+                        max(screen.top(), min(point.y(), screen.bottom() - self.panel.height())))
 
     def _voices(self):
         self.voice.blockSignals(True)
@@ -145,7 +172,21 @@ class ReadAloud(qt.QObject):
         if self.engine is None:
             return
         self.stop()
-        self.pending.extend(speech_chunks(self.text_provider()))
+        text = self.text_provider()
+        widget = self.text_widget() if callable(self.text_widget) else self.text_widget
+        self._highlight_widget = widget
+        cursor = widget.textCursor() if widget is not None else None
+        base = cursor.selectionStart() if cursor is not None and cursor.hasSelection() else (
+            self.start_provider() if self.start_provider else 0)
+        search = 0
+        capable = bool(self.engine.engineCapabilities() & self.speech_type.Capability.WordByWordProgress)
+        for chunk in speech_chunks(text, 3000 if capable else 350):
+            start = text.find(chunk, search)
+            if start < 0:
+                start = search
+            offset = base + len(text[:start].encode('utf-16-le')) // 2
+            self.pending.append((chunk, offset))
+            search = start + len(chunk)
         if not self.pending:
             self.message.setText('There is no text to read here.')
             return
@@ -153,7 +194,44 @@ class ReadAloud(qt.QObject):
 
     def _next(self):
         if self.pending:
-            self.engine.say(self.pending.popleft())
+            text, self._utterance_offset = self.pending.popleft()
+            self._highlight(self._utterance_offset, len(text.encode('utf-16-le')) // 2)
+            self.engine.say(text)
+
+    def _word(self, word, utterance, start, length):
+        if self._speaking:
+            self._highlight(self._utterance_offset + start, length)
+
+    def _highlight(self, start, length):
+        widget = self._highlight_widget
+        if widget is None:
+            return
+        selection = qt.QTextEdit.ExtraSelection()
+        cursor = qt.QTextCursor(widget.document())
+        maximum = widget.document().characterCount() - 1
+        cursor.setPosition(max(0, min(start, maximum)))
+        cursor.setPosition(max(0, min(start + length, maximum)), qt.QTextCursor.MoveMode.KeepAnchor)
+        selection.cursor = cursor
+        selection.format.setBackground(widget.palette().brush(qt.QPalette.ColorRole.Highlight))
+        selection.format.setForeground(widget.palette().brush(qt.QPalette.ColorRole.HighlightedText))
+        selection.format.setProperty(qt.QTextFormat.Property.UserProperty + 77, True)
+        others = [entry for entry in widget.extraSelections()
+                  if not entry.format.property(qt.QTextFormat.Property.UserProperty + 77)]
+        widget.setExtraSelections(others + [selection])
+        self.positionChanged.emit(cursor.selectionStart(), cursor.selectionEnd())
+        if not hasattr(widget, 'read_pointer'):
+            rectangle = widget.cursorRect(cursor)
+            if not widget.viewport().rect().contains(rectangle.center()):
+                widget.verticalScrollBar().setValue(widget.verticalScrollBar().value() + rectangle.center().y()
+                                                   - widget.viewport().height() // 2)
+
+    def _clear_highlight(self):
+        if self._highlight_widget is not None:
+            widget = self._highlight_widget
+            widget.setExtraSelections([entry for entry in widget.extraSelections()
+                if not entry.format.property(qt.QTextFormat.Property.UserProperty + 77)])
+        self._highlight_widget = None
+        self.positionChanged.emit(-1, -1)
 
     def _state_changed(self, state):
         states = self.speech_type.State
@@ -174,11 +252,14 @@ class ReadAloud(qt.QObject):
             # Avoid starting another utterance inside a native state callback.
             self.advance.start(0)
         else:
+            if finished:
+                self._clear_highlight()
             self.message.setText('Reading…' if speaking else 'Paused' if paused else 'Ready — select text to read just that selection.')
 
     def _error(self):
         self.pending.clear()
         self._speaking = False
+        self._clear_highlight()
         self.message.setText('Read aloud is unavailable: ' + (self.engine.errorString() or 'The system speech engine failed.'))
         self.read.setEnabled(False)
         self.pause.setEnabled(False)
@@ -195,5 +276,6 @@ class ReadAloud(qt.QObject):
         self.advance.stop()
         self.pending.clear()
         self._speaking = False
+        self._clear_highlight()
         if self.engine:
             self.engine.stop()
