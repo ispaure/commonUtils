@@ -30,3 +30,36 @@ See the included Pygments BSD license and the implementation notes in the module
 sniffing, normalized text snapshots and atomic conflict-checked byte writes. Use
 explicit codecs for ambiguous legacy encodings and retain snapshots until save.
 No existing File class is changed or automatically coupled to an editor.
+
+
+## Extended editing components
+
+`CodeEdit.transform(command)` applies undoable line/selection transformations;
+`transforms.transform_lines` is Qt independent. `formatting.validate_text` and
+`format_text` are bounded JSON/XML utilities. JSON output preserves lexical tokens;
+XML rejects DTD/entity declarations and refuses formatting mixed content, CDATA
+and xml:space-preserved content. Validation/formatting is limited to 1 MiB.
+
+`CodeEdit` supports bounded multi-cursor editing via `set_cursors`,
+`add_next_occurrence`, `rectangular_selection` and `clear_extra_cursors`. Alt-click
+adds cursors and Alt+Shift-drag selects columns. Paste distributes matching line
+counts across cursors. Qt cursors retain UTF-16 positions, edits form one undo block,
+and foreign document changes retire extra cursors. There is no virtual-space padding.
+
+`EditorViews` owns two editors with one shared QTextDocument and independent
+navigation. Its `active` editor follows focus. `set_split(Qt.Orientation.Horizontal)`
+creates side-by-side views, Vertical creates stacked views, and None removes the
+extra view. Read-only state and folding are shared. File/session policy remains
+with the caller. `folding.fold_ranges` is a pure bounded structural region finder;
+fold markers and indentation guides follow the editor palette.
+
+`diff.compare_text` returns a bounded text diff model; `DiffDialog` shows read-only
+side-by-side and unified views. An optional application callback applies a selected
+change. `apply_change` rejects stale buffers and returns Python-character offsets
+and replacement text; callers convert offsets to Qt positions and own undo/save
+policy. Limits are 1 MiB and 5,000 lines per side.
+
+Outside this package, `ui.command_palette` searches/configures caller-owned QAction
+mappings. It imports no application feature modules. `session_store.SessionStore`
+provides bounded, atomic, private JSON checkpoints without Qt; callers own record
+schemas, live-instance locking, restoration and worker policy.
