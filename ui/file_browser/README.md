@@ -302,3 +302,9 @@ Cancellation of the last shared index subscriber connects its finish callback
 before interrupting the worker and also checks already-finished workers. This
 closes the race where a thread exits before the new callback is connected but
 its GUI completion is still queued; handles always leave the busy state.
+
+File-view keyboard navigation follows the host platform: macOS Command-Up goes
+up, Command-Down/Command-O opens the selection, and Return renames. Windows and
+Linux use Enter to open, F2 to rename, and Alt-Up to go up. Windows also accepts
+Backspace to go up. Alt-Left/Right traverse history. Text fields and inline
+filename editors retain their own keyboard handling.
