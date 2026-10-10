@@ -65,6 +65,40 @@ class BrowserTests(unittest.TestCase):
             time.sleep(.01)
         self.assertFalse(self.browser.busy or self.browser.folder_busy or self.browser.views._column_selection_pending)
 
+    def test_network_policy_blocks_maps_scans_indexing_and_thumbnails_then_restores_local(self):
+        remote = self.root/'share'; remote.mkdir()
+        from commonUtils.network_filesystems import is_network_location
+        def network(path, **kwargs):
+            path = Path(path)
+            return path == remote or remote in path.parents
+        with patch('commonUtils.network_filesystems.is_network_location', side_effect=network), \
+             patch('commonUtils.directory_index.directory_cache.reconcile_folder') as scan:
+            self.browser.set_directory(remote)
+            self.wait()
+            self.assertTrue(self.browser.network_location)
+            for mode in (3, 4):
+                self.assertFalse(self.browser.view_selector.buttons[mode].isEnabled())
+                self.assertEqual(self.browser.view_selector.buttons[mode].toolTip(), 'Size map disabled for network drives')
+            self.browser.view_selector.setCurrentIndex(3)
+            self.browser.views.set_mode(3)
+            self.assertNotEqual(self.browser.views.currentIndex(), 3)
+            self.browser.refresh(); self.browser.refresh_folder_totals()
+            self.assertIsNone(self.browser.open_storage())
+            self.assertIsNone(self.browser.open_search())
+            self.assertIsNone(self.browser.show_index_details())
+            self.assertFalse(self.browser.refresh_button.isEnabled())
+            self.assertEqual(self.browser.index_watcher.directories(), [])
+            self.assertIn('disabled for network drives', self.browser.index_status.text())
+            with patch.object(self.browser.views, '_enqueue_cover') as cover:
+                self.browser.views._request_cover(remote/'file.cbz'); self.app.processEvents()
+                cover.assert_not_called()
+            scan.assert_not_called()
+        self.browser.set_directory(self.root)
+        self.wait()
+        self.assertFalse(self.browser.network_location)
+        self.assertTrue(self.browser.refresh_button.isEnabled())
+        self.assertTrue(self.browser.view_selector.buttons[3].isEnabled())
+
     def test_search_results_locate_file_and_keep_worker_safe(self):
         from commonUtils.directory_index import DirectoryCache
         support = Path(self.enterContext(TemporaryDirectory()))
@@ -270,6 +304,26 @@ class BrowserTests(unittest.TestCase):
         navigation.set_directory(comic)
         self.assertEqual(navigation.directory, self.root)
         self.assertEqual(navigation.breadcrumbs.paths, [self.root])
+
+    def test_root_breadcrumb_menu_lists_drives_and_opens_network_locations(self):
+        breadcrumbs = self.browser.navigation.breadcrumbs
+        opened = []
+        breadcrumbs.enable_drive_menu(opened.append)
+        self.assertEqual(breadcrumbs.root_button.popupMode(),
+                         qt.QToolButton.ToolButtonPopupMode.InstantPopup)
+        drive = self.root / 'drive'
+        with patch.object(qt.QDir, 'drives', return_value=[qt.QFileInfo(str(drive))]):
+            breadcrumbs.drive_menu.aboutToShow.emit()
+        actions = breadcrumbs.drive_menu.actions()
+        self.assertEqual(actions[0].text(), str(drive))
+        actions[0].trigger()
+        self.assertEqual(opened, [drive])
+        with patch.object(qt.QFileDialog, 'getExistingDirectory', return_value=r'\\server\share'):
+            actions[-1].trigger()
+        self.assertEqual(str(opened[-1]), r'\\server\share')
+        with patch.object(qt.QFileDialog, 'getExistingDirectory', return_value=''):
+            actions[-1].trigger()
+        self.assertEqual(len(opened), 2)
 
     def test_structured_fields_are_selectable_plain_text_and_use_model_folder_icon(self):
         folder = self.root / 'custom folder'

@@ -96,11 +96,30 @@ class BreadcrumbBar(qt.QWidget):
         self.scroll.setFixedHeight(max(30, self.root_button.sizeHint().height() + 4))
         qt.QTimer.singleShot(0, self._show_current)
 
+    def enable_drive_menu(self, open_location):
+        """Put local/mapped drives and network navigation on the root breadcrumb."""
+        self.drive_menu = qt.QMenu(self.root_button)
+        self.root_button.setMenu(self.drive_menu)
+        self.root_button.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
+        def populate():
+            self.drive_menu.clear()
+            for drive in qt.QDir.drives():
+                path = drive.absoluteFilePath()
+                self.drive_menu.addAction(path, lambda checked=False, value=path: open_location(Path(value)))
+            self.drive_menu.addSeparator()
+            def network():
+                path = qt.QFileDialog.getExistingDirectory(self, 'Open network location', '//')
+                if path: open_location(Path(path))
+            self.drive_menu.addAction('Network location…', network)
+        self.drive_menu.aboutToShow.connect(populate)
+
     def _configure(self, button, path):
-        button.setText(path.name or str(path))
+        button.setText(path.name or path.as_posix())
         button.setToolTip(str(path))
         button.setAccessibleName(f'Go to folder {path.name or path}')
-        button.setIcon(self.icons.icon(qt.QFileInfo(str(path))))
+        from ...network_filesystems import is_network_location
+        button.setIcon(self.icons.icon(qt.QFileIconProvider.IconType.Folder) if is_network_location(path)
+                       else self.icons.icon(qt.QFileInfo(str(path))))
         button.setIconSize(qt.QSize(18, 18))
 
     def _show_current(self):

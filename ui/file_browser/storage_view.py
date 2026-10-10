@@ -320,7 +320,9 @@ class StorageView(qt.QWidget):
         self.refresh()
 
     def refresh(self):
-        if self.closing or self.browser.views.currentIndex() != 3 or self.root is None:
+        from ...network_filesystems import is_network_location
+        if (self.closing or self.browser.views.currentIndex() != 3 or self.root is None
+                or is_network_location(self.root)):
             return
         key = (self.root, self.chart_selector.currentIndex(), self._revision)
         if key == self._loaded_key or self.busy and key == self._request_key:

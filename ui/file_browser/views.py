@@ -220,6 +220,9 @@ class FileViews(qt.QStackedWidget):
         self.directory_opened.emit(self.root)
 
     def set_mode(self, mode):
+        from ...network_filesystems import is_network_location
+        if mode >= 3 and self.root is not None and is_network_location(self.root):
+            return
         chart_mode = max(0, mode - 3)
         mode = min(mode, 3)  # Both storage buttons share the established storage widget.
         selected = self.selected_rows()
@@ -274,7 +277,8 @@ class FileViews(qt.QStackedWidget):
             self.tiles.viewport().update()
 
     def _request_cover(self, path):
-        if self.closing:
+        from ...network_filesystems import is_network_location
+        if self.closing or is_network_location(path):
             return
         qt.QTimer.singleShot(0, lambda: self._enqueue_cover(path))
 

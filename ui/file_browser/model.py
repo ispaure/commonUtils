@@ -14,6 +14,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.folder_totals = {}
+        self.network_location = False
         self.size_parents = set()
         self._items = OrderedDict()
 
@@ -43,6 +44,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                 return item.name if isinstance(item, Directory) else item.file_name
             if index.column() == 1:
                 if isinstance(item, Directory):
+                    if self.network_location: return '—'
                     stats = self.folder_totals.get(item.path)
                     if item.path.is_symlink():
                         return '—'
@@ -52,6 +54,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                 return format_datetime(item.modified_time)
         if index.isValid() and index.column() == 1 and role == qt.Qt.ItemDataRole.ToolTipRole:
             if isinstance(self.item(index), Directory):
+                if self.network_location: return 'Folder sizes disabled for network drives'
                 stats = self.folder_totals.get(Path(self.filePath(index)))
                 state = ('Incomplete / calculating' if not stats.complete else 'Cached; checking for changes'
                          if stats.stale else 'Up to date') if stats is not None else 'Calculating'

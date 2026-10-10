@@ -9,6 +9,14 @@ _DOCK_AREAS = (qt.Qt.DockWidgetArea.LeftDockWidgetArea |
                qt.Qt.DockWidgetArea.TopDockWidgetArea)
 
 
+class _DockTabStyle(qt.QProxyStyle):
+    def styleHint(self, hint, option=None, widget=None, return_data=None):
+        if hint == qt.QStyle.StyleHint.SH_TabBar_Alignment:
+            # macOS centers native dock tabs, including our reserved + space.
+            return qt.Qt.AlignmentFlag.AlignLeft.value
+        return super().styleHint(hint, option, widget, return_data)
+
+
 def _tab_button(text, tooltip, parent, callback=None):
     button = qt.QToolButton(parent)
     button.setText(text)
@@ -224,6 +232,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             height = 0 if grouped else 30
             if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
                 dock.tab_header.setFixedHeight(height)
+            dock.tab_header.close_button.setVisible(self.can_close_tab(dock))
             dock.tab_header.close_button.setEnabled(self.can_close_tab(dock))
         for bar in self.findChildren(qt.QTabBar):
             # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
@@ -234,6 +243,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             bar.setElideMode(qt.Qt.TextElideMode.ElideRight)
             bar.setUsesScrollButtons(True)
             if not hasattr(bar, 'workspace_plus'):
+                bar.workspace_style = _DockTabStyle()
+                bar.workspace_style.setParent(bar)
+                bar.setStyle(bar.workspace_style)
                 bar.workspace_plus = _tab_button('+', 'New tab', bar, lambda: self.add_view())
                 bar.currentChanged.connect(self._schedule_tab_headers)
                 bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
@@ -257,6 +269,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                     button.clicked.connect(lambda checked=False, owner=button: owner.dock.close())
                     bar.setTabButton(index, qt.QTabBar.ButtonPosition.LeftSide, button)
                 button.dock = dock
+                button.setVisible(self.can_close_tab(dock))
                 button.setEnabled(self.can_close_tab(dock))
             arrows = [bar.findChild(qt.QToolButton, name)
                       for name in ('ScrollLeftButton', 'ScrollRightButton')]

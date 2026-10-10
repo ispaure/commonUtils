@@ -100,7 +100,7 @@ class IndexSearch(qt.QWidget):
             self.refresh()
 
     def refresh(self):
-        if not self.active or self.closing or self.browser.stopping:
+        if not self.active or self.closing or self.browser.stopping or self.browser.network_location:
             return
         if self.busy:
             self.pending = True
