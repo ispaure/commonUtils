@@ -211,7 +211,7 @@ class MarkdownTests(QtTestCase):
         cursor = self.viewer.editor.textCursor()
         cursor.movePosition(qt.QTextCursor.MoveOperation.End)
         cursor.insertText('Extra')
-        with patch('commonUtils.ui.markdown.io.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.persistence.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertEqual(self.first.read_bytes(), source)
         self.assertTrue(self.viewer.is_modified)
@@ -400,7 +400,7 @@ class MarkdownTests(QtTestCase):
         with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel):
             self.assertFalse(self.viewer.open_document(self.second))
         self.assertIn('Unsaved rich text', self.viewer.formatted_editor.toPlainText())
-        with patch('commonUtils.ui.markdown.io.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.persistence.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertTrue(self.viewer.is_modified)
         self.assertEqual(self.first.read_bytes(), original)
