@@ -8,6 +8,86 @@ MIME = 'application/x-commonutils-workspace-tab'
 _docks = WeakValueDictionary()
 
 
+class DockWindowDrag(qt.QObject):
+    """Move the actual pane and resolve drops consistently on every platform."""
+    def __init__(self, workspace, dock, point, origin):
+        super().__init__(workspace)
+        self.workspace, self.dock = workspace, dock
+        self.hotspot = dock.mapFromGlobal(origin)
+        self.hotspot.setY(max(15, self.hotspot.y()))
+        size = dock.size()
+        dock.setFloating(True)
+        dock.resize(size)
+        dock.show(); dock.raise_()
+        dock.tab_header.grabMouse()
+        qt.QApplication.instance().installEventFilter(self)
+        self.move(point)
+
+    def target(self, point):
+        from .workspace import _workspaces
+        page = getattr(self.workspace, 'page', None)
+        if page is not None and page.window().frameGeometry().contains(point):
+            page.activate()
+        for workspace in tuple(_workspaces):
+            if (isValid(workspace) and workspace.isVisible() and not workspace._closing
+                    and workspace.dock_group == self.workspace.dock_group):
+                local = workspace.mapFromGlobal(point)
+                if workspace.rect().contains(local):
+                    anchor, placement, preview = workspace._drop_location(local, self.dock)
+                    return workspace, anchor, placement, preview
+        return None
+
+    def clear_preview(self):
+        from .workspace import _workspaces
+        for workspace in tuple(_workspaces):
+            if isValid(workspace):
+                workspace._drop_preview.hide()
+
+    def move(self, point):
+        self.dock.move(point - self.hotspot)
+        self.clear_preview()
+        target = self.target(point)
+        if target:
+            workspace, anchor, placement, preview = target
+            workspace._drop_preview.setGeometry(preview)
+            workspace._drop_preview.show(); workspace._drop_preview.raise_()
+        self.dock.raise_()
+
+    def finish(self, point, *, cancel=False):
+        qt.QApplication.instance().removeEventFilter(self)
+        alive = isValid(self.dock) and self.dock in self.workspace.docks
+        target = None if cancel or not alive else self.target(point)
+        self.clear_preview()
+        if isValid(self.dock.tab_header):
+            self.dock.tab_header.releaseMouse()
+        self.workspace._window_drag = None
+        if target:
+            workspace, anchor, placement, preview = target
+            if self.dock.workspace is not workspace:
+                workspace.adopt(self.dock)
+            workspace.arrange(self.dock, placement, anchor=anchor)
+            workspace._update_drop_target()
+        self.deleteLater()
+
+    def eventFilter(self, watched, event):
+        if not isValid(self.dock) or self.dock not in self.workspace.docks or self.workspace._closing:
+            self.finish(qt.QCursor.pos(), cancel=True)
+            return False
+        if event.type() == qt.QEvent.Type.MouseMove:
+            if not event.buttons() & qt.Qt.MouseButton.LeftButton:
+                self.finish(event.globalPosition().toPoint())
+                return True
+            self.move(event.globalPosition().toPoint())
+            return True
+        if event.type() == qt.QEvent.Type.MouseButtonRelease and event.button() == qt.Qt.MouseButton.LeftButton:
+            self.finish(event.globalPosition().toPoint())
+            return True
+        if event.type() == qt.QEvent.Type.KeyPress and event.key() == qt.Qt.Key.Key_Escape:
+            self.finish(qt.QCursor.pos(), cancel=True)
+            return True
+        return False
+
+
 def register_dock(dock):
     dock.drag_id = uuid4().hex
     _docks[dock.drag_id] = dock
@@ -20,6 +100,11 @@ def tab_mime(dock):
 
 
 class WorkspaceDragMixin:
+    def begin_window_drag(self, dock, point, origin):
+        if self._closing:
+            return
+        self._window_drag = DockWindowDrag(self, dock, point, origin)
+
     def drag_tab(self, dock):
         drag = qt.QDrag(self)
         drag.setMimeData(tab_mime(dock))
