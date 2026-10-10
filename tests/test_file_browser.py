@@ -15,6 +15,7 @@ from commonUtils.filesystem import BrowserPanel, BrowserDetails, BrowserAction
 from commonUtils.formats.registry import register_file_type, file_types
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
+from commonUtils.ui.file_browser.tiles import CELL_PADDING, COVER_WIDTH
 
 
 class CustomFile(File):
@@ -383,9 +384,10 @@ class BrowserTests(QtTestCase):
             self.app.processEvents()
             tiles.fit_grid()
             usable = tiles.viewport().width() - 2
-            columns = max(1, usable // 99)
+            preferred_width = round(COVER_WIDTH * tiles.folder_scale)
+            columns = max(1, usable // (preferred_width + CELL_PADDING))
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
-            self.assertEqual(tiles.iconSize().width(), min(71, max(16, tiles.gridSize().width() - 28)))
+            self.assertEqual(tiles.iconSize().width(), min(preferred_width, max(16, tiles.gridSize().width() - CELL_PADDING)))
 
     def test_column_single_click_opens_file_information(self):
         from PySide6.QtTest import QTest
@@ -525,7 +527,7 @@ class BrowserTests(QtTestCase):
             self.app.processEvents()
             root = tiles.rootIndex()
             usable = tiles.viewport().width() - 2
-            columns = max(1, usable // 99)
+            columns = max(1, usable // (round(COVER_WIDTH * tiles.folder_scale) + CELL_PADDING))
             self.assertLess(usable - columns * tiles.gridSize().width(), columns)
             first_row = [tiles.visualRect(tiles.model().index(row, 0, root)) for row in range(columns)]
             self.assertTrue(all(rect.top() == first_row[0].top() for rect in first_row))
