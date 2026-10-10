@@ -46,3 +46,10 @@ class PerforceTests(unittest.TestCase):
         with patch.object(p4_utils, 'get_os', return_value=p4_utils.OS.WIN), patch.object(cmdShellWrapper, 'run_command', return_value=result), patch.object(p4_utils, 'log', side_effect=fail):
             with self.assertRaisesRegex(RuntimeError, 'timed out'):
                 p4_utils.exec_p4_command('p4 edit file')
+
+    def test_windows_configured_executable_is_used(self):
+        configure_runtime(PerforceRuntime(executable=lambda platform: r'C:\Program Files\Perforce\p4.exe'))
+        result = cmdShellWrapper.CommandResult(0, stdout=('ok',))
+        with patch.object(p4_utils, 'get_os', return_value=p4_utils.OS.WIN), patch.object(cmdShellWrapper, 'run_command', return_value=result) as run:
+            p4_utils.exec_p4_command('p4 info')
+            self.assertEqual(run.call_args.args[0], '\"C:\\Program Files\\Perforce\\p4.exe\" info')

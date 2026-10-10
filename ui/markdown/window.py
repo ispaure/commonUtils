@@ -4,7 +4,7 @@ from .viewer import MarkdownViewer
 
 
 class MarkdownWindow(qt.QMainWindow):
-    document_editor_name = 'Markdown / Obsidian'
+    document_editor_name = 'Markdown Editor'
     document_editor_id = 'markdown'
     def __init__(self, path, parent=None, *, allow_edit=False):
         super().__init__(parent)
@@ -37,7 +37,10 @@ class MarkdownWindow(qt.QMainWindow):
             view_menu.addAction(action)
         self.setWindowTitle('Documentation')
         self.resize(900, 700)
-        self.viewer.open_document(path)
+        if path is None:
+            self.viewer.new_document()
+        else:
+            self.viewer.open_document(path)
 
     def _update_title(self):
         path = self.viewer.current_path

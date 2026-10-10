@@ -79,7 +79,8 @@ def p4_fstat_dict(file_path_string, silent_mode=False) -> Optional[List[Dict[str
                             split_i_up_to_last += value
                 result_dict[split_i[0]] = split_i_up_to_last
             else:
-                result_dicts_lst.append(result_dict)
+                if result_dict:
+                    result_dicts_lst.append(result_dict)
                 result_dict = {}
 
     if result_dict:
@@ -179,6 +180,9 @@ def exec_p4_command(command: str):
 
             # Replace p4 in command with the path (in quotes)
             command = f'"{p4_path}"{command[2:]}'
+
+        case OS.WIN:
+            command = subprocess.list2cmdline([p4_path]) + command[2:]
 
     # Execute the command
     result = cmdShellWrapper.run_command(command, shell=True, idle_timeout=15)
