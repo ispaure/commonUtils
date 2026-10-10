@@ -9,11 +9,9 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from hashlib import sha256
 import codecs
-import os
 from pathlib import Path
 import re
 import stat
-from tempfile import NamedTemporaryFile
 
 MAX_BYTES = 16 * 1024 * 1024
 SIMPLE_BYTES = 1024 * 1024
@@ -221,24 +219,6 @@ def write_text_file(path, content, *, expected=None, allow_overwrite=False):
                 "The original file was deleted. Choose Save As to recover your buffer."
             )
 
-    check()
-    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
-    staged = None
-    try:
-        with NamedTemporaryFile(dir=path.parent, delete=False) as stream:
-            staged = Path(stream.name)
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        if mode is not None:
-            staged.chmod(mode)
-        check()
-        if expected is None and not allow_overwrite:
-            # Atomic no-clobber creation protects a racing new destination.
-            os.link(staged, path)
-            staged.unlink()
-        else:
-            os.replace(staged, path)
-    finally:
-        if staged is not None:
-            staged.unlink(missing_ok=True)
+    from .persistence import atomic_write_bytes
+    atomic_write_bytes(path, content, validate=check,
+                       overwrite=expected is not None or allow_overwrite)
