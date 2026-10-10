@@ -233,6 +233,20 @@ class ContainerTests(QtTestCase):
                 if platform != 'darwin':
                     self.assertTrue(view.menuBar().isVisible())
 
+    def test_hidden_main_workspace_does_not_replace_active_host_menus(self):
+        from commonUtils.ui.workspace_menus import sync_native_menus
+        with patch('commonUtils.ui.workspace_menus.sys.platform', 'darwin'):
+            host = qt.QMainWindow(); self.hosts.append(host)
+            host.menuBar().addMenu('Host')
+            workspace = Workspace(lambda unused: qt.QMainWindow(), host, policy=WorkspacePolicy())
+            host.setCentralWidget(workspace); host.show()
+            first = workspace.add_view(); first.menuBar().addMenu('File')
+            sync_native_menus(host, first)
+            self.assertEqual([action.text() for action in host.menuBar().actions()], ['File'])
+            workspace.hide()
+            workspace.add_view()
+            self.assertEqual([action.text() for action in host.menuBar().actions()], ['File'])
+
 
 if __name__ == '__main__':
     unittest.main()
