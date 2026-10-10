@@ -18,9 +18,32 @@ class LinkSpan:
 
 # Angle-bracket destinations and balanced parentheses cover typical file/URL links.
 _LINK = re.compile(r'(?<![\\!\[])(?:'
-    r'\[\[(?P<page>[^\]\n|]+)(?:\|(?P<alias>[^\]\n]+))?\]\]'
+    r'\[(?P<reference_label>[^\]\n]+)\]\[(?P<reference_target>[^\]\n]+)\]'
+    r'|\[\[(?P<page>[^\]\n|]+)(?:\|(?P<alias>[^\]\n]+))?\]\]'
     r'|\[(?P<shortpage>[^\]\n|]+)\|(?P<shortalias>[^\]\n]+)\]'
     r'|\[(?P<label>[^\]\n]+)\]\((?P<url><[^>\n]+>|(?:[^()\s]|\([^()\n]*\))+)(?:[ \t]+[\"\'][^\n]*?[\"\'])?\))')
+
+
+_REFERENCE = re.compile(r'^ {0,3}\[([^]\n]+)\]:[ \t]*(<[^>\n]+>|\S+)(?:[ \t]+.*)?$')
+
+
+def reference_destinations(markdown):
+    references = {}
+    fence = None
+    for line in markdown.splitlines():
+        if fence:
+            if fence_close(line, fence):
+                fence = None
+            continue
+        opening = FENCE_OPEN.fullmatch(line)
+        if opening:
+            fence = opening.group(1)
+            continue
+        match = _REFERENCE.fullmatch(line)
+        if match:
+            key = ' '.join(match.group(1).split()).casefold()
+            references.setdefault(key, match.group(2).strip('<>'))
+    return references
 
 
 def wiki_target(target):
@@ -33,12 +56,19 @@ def wiki_target(target):
     return quote(path, safe='/:@%?=&+') + (('#' + quote(heading, safe='%-')) if separator else '')
 
 
-def link_spans(text):
+def link_spans(text, references=None):
     code = [(span.start, span.end) for span in inline_spans(text) if span.marker.startswith('`')]
     for match in _LINK.finditer(text):
         if any(start <= match.start() < end for start, end in code):
             continue
-        if match.group('url') is not None:
+        if match.group('reference_target') is not None:
+            label = 'reference_label'
+            key = ' '.join(match.group('reference_target').split()).casefold()
+            target = (references or {}).get(key)
+            wiki = target is None
+            if wiki:
+                target = wiki_target(match.group('reference_target'))
+        elif match.group('url') is not None:
             label = 'label'
             target = match.group('url').strip('<>')
             wiki = False
@@ -48,13 +78,17 @@ def link_spans(text):
                 label = 'shortalias'
             target = wiki_target(match.group('page') or match.group('shortpage'))
             wiki = True
-        yield LinkSpan(match.start(), match.end(), match.start(label), match.end(label), target, wiki)
+        content_start = match.start(label)
+        if label == 'reference_label' and '|' in match.group(label):
+            content_start += match.group(label).index('|') + 1
+        yield LinkSpan(match.start(), match.end(), content_start, match.end(label), target, wiki)
 
 
 def render_links(markdown):
     """Expand aliases only for preview; preserve source and literal code unchanged."""
     lines = []
     fence = None
+    references = reference_destinations(markdown)
     for line in markdown.splitlines(keepends=True):
         opening = FENCE_OPEN.fullmatch(line.rstrip('\r\n'))
         if fence:
@@ -65,8 +99,8 @@ def render_links(markdown):
         if opening:
             fence = opening.group(1)
         else:
-            for span in reversed(list(link_spans(line))):
-                if span.wiki:
+            for span in reversed(list(link_spans(line, references))):
+                if span.wiki or re.fullmatch(r'\[[^]\n]+\]\[[^]\n]+\]', line[span.start:span.end]):
                     label = line[span.content_start:span.content_end]
                     line = line[:span.start] + '[' + label + '](' + span.target + ')' + line[span.end:]
         lines.append(line)

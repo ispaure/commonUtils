@@ -93,8 +93,11 @@ Standard `[label](https://example.com)` links and local `[[Page]]`, `[[Page|Labe
 `[Page|Label]` aliases are supported in reading and formatted editing. Aliases
 resolve relative to the current document, adding `.md` when no extension is given;
 `[[Page#heading|Label]]` also works. Explicit Markdown destinations retain their
-extension as written. Code examples and escaped links stay literal. In formatted
-editing the cursor reveals link syntax; Ctrl/Cmd-click follows a link. Ordinary
+extension as written. Paired `[label][reference]` links resolve Markdown reference
+definitions when present; otherwise the second bracket names a local page.
+`[page|Label][target]` displays only `Label`. Inactive link brackets and destinations
+have zero width, keeping the visible label aligned with surrounding text. Code examples and escaped links stay literal. In formatted
+editing the cursor or pointer hovering over a link reveals its syntax; Ctrl/Cmd-click follows a link. Ordinary
 clicks place the cursor for editing. Source is retained as authored when saved.
 
 **Contents** opens a floating list at the right side of the toolbar, with indented
@@ -153,10 +156,10 @@ assert split_frontmatter(updated).body == parts.body
 
 Formatted mode follows the [Obsidian Live Preview rule](https://obsidian.md/help/edit-and-read)
 for supported inline spans: hide Markdown markers outside the active span and show
-them when the caret is inside it or the selection overlaps it. This includes the
+them when the pointer or caret is inside it or the selection overlaps it. This includes the
 position immediately after the last letter, before the closing marker. Moving or
 selecting does not change the text, dirty flag or undo history. Heading prefixes
-also appear on the active heading. Inactive heading prefixes have zero horizontal
+also appear on the active or hovered heading, including headings containing links. Inactive heading prefixes have zero horizontal
 advance, including their trailing space. Active link text and delimiters are white;
 inactive links retain their normal link styling. Bold/italic remain styled while their delimiters
 are visible; incomplete delimiters remain plain so they can be repaired.

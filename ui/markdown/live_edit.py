@@ -2,7 +2,7 @@
 from .. import pyside as qt
 from ..text_commands import wrap_selection
 from .syntax import _units
-from .links import link_spans
+from .links import link_spans, reference_destinations
 from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
 from .preview import LivePreviewHighlighter
 from .syntax import HEADING, fenced_regions
@@ -30,6 +30,10 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         super().__init__(parent)
         self._live_document = LiveMarkdownDocument(self)
         self.setDocument(self._live_document)
+        self._hover_position = None
+        self._hover_point = None
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
         self._highlighter = LivePreviewHighlighter(self)
         self._wrapped_selection = None
         self.table_actions = ()
@@ -37,12 +41,38 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         self.selectionChanged.connect(self._highlighter.refresh_cursor)
 
     def setMarkdown(self, markdown):
+        self._hover_position = None
+        self._hover_point = None
         self._highlighter.setDocument(None)
         protected, tokens = protect_escapes(markdown)
         self.document().setMarkdown(protected,
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         materialize_formats(self)
         restore_escapes(self.document(), tokens)
+        # Qt imports heading text with a relative size adjustment, which takes
+        # precedence over the highlighter's collapsed-marker font. Normalize
+        # it to the same absolute sizes used for headings typed in this editor.
+        block = self.document().begin()
+        while block.isValid():
+            level = block.blockFormat().headingLevel()
+            if level:
+                iterator = block.begin()
+                formats = []
+                while not iterator.atEnd():
+                    fragment = iterator.fragment()
+                    fmt = fragment.charFormat()
+                    fmt.clearProperty(qt.QTextFormat.Property.FontSizeAdjustment)
+                    size = self.font().pointSizeF()
+                    fmt.setFontPointSize((size if size > 0 else 12) *
+                                         (1.9, 1.6, 1.35, 1.2, 1.1, 1)[level - 1])
+                    formats.append((fragment.position(), fragment.length(), fmt))
+                    iterator += 1
+                for position, length, fmt in formats:
+                    cursor = qt.QTextCursor(self.document())
+                    cursor.setPosition(position)
+                    cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
+                    cursor.setCharFormat(fmt)
+            block = block.next()
         style_document(self.document(), self.palette())
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
@@ -134,6 +164,22 @@ class FormattedMarkdownEdit(qt.QTextEdit):
             self.setCurrentCharFormat(chars)
         self._highlighter.refresh_cursor()
 
+    def mouseMoveEvent(self, event):
+        point = event.position().toPoint()
+        # Reformatting changes glyph positions. Keep a stationary pointer's hit
+        # stable so revealing a prefix does not immediately hide it again.
+        if point != self._hover_point:
+            self._hover_point = point
+            self._hover_position = self.cursorForPosition(point).position()
+            self._highlighter.refresh_cursor()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover_position = None
+        self._hover_point = None
+        self._highlighter.refresh_cursor()
+        super().leaveEvent(event)
+
     def mousePressEvent(self, event):
         if (event.button() == qt.Qt.MouseButton.LeftButton and event.modifiers() &
                 (qt.Qt.KeyboardModifier.ControlModifier | qt.Qt.KeyboardModifier.MetaModifier)):
@@ -144,7 +190,7 @@ class FormattedMarkdownEdit(qt.QTextEdit):
                           for first, last, _, _ in fenced_regions(self.document()))
             if not in_code:
                 offset = cursor.positionInBlock()
-                for span in link_spans(block.text()):
+                for span in link_spans(block.text(), reference_destinations(self.toPlainText())):
                     if _units(block.text()[:span.start]) <= offset < _units(block.text()[:span.end]):
                         self.linkActivated.emit(qt.QUrl(span.target))
                         event.accept()
