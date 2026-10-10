@@ -4,6 +4,8 @@ from .viewer import MarkdownViewer
 
 
 class MarkdownWindow(qt.QMainWindow):
+    document_editor_name = 'Markdown / Obsidian'
+    document_editor_id = 'markdown'
     def __init__(self, path, parent=None, *, allow_edit=False):
         super().__init__(parent)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)

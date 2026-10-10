@@ -707,3 +707,9 @@ Workspace tab bars use horizontal dragging to reorder panes. Drag outside the
 tab bar to detach and move the whole pane, then drop to tabify or split. The
 workspace keeps its dock order synchronized with native tab order so indexed
 close actions and document lists refer to the visible tab.
+
+
+Floating `WorkspaceDock` panes use regular native window flags, including
+minimize/maximize controls and no transient parent. The inner tab header still
+supports dragging and double-click reattachment. Their cooperative close handler
+and `WA_QuitOnClose=False` preserve the document/worker lifecycle.
