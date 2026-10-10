@@ -34,6 +34,23 @@ class MarkdownTests(unittest.TestCase):
         self.addCleanup(self.viewer.deleteLater)
         self.app.processEvents()
 
+    def test_edit_read_icons_and_speech_action_visibility(self):
+        viewer = MarkdownViewer(allow_edit=True)
+        viewer.set_editing(False)
+        self.addCleanup(viewer.deleteLater)
+        viewer.show()
+        self.assertFalse(viewer.edit_button.icon().isNull())
+        self.assertEqual(viewer.edit_button.toolButtonStyle(), qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.assertTrue(viewer.speech.action.isVisible())
+        viewer.set_editing(True)
+        self.assertEqual(viewer.edit_button.accessibleName(), 'Read Markdown')
+        self.assertFalse(viewer.speech.action.isVisible())
+        self.assertFalse(viewer.speech.anchor.isVisible())
+        viewer.set_editing(False)
+        self.assertEqual(viewer.edit_button.accessibleName(), 'Edit Markdown')
+        self.assertTrue(viewer.speech.action.isVisible())
+        self.assertTrue(viewer.speech.anchor.isVisible())
+
     def test_long_document_and_html_block_keep_tail_in_reading_and_editing(self):
         text = '# Long\n\n' + 'Paragraph text.\n\n' * 3000 + '<div>\nText\n\nTAIL_SENTINEL'
         self.first.write_text(text)

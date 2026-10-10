@@ -14,6 +14,20 @@ class LiveMarkdownTests(unittest.TestCase):
         self.editor = FormattedMarkdownEdit()
         self.addCleanup(self.editor.deleteLater)
 
+    def test_inactive_emphasis_markers_have_zero_advance_without_mutating_text(self):
+        self.editor.setMarkdown('Before **bold** after\n\nElsewhere')
+        source = self.editor.toPlainText()
+        self.editor.resize(500, 300); self.editor.show()
+        cursor = self.editor.textCursor(); cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+        self.editor.setTextCursor(cursor); self.app.processEvents()
+        line = self.editor.document().begin().layout().lineAt(0)
+        self.assertAlmostEqual(line.cursorToX(7)[0], line.cursorToX(9)[0], places=2)
+        self.assertAlmostEqual(line.cursorToX(13)[0], line.cursorToX(15)[0], places=2)
+        cursor.setPosition(10); self.editor.setTextCursor(cursor); self.app.processEvents()
+        line = self.editor.document().begin().layout().lineAt(0)
+        self.assertGreater(line.cursorToX(9)[0] - line.cursorToX(7)[0], 1)
+        self.assertEqual(self.editor.toPlainText(), source)
+
     def test_inactive_heading_has_zero_marker_width_and_keeps_source(self):
         self.editor.setMarkdown('###### Heading\n\nOther')
         self.editor.resize(500, 300)
@@ -190,7 +204,7 @@ class LiveMarkdownTests(unittest.TestCase):
         offset = position - block.position()
         for span in block.layout().formats():
             if span.start <= offset < span.start + span.length:
-                return span.format.fontPointSize()
+                return span.format.font().pixelSize() if span.format.font().pixelSize() > 0 else span.format.fontPointSize()
         return 0
 
     def test_cursor_and_selection_reveal_markers_without_mutation_or_dirty_undo(self):
@@ -201,7 +215,7 @@ class LiveMarkdownTests(unittest.TestCase):
         cursor = self.editor.textCursor()
         cursor.movePosition(qt.QTextCursor.MoveOperation.End)
         self.editor.setTextCursor(cursor)
-        self.assertEqual(self.marker_size(7), 0.1)
+        self.assertEqual(self.marker_size(7), 1)
         cursor.setPosition(7 + 2 + 3)
         self.editor.setTextCursor(cursor)
         self.assertEqual(self.marker_size(7), 0)
@@ -216,7 +230,7 @@ class LiveMarkdownTests(unittest.TestCase):
         cursor.clearSelection()
         cursor.movePosition(qt.QTextCursor.MoveOperation.End)
         self.editor.setTextCursor(cursor)
-        self.assertEqual(self.marker_size(7), 0.1)
+        self.assertEqual(self.marker_size(7), 1)
         self.assertEqual(self.editor.toPlainText(), before)
         self.assertEqual(self.editor.document().toMarkdown(), source)
         self.assertFalse(self.editor.document().isModified())
