@@ -39,7 +39,7 @@ def is_encrypted(path):
 
 
 @contextmanager
-def open_archive(path, mode='r', *, password=None):
+def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLATED, compresslevel=None):
     """Open plain/ZipCrypto/AES ZIPs; never silently write unencrypted output."""
     password = password_bytes(password)
     if mode not in ('r', 'w', 'x'):
@@ -50,12 +50,12 @@ def open_archive(path, mode='r', *, password=None):
     if mode == 'r' and encrypted and not password:
         raise ArchivePasswordError(f'Archive password required: {Path(path).name}')
     if encrypted:
-        archive = pyzipper.AESZipFile(str(path), mode, compression=zipfile.ZIP_DEFLATED)
+        archive = pyzipper.AESZipFile(str(path), mode, compression=compression, compresslevel=compresslevel)
         archive.setpassword(password)
         if mode != 'r':
             archive.setencryption(pyzipper.WZ_AES, nbits=256)
     else:
-        archive = zipfile.ZipFile(path, mode, compression=zipfile.ZIP_DEFLATED)
+        archive = zipfile.ZipFile(path, mode, compression=compression, compresslevel=compresslevel)
     try:
         with archive:
             yield archive
@@ -104,8 +104,9 @@ def validate_members(archive):
                 raise ValueError(f'Archive file is also a directory: {parent}')
 
 
-def authenticate(path, password, *, all_members=False, for_rewrite=False):
+def authenticate(path, password, *, all_members=False, for_rewrite=False, cancelled=lambda: False):
     """Authenticate by fully reading encrypted data, not just its weak header check."""
+    check_cancelled(cancelled)
     with zipfile.ZipFile(path) as headers:
         files = [info for info in headers.infolist() if not info.is_dir()]
         protected = [info for info in files if info.flag_bits & 1]
@@ -122,7 +123,7 @@ def authenticate(path, password, *, all_members=False, for_rewrite=False):
             names = names[:1]
         for name in names:
             with archive.open(name) as stream:
-                for _ in iter_chunks(stream):
+                for _ in iter_chunks(stream, cancelled=cancelled):
                     pass
 
 
@@ -243,6 +244,7 @@ def write_directory(source, destination, *, password=None, keep_root=True):
 
 
 def create_archive(sources, destination, *, password=None,
+                   compression=zipfile.ZIP_DEFLATED, compresslevel=None,
                    progress=lambda done, total, message: None, cancelled=lambda: False):
     """Create a verified separate ZIP atomically; never delete or replace sources.
 
@@ -303,13 +305,14 @@ def create_archive(sources, destination, *, password=None,
     from tempfile import TemporaryDirectory
     with TemporaryDirectory(prefix='.logistics-zip-', dir=destination.parent) as temp:
         staged = Path(temp) / 'result.zip'
-        with open_archive(staged, 'w', password=password) as archive:
+        with open_archive(staged, 'w', password=password, compression=compression, compresslevel=compresslevel) as archive:
             for path, name in entries:
                 check_cancelled(cancelled)
                 if path.is_symlink() or signature(path.stat()) != signature(signatures[path]):
                     raise RuntimeError(f'Source changed while archiving: {path}')
                 info = copy_member_info(zipfile.ZipInfo.from_file(path, name), archive)
                 info.compress_type = archive.compression
+                info._compresslevel = compresslevel
                 if path.is_dir():
                     archive.writestr(info, b'')
                 else:
