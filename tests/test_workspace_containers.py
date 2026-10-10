@@ -54,6 +54,8 @@ class ContainerTests(QtTestCase):
         source.add_view('first'); dock = source.active_dock
         self.settle()
         self.assertEqual(dock.tab_header.height(), 0)
+        self.assertEqual(dock.tab_header.sizeHint().height(), 0)
+        self.assertEqual(dock.widget().y(), 0)
         self.assertTrue(dock.local_new_button.isVisible())
         self.assertIsNone(source.detach_active())
         target = self.create(browser=True)
@@ -70,6 +72,7 @@ class ContainerTests(QtTestCase):
         self.settle(); dock = detached.active_dock
         self.assertEqual(len(main.docks), 1)
         self.assertEqual(dock.tab_header.height(), 0)
+        self.assertEqual(dock.widget().y(), 0)
         self.assertTrue(detached.can_move_tab(dock))
         self.assertTrue(dock.return_button.isVisible())
         dock.local_new_button.click(); self.settle()
@@ -77,6 +80,7 @@ class ContainerTests(QtTestCase):
         self.assertEqual(len(detached.docks), 2)
         bar = next(bar for bar in detached.findChildren(qt.QTabBar) if bar.parent() is detached and bar.count() == 2)
         self.assertTrue(bar.isVisible())
+        self.assertEqual(detached.active_dock.widget().y(), 0)
         self.assertIsNot(detached.active_dock, dock)
         detached.close_active(); self.settle()
         self.assertEqual(detached.docks, [dock])

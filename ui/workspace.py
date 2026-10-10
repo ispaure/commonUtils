@@ -54,6 +54,18 @@ class DockTabHeader(qt.QWidget):
         self.setFixedHeight(30)
         self._press = None
 
+    def sizeHint(self):
+        # QDockWidget reserves its title area from this hint, even when the
+        # title widget itself has been assigned a fixed height of zero.
+        hint = super().sizeHint()
+        hint.setHeight(self.minimumHeight())
+        return hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setHeight(self.minimumHeight())
+        return hint
+
     def mousePressEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton:
             self._press = event.globalPosition().toPoint()
