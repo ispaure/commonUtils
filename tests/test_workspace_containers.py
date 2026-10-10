@@ -218,6 +218,21 @@ class ContainerTests(QtTestCase):
             self.assertEqual(main.detached_windows, [])
             self.assertTrue(isValid(view))
 
+    def test_direct_mainwindow_views_keep_menus_in_detached_container(self):
+        for platform in ('darwin', 'win32', 'linux'):
+            with self.subTest(platform=platform), patch('commonUtils.ui.workspace_menus.sys.platform', platform):
+                host = qt.QMainWindow(); self.hosts.append(host)
+                workspace = Workspace(lambda unused: qt.QMainWindow(), host, policy=WorkspacePolicy())
+                host.setCentralWidget(workspace); host.show()
+                view = workspace.add_view(); view.menuBar().addMenu('Tools')
+                # Menus can be built after add_view; activation must still route them.
+                window = workspace.detach_active(); self.settle()
+                self.assertEqual([action.text() for action in window.menuBar().actions()], ['Tools'])
+                window.close(); self.settle()
+                self.assertIs(workspace.active_view, view)
+                if platform != 'darwin':
+                    self.assertTrue(view.menuBar().isVisible())
+
 
 if __name__ == '__main__':
     unittest.main()
