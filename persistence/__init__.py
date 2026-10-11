@@ -3,6 +3,35 @@ import os
 from pathlib import Path
 import stat
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
+
+
+def promote_path(staged, destination):
+    """Publish a staged file/tree, keeping the old path as a recovery copy.
+
+    Stage on the destination filesystem. If promotion fails, restore the old
+    path before raising. Return its recovery path, or None for a new install.
+    Callers validate the staged contents before invoking this function.
+    """
+    staged, destination = Path(staged), Path(destination)
+    if staged.is_symlink() or destination.is_symlink():
+        raise ValueError('Refusing to replace a symbolic link')
+    from ..filesystem.links import is_junction
+    if is_junction(staged) or is_junction(destination):
+        raise ValueError('Refusing to replace a junction')
+    if not staged.exists():
+        raise FileNotFoundError(staged)
+    backup = None
+    if destination.exists():
+        backup = destination.with_name(f'{destination.name}.previous-{uuid4().hex}')
+        destination.rename(backup)
+    try:
+        staged.rename(destination)
+    except BaseException:
+        if backup is not None:
+            backup.rename(destination)
+        raise
+    return backup
 
 
 def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
