@@ -96,3 +96,9 @@ limits each input/result to 1,048,576 Python characters and 5,000 lines; Git cal
 also bound raw blob bytes. Hunk rendering supplies character emphasis for short
 regions. `diff_bands` provides the extracted unified-patch renderer and dual
 line-number gutter for consumers with patch presentation models.
+
+Filename detection recognizes `.pyi`, PHP with embedded HTML, and case-insensitive
+`.blade.php` compound names. Blade uses a small directive/interpolation layer over
+Pygments HTML/PHP grammars; multiline Blade constructs use the bounded per-line
+fallback and are not parsed as a complete template. Both light and dark palettes
+use the same shared highlighter. Hosts need no separate language definitions.

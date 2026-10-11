@@ -13,6 +13,8 @@ from .. import pyside as qt
 LANGUAGES = (
     ("Plain Text", "text"),
     ("Python", "python"),
+    ("PHP / HTML", "html+php"),
+    ("Laravel Blade", "blade"),
     ("Shell", "bash"),
     ("Windows Batch", "batch"),
     ("PowerShell", "powershell"),
@@ -37,6 +39,8 @@ LANGUAGES = (
 COMMENT_PREFIX = {
     "bash": "#",
     "python": "#",
+    "php": "//",
+    "html+php": "//",
     "powershell": "#",
     "yaml": "#",
     "toml": "#",
@@ -55,11 +59,18 @@ COMMENT_PREFIX = {
 
 
 def detect_language(path, text=""):
+    name = str(path).lower() if path else ""
+    if name.endswith(".blade.php"):
+        return "blade"
+    if name.endswith(".php"):
+        return "html+php"
+    if name.endswith((".py", ".pyi")):
+        return "python"
     try:
         from pygments.lexers import get_lexer_for_filename
 
         if path:
-            name = str(path)
+            name = str(path).lower()
             if name.endswith((".command", ".zsh", ".bash")):
                 return "bash"
             if name.endswith((".env", ".gitignore", ".editorconfig", ".conf", ".cfg")):
@@ -157,7 +168,10 @@ class SyntaxHighlighter(qt.QSyntaxHighlighter):
         try:
             from pygments.lexers import get_lexer_by_name
 
-            if language != "text":
+            if language == "blade":
+                from .blade import BladeLexer
+                self.lexer = BladeLexer(stripnl=False, ensurenl=False)
+            elif language != "text":
                 self.lexer = get_lexer_by_name(language, stripnl=False, ensurenl=False)
         except (ImportError, ValueError):
             self.language = "text"
