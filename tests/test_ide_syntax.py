@@ -23,3 +23,18 @@ class SyntaxTests(QtTestCase):
             highlighter.refresh_theme()
             self.assertTrue(editor.document().firstBlock().layout().formats())
         editor.close()
+
+
+    def test_php_and_html_states_survive_line_boundaries(self):
+        from pygments.token import Keyword, Name
+        editor = CodeEdit()
+        editor.setPlainText('<?php\nclass Thing {}\n?>\n<h1>Title</h1>')
+        highlighter = SyntaxHighlighter(editor, 'html+php')
+        highlighter.rehighlight()
+        php = editor.document().findBlockByNumber(1).layout().formats()
+        self.assertTrue(any(span.start == 0 and span.length == 5 and
+                            span.format == highlighter.token_format(Keyword) for span in php))
+        html = editor.document().findBlockByNumber(3).layout().formats()
+        self.assertTrue(any(span.start == 1 and span.length == 2 and
+                            span.format == highlighter.token_format(Name.Tag) for span in html))
+        editor.close()

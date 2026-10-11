@@ -102,3 +102,8 @@ Filename detection recognizes `.pyi`, PHP with embedded HTML, and case-insensiti
 Pygments HTML/PHP grammars; multiline Blade constructs use the bounded per-line
 fallback and are not parsed as a complete template. Both light and dark palettes
 use the same shared highlighter. Hosts need no separate language definitions.
+
+PHP/HTML mode carries both Pygments grammar states across blocks, so a PHP opening
+tag on one line still highlights declarations on subsequent lines and resumes
+HTML formatting after the closing tag. Blade retains its documented per-line
+delegating fallback.
