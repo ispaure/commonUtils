@@ -24,21 +24,23 @@ class FileMoveTests(unittest.TestCase):
 
     def test_missing_source_preserves_destination(self):
         self.src.unlink()
-        self.assertFalse(fileUtils.move_file(self.src, self.dest))
+        with self.assertRaises(OSError):
+            fileUtils.File(self.src).move_file(self.dest)
         self.assertEqual(self.dest.read_text(), 'old')
 
     def test_same_file_is_noop(self):
-        self.assertTrue(fileUtils.move_file(self.src, self.src))
+        self.assertEqual(fileUtils.File(self.src).move_file(self.src).path, self.src)
         self.assertEqual(self.src.read_text(), 'new')
 
     def test_replaces_existing_destination(self):
-        self.assertTrue(fileUtils.move_file(self.src, self.dest))
+        self.assertEqual(fileUtils.File(self.src).move_file(self.dest).path, self.dest)
         self.assertEqual(self.dest.read_text(), 'new')
         self.assertFalse(self.src.exists())
 
     def test_failed_replace_preserves_both_files(self):
         with patch.object(fileUtils.os, 'replace', side_effect=PermissionError('denied')):
-            self.assertFalse(fileUtils.move_file(self.src, self.dest))
+            with self.assertRaises(OSError):
+                fileUtils.File(self.src).move_file(self.dest)
         self.assertEqual(self.src.read_text(), 'new')
         self.assertEqual(self.dest.read_text(), 'old')
 
@@ -50,7 +52,8 @@ class FileMoveTests(unittest.TestCase):
         with patch.object(fileUtils.os, 'replace', side_effect=OSError(errno.EXDEV, 'cross-device')), patch.object(
             fileUtils, 'copy2', side_effect=partial_copy
         ):
-            self.assertFalse(fileUtils.move_file(self.src, self.dest))
+            with self.assertRaises(OSError):
+                fileUtils.File(self.src).move_file(self.dest)
         self.assertEqual(self.src.read_text(), 'new')
         self.assertEqual(self.dest.read_text(), 'old')
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), ['destination.txt', 'source.txt'])
@@ -65,7 +68,7 @@ class FileMoveTests(unittest.TestCase):
             return real_replace(source, target)
 
         with patch.object(fileUtils.os, 'replace', side_effect=replace):
-            self.assertTrue(fileUtils.move_file(self.src, self.dest))
+            self.assertEqual(fileUtils.File(self.src).move_file(self.dest).path, self.dest)
         self.assertEqual(self.dest.read_text(), 'new')
         self.assertFalse(self.src.exists())
         self.assertEqual(list(self.root.iterdir()), [self.dest])
@@ -74,14 +77,15 @@ class FileMoveTests(unittest.TestCase):
         with patch.object(fileUtils.os, 'replace', side_effect=[
             OSError(errno.EXDEV, 'cross-device'), PermissionError('denied')
         ]):
-            self.assertFalse(fileUtils.move_file(self.src, self.dest))
+            with self.assertRaises(OSError):
+                fileUtils.File(self.src).move_file(self.dest)
         self.assertEqual(self.src.read_text(), 'new')
         self.assertEqual(self.dest.read_text(), 'old')
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), ['destination.txt', 'source.txt'])
 
     def test_new_destination_parent_is_created(self):
         destination = self.root / 'nested' / 'destination.txt'
-        self.assertTrue(fileUtils.move_file(self.src, destination))
+        self.assertEqual(fileUtils.File(self.src).move_file(destination).path, destination)
         self.assertEqual(destination.read_text(), 'new')
         self.assertFalse(self.src.exists())
 

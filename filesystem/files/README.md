@@ -3,7 +3,7 @@
 Import from `commonUtils.filesystem.files`. Implementation and public exports live in
 [`__init__.py`](__init__.py).
 
-Public entry points: `File`, `move_file`, `has_subdirectories`, `get_split_character`, `rename_file`, `copy_file`, `make_dir`, `get_current_working_dir`, `get_user_home_dir`, `get_user_name`, `get_user_lib_dir`, `get_user_application_support`, `get_user_appdata_roaming`, `get_user_appdata_local`
+Public entry points: `File`, `has_subdirectories`, `get_split_character`, `get_current_working_dir`, `get_user_home_dir`, `get_user_name`, `get_user_lib_dir`, `get_user_application_support`, `get_user_appdata_roaming`, `get_user_appdata_local`
 
 [Library overview](../../README.md).
 
@@ -11,10 +11,10 @@ Public entry points: `File`, `move_file`, `has_subdirectories`, `get_split_chara
 
 | Entry point | Purpose |
 | --- | --- |
-| `move_file` | Move a file, preserving an existing destination if replacement fails. |
-| `rename_file` | Renames a file on disk. |
-| `copy_file` | Copy a file from source to destination. |
-| `make_dir` | Creates directory at location (if it doesn't exist) |
+| `File.move_file` | Move a file, preserving an existing destination if replacement fails. |
+| `File.rename_file` | Renames a file on disk. |
+| `File.copy_file` | Copy a file from source to destination. |
+| `Path.mkdir` / `Directory.make_dir` | Create a directory. |
 | `get_user_home_dir` | Get the current user's home directory |
 
 ## File operations
@@ -30,6 +30,8 @@ destination unless force=True. Move retains atomic replacement and cross-volume
 staging. Specialized file types should be reconstructed through their registry
 when format-specific state needs reloading.
 
-The free copy_file/rename_file/move_file functions are convenience adapters
-that delegate to these methods and retain boolean outcomes. User/home/platform
-helpers stay module functions; they are not properties of individual files.
+The module-level `copy_file`, `rename_file`, `move_file` and `make_dir`
+functions have been removed. Use the instance methods above and catch `OSError`
+where a workflow needs a boolean failure result. For directory creation, use
+`Path(path).mkdir(parents=True, exist_ok=True)` or `Directory(path).make_dir()`.
+User/home/platform helpers remain module functions.

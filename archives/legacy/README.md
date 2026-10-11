@@ -17,3 +17,7 @@ Public entry points: `unzip_file`, `unrar_file`, `zip_file`
 | `unzip_file` | Validated streaming extraction for plain/AES ZIPs. |
 | `unrar_file` | Extracts rar file to desired location. |
 | `zip_file` | Create a zip file from the source to the destination. |
+
+`zip_file` propagates I/O errors, including failure to publish a generated ZIP
+under a non-`.zip` extension. A failed move preserves the existing destination
+and leaves the intermediate ZIP available.

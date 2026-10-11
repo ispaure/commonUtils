@@ -17,8 +17,9 @@ file; other filesystem errors may propagate.
 `File.copy_file`, `rename_file` and `move_file` return a **new plain File**. The old
 object is not retargeted. Copy overwrites; rename preserves a destination unless
 `force=True`; move supports staged cross-volume replacement. I/O errors propagate.
-The same-named module functions retain boolean outcomes. Resolve the returned path
-again when a specialized class is needed. See [files](../../filesystem/files/README.md).
+The same-named module functions have been removed; catch `OSError` in callers
+that need boolean failure outcomes. Resolve the returned path again when a
+specialized class is needed. See [files](../../filesystem/files/README.md).
 
 `Directory(Path(...)).list_files(recursive=True, filter_extension=None)` returns a
 list of registered objects, follows directory links and reports recursive loops

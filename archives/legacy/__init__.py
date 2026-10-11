@@ -123,7 +123,7 @@ def zip_file(source: Union[str, Path], destination: Union[str, Path], keep_root=
             else:
                 log(Severity.DEBUG, 'zipUtils.zip_file', f'Creating Archive: {if_was_zip_path}')
                 make_archive(destination_str[:-len(ext) - 1], 'zip', source_str)
-                fileUtils.move_file(Path(if_was_zip_path), destination_path)
+                fileUtils.File(Path(if_was_zip_path)).move_file(destination_path)
 
     if isinstance(source, str):
         source_str = source

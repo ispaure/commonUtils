@@ -1,4 +1,4 @@
-"""File operation results preserve snapshot identity and legacy boolean callers."""
+"""File operation results preserve snapshot identity and propagate I/O errors."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -27,24 +27,17 @@ class FileObjectOperationTests(unittest.TestCase):
         target=self.root/'existing.txt'; target.write_text('keep')
         with self.assertRaises(FileExistsError):self.file.rename_file(target)
         self.assertEqual(target.read_text(),'keep'); self.assertEqual(self.source.read_text(),'contents')
-        self.assertFalse(fileUtils.rename_file(self.source,target))
 
     def test_force_rename_replaces_destination(self):
         target=self.root/'existing.txt'; target.write_text('old')
         self.assertEqual(self.file.rename_file(target,force=True).path,target)
         self.assertEqual(target.read_text(),'contents')
 
-    def test_copy_errors_propagate_but_legacy_function_returns_false(self):
+    def test_copy_errors_propagate(self):
         with patch('commonUtils.filesystem.files.copyfile',side_effect=OSError('denied')):
             with self.assertRaisesRegex(OSError,'denied'):self.file.copy_file(self.root/'copy.txt')
-            self.assertFalse(fileUtils.copy_file(self.source,self.root/'copy.txt'))
 
     def test_move_returns_new_snapshot(self):
         target=self.root/'other'/'moved.txt'; result=self.file.move_file(target)
         self.assertEqual(result.path,target); self.assertFalse(self.source.exists())
         self.assertEqual(self.file.path,self.source)
-
-    def test_legacy_copy_and_move_still_return_booleans(self):
-        target=self.root/'copy.txt'
-        self.assertIs(fileUtils.copy_file(self.source,target),True)
-        self.assertIs(fileUtils.move_file(target,self.root/'moved.txt'),True)

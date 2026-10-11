@@ -211,16 +211,6 @@ class File(FilesystemObject):
         return File(dest)
 
 
-def move_file(src: Path, dest: Path) -> bool:
-    """Compatibility function: boolean outcome; new callers use File.move_file."""
-    try:
-        File(src).move_file(dest)
-        return True
-    except Exception as error:
-        log(Severity.ERROR, 'fileUtils.move_file', f'Could not move_file from "{src}" to "{dest}": {error}')
-        return False
-
-
 def has_subdirectories(path: Path) -> bool:
     return any(item.is_dir() for item in path.iterdir())
 
@@ -231,37 +221,6 @@ def get_split_character():
             return '\\'
         case OS.MAC | OS.LINUX:
             return '/'
-
-
-def rename_file(original_name: Path, new_name: Path, force: bool = False) -> bool:
-    """Compatibility function: boolean outcome; new callers use File.rename_file."""
-    try:
-        File(original_name).rename_file(new_name, force=force)
-        return True
-    except Exception as error:
-        log(Severity.ERROR, 'fileUtils.rename_file', f'Could not rename_file from "{original_name}" to "{new_name}": {error}')
-        return False
-
-
-def copy_file(source: Union[str, Path], destination: Union[str, Path]) -> bool:
-    """Compatibility function: boolean outcome; new callers use File.copy_file."""
-    try:
-        File(source).copy_file(destination)
-        return True
-    except (OSError, IOError) as error:
-        log(Severity.ERROR, 'fileUtils.copy_file', f'Could not copy_file from "{source}" to "{destination}": {error}')
-        return False
-
-
-def make_dir(directory):
-    """
-    Creates directory at location (if it doesn't exist)
-    DEPRECATED: Fix any usage by swapping to Directory.make_dir() instead.
-    """
-    log(Severity.WARNING, 'fileUtils.make_dir', 'This function is deprecated! Use dirUtils.Directory.make_dir instead.')
-    if not os.path.exists(directory):
-        log(Severity.DEBUG, 'fileUtils.make_dir', f'Creating Directory at "{directory}"')
-        Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 def get_current_working_dir() -> Path:

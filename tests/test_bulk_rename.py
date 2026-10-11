@@ -242,15 +242,17 @@ class BulkRenameTests(unittest.TestCase):
         self.assertEqual(calls.count(path), 1)
 
     def test_single_rename_explicit_overwrite_and_failed_replacement(self):
-        from commonUtils.filesystem.files import rename_file
+        from commonUtils.filesystem.files import File
         source, target = self.file('source.txt', 'source'), self.file('target.txt', 'target')
-        self.assertFalse(rename_file(source, target))
+        with self.assertRaises(FileExistsError):
+            File(source).rename_file(target)
         self.assertEqual(source.read_text(), 'source')
         self.assertEqual(target.read_text(), 'target')
         with patch.object(rename.os, 'replace', side_effect=PermissionError('locked')):
-            self.assertFalse(rename_file(source, target, force=True))
+            with self.assertRaises(PermissionError):
+                File(source).rename_file(target, force=True)
         self.assertEqual(target.read_text(), 'target')
-        self.assertTrue(rename_file(source, target, force=True))
+        self.assertEqual(File(source).rename_file(target, force=True).path, target)
         self.assertEqual(target.read_text(), 'source')
         self.assertFalse(source.exists())
-        self.assertTrue(rename_file(target, target))
+        self.assertEqual(File(target).rename_file(target).path, target)
