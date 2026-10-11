@@ -58,6 +58,9 @@ run on the GUI thread. Controllers own expensive action jobs. File information,
 preview cache invalidation and source/proxy selection mapping must continue to refer
 to the original filesystem items, including after sort/view changes. See
 [extension contracts](../../docs/developer/extension-points.md).
+Built-in menu open/rename actions and queued inline renames retain paths and
+resolve fresh model indexes when invoked. Removed paths and stopped browsers are
+ignored; callback closures do not retain native persistent indexes past teardown.
 
 ## Index and search lifecycle
 

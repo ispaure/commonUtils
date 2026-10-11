@@ -109,14 +109,18 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
     def gutter_width(self):
         return (
             28
-            + self.fontMetrics().horizontalAdvance("9")
-            * len(str(max(1, self.blockCount())))
+            + max(self.fontMetrics().horizontalAdvance(digit * len(str(max(1, self.blockCount()))))
+                  for digit in '0123456789')
             if self.line_numbers
             else 0
         )
 
     def update_gutter(self, *args):
         self.setViewportMargins(self.gutter_width(), 0, 0, 0)
+        area = self.contentsRect()
+        self.gutter.setGeometry(
+            area.left(), area.top(), self.gutter_width(), area.height()
+        )
         self.gutter.setVisible(self.line_numbers)
         self.gutter.update()
 
@@ -137,6 +141,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
 
     def paint_gutter(self, event):
         painter = qt.QPainter(self.gutter)
+        painter.setFont(self.font())
         painter.fillRect(
             event.rect(), self.palette().brush(qt.QPalette.ColorRole.AlternateBase)
         )

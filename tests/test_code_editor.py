@@ -86,6 +86,19 @@ class CodeEditorTests(QtTestCase):
         editor.line_numbers = False; editor.update_gutter()
         self.assertEqual(editor.gutter_width(), 0)
 
+    def test_gutter_tracks_font_and_digit_growth_without_window_resize(self):
+        self.editor.resize(600, 300)
+        self.editor.show()
+        self.app.processEvents()
+        for size, lines in ((14, 9), (24, 1000), (10, 10), (48, 10000)):
+            self.editor.set_font_size(size)
+            self.editor.setPlainText('\n'.join('line' for _ in range(lines)))
+            self.app.processEvents()
+            self.assertEqual(self.editor.gutter.width(), self.editor.gutter_width())
+            self.assertEqual(self.editor.viewportMargins().left(), self.editor.gutter.width())
+            self.assertGreaterEqual(self.editor.gutter.width() - 28,
+                                    self.editor.fontMetrics().horizontalAdvance(str(lines)))
+
     def test_line_edits_are_undoable_and_unicode_offsets_work(self):
         self.editor.setPlainText("😀 one\ntwo\nthree")
         cursor = self.editor.textCursor()

@@ -12,6 +12,9 @@ matching delimiters; it is off by default in the bare shared editor. Indentation
 and tabs-versus-spaces are chosen by the host. Line transformations can sort, remove
 duplicate lines, trim trailing spaces or change indentation; they are undoable.
 
+Line-number gutters follow the editor font and resize when the font or line count
+changes, including when the surrounding window keeps its size.
+
 Alt-click adds cursors; Alt+Shift-drag selects a rectangular column region. Typing
 changes multiple selections as one undo operation. Pasting the same number of lines
 as cursors distributes them. There is no virtual-space padding beyond line ends,
