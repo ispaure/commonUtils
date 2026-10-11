@@ -3,7 +3,7 @@
 Importing this module never changes an application. Call apply_theme(app) once;
 the returned controller supports system/light/dark selection without restarting.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from . import pyside as qt
 from ..configuration.settings import get_setting
 
@@ -26,6 +26,30 @@ SLATE_LIGHT = ThemeColors('#f0f2f6', '#ffffff', '#f5f7fa', '#202838', '#606b7c',
                           '#c5cedb', '#2563eb', '#ffffff', '#e3eaf7')
 SLATE_DARK = ThemeColors('#1c1f26', '#252a34', '#2d3340', '#eef1f7', '#a6b0c0',
                          '#495366', '#75a7ff', '#ffffff', '#35425a', '#356ac3')
+
+
+def configured_colors(dark):
+    """Tint neutral dark surfaces with the accent and choose readable selection text."""
+    from .styling import style_values
+    values = style_values()
+    colors = SLATE_DARK if dark else SLATE_LIGHT
+    accent = qt.QColor(values['accent_color_str'])
+    def luminance(color):
+        channels = [channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4
+                    for channel in color.getRgbF()[:3]]
+        return sum(channel * weight for channel, weight in zip(channels, (.2126, .7152, .0722)))
+    def text_on(color):
+        return '#000000' if luminance(color) > .179 else '#ffffff'
+    selection = accent
+    changes = dict(accent=accent.name(), selection_background=selection.name(), selected_text=text_on(selection))
+    if dark:
+        amount = values['dark_tint_int'] / 100
+        for name, neutral in (('window', '#1e1e1e'), ('surface', '#282828'), ('alternate', '#303030'),
+                              ('border', '#505050'), ('hover', '#393939')):
+            base = qt.QColor(neutral)
+            changes[name] = qt.QColor(*(round(a * (1 - amount) + b * amount)
+                                       for a, b in zip(base.getRgb()[:3], accent.getRgb()[:3]))).name()
+    return replace(colors, **changes)
 
 
 def theme_palette(colors):
@@ -119,7 +143,7 @@ class ThemeController(qt.QObject):
         scheme = self.app.styleHints().colorScheme()
         dark = (self.mode == 'dark' or self.mode == 'system' and
                 (scheme == qt.Qt.ColorScheme.Dark or scheme == qt.Qt.ColorScheme.Unknown and self._initial_dark))
-        self.colors = SLATE_DARK if dark else SLATE_LIGHT
+        self.colors = configured_colors(dark)
         self.app.setStyle('Fusion')
         self.app.setPalette(theme_palette(self.colors))
         self.app.setStyleSheet(theme_stylesheet(self.colors) + '\n' + self._base_stylesheet)
@@ -132,7 +156,7 @@ def apply_theme(app=None, *, mode=None):
     if app is None:
         raise RuntimeError('Create QApplication before applying a theme')
     if mode is None:
-        mode = get_setting('Theme', 'mode', 'system').strip().lower()
+        mode = get_setting('Styling', 'theme_mode', get_setting('Theme', 'mode', 'system')).strip().lower()
         if mode not in ('system', 'light', 'dark'):
             mode = 'system'
     controller = getattr(app, '_commonutils_theme', None)

@@ -32,6 +32,14 @@ def get_setting(section, key, default, *, minimum=None, maximum=None, path=None)
     Saved edits are picked up on the next read without restarting the application.
     """
     path = Path(path) if path is not None else settings_path()
+    from .layered import personal_path
+    personal = personal_path(path)
+    value = _get_file_setting(path, section, key, default, minimum, maximum)
+    return (_get_file_setting(personal, section, key, value, minimum, maximum)
+            if personal is not None else value)
+
+
+def _get_file_setting(path, section, key, default, minimum, maximum):
     try:
         stat = path.stat()
         parser = _read(path, (stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size))

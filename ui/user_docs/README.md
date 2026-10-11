@@ -84,3 +84,14 @@ always use in-window menus. Missing or invalid values use `true`.
 
 Click a menu title once, then move the pointer across neighboring titles to
 browse their options without another click. Press Escape to dismiss the menu.
+
+## Shared appearance
+
+Hosts can expose software defaults and personal settings using the shared settings
+editor. Personal fields show Inherited or Override; **↶** removes an override, then
+Save applies it. Software mode edits the defaults INI and ↶ reverts an unsaved
+field. Appearance has four font roles: interface/dialogs, browsers, reading, code.
+Markdown uses the reading font for prose and the code font for source/code blocks.
+Accent and dark surface tint update the theme. In a host with central settings,
+Markdown's appearance button opens that host window; standalone hosts retain a
+local reading-size popup.

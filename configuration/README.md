@@ -180,3 +180,31 @@ avoid publishing duplicate commands.
 Workspace menu publication owns its native-bar rebind events. The application
 policy ignores those events so publication settles instead of repeatedly
 rebinding menus during pointer tracking.
+
+## Software defaults and sparse personal overrides
+
+`configuration.layered.register_settings(defaults, personal)` associates a
+repository INI with a host-owned personal INI. Reads never create files.
+`get_setting` reads registered overrides with typed validation and falls back to
+the software value when a personal value is invalid. `effective_settings` provides
+a ConfigParser overlay for legacy non-typed readers. A malformed personal file is
+ignored for reads and preserved; editors refuse to overwrite malformed files.
+
+`LayeredSettings(defaults, personal)` exposes `values(scope)`, `overrides()` and
+`save(changes, scope='personal', expected=None)`. Scope `application` edits the
+software INI; `personal` edits only overrides. Changes map `(section, key)` to
+strings. A `None` removes an explicit personal field and its continuation lines;
+it is forbidden for software-default fields. `expected=(original_bytes,)` adds
+an editor snapshot check. Atomic saves retain unrelated fields, comments, BOM,
+line endings and permissions and reject concurrent edits. Unsafe removal layouts
+raise rather than corrupting the file. Defaults and personal paths must differ.
+
+`shared_settings()` uses registered shared UI paths, or a platform-standard
+persistent commonUtils directory when the host has not supplied its own mapping.
+Hosts own discovery, migrations and path policy; shared code does not discover
+application features. `ui.layered_settings.LayeredSettingsEditor` provides explicit
+Save/Reload, indicators and per-field ↶ reset for a declared schema. It accepts a
+scope, optional section filter, labels and host validator for domain constraints.
+Dirty editors compare both layers before saving. Choice metadata supplies mode
+dropdowns rather than appearing as a user preference. Undeclared personal session
+fields are retained on disk but omitted from the software settings form.

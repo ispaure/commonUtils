@@ -52,3 +52,12 @@ print(settings.read_json())
 Directory listing is recursive by default and resolves registered file types
 without reading their contents. JSON writes stage and replace atomically;
 missing/malformed reads raise exceptions for the application to handle.
+
+## Optional personal launch overrides
+
+Hosts may export `COMMONUTILS_PERSONAL_CONFIG_FILE` with a private INI path before
+invoking a shared launcher. `[Launch]` keys in that file override matching software
+keys; absent keys inherit. Explicit empty values remain empty. Missing personal
+files are ignored. Duplicate entries for a requested launch key within either layer are rejected.
+Unix and native Windows readers use the same layered contract. Hosts own the
+personal path and expose editable defaults and overrides in their settings UI.
