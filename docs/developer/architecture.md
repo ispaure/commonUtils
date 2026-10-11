@@ -50,7 +50,10 @@ retains its own visible folder and cancellation. Writers serialize across proces
 Old read transactions remain consistent while later generations or reconciliations
 are published; release snapshots when their owner is done to avoid retaining WAL
 storage. Network browsing disables automatic indexing and rich metadata work.
-See [index lifecycle](../../filesystem/index/README.md).
+Hosts may opt into the durable process-shared coordinator: one OS-elected runner
+handles queued requests, other processes follow progress and take over after exit.
+The host retains/stops its runner independently of browser widgets; see
+[index lifecycle](../../filesystem/index/README.md).
 
 ## Initialization and shutdown
 

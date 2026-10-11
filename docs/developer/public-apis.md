@@ -68,6 +68,12 @@ sorting applies before paging. `folder_stats()` returns path-keyed totals. Inspe
 Close snapshots or use them as context managers. See the
 [index guide](../../filesystem/index/README.md) for refresh/reconciliation differences.
 
+Hosts that need shared background jobs across processes can opt into
+`commonUtils.filesystem.index.coordinator.IndexCoordinator`. The host runs/stops
+its worker and supplies any Qt notification bridge; cancelled subscriptions leave
+durable requests available for takeover. See the coordinator contract in the
+[index guide](../../filesystem/index/README.md#optional-process-shared-coordinator).
+
 ## Operations, processes and integrations
 
 `run_command(arguments, timeout=..., idle_timeout=...)` waits and returns a

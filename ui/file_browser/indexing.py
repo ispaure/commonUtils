@@ -19,6 +19,29 @@ class IndexPriorityLease(qt.QObject):
 
 
 class BrowserIndexing:
+    @qt.Slot(object)
+    def _shared_index_changed(self, job):
+        """An idle view also follows work started later in another process."""
+        if (self.stopping or self.network_location or self._index_paused
+                or not self.calculate_folder_sizes or self.folder_busy):
+            return
+        root = self.navigation.directory
+        source = Path(job['root'])
+        if root is None or not (source == root or job['covers_tree'] and source in root.parents):
+            return
+        from ...filesystem.index import directory_cache
+        from ...filesystem.index.exclusions import is_excluded
+        if source != root and is_excluded(root, map(Path, job.get('exclusions', ()))):
+            return
+        if job['state'] == 'error':
+            return
+        with directory_cache._state_lock:
+            directory_cache._shared_sources[root] = source
+            directory_cache._session_checked.add((directory_cache.database, root))
+        # Read/subscribe without enqueueing another check in response to our own
+        # completion notification, even if automatic refresh is enabled.
+        self.refresh_folder_totals()
+
     def refresh_item(self, path):
         self._changed_paths.add(Path(path).parent)
         self.model.invalidate(path)
@@ -128,6 +151,14 @@ class BrowserIndexing:
             self.index_status.setText('Loading saved sizes…' if cached_only else 'Checking saved index…')
         def scanner(path, cancelled, *, report, reuse_for):
             try:
+                coordinator = directory_cache.coordinator
+                active = coordinator.active_job(path) if coordinator and read_cache and not paused else None
+                if active is not None:
+                    snapshot = coordinator.follow(active, path, cancelled=cancelled, report=report)
+                    if snapshot is None:
+                        return None
+                    with snapshot:
+                        return snapshot.folder_stats(children_of=path, cancelled=cancelled)
                 if read_cache:
                     if not paused:
                         directory_cache.repair_cached_exclusions(path, cancelled=cancelled, report=report)
@@ -135,10 +166,16 @@ class BrowserIndexing:
                 else:
                     snapshot = None
                 if not read_cache or snapshot is None and not paused and policy.scan_on_open:
-                    snapshot = directory_cache.reconcile_folder(path, changes=changes, full=full, once=True,
+                    indexer = directory_cache.coordinator or directory_cache
+                    snapshot = indexer.reconcile_folder(path, changes=changes, full=full, once=True,
                                                                cancelled=cancelled, report=report,
-                                                               recursive_initial=policy.recursive_on_open)
-                return snapshot.folder_stats(children_of=path, cancelled=cancelled) if snapshot else None
+                                                               recursive_initial=policy.recursive_on_open,
+                                                               **({'background_priority': policy.background_priority}
+                                                                  if directory_cache.coordinator else {}))
+                if snapshot is None:
+                    return None
+                with snapshot:
+                    return snapshot.folder_stats(children_of=path, cancelled=cancelled)
             except OperationCancelled:
                 return None
         self.folder_operation = FolderOperation(root, scanner, self,
@@ -203,6 +240,9 @@ class BrowserIndexing:
     def _index_progressed(self, message):
         from .status import private_status
         message = private_status(message)
+        if message == 'Following shared index' and not self._index_paused:
+            self._loading_cached_only = False
+            self.index_activity.setVisible(not getattr(self, 'workspace_status', False))
         if self.network_location or self.folder_busy and getattr(self, '_loading_cached_only', False):
             return
         if not self.stopping and self.calculate_folder_sizes and not self._index_paused:

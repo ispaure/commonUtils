@@ -71,6 +71,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._index_priority_owner = object()
         from ...filesystem.index import directory_cache
         self._index_priority_lease = IndexPriorityLease(self, directory_cache, self._index_priority_owner)
+        if directory_cache.shared_activity is not None:
+            directory_cache.shared_activity.connect(self._shared_index_changed)
         self._full_index_refresh = False
         self.folder_root = None
         self.refresh_pending = False

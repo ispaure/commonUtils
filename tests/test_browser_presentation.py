@@ -61,9 +61,10 @@ class BrowserPresentationTests(QtTestCase):
         from commonUtils.ui.file_browser.index_worker import _IndexJob
         app = qt.QApplication.instance() or qt.QApplication([])
         root = Path('/fixture')
+        closed = []
         snapshot = SimpleNamespace(
             folder_stats=lambda *args, **kw: {root: SimpleNamespace(files=100000, folders=400)},
-            errors=(), children=lambda *a, **kw: (),
+            errors=(), children=lambda *a, **kw: (), close=lambda: closed.append(True),
         )
         job = _IndexJob(root, lambda *a, **kw: None, app)
         try:
@@ -71,6 +72,7 @@ class BrowserPresentationTests(QtTestCase):
                 job._cached(force=True)
             self.assertEqual(job.saved_entries, 100400)
             self.assertIn('Waiting for index writer', job.last_progress)
+            self.assertEqual(closed, [True])
         finally:
             job.deleteLater()
 
