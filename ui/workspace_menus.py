@@ -85,6 +85,9 @@ def sync_native_menus(container, document=None):
     if not isinstance(container, qt.QMainWindow):
         return
     install_menu_policy()
+    provider = getattr(container, 'workspace_menu_document', None)
+    if callable(provider):
+        document = provider()
     context = getattr(container, '_workspace_menu_context', None)
     if context is None:
         context = container._workspace_menu_context = _MenuContext(container)
@@ -99,7 +102,8 @@ def _apply_menus(container, document=None):
     native = native_menus_enabled()
     # Attached views keep their in-page menus on Windows/Linux. Detached
     # containers expose the active document's menus in their own header.
-    if not native and not getattr(getattr(container, 'workspace', None), 'is_detached', False):
+    if (not native and not getattr(container, 'workspace_publish_menus', False)
+            and not getattr(getattr(container, 'workspace', None), 'is_detached', False)):
         bar = container.menuBar()
         if hasattr(container, '_workspace_base_menus'):
             actions = [a for a in container._workspace_base_menus if isValid(a)]
@@ -129,7 +133,8 @@ def _apply_menus(container, document=None):
         # container destruction, so accessing action.menu() cannot delete it.
         source._workspace_menu_actions = source.actions()
         actions = source._workspace_menu_actions
-    actions = [action for action in actions if isValid(action)]
+    extras = getattr(container, 'workspace_menu_actions', ())
+    actions = list(dict.fromkeys(action for action in [*extras, *actions] if isValid(action)))
     changed = bar.actions() != actions
     native_changed = bar.isNativeMenuBar() != native
     if native_changed or changed:

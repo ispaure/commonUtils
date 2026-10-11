@@ -113,6 +113,24 @@ class MenuContextTests(QtTestCase):
         self.assertIs(routed, command)
         routed.trigger(); callback.assert_called_once()
 
+    def test_attached_host_can_publish_context_with_global_navigation_on_each_platform(self):
+        self.host.workspace.is_detached = False
+        self.host.workspace_publish_menus = True
+        global_menu = self.host.menuBar().addMenu('Application')
+        self.host.workspace_menu_actions = [global_menu.menuAction()]
+        first, second = self.document('File'), self.document('View')
+        for platform in ('darwin', 'win32', 'linux'):
+            with self.subTest(platform=platform), patch('commonUtils.ui.workspace_menus.sys.platform', platform):
+                self.host.workspace_menu_document = lambda: second
+                sync_native_menus(self.host, first)
+                self.assertEqual(self.titles(), ['Application', 'View'])
+                self.settle()
+                self.assertTrue(second.menuBar().isHidden())
+                self.host.workspace_menu_document = lambda: None
+                sync_native_menus(self.host, second)
+                self.settle()
+                self.assertEqual(self.titles(), ['Application'])
+
 
 class CocoaMenuRedrawTests(QtTestCase):
     def bridge(self, visible=True):
