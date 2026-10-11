@@ -302,7 +302,7 @@ host application rather than the file-type registry.
 
 `file_from_path()` resolves `.md` and `.markdown` (case-insensitively) as
 `MarkdownFile`, a `TXTFile` subclass. Double-click activation in FileBrowser opens
-the shared [Markdown reader](../ui/README.md#markdown-reader). Resolution and text
+the shared [Markdown reader](../ui/markdown/README.md). Resolution and text
 operations do not import Qt; only activation requires an existing QApplication.
 Feature-installed activation handlers still take precedence over the file's hook.
 
