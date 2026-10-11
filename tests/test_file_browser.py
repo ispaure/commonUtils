@@ -55,17 +55,23 @@ class BrowserTests(QtTestCase):
         self.app.processEvents()
 
     def wait(self):
-        deadline = time.monotonic() + 5
+        # Windows CI can take longer to schedule the browser's initial workers.
+        # Keep polling for real completion rather than adding a fixed delay.
+        deadline = time.monotonic() + 20
         stable = 0
         while time.monotonic() < deadline:
             self.app.processEvents()
-            pending = (self.browser.busy or self.browser.folder_busy or self.browser.views.cover_busy
-                       or self.browser.views._column_selection_pending)
-            stable = 0 if pending else stable + 1
+            pending = {
+                'listing': self.browser.busy,
+                'folder totals': self.browser.folder_busy,
+                'covers': self.browser.views.cover_busy,
+                'column selection': self.browser.views._column_selection_pending,
+            }
+            stable = 0 if any(pending.values()) else stable + 1
             if stable >= 2:
                 break
             time.sleep(.01)
-        self.assertFalse(self.browser.busy or self.browser.folder_busy or self.browser.views._column_selection_pending)
+        self.assertFalse(any(pending.values()), f'Browser workers did not settle: {pending}')
 
     def test_parent_destruction_releases_index_priority(self):
         import gc
