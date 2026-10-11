@@ -5,6 +5,10 @@ from shiboken6 import isValid
 from .workspace_policy import WorkspacePolicy, header_visible
 from .workspace_drag import WorkspaceDragMixin, register_dock
 
+TAB_BUTTON_SIZE = 28
+TAB_HEADER_HEIGHT = 30
+TAB_PLUS_RESERVE = 32
+
 _workspaces = WeakSet()
 _DOCK_AREAS = (qt.Qt.DockWidgetArea.LeftDockWidgetArea |
                qt.Qt.DockWidgetArea.RightDockWidgetArea |
@@ -25,7 +29,8 @@ def _tab_button(text, tooltip, parent, callback=None):
     button.setToolTip(tooltip)
     button.setAccessibleName(tooltip)
     button.setAutoRaise(True)
-    button.setFixedSize(28, 28)
+    button.setFixedSize(TAB_BUTTON_SIZE, TAB_BUTTON_SIZE)
+    font = button.font(); font.setPointSizeF(font.pointSizeF() * 1.5); button.setFont(font)
     if callback is not None:
         button.clicked.connect(callback)
     return button
@@ -51,7 +56,7 @@ class DockTabHeader(qt.QWidget):
         layout.addWidget(self.new_button)
         dock.windowTitleChanged.connect(self.title.setText)
         font = self.title.font(); font.setBold(True); self.title.setFont(font)
-        self.setFixedHeight(30)
+        self.setFixedHeight(TAB_HEADER_HEIGHT)
         self._press = None
 
     def sizeHint(self):
@@ -101,7 +106,7 @@ class DockTabHeader(qt.QWidget):
     def paintEvent(self, event):
         option = qt.QStyleOptionTab()
         option.initFrom(self)
-        reserve = 32 if self.parentWidget().workspace.allow_new_tabs else 0
+        reserve = TAB_PLUS_RESERVE if self.parentWidget().workspace.allow_new_tabs else 0
         option.rect = qt.QRect(0, 0, max(0, self.width() - reserve), self.height())
         option.shape = qt.QTabBar.Shape.RoundedNorth
         option.position = qt.QStyleOptionTab.TabPosition.OnlyOneTab
@@ -240,7 +245,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self.empty_new_button = _tab_button('+', 'New tab', empty_header, lambda: self.request_new_view())
         self.empty_new_button.setVisible(allow_new_tabs)
         empty_layout.addWidget(self.empty_new_button)
-        empty_header.setFixedHeight(30)
+        empty_header.setFixedHeight(TAB_HEADER_HEIGHT)
         self._drop_target.setTitleBarWidget(empty_header)
         hint = qt.QLabel('Open a tab with +, or drop a detached tab here to return it to this window.')
         hint.setWordWrap(True)
@@ -298,7 +303,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         for dock in self.docks:
             grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
             visible = self.policy is None or header_visible(self.policy, len(self.docks), self.is_detached)
-            height = 30 if visible and not grouped else 0
+            height = TAB_HEADER_HEIGHT if visible and not grouped else 0
             self._refresh_view_controls(dock, not visible)
             if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
                 dock.tab_header.setFixedHeight(height)
@@ -309,7 +314,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             if bar.parent() is not self or not bar.count() or not self._tab_dock(bar, 0):
                 continue
             visible = self.policy is None or header_visible(self.policy, bar.count(), self.is_detached)
-            bar.setFixedHeight(30 if visible else 0)
+            bar.setFixedHeight(TAB_HEADER_HEIGHT if visible else 0)
             bar.setVisible(visible)
             bar.installEventFilter(self)
             bar.setExpanding(False)
@@ -327,9 +332,9 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 bar.currentChanged.connect(lambda index, owner=bar: self._activate(self._tab_dock(owner, index)))
             if self.active_dock in [self._tab_dock(bar, index) for index in range(bar.count())]:
                 self._activate(self._tab_dock(bar, bar.currentIndex()))
-            reserve = 32 if self.allow_new_tabs else 0
+            reserve = TAB_PLUS_RESERVE if self.allow_new_tabs else 0
             width = max(60, (bar.width() - reserve) // bar.count())
-            style = (f'QTabBar::tab {{ width: {width}px; height: 30px; padding: 0px; }} '
+            style = (f'QTabBar::tab {{ width: {width}px; height: {TAB_HEADER_HEIGHT}px; padding: 0px; }} '
                      'QTabBar::scroller { width: 96px; } '
                      'QTabBar::tab:selected { background: palette(base); color: palette(text); '
                      'border-bottom: 3px solid palette(highlight); font-weight: bold; }')
@@ -360,7 +365,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                     if overflow:
                         arrow.setFixedSize(28, 28)
                         arrow.move(bar.width() - 62 + index * 32, 1)
-            bar.workspace_plus.move(bar.width() - (94 if overflow else 30), max(0, (bar.height() - 28) // 2))
+            bar.workspace_plus.move(bar.width() - (94 if overflow else TAB_BUTTON_SIZE + 2), max(0, (bar.height() - TAB_BUTTON_SIZE) // 2))
             bar.workspace_plus.setVisible(self.allow_new_tabs)
             bar.workspace_plus.raise_()
 
