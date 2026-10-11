@@ -16,6 +16,8 @@ class MarkdownWindow(qt.QMainWindow):
         self.viewer.path_changed.connect(lambda path: self._update_title())
         self.viewer.modified_changed.connect(lambda modified: self._update_title())
         self._file_menu = file_menu = self.menuBar().addMenu('File')
+        from ..menu_policy import install_menu_policy
+        install_menu_policy()
         for action in (self.viewer.new_action, self.viewer.open_action, self.viewer.save_action, self.viewer.save_as_action):
             file_menu.addAction(action)
         file_menu.addSeparator()

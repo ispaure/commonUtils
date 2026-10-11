@@ -47,6 +47,8 @@ class ReaderMenus(qt.QObject):
     def __init__(self, owner, bar, *, open_file, edit_metadata, close, fullscreen,
                  open_path=None, find=None, open_label='Open…', suffixes=(), history=None):
         super().__init__(owner)
+        from .menu_policy import install_menu_policy
+        install_menu_policy()
         self.shortcut_widget = owner
         while self.shortcut_widget is not None and not isinstance(self.shortcut_widget, qt.QWidget):
             self.shortcut_widget = self.shortcut_widget.parent()
