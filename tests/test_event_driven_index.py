@@ -42,9 +42,10 @@ class EventDrivenIndexTests(QtTestCase):
         self.temp.cleanup()
 
     def wait(self, condition):
-        deadline = monotonic() + 8
+        # Initial native browser workers can be slow on Windows CI runners.
+        deadline = monotonic() + 20
         while not condition():
-            self.assertLess(monotonic(), deadline)
+            self.assertLess(monotonic(), deadline, 'Browser index did not settle within 20 seconds')
             self.app.processEvents(); sleep(.005)
         self.app.processEvents()
 
