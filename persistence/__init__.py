@@ -14,6 +14,9 @@ def promote_path(staged, destination):
     Callers validate the staged contents before invoking this function.
     """
     staged, destination = Path(staged), Path(destination)
+    source, target = staged.absolute(), destination.absolute()
+    if source == target or source in target.parents or target in source.parents:
+        raise ValueError('Staged and destination paths cannot overlap')
     if staged.is_symlink() or destination.is_symlink():
         raise ValueError('Refusing to replace a symbolic link')
     from ..filesystem.links import is_junction

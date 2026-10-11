@@ -140,6 +140,34 @@ See [browser features](ui/features/README.md) for those examples and
 | Open applications, work with web links and wrap external tools | [Integrations](integrations/README.md) |
 | Save files atomically and recover editing sessions | [Persistence](persistence/README.md) |
 
+## Work with paths and archives
+
+Use a `Directory` for registered file objects, or the traversal helper for plain
+paths. Traversal skips directory links and can be cancelled.
+
+```python
+from pathlib import Path
+from commonUtils.filesystem.traversal import scan_directory
+from commonUtils import archives
+
+folder = Path('/data/notes')
+notes = scan_directory(folder, mask='*.txt', recursive=True)
+print('Text files:', len(notes))
+archives.create(notes, folder.parent / 'notes.zip')
+```
+
+Archive creation keeps existing outputs. For passwords, extraction and supported
+formats, see [archives](archives/README.md). For saving JSON or replacing a staged
+installation, see [persistence examples](persistence/README.md).
+
+## Add progress without freezing a window
+
+A worker callback handles files or commands; its completion handler updates the
+UI after the worker stops. Use `OperationProgress` for progress and cancellation.
+The [complete dialog example](ui/operation_progress.md#run-a-cancellable-job-in-a-qt-dialog)
+shows how to keep the window alive during cancellation. Do not update widgets
+from the worker or delete its owner while it is running.
+
 ## Contributing and compatibility
 
 Keep application-specific workflows in the consuming project and reusable tools

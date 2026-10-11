@@ -25,3 +25,36 @@ is imposed. `overwrite=False` uses atomic no-clobber creation.
 parent-directory durability. Callers create directories with their own permission
 policy and retain their own schemas. TextSnapshot, Markdown and INI save paths
 continue to own their format-specific rules. `configuration.legacy` retains the existing configuration behavior.
+
+## Save a small settings file
+
+Create the directory first, then save JSON. A serialization or replacement error
+keeps the previous file available.
+
+```python
+from pathlib import Path
+from commonUtils.persistence import atomic_write_json
+
+settings = Path.home() / '.my-tool' / 'settings.json'
+settings.parent.mkdir(parents=True, exist_ok=True)
+atomic_write_json(settings, {'theme': 'dark', 'recent_folders': []})
+```
+
+## Replace an installation with a recovery copy
+
+Build and validate the new installation in a temporary directory on the same
+filesystem, then publish it. The previous installation stays beside the new one.
+Keep it until you have checked that the application works.
+
+```python
+from pathlib import Path
+from commonUtils.persistence import promote_path
+
+previous = promote_path(Path('/apps/.staged-tool'), Path('/apps/tool'))
+if previous is not None:
+    print('Recovery copy:', previous)
+```
+
+If promotion fails, the helper restores the old path before raising. It refuses
+symbolic links and junctions. Callers supply installation validation and decide
+when recovery copies can be removed.
