@@ -1,4 +1,5 @@
 """Real processes share progress, serialize writers and recover saved work."""
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -7,6 +8,7 @@ from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from time import monotonic, sleep
 import unittest
+from unittest.mock import patch
 
 from commonUtils.filesystem.index import DirectoryCache
 from commonUtils.filesystem.index.coordinator import IndexCoordinator, runner_lock
@@ -92,7 +94,7 @@ class CoordinatorTests(unittest.TestCase):
         with self.cache.peek(self.root) as snapshot:
             self.assertTrue(snapshot.complete)
             self.assertEqual(len(snapshot.entries), 10)
-        with sqlite3.connect(self.cache.database) as db:
+        with closing(sqlite3.connect(self.cache.database)) as db:
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
             self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
 
@@ -111,6 +113,30 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(len(journal.read_text().splitlines()), 6)
         self.assertIsNone(first.poll())
         self.assertIsNone(second.poll())
+
+    def test_integrity_check_releases_database_before_fixture_cleanup(self):
+        identity = self.queue.submit(self.root)
+        with self.cache.get(self.root):
+            pass
+        self.queue._update(identity, state='done')
+        connect = sqlite3.connect
+        connections = []
+
+        def tracked_connect(*args, **kwargs):
+            db = connect(*args, **kwargs)
+            connections.append(db)
+            return db
+
+        try:
+            with patch('sqlite3.connect', side_effect=tracked_connect):
+                self.assert_done(identity)
+            self.assertTrue(connections)
+            for db in connections:
+                with self.assertRaises(sqlite3.ProgrammingError):
+                    db.execute('SELECT 1')
+        finally:
+            for db in connections:
+                db.close()
 
     def test_killed_owner_is_taken_over_without_resubmitting(self):
         identity = self.queue.submit(self.root)
