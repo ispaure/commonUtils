@@ -71,7 +71,11 @@ Index policy is read per request. Explicit refresh validates the subtree; ordina
 navigation can use cached data or immediate-folder checks. Disjoint scan roots keep
 independent jobs while SQLite serializes writers. Visible-folder priorities apply
 within an existing scan root. Each tab retains its own selection/navigation and
-subscription; cancelling one subscriber only stops shared work when none remain.
+subscription; cancelling one subscriber only stops in-process work when none remain.
+When the host enables the persistent index coordinator, cancellation detaches the
+view while submitted work survives. A host-provided `shared_activity` Qt signal
+connects idle browsers to jobs started by another process. Cache-only views can
+follow existing work without requesting a scan; explicitly paused views do not.
 
 See [index persistence and migration](../../filesystem/index/README.md). Snapshot
 owners must close readers when done, especially before removing temporary databases

@@ -59,6 +59,10 @@ class DirectoryCache(DirectoryScan):
         self._priority_folders = {}
         self._exclusion_checked = set()
         self._readers = WeakSet()
+        # Optional host-owned runner. Ordinary library callers remain synchronous.
+        self.coordinator = None
+        self.shared_activity = None
+        self._shared_sources = {}
 
     def close(self):
         """Release this owner's read snapshots before removing its cache files."""
@@ -627,7 +631,11 @@ class DirectoryCache(DirectoryScan):
         db = sqlite3.connect(f'{self.database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         try:
             db.execute('BEGIN')
-            row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
+            with self._state_lock:
+                source = self._shared_sources.get(root, root)
+            row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(source), recursive)).fetchone()
+            if source != root and (row is None or not (row[1] or row[2])):
+                row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=?', (str(root), recursive)).fetchone()
             if row is None and not recursive:
                 row = db.execute('SELECT root,completed,building FROM roots WHERE root=? AND recursive=1', (str(root),)).fetchone()
             if (row is None or not (row[1] or row[2])) and recursive:

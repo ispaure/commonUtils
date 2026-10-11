@@ -82,6 +82,12 @@ not stop another tab's scan. A closing tab may disappear while its background wo
 finishes; the application retains it until shutdown is safe. Feature-specific
 unsaved changes can veto closing.
 
+Applications that enable shared indexing across processes can also show work from
+another running instance. Closing or pausing a view detaches it; queued work stays
+available for another instance to finish. If every instance closes, the next launch
+can resume saved checkpoints. This applies to indexing only. The application owns
+whether this shared service is enabled.
+
 ## Copy, rename and remove
 
 Use the selection's context menu for available file operations. Application-added

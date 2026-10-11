@@ -1,4 +1,5 @@
 """Worker snapshots keep database reads and aggregate loading off the GUI thread."""
+from contextlib import ExitStack
 from time import monotonic
 import sqlite3
 from threading import Event, RLock
@@ -63,55 +64,75 @@ class _IndexJob(Operation):
         return result
 
     def _report(self, done, total, message):
+        if message == 'Following shared index':
+            self.progress.emit(message)
+            return
         now = monotonic()
         self._status.update(done, message, saved_entries=self.saved_entries)
         if now - self._last_progress >= .2 or done == 0:
             self._last_progress = now
             self.last_progress = self._status.render(now)
             self.progress.emit(self.last_progress)
-        if message == 'Saved progressive folder totals' or self._cache_requested.is_set():
-            self._cache_requested.clear()
-            self._cached(force=True)
+        try:
+            if message == 'Saved progressive folder totals' or self._cache_requested.is_set():
+                force = self._cache_requested.is_set() or directory_cache.coordinator is None
+                self._cache_requested.clear()
+                self._cached(force=force)
+            elif directory_cache.coordinator is not None:
+                # Followers re-open committed snapshots even if they missed the
+                # writer's brief checkpoint message between progress polls.
+                self._cached()
+        except sqlite3.OperationalError:
+            # Cached display is optional while a process creates/migrates schema.
+            # The actual job still reports persistent index failures to the view.
+            pass
 
     def _cached(self, *, force=False):
         if self.isInterruptionRequested() or not force and monotonic() - self._last_update < 1:
             return
         with self._view_lock:
             roots = tuple(dict.fromkeys((self.root,) + tuple(self._view_roots.values())))
-        source = directory_cache.peek(self.root, cancelled=self.isInterruptionRequested)
-        for root in roots:
-            if self.isInterruptionRequested():
-                return
-            # Every view follows this worker's generation, even if an older
-            # independently indexed child root also exists in the database.
-            snapshot = source or directory_cache.peek(root, cancelled=self.isInterruptionRequested)
-            if snapshot is None:
-                continue
-            if root == self.root:
-                stats = snapshot.folder_stats([root], cancelled=self.isInterruptionRequested).get(root)
-                self.saved_entries = stats.files + stats.folders if stats else 0
-                self._status.update(0, self._status.phase, saved_entries=self.saved_entries)
-                self.last_progress = self._status.render()
-                self.progress.emit(self.last_progress)
-            totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
-            changed = self.totals_by_root.get(root) != totals
-            self.totals_by_root[root] = totals
-            if root == self.root:
-                self.last_totals = totals
-            if changed:
-                self.updated.emit(root, totals)
-            failed = {path for path, error in snapshot.errors}
-            def watchable(path):
-                return path not in failed and not any(parent in failed for parent in path.parents)
-            # Failed paths stay visible in diagnostics, but do not generate an
-            # endless stream of automatic retry jobs. Refresh retries explicitly.
-            candidates = (root,) + tuple(entry.path for entry in snapshot.children(root, limit=128) if not entry.symlink)
-            paths = tuple(path for path in candidates if watchable(path))
-            self.paths_by_root[root] = paths
-            if root == self.root:
-                self.last_paths = paths
-            self.watch_paths.emit(root, paths)
-        self._last_update = monotonic()
+        with directory_cache._state_lock:
+            source_root = directory_cache._shared_sources.get(self.root, self.root)
+        with ExitStack() as snapshots:
+            source = directory_cache.peek(source_root, cancelled=self.isInterruptionRequested)
+            if source is not None:
+                snapshots.callback(source.close)
+            for root in roots:
+                if self.isInterruptionRequested():
+                    return
+                # Every view follows this worker's generation, even if an older
+                # independently indexed child root also exists in the database.
+                snapshot = source or directory_cache.peek(root, cancelled=self.isInterruptionRequested)
+                if snapshot is None:
+                    continue
+                if snapshot is not source:
+                    snapshots.callback(snapshot.close)
+                if root == self.root:
+                    stats = snapshot.folder_stats([root], cancelled=self.isInterruptionRequested).get(root)
+                    self.saved_entries = stats.files + stats.folders if stats else 0
+                    self._status.update(0, self._status.phase, saved_entries=self.saved_entries)
+                    self.last_progress = self._status.render()
+                    self.progress.emit(self.last_progress)
+                totals = snapshot.folder_stats(children_of=root, cancelled=self.isInterruptionRequested)
+                changed = self.totals_by_root.get(root) != totals
+                self.totals_by_root[root] = totals
+                if root == self.root:
+                    self.last_totals = totals
+                if changed:
+                    self.updated.emit(root, totals)
+                failed = {path for path, error in snapshot.errors}
+                def watchable(path):
+                    return path not in failed and not any(parent in failed for parent in path.parents)
+                # Failed paths stay visible in diagnostics, but do not generate an
+                # endless stream of automatic retry jobs. Refresh retries explicitly.
+                candidates = (root,) + tuple(entry.path for entry in snapshot.children(root, limit=128) if not entry.symlink)
+                paths = tuple(path for path in candidates if watchable(path))
+                self.paths_by_root[root] = paths
+                if root == self.root:
+                    self.last_paths = paths
+                self.watch_paths.emit(root, paths)
+            self._last_update = monotonic()
 
 
 _jobs = {}
@@ -205,6 +226,9 @@ class FolderOperation(qt.QObject):
         if root != job.root and job.root not in root.parents:
             return False
         self.visible_root = root
+        if directory_cache.coordinator is not None:
+            with directory_cache._state_lock:
+                directory_cache._shared_sources[root] = directory_cache._shared_sources.get(job.root, job.root)
         job.set_view_root(self, root)
         if root in job.totals_by_root:
             self.updated.emit(root, job.totals_by_root[root])
