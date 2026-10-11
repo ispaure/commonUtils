@@ -39,7 +39,8 @@ class ThemeTests(QtTestCase):
         for colors in (SLATE_LIGHT,SLATE_DARK):
             self.assertGreaterEqual(contrast(colors.text,colors.surface),4.5)
             self.assertGreaterEqual(contrast(colors.muted,colors.surface),4.5)
-            self.assertGreaterEqual(contrast(colors.selected_text,colors.accent),4.5)
+            self.assertEqual(colors.selected_text, '#ffffff')
+            self.assertGreaterEqual(contrast(colors.selected_text,colors.selection_background or colors.accent),4.5)
 
     def test_switching_reuses_controller_and_does_not_grow_stylesheet(self):
         controller=apply_theme(self.app,mode='light');light=self.app.styleSheet()
@@ -94,6 +95,6 @@ class ThemeTests(QtTestCase):
             self.app.processEvents()
             self.assertIs(workspace.active_view, workspace.docks[1].widget())
             self.assertIn('palette(highlight)',bars[0].styleSheet())
-            self.assertEqual(bars[0].palette().color(qt.QPalette.ColorRole.Highlight).name(),colors.accent)
+            self.assertEqual(bars[0].palette().color(qt.QPalette.ColorRole.Highlight).name(),colors.selection_background or colors.accent)
             self.assertTrue(workspace.docks[0].tab_header.title.font().bold())
         workspace.close();self.app.processEvents()
