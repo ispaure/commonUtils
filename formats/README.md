@@ -1,6 +1,9 @@
 # File Types
 
-The `commonUtils.formats` package contains specialized `File` subclasses for common file formats. Each type extends the base `File` abstraction from `fileUtils.py` with format-specific behavior while retaining the standard file information and operations provided by `File`.
+The `commonUtils.formats` package contains specialized `File` subclasses for common file formats. Each type extends the base `File` abstraction from `commonUtils.filesystem.files` with format-specific behavior while retaining the standard file information and operations provided by `File`.
+
+See [public API contracts](../docs/developer/public-apis.md) and
+[extension points](../docs/developer/extension-points.md) for integration guidance.
 
 ## Available File Types
 
@@ -8,6 +11,7 @@ The `commonUtils.formats` package contains specialized `File` subclasses for com
 | --- | --- | --- |
 | `TXTFile` | `txtType.py` | Read, write, and open text files |
 | `CSVFile` | `csvType.py` | Read and write CSV data |
+| `INIFile` | `iniType.py` | String-valued INI documents, formatting preservation and conflict-checked saves |
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
 | `MarkdownFile` | `markdownType.py` | Text-file operations and activation in the shared Markdown reader |
 | `XMLFile` | `xmlType.py` | DOM queries, namespace-aware editing and atomic saving, plus inherited line operations |
