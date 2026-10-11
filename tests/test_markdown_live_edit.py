@@ -48,7 +48,21 @@ class LiveMarkdownTests(QtTestCase):
         self.assertIn('###### Heading', self.editor.document().toMarkdown())
         self.assertFalse(self.editor.document().isModified())
 
-    def test_active_link_text_and_syntax_are_white_for_supported_forms(self):
+    def test_caret_in_next_block_does_not_reveal_previous_heading(self):
+        self.editor.setMarkdown('# Heading\n\nOther')
+        cursor = qt.QTextCursor(self.editor.document().begin().next())
+        self.editor.setTextCursor(cursor)
+        self.assertEqual(self.marker_size(), 1)
+
+    def test_active_link_text_and_syntax_follow_light_and_dark_palettes(self):
+        for foreground, background in (('black', 'white'), ('white', 'black')):
+            palette = self.editor.palette()
+            palette.setColor(qt.QPalette.ColorRole.Text, qt.QColor(foreground))
+            palette.setColor(qt.QPalette.ColorRole.Base, qt.QColor(background))
+            self.editor.setPalette(palette)
+            self.check_active_link_colors(qt.QColor(foreground))
+
+    def check_active_link_colors(self, foreground):
         from commonUtils.ui.markdown.links import link_spans
         for text in ('[Label](target.md)', '[**Bold**](<target file.md>)',
                      '[[Page|Label]]', '[Page|Label]', '[Label](url \"Title\")'):
@@ -64,7 +78,7 @@ class LiveMarkdownTests(QtTestCase):
                 for index in range(spans[0].start, spans[0].end):
                     fmt = next(qt.QTextCharFormat(item.format) for item in block.layout().formats()
                                if item.start <= index < item.start + item.length)
-                    self.assertEqual(fmt.foreground().color(), qt.QColor('white'))
+                    self.assertEqual(fmt.foreground().color(), foreground)
                 cursor.movePosition(qt.QTextCursor.MoveOperation.End)
                 self.editor.setTextCursor(cursor)
                 self.assertEqual(self.editor.toPlainText(), text + ' after')
@@ -207,6 +221,19 @@ class LiveMarkdownTests(QtTestCase):
             if span.start <= offset < span.start + span.length:
                 return span.format.font().pixelSize() if span.format.font().pixelSize() > 0 else span.format.fontPointSize()
         return 0
+
+    def test_caret_touching_both_ends_reveals_inline_markers(self):
+        for text in ('**opposum**', '*opposum*', '`opposum`', '[opposum](page.md)'):
+            with self.subTest(text=text):
+                self.editor.setPlainText(text + ' after')
+                cursor = self.editor.textCursor()
+                for position in (0, len(text)):
+                    cursor.setPosition(position)
+                    self.editor.setTextCursor(cursor)
+                    self.assertEqual(self.marker_size(), 0)
+                cursor.setPosition(len(text) + 1)
+                self.editor.setTextCursor(cursor)
+                self.assertEqual(self.marker_size(), 1)
 
     def test_cursor_and_selection_reveal_markers_without_mutation_or_dirty_undo(self):
         self.editor.setMarkdown('Before **obsidian** after')

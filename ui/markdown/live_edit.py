@@ -30,10 +30,7 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         super().__init__(parent)
         self._live_document = LiveMarkdownDocument(self)
         self.setDocument(self._live_document)
-        self._hover_position = None
-        self._hover_point = None
-        self.setMouseTracking(True)
-        self.viewport().setMouseTracking(True)
+        self._pressed_link = None
         self._highlighter = LivePreviewHighlighter(self)
         self._wrapped_selection = None
         self.table_actions = ()
@@ -41,8 +38,6 @@ class FormattedMarkdownEdit(qt.QTextEdit):
         self.selectionChanged.connect(self._highlighter.refresh_cursor)
 
     def setMarkdown(self, markdown):
-        self._hover_position = None
-        self._hover_point = None
         self._highlighter.setDocument(None)
         protected, tokens = protect_escapes(markdown)
         self.document().setMarkdown(protected,
@@ -164,25 +159,15 @@ class FormattedMarkdownEdit(qt.QTextEdit):
             self.setCurrentCharFormat(chars)
         self._highlighter.refresh_cursor()
 
-    def mouseMoveEvent(self, event):
-        point = event.position().toPoint()
-        # Reformatting changes glyph positions. Keep a stationary pointer's hit
-        # stable so revealing a prefix does not immediately hide it again.
-        if point != self._hover_point:
-            self._hover_point = point
-            self._hover_position = self.cursorForPosition(point).position()
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == qt.QEvent.Type.PaletteChange and hasattr(self, '_highlighter'):
             self._highlighter.refresh_cursor()
-        super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event):
-        self._hover_position = None
-        self._hover_point = None
-        self._highlighter.refresh_cursor()
-        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
-        if (event.button() == qt.Qt.MouseButton.LeftButton and event.modifiers() &
-                (qt.Qt.KeyboardModifier.ControlModifier | qt.Qt.KeyboardModifier.MetaModifier)):
+        self._pressed_link = None
+        if (event.button() == qt.Qt.MouseButton.LeftButton and not event.modifiers() &
+                (qt.Qt.KeyboardModifier.ShiftModifier | qt.Qt.KeyboardModifier.AltModifier)):
             cursor = self.cursorForPosition(event.position().toPoint())
             block = cursor.block()
             in_code = any(first.position() <= block.position() <=
@@ -191,11 +176,31 @@ class FormattedMarkdownEdit(qt.QTextEdit):
             if not in_code:
                 offset = cursor.positionInBlock()
                 for span in link_spans(block.text(), reference_destinations(self.toPlainText())):
-                    if _units(block.text()[:span.start]) <= offset < _units(block.text()[:span.end]):
-                        self.linkActivated.emit(qt.QUrl(span.target))
-                        event.accept()
-                        return
+                    modified = event.modifiers() & (qt.Qt.KeyboardModifier.ControlModifier |
+                                                    qt.Qt.KeyboardModifier.MetaModifier)
+                    start, end = ((span.start, span.end) if modified else
+                                  (span.content_start, span.content_end))
+                    if _units(block.text()[:start]) <= offset < _units(block.text()[:end]):
+                        self._pressed_link = (qt.QUrl(span.target), event.position().toPoint())
+                        break
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        pressed = self._pressed_link
+        self._pressed_link = None
+        if pressed is not None and event.button() == qt.Qt.MouseButton.LeftButton:
+            target, point = pressed
+            if (event.position().toPoint() - point).manhattanLength() < qt.QApplication.startDragDistance():
+                # Complete the old document's mouse gesture before navigation
+                # replaces its content, so release cannot select the new page.
+                super().mouseReleaseEvent(event)
+                cursor = self.textCursor()
+                cursor.clearSelection()
+                self.setTextCursor(cursor)
+                event.accept()
+                self.linkActivated.emit(target)
+                return
+        super().mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event):
         if not self.isReadOnly() and not self.textCursor().hasSelection():

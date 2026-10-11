@@ -31,8 +31,11 @@ the current rendered document, including unsaved edits, and **Edit** returns to 
 editor. Standalone windows can also enable editing when opened with Alt held.
 
 **Formatted** mode lets you edit rendered headings, emphasis, lists, links and tables.
-Supported Markdown markers become visible near the caret/selection or pointer so
-you can repair syntax. Formatting controls and selection wrapping support common
+Supported Markdown markers become visible when the caret touches or is inside an
+element, or a selection overlaps it. Hovering leaves the markers hidden. Click a
+link label to navigate, including while editing; click its revealed syntax to edit
+the destination, or Shift-click/drag to select text. Ctrl/Command-click also follows
+links from their syntax. Formatting controls and selection wrapping support common
 inline styles. The Table commands insert a table or add/remove rows and columns;
 the first row is the header. Structural table changes are undoable.
 

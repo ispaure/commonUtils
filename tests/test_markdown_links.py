@@ -51,6 +51,7 @@ class MarkdownLinkTests(QtTestCase):
             self.editor.setTextCursor(cursor)
             self.assertNotEqual(self.marker_size(), 0.1)
             cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+            cursor.insertText(' after')
             self.editor.setTextCursor(cursor)
             formats = self.editor.document().begin().layout().formats()
             self.assertEqual(formats[0].format.font().pixelSize(), 1)
@@ -73,7 +74,7 @@ class MarkdownLinkTests(QtTestCase):
         self.assertIn('[Website][site]', exported)
         self.assertIn('[site]: https://example.com', exported)
 
-    def test_hover_reveals_links_and_heading_without_editing_or_moving_caret(self):
+    def test_hover_keeps_links_and_heading_collapsed_without_moving_caret(self):
         source = '## [Website](https://example.com)\n\nOther'
         self.editor.setMarkdown(source)
         source = self.editor.toPlainText()
@@ -91,7 +92,7 @@ class MarkdownLinkTests(QtTestCase):
         point = self.editor.cursorRect(hit).center()
         QTest.mouseMove(self.editor.viewport(), point)
         self.app.processEvents()
-        self.assertGreater(block.layout().lineAt(0).cursorToX(4)[0], 10)
+        self.assertAlmostEqual(block.layout().lineAt(0).cursorToX(4)[0], 0, places=2)
         self.assertEqual(self.editor.textCursor().position(), cursor.position())
         self.assertEqual(self.editor.toPlainText(), source)
         self.assertFalse(self.editor.document().isModified())
@@ -115,7 +116,7 @@ class MarkdownLinkTests(QtTestCase):
             self.assertEqual(viewer.current_path, second.resolve())
             self.assertTrue(viewer.allow_edit)
 
-    def test_ctrl_click_follows_but_plain_click_edits(self):
+    def test_plain_and_ctrl_click_follow_links_but_syntax_click_edits(self):
         self.editor.setMarkdown('[Web](https://example.com)')
         self.editor.resize(600, 160)
         self.editor.show()
@@ -127,10 +128,88 @@ class MarkdownLinkTests(QtTestCase):
         with patch.object(self.editor, 'linkActivated') as activated:
             QTest.mouseClick(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
                              qt.Qt.KeyboardModifier.NoModifier, point)
-            activated.emit.assert_not_called()
+            activated.emit.assert_called_once_with(qt.QUrl('https://example.com'))
+            activated.emit.reset_mock()
             QTest.mouseClick(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
                              qt.Qt.KeyboardModifier.ControlModifier, point)
             activated.emit.assert_called_once_with(qt.QUrl('https://example.com'))
+            activated.emit.reset_mock()
+            cursor.setPosition(0)
+            point = self.editor.cursorRect(cursor).center()
+            QTest.mouseClick(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
+                             qt.Qt.KeyboardModifier.NoModifier, point)
+            activated.emit.assert_not_called()
+
+    def test_navigation_clears_old_selection_in_read_and_formatted_modes(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            first, second = root / 'first.md', root / 'second.md'
+            first.write_text('[Next](second.md)\n\nOther text')
+            second.write_text('# Second\n\nA new document with enough text for the old selection.')
+            viewer = MarkdownViewer(first, allow_edit=True)
+            self.addCleanup(viewer.deleteLater)
+            viewer.resize(700, 400)
+            viewer.show()
+            for editing in (False, True):
+                with self.subTest(editing=editing):
+                    viewer.open_document(first)
+                    viewer.set_editing(editing)
+                    viewer.browser.selectAll()
+                    target = viewer.active_editor() if editing else viewer.browser
+                    if editing:
+                        cursor = target.textCursor()
+                        cursor.movePosition(qt.QTextCursor.MoveOperation.End)
+                        target.setTextCursor(cursor)
+                        cursor.setPosition(3)
+                    else:
+                        cursor = target.document().find('Next')
+                    self.app.processEvents()
+                    point = target.cursorRect(cursor).center()
+                    QTest.mouseClick(target.viewport(), qt.Qt.MouseButton.LeftButton,
+                                     qt.Qt.KeyboardModifier.NoModifier, point)
+                    self.assertEqual(viewer.current_path, second.resolve())
+                    self.assertFalse(viewer.browser.textCursor().hasSelection())
+                    self.assertFalse(viewer.formatted_editor.textCursor().hasSelection())
+                    self.assertFalse(viewer.is_modified)
+                    viewer.browser.selectAll()
+                    viewer.back()
+                    self.assertEqual(viewer.current_path, first.resolve())
+                    self.assertFalse(viewer.browser.textCursor().hasSelection())
+                    viewer.forward()
+                    self.assertEqual(viewer.current_path, second.resolve())
+                    self.assertFalse(viewer.browser.textCursor().hasSelection())
+
+    def test_drag_and_shift_click_select_link_text_without_navigation(self):
+        self.editor.setMarkdown('[Next](page.md) after')
+        self.editor.resize(600, 160)
+        self.editor.show()
+        cursor = self.editor.textCursor()
+        cursor.setPosition(2)
+        self.editor.setTextCursor(cursor)
+        self.app.processEvents()
+        point = self.editor.cursorRect(cursor).center()
+        with patch.object(self.editor, 'linkActivated') as activated:
+            QTest.mouseClick(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
+                             qt.Qt.KeyboardModifier.ShiftModifier, point)
+            activated.emit.assert_not_called()
+            QTest.mousePress(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
+                             qt.Qt.KeyboardModifier.NoModifier, point)
+            cursor.setPosition(5)
+            end = self.editor.cursorRect(cursor).center()
+            QTest.mouseMove(self.editor.viewport(), end)
+            QTest.mouseRelease(self.editor.viewport(), qt.Qt.MouseButton.LeftButton,
+                               qt.Qt.KeyboardModifier.NoModifier, end)
+            activated.emit.assert_not_called()
+            self.assertTrue(self.editor.textCursor().hasSelection())
+
+    def test_same_document_restyle_preserves_reading_selection(self):
+        viewer = MarkdownViewer(allow_edit=True)
+        self.addCleanup(viewer.deleteLater)
+        viewer._render_source('Selectable text')
+        viewer.browser.selectAll()
+        selected = viewer.browser.textCursor().selectedText()
+        viewer._render_source('Selectable text')
+        self.assertEqual(viewer.browser.textCursor().selectedText(), selected)
 
     def test_alt_is_handled_by_window_and_helper_without_caller_flags(self):
         with TemporaryDirectory() as directory:

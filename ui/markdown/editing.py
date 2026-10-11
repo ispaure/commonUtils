@@ -160,7 +160,7 @@ class MarkdownEditingMixin:
         self.editor.document().setModified(False)
         self.location.setText('Untitled')
         self.status.clear()
-        self._render_source('')
+        self._render_source('', preserve_selection=False)
         self._update_buttons()
         self.set_editing(True)
         self.path_changed.emit(None)
