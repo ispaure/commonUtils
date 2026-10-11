@@ -4,7 +4,7 @@
 `ui_font_*` (interface and dialogs), `browser_font_*`, `reading_font_*` (Markdown
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
-with monospace for code. Defaults are 11 pt for UI/browser/code and 15 pt Georgia
+with one shared monospace fallback for editors, diffs and Markdown code. Defaults are 11 pt for UI/browser/code and 15 pt Georgia
 for reading. UI/browser sizes allow 7–32 pt, reading 8–48, code 7–48.
 
 `theme_mode` selects system/light/dark. `accent_color_str` accepts a QColor value.
