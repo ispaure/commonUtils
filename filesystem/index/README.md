@@ -69,6 +69,9 @@ result paths. Network mounts and the index's own storage are excluded from scans
 Whole-filesystem macOS scans omit `/System/Volumes/Data` to avoid duplicating firmlink
 paths, while explicitly indexing it remains supported. Sizes are logical file bytes,
 not allocated disk usage; links, clones and sparse files need that distinction.
+Scan exclusions are reduced to paths with no already-excluded ancestor before
+enumeration. The cache directory covers its database/lock/sidecar files, and an
+excluded mount covers nested mounts, avoiding redundant parent-path checks per entry.
 
 ## Storage and concurrency
 

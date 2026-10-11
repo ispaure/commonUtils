@@ -51,10 +51,11 @@ class MarkdownReadingMixin:
         show_reader_popup(popup, self.appearance_button, align_right=True)
         spin.setFocus()
 
-    def _render_source(self, text):
+    def _render_source(self, text, *, preserve_selection=True):
         scroll = self.browser.verticalScrollBar().value()
         previous_cursor = self.browser.textCursor()
-        cursor_position, cursor_anchor = previous_cursor.position(), previous_cursor.anchor()
+        cursor_position, cursor_anchor = ((previous_cursor.position(), previous_cursor.anchor())
+                                          if preserve_selection else (0, 0))
         self.browser.document().setBaseUrl(qt.QUrl.fromLocalFile(str(self._loaded_path.parent) + '/')
                                          if self._loaded_path else qt.QUrl())
         self.properties.refresh(text)

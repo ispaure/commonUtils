@@ -4,6 +4,11 @@ Generic CLI wrapper extracted from BlueHole. Existing P4File, P4FileGroup,
 P4Info, P4FileStatus, P4UserWorkspace and message classes retain their structure,
 fields and callback methods. The library imports neither bpy nor add-on preferences.
 
+Start with the [developer guide and examples](developer-guide.md) for configuration,
+server/workspace information, file status, single-file and batch checkout, adding
+files, syncing and lower-level commands. It also describes return values and the
+current wrapper limitations.
+
 | File | Ownership |
 | --- | --- |
 | p4_file.py | Single-file state, checkout/add/sync/move and extension callbacks |

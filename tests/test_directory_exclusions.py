@@ -7,7 +7,63 @@ import unittest
 from unittest.mock import patch
 
 from commonUtils.filesystem.index import DirectoryCache, storage_totals
+from commonUtils.filesystem.index.exclusions import scan_exclusions, is_excluded
 from commonUtils.runtime.operations import OperationCancelled
+
+
+class ScanExclusionTests(unittest.TestCase):
+    def test_cache_directory_covers_sidecars_without_excluding_similarly_named_folder(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            cache_folder = root / 'cache'
+            cache_folder.mkdir()
+            database = cache_folder / 'index.sqlite3'
+            for name in ('index.sqlite3', 'index.lock', 'index.sqlite3-wal', 'index.sqlite3-shm'):
+                (cache_folder / name).touch()
+            neighbor = root / 'cache-backup'
+            neighbor.mkdir()
+            visible = neighbor / 'notes.txt'
+            visible.write_bytes(b'abc')
+            with patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=()):
+                self.assertEqual(scan_exclusions(root, database), {cache_folder})
+                with DirectoryCache(database=database) as cache, cache.get(root) as snapshot:
+                    self.assertTrue(snapshot.complete)
+                    self.assertEqual({entry.path for entry in snapshot.entries}, {neighbor, visible})
+                    self.assertEqual(storage_totals(snapshot)[root], 3)
+
+    def test_nested_mounts_are_covered_without_excluding_a_scope_below_them(self):
+        with TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve()
+            root = base / 'tree'
+            mount = root / 'network'
+            nested = mount / 'nested'
+            nested.mkdir(parents=True)
+            scope = nested / 'folder'
+            scope.mkdir()
+            database = base / 'cache' / 'index.sqlite3'
+            with patch('commonUtils.filesystem.index.exclusions.network_mount_roots',
+                       return_value=(mount, nested)):
+                exclusions = scan_exclusions(root, database)
+                self.assertEqual(exclusions, {mount})
+                self.assertTrue(is_excluded(nested / 'file.txt', exclusions))
+                self.assertFalse(is_excluded(root / 'network-backup' / 'file.txt', exclusions))
+                self.assertEqual(scan_exclusions(scope, database), set())
+
+    @unittest.skipIf(os.name == 'nt', 'Creating symlinks requires Windows privileges')
+    def test_cache_file_resolving_outside_cache_directory_keeps_its_own_exclusion(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            cache_folder = root / 'cache'
+            cache_folder.mkdir()
+            target = root / 'external.sqlite3'
+            target.touch()
+            database = cache_folder / 'index.sqlite3'
+            database.symlink_to(target)
+            with patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=()):
+                exclusions = scan_exclusions(root, database)
+            self.assertEqual(exclusions, {cache_folder, target})
+            self.assertTrue(is_excluded(target, exclusions))
+            self.assertFalse(is_excluded(root / 'external.sqlite3-backup', exclusions))
 
 
 class MacOSExclusionTests(unittest.TestCase):

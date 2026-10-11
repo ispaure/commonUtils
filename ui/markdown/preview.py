@@ -31,13 +31,10 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             self._refreshing = False
 
     def _active(self, start, end):
-        hover = self.editor._hover_position
-        if hover is not None and start <= hover < end:
-            return True
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
             return cursor.selectionStart() < end and cursor.selectionEnd() > start
-        return start <= cursor.position() < end
+        return start <= cursor.position() <= end
 
     def _marker_format(self, active, *, collapse=False):
         fmt = qt.QTextCharFormat()
@@ -99,7 +96,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
         heading = HEADING.match(text)
         if heading:
             self._collapsed_markers(text, 0, heading.end(),
-                self._active(position, position + _units(text) + 1))
+                self._active(position, position + _units(text)))
         links = list(link_spans(text, self._references))
         for span in links:
             start, end = _units(text[:span.start]), _units(text[:span.end])
@@ -140,6 +137,6 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             if self._active(position + start, position + end):
                 for index in range(start, end):
                     fmt = self.format(index)
-                    fmt.setForeground(qt.QColor('white'))
+                    fmt.setForeground(self.editor.palette().color(qt.QPalette.ColorRole.Text))
                     fmt.clearProperty(qt.QTextFormat.Property.FontPointSize)
                     self.setFormat(index, 1, fmt)

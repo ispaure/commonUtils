@@ -35,7 +35,10 @@ def scan_exclusions(root, database):
                 break
             except ValueError:
                 pass
-    return excluded
+    # An excluded directory already covers its descendants. Normalize once per
+    # scan instead of repeatedly walking each entry's parents for cache files
+    # and nested mounts that are already covered by a broader exclusion.
+    return {path for path in excluded if not any(parent in excluded for parent in path.parents)}
 
 
 def is_excluded(path, exclusions):

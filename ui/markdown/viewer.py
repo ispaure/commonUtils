@@ -239,7 +239,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self._rich_snapshot = None
         if self.edit_button.isChecked() and self.edit_mode.currentData() == "formatted":
             self._load_formatted()
-        self._render_source(text)
+        self._render_source(text, preserve_selection=False)
         self.location.setText(str(path))
         self.status.clear()
         if scroll is not None:

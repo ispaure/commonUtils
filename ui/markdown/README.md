@@ -43,6 +43,12 @@ Relative links use the loaded/saved file's parent; Save As updates that base.
 Reusable actions such as `save_action`, `find_action` and `open_action` can be placed
 in host menus. Source replacement can reset rich undo history.
 
+Formatted syntax reveal follows the caret (including element boundaries) and
+overlapping selections, never pointer hover. Active link text uses the palette's
+Text color. Link labels activate on click release; revealed syntax remains editable,
+and Ctrl/Command-click activates from anywhere in a link. New document loads reset
+reading selections; rerendering the current document preserves them.
+
 An embedded host must call `can_close()` before destroying/replacing the viewer,
 honor false, and stop its speech/optional diagram work when performing custom
 shutdown. MarkdownWindow handles those duties for its own close event. Document
