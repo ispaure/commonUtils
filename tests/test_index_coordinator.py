@@ -60,16 +60,24 @@ class CoordinatorTests(unittest.TestCase):
         self.addCleanup(self.cache.close)
         self.queue = IndexCoordinator(self.cache)
 
-    def until(self, predicate, timeout=15):
+    def until(self, predicate, timeout=30, *, child=None):
         deadline = monotonic()+timeout
         while monotonic() < deadline:
+            if child is not None and child.poll() is not None:
+                _, errors = child.communicate()
+                self.fail(f'Index runner exited with {child.returncode}: {errors.decode(errors="replace")}')
             # Match production follow(): short queue/schema lock contention is
             # retried while the actual index writer remains serialized.
             result = _retry_sql(predicate, cancelled=lambda: monotonic() >= deadline)
             if result:
                 return result
             sleep(.03)
-        self.fail('Timed out waiting for shared index state')
+        try:
+            with self.queue._connection() as db:
+                receipts = [dict(row) for row in db.execute('SELECT state,message,error FROM jobs')]
+        except sqlite3.Error as error:
+            receipts = str(error)
+        self.fail(f'Timed out waiting for shared index state; receipts={receipts}')
 
     def runner(self, name, *, stall=False):
         stop = self.base / (name+'.stop')
@@ -103,7 +111,7 @@ class CoordinatorTests(unittest.TestCase):
     def test_two_processes_share_progress_and_do_not_duplicate_scan(self):
         identity = self.queue.submit(self.root)
         first, stop, marker, release, journal = self.runner('owner', stall=True)
-        self.until(marker.exists)
+        self.until(marker.exists, child=first)
         second, _, _, _, other_journal = self.runner('follower')
         self.until(lambda: self.queue.status(identity)['done'] == 123)
         self.assertEqual(self.queue.submit(self.root), identity)
@@ -143,7 +151,7 @@ class CoordinatorTests(unittest.TestCase):
     def test_killed_owner_is_taken_over_without_resubmitting(self):
         identity = self.queue.submit(self.root)
         first, _, marker, _, journal = self.runner('owner', stall=True)
-        self.until(marker.exists)
+        self.until(marker.exists, child=first)
         self.runner('successor')  # This instance has no browser subscription.
         first.kill()
         first.communicate(timeout=10)
@@ -155,7 +163,7 @@ class CoordinatorTests(unittest.TestCase):
     def test_graceful_owner_exit_and_last_instance_restart(self):
         identity = self.queue.submit(self.root)
         first, stop, marker, _, _ = self.runner('owner', stall=True)
-        self.until(marker.exists)
+        self.until(marker.exists, child=first)
         stop.touch()
         _, errors = first.communicate(timeout=10)
         self.assertEqual(first.returncode, 0, errors.decode())
@@ -169,7 +177,7 @@ class CoordinatorTests(unittest.TestCase):
             (self.root/f'file-{index}.txt').write_text('x')
         identity = self.queue.submit(self.root)
         first, _, marker, _, _ = self.runner('mid-owner', stall=True)
-        self.until(marker.exists)
+        self.until(marker.exists, child=first)
         first.kill()
         first.communicate(timeout=10)
         self.runner('successor')
@@ -193,8 +201,8 @@ class CoordinatorTests(unittest.TestCase):
 
     def test_detaching_follower_does_not_cancel_shared_task(self):
         identity = self.queue.submit(self.root)
-        _, _, marker, release, _ = self.runner('owner', stall=True)
-        self.until(marker.exists)
+        owner, _, marker, release, _ = self.runner('owner', stall=True)
+        self.until(marker.exists, child=owner)
         cancelled = Event()
         def report(*args):
             cancelled.set()
@@ -206,8 +214,8 @@ class CoordinatorTests(unittest.TestCase):
 
     def test_refresh_and_changes_during_scan_run_afterwards(self):
         identity = self.queue.submit(self.root)
-        _, _, marker, release, _ = self.runner('owner', stall=True)
-        self.until(marker.exists)
+        owner, _, marker, release, _ = self.runner('owner', stall=True)
+        self.until(marker.exists, child=owner)
         refresh = self.queue.submit(self.root, full=True)
         changed = self.queue.submit(self.root, changes=(self.root,))
         self.assertNotEqual(identity, refresh)
