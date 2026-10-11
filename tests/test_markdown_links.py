@@ -163,8 +163,13 @@ class MarkdownLinkTests(QtTestCase):
                         cursor.setPosition(3)
                     else:
                         cursor = target.document().find('Next')
+                        # Click inside the label, not its trailing glyph boundary:
+                        # font metrics differ across the headless platform runners.
+                        cursor.setPosition(cursor.selectionStart() + 2)
                     self.app.processEvents()
                     point = target.cursorRect(cursor).center()
+                    if not editing:
+                        self.assertTrue(target.anchorAt(point).endswith('second.md'))
                     QTest.mouseClick(target.viewport(), qt.Qt.MouseButton.LeftButton,
                                      qt.Qt.KeyboardModifier.NoModifier, point)
                     self.assertEqual(viewer.current_path, second.resolve())
