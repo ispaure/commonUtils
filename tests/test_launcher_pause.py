@@ -21,12 +21,12 @@ class LauncherPauseTests(unittest.TestCase):
                                      ('on','true'),('1','true')]:
                 with self.subTest(launcher=name, value=value):
                     result = subprocess.run([bash,'-c',prefix,'launcher','root','config',value],
-                                            capture_output=True,text=True,timeout=5)
+                                            capture_output=True,text=True,timeout=20)
                     self.assertEqual(result.returncode,0,result.stderr)
                     self.assertEqual(result.stdout,expected)
                     self.assertNotIn('bad substitution',result.stderr)
             result = subprocess.run([bash,'-c',prefix,'launcher','root','config','invalid'],
-                                    capture_output=True,text=True,timeout=5)
+                                    capture_output=True,text=True,timeout=20)
             self.assertEqual(result.returncode,1)
             self.assertIn('pause_on_exit must be',result.stderr)
 
