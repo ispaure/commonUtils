@@ -99,3 +99,7 @@ UTF-16 selection accounting, heading collisions, last-paragraph visibility, exte
 save conflicts and process/speech retirement when changing them.
 
 [UI overview](../README.md) · [Developer hub](../../docs/developer/README.md)
+
+Formatting actions share the existing navigation row through a compact Format
+menu. Table actions remain attached to the formatted editor and update their
+enabled state from its current selection; no second formatting row is reserved.
