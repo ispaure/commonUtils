@@ -49,7 +49,40 @@ modules on three OS runners. Blue Hole was not available for independent validat
   current CI success or native speech, shell, trash and window-manager behavior.
 - Directory indexes do not track volume identity. Parent scans can prune disconnected
   children; offline retention is not a completed contract.
+- Code diff/formatting error text calls a Python-character bound “1 MiB”. The
+  documentation records the actual measurement; runtime wording is unchanged.
 - No release/version policy or supported dependency range was found. Python 3.10
   syntax compatibility does not establish a tested Python 3.10 environment.
 
 These are documentation findings; implementation behavior was not changed.
+
+## Validation of this overhaul
+
+- Checked all 274 local Markdown links, including relative files and heading anchors.
+- Parsed all 57 Python code blocks in repository Markdown.
+- Executed eight examples: root command, initial file listing, two extension examples,
+  isolated index snapshot, diagnostics, complete browser construction/cooperative close,
+  and the Markdown window event loop/close. GUI examples used offscreen Qt and temporary
+  storage; each application example requires its own QApplication lifecycle.
+- Passed 191 focused tests across 22 modules: registry, file operations, traversal,
+  package compatibility/layout, features, index policy/reconciliation/search, settings,
+  INI/text editors, Markdown/frontmatter/links/presentation, read aloud, code editing,
+  diff/merge and workspaces.
+- Used the available Python 3.12.2 / PySide6 6.6.2 environment. Qt initially aborted
+  during sandbox CPU-feature detection; the same isolated Qt tests passed outside
+  that sandbox. Test caches and temporary workspaces were redirected to disposable
+  directories rather than the live user index.
+- Checked whitespace and documentation-only Git diffs. No Python implementation,
+  package directory, settings value or Logistics working-tree file was changed by
+  this task. The commonUtils commits naturally change its parent submodule status.
+
+This was focused documentation validation, not a complete native/platform test pass.
+Windows/Linux runtime behavior, real speech engines, installed Mermaid CLI output,
+external applications, hosted CI and Blue Hole were not independently exercised.
+
+The overhaul consolidates duplicated root/browser examples into the existing feature
+guide; keeps `_compat.md` as a navigation entry; moves index migration notes to the
+index reference and reader menus/chrome to workspace presentation; removes repeated
+code-editor/Markdown summaries; and replaces mixed browser/Markdown narration with
+separate integration and user guides. Specialized archive, persistence, format and
+process references remain in place.

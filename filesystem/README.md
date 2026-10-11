@@ -1,41 +1,38 @@
-# filesystem
+# Filesystem utilities
 
-Generic filesystem information and browser contribution hooks without Qt.
+Choose an interface by whether you need file objects, plain paths, live operations
+or saved metadata. These interfaces have different traversal and failure contracts;
+see the [developer API guide](../docs/developer/public-apis.md#files-types-and-directories).
 
-Import from `commonUtils.filesystem`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
-
-Public entry points: `BrowserDetails`, `BrowserPanel`, `BrowserAction`, `FilesystemObject`, `FolderStats`, `scan_folders`, `format_size`, `format_datetime`
-
-[Library overview](../README.md).
-
-`transfers.py` owns the historical `file_operations` implementation; the centralized compatibility
-adapter preserves existing consumers.
-
-`removal.py` owns the historical `file_removal` implementation; the centralized compatibility
-adapter preserves existing consumers.
-
-`traversal.py` owns the historical `traversal` implementation; the centralized compatibility
-adapter preserves existing consumers.
-
-`network.py` owns the historical `network_filesystems` implementation; the centralized compatibility
-adapter preserves existing consumers.
-
-## API behavior
-
-| Entry point | Purpose |
+| Need | Start here |
 | --- | --- |
-| `FilesystemObject` | Common read-only information and optional browser behavior for files/folders. |
-| `scan_folders` | Compatibility API: recursive totals from the shared persistent index. |
-| `format_datetime` | Human-readable local date/time, independent of platform strftime flags. |
+| File information and copy/move/rename methods | [File objects](files/README.md) |
+| Registered file objects from a directory | [Directory](directories/README.md) |
+| Plain paths, masks and cancellable traversal | `filesystem.traversal.scan_directory`; skips nested directory links |
+| Symlinks, junctions and platform shortcuts | [Links](links/README.md) |
+| Batch filename changes | [Rename](rename/README.md) |
+| Persistent filename search and recursive sizes | [Directory index](index/README.md) |
+| Cache paths and private temporary workspaces | [Storage](storage/README.md) |
+| Planned copy/move operations | `filesystem.transfers` (historical `file_operations`) |
+| Snapshot removal plans and execution | `filesystem.removal` (historical `file_removal`) |
+| Network-location detection | `filesystem.network` (historical `network_filesystems`) |
 
-## Related modules
+`commonUtils.filesystem` exports FilesystemObject, BrowserDetails, BrowserPanel,
+BrowserAction, FolderStats, scan_folders, format_size and format_datetime. These
+information/provider records do not require Qt widgets. File classes can supply
+read-only details and encoded thumbnails; see [metadata extension contracts](../docs/developer/extension-points.md#supply-metadata-and-thumbnails).
 
-- `files`: file objects and helpers.
-- `directories`: directory objects and browsing helpers.
-- `links`: symbolic links and shortcuts.
-- `rename`: filename transformations and batch rename policy.
-- `index`: persistent directory metadata, search and reconciliation.
-- `storage`: capacity and storage accounting.
+`scan_folders()` is a compatibility API backed by the shared persistent index,
+not an independent traversal. `visible_only=True` limits returned folder totals to
+the root and immediate child folders; their sizes include known descendants.
+Cancellation returns None. Inspect partial/stale metadata rather than assuming
+saved sizes describe the current disk exactly.
 
-Example: `from commonUtils.filesystem.directories import Directory`.
+Storage workspaces are disposable, but replacement staging must remain beside the
+destination for atomic publication. Use [persistence](../persistence/README.md) for
+publication; a temporary directory alone does not provide transaction semantics.
+
+Historical aliases share canonical module identity through the centralized
+[compatibility adapter](../docs/developer/compatibility.md).
+
+[Library overview](../README.md)
