@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from commonUtils.filesystem.index import DirectoryCache
-from commonUtils.filesystem.index.coordinator import IndexCoordinator, runner_lock
+from commonUtils.filesystem.index.coordinator import IndexCoordinator, runner_lock, _retry_sql
 from commonUtils.runtime.operations import OperationCancelled
 
 
@@ -63,7 +63,9 @@ class CoordinatorTests(unittest.TestCase):
     def until(self, predicate, timeout=15):
         deadline = monotonic()+timeout
         while monotonic() < deadline:
-            result = predicate()
+            # Match production follow(): short queue/schema lock contention is
+            # retried while the actual index writer remains serialized.
+            result = _retry_sql(predicate, cancelled=lambda: monotonic() >= deadline)
             if result:
                 return result
             sleep(.03)
