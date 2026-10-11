@@ -1,5 +1,7 @@
 # Archive contents widgets
 
+[User guide](user_docs/README.md) · [Developer API map](../../docs/developer/public-apis.md)
+
 Passive archive entry lists, folder navigation and previews. Widgets emit requests; the application owns jobs, passwords, mutations and error presentation.
 
 Used by Logistics Archives. Shares generic entry-selection mechanics with the file browser, while archive entries remain archive-domain data.

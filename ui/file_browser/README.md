@@ -1,365 +1,87 @@
-# File browser
+# File Browser integration
 
-Start with the [runnable browser window](../../README.md#build-a-browser-with-your-own-actions),
-then [add actions, custom file types and previews](../features/README.md).
+`commonUtils.ui.file_browser.FileBrowser` embeds reusable browsing, selection,
+previews, indexed search and size maps. Applications supply domain actions and
+host navigation. Start with the [runnable browser example](../features/README.md#runnable-example-add-a-menu-action-to-a-browser).
+For workflows and settings, see the [user guide](user_docs/README.md).
 
-`FileBrowser` is the reusable host; Logistics supplies feature behavior through
-extensions. Keep existing constructor arguments, methods, signals, widget fields,
-and imports compatible. File handlers may also be used outside Logistics.
+## Construction and navigation
 
-## Responsibilities
+Create QApplication first, then `FileBrowser(root, parent=owner)` and add it to
+an existing layout or main window. The constructor accepts `services`,
+`action_providers`, `folder_fields`, `calculate_folder_sizes` and
+`index_settings_path` as keyword options. Prefer [Feature declarations](../features/README.md)
+for new grouped integrations. Keep existing constructor arguments, signals and
+established widget fields compatible.
 
-- `__init__.py`: orchestration, extensions, selection/detail work, indexing lifecycle.
-- `views.py`, `tiles.py`, `columns.py`: view modes and source/proxy selection mapping.
-- `model.py`: filesystem objects, cached totals and sorting by actual bytes.
-- `preview.py`, `details.py`: optional selection pane, responsive cover, field display.
-- `index_worker.py`: per-location shared work and independent tab subscriptions.
-- `status.py`: path-free progress formatting, live elapsed time, one workspace line.
-- `index_search.py`: cancellable paging of cached names, with no filesystem scan.
-- `storage_view.py`: immediate-child treemap; bounded radial hierarchy on demand.
-- `file_actions.py`, `editing.py`: clipboard operations and names; preserve source indices.
-- `trash_actions.py`: removal confirmations, system trash and explicit permanent fallback.
-- `search_columns.py`: responsive Name-first layouts for inline/dialog search results.
-- `navigation.py`, `controls.py`: breadcrumbs, history and presentation controls.
+`set_directory(path, navigation_root=...)` separates the initial location from its
+navigation boundary. The one-argument API remains folder-scoped. Applications choose
+Home/root defaults and new-tab destinations; these are not universal library policy.
+`index_settings_path` selects refresh preferences, **not** an alternate SQLite cache.
+See [index policy](user_docs/README.md#settings-and-their-effects).
 
-The index backend is separated into `commonUtils.filesystem.index.reader` (immutable
-SQLite readers), `filesystem.index.schema` (migration, record interning and membership),
-`filesystem.index.store` (scan scheduling/checkpoints), `filesystem.index.reconcile` (targeted
-completed-index updates), `filesystem.index.totals` (incremental
-aggregation), and `filesystem.index.order` (natural ordering). Reader/order
-imports remain available from `filesystem.index.store`. Public access uses
-`commonUtils.filesystem.index`.
+## Selection and extensions
 
-## State and ownership
+`selected_objects()` returns filesystem objects. `selection_changed(objects)`,
+`details_loaded(result)` and `refreshed()` notify hosts. After mutations use
+`refresh_item(path)` or `refresh()` as appropriate. Existing objects remain snapshots;
+registry revisions cause browser models to re-resolve future objects.
 
-Widgets and selections belong to the GUI thread. Panel loaders, filesystem work,
-and database queries run in workers. Closing cooperatively stops workers before
-Qt owners are deleted. Sharing a scan does not share selection/navigation state;
-cancelling one tab unsubscribes it, and only the last subscriber stops the scan.
-SQLite serializes writers across processes. Independent read transactions keep
-older displayed snapshots valid while generations are replaced or pruned.
+Preview is optional in tiles/list, intrinsic to columns, and replaced by ranked
+entries in storage views. Turning it off avoids automatic detail loaders;
+`selected_object` remains available. Explicit `load(item)` displays details when
+Preview is enabled. Keep `preview_panel`, heading/message/cover fields and existing
+preview interfaces compatible for established consumers.
 
-`set_directory(path, navigation_root=...)` separates an initial folder from its
-navigation boundary. The original one-argument API remains folder-scoped.
-Logistics uses the filesystem root for its default page, starts at the user's home
-folder, and indexes that visible scope; creating the page does not launch a `/`
-scan. Windows defaults to C: (falling back to the home drive if unavailable) and
-provides a drive selector. New tabs in an unconstrained page start at Home and
-retain filesystem navigation. Explicitly opened pages/windows and explicitly
-scoped tabs retain their folder bounds. Starting at home does not add a synthetic root visit
-to Back history.
+Panel/thumbnail providers return data from workers; action and activation handlers
+run on the GUI thread. Controllers own expensive action jobs. File information,
+preview cache invalidation and source/proxy selection mapping must continue to refer
+to the original filesystem items, including after sort/view changes. See
+[extension contracts](../../docs/developer/extension-points.md).
 
-Cached chart paths missing from Qt's live model activate directly by path. When
-an explicitly opened hidden folder needs it, the live model temporarily enables
-hidden entries in that subtree, restoring the original filter on leaving it.
+## Index and search lifecycle
 
-Preview is enabled by default in tile/list views and starts at roughly 30% of the
-splitter width (minimum 220 px). It shows selections or current-folder properties
-when nothing is selected. Users may resize it or switch it off. Column view always
-shows selected-file details in its native final column, matching the preceding
-column width; selecting folders continues the folder trail. Its toggle is hidden.
-Storage charts never show details previews: their right pane lists files and
-folders largest first. Radial rows nest the loaded descendants; clicking a deep
-sector expands its ancestors and scrolls to its matching row. Percentages use the
-current root total at every level. The radial loader shares its 3,000-entry budget
-breadth-first across siblings and reserves room for each of its four rings, so a
-large early branch cannot consume the entire chart. Omitted entries leave gaps;
-zero-byte folders have no area and incomplete indexed totals can leave branches
-unrepresented until the index is repaired. Double-click a folder to explore deeper. Treemap and radial have separate toolbar buttons under
-Storage. Their old `chart_selector` API remains available as a hidden widget.
-Disabled previews do not start selection detail loaders. Existing `preview_panel`,
-`heading`, `message`, `cover`, `tabs`, `preview`, `load`, and selection signals remain
-available. Explicit `load(item)` still displays requested details when Preview is
-enabled, and `selected_object` remains available when automatic previews are off.
-The INI setting `[FileBrowser] preview_enabled` supplies new-tab defaults.
+Live file browsing and cached recursive metadata are independent. `open_search()`
+returns the embedded IndexSearch panel, not a standalone dialog. Search and storage
+read cached snapshots on workers and follow shared index updates. They do not launch
+independent scans. Network locations disable indexing/search/storage and automatic
+rich previews while retaining ordinary browsing and explicit opening.
 
-The magnifying-glass toolbar button toggles inline search, hidden initially.
-The search bar sits below navigation in the file-list panel, alongside an X that
-clears the query and closes search. Escape and the toggle also close it; Ctrl/Cmd+F
-opens and focuses it. `open_search()` returns the embedded IndexSearch panel;
-there is no standalone search dialog.
-Opening a search-result folder keeps the query and searches that folder's
-descendants. **Show in browser** explicitly exits search and locates the result.
+Index policy is read per request. Explicit refresh validates the subtree; ordinary
+navigation can use cached data or immediate-folder checks. Disjoint scan roots keep
+independent jobs while SQLite serializes writers. Visible-folder priorities apply
+within an existing scan root. Each tab retains its own selection/navigation and
+subscription; cancelling one subscriber only stops shared work when none remain.
 
-Navigation and controls share one toolbar row. The inline **Size** slider follows
-the breadcrumbs and immediately precedes View; it adjusts tiles, list icons and
-column icons. Overflowing breadcrumbs keep the current folder visible and compact
-the root shortcut. Layout-derived minimum sizes keep split panes from overlapping
-when the window shrinks. The workspace footer is outside the bordered view
-panes; cached-only reads do not show scan activity.
+See [index persistence and migration](../../filesystem/index/README.md). Snapshot
+owners must close readers when done, especially before removing temporary databases
+on Windows. Do not close a shared cache while other views still use it.
 
-Workspace tab dragging uses explicit left/right drop zones and a center tab-group
-zone (`commonUtils.ui.workspace_drag`). Closing a worker-only browser tab removes
-it from the visible layout immediately; the workspace retains its hidden dock in
-`_retiring` until its owners report idle. A feature close refusal keeps the tab
-visible. Whole-window shutdown checks both visible and retired owners.
-Dragging an attached tab moves the full pane; Escape or a rejected destination
-restores its layout and owner. With an opt-in `WorkspacePolicy`, detached windows
-contain their own tabs, selection, local New action and footer. Single browser
-headers can collapse completely while local controls use the navigation row.
-Legacy workspaces retain native floating-dock windows.
+## Shutdown and workspaces
 
-Storage refreshes carry a root/mode/index-revision identity. Repeated mode changes
-reuse loaded data and obsolete results are discarded. Immediate child reads and
-rows are capped at 3,000, while saved root totals remain accurate; the view labels
-this limit. Index progress uses saved file/folder aggregates rather than counting
-every indexed entry. Unchanged totals do not rebuild models or details, and fresh
-folder details replace existing presentation only once ready.
+`stop()` returns **true while workers are still finishing**. Ignore close while
+true and retry on `idle`. `shutdown()` waits during final application exit. Retain
+controllers and feature bindings as long as their jobs need them: browser stop does
+not substitute for `binding.prepare_close()` (false means controller not ready).
+See [initialization and shutdown](../../docs/developer/architecture.md#initialization-and-shutdown).
 
-Filename search ignores case, including Unicode case folding. Bare space-separated
-terms must all occur, in any order. Quoted phrases keep adjacent word order, treating
-whitespace, underscores and hyphens as equivalent separators; punctuation and
-wildcards otherwise remain literal. Unfinished quotes act as phrases during live
-typing. SQL and detached snapshots share these rules in `directory.search.py`.
-Phrase normalization is a SQLite scalar function at query time, so existing saved
-names need no migration; unquoted keyword queries remain SQL substring predicates.
-Search results give Name the remaining width, keep Type/Size sized to their
-contents (capped at 130/110 px), and give Path roughly 27% of the view, up to 300 px.
-Users can resize Path manually. Elided values have complete text in tooltips.
-Names use a slightly stronger font weight; paths use the theme's muted color.
+A [Workspace](../workspaces.md) may remove a worker-only tab from view while keeping
+its hidden owners until idle. Close vetoes retain the tab, and whole-window shutdown
+checks retired owners too. Dock groups and optional WorkspacePolicy govern transfer
+and detached-window behavior; application destinations remain host-owned.
 
-## Removing files and folders
+## Maintenance boundaries
 
-Right-click selected items and choose **Move to Trash / Recycle Bin…**, or use
-the platform Delete shortcut while a file view has focus. Delete inside a text
-field still edits text. The confirmation defaults to Cancel and lists selected
-names, with full paths under Details. Folder selections include their contents;
-duplicate/parent-and-child selections are processed once.
+Orchestration/selection is in `__init__.py`; views/model map source objects to
+presentation; indexing/index_worker own lifecycle and subscriptions; storage/search
+modules read snapshots. File/trash actions own confirmation and mutation integration.
+These implementation locations explain maintenance responsibilities, not a guarantee
+that every helper is a public API.
 
-`QFile.moveToTrash()` delegates to the system on macOS/Windows and the supported
-freedesktop trash implementation on Unix. The browser does not assume a network
-volume supports trash. If the operation fails, the item stays in place, errors
-are available under Details, and **Keep items** is the default. Users may instead
-choose **Review permanent deletion…**, then explicitly confirm a second warning
-that the files/folder contents cannot be recovered through the app. A failed
-trash operation never silently invokes permanent deletion.
+Keep current bounded chart reads (3,000 entries, four radial levels), stale-result
+rejection and row/sector selection correspondence. Radial scene caching depends on
+chart data, size, font and palette; selection/zoom reuse it. Do not turn a chart refresh
+into a filesystem traversal. Hidden pause/chart selector compatibility objects are
+not a reason to document visible controls that do not exist.
 
-`commonUtils.filesystem.removal` provides snapshot plans and worker-safe execution.
-Filesystem/mount roots are refused; item identity and parent resolution are
-rechecked immediately before each operation. Symlinks are removed themselves,
-without recursively following their targets. The shared operation UI cancels
-between items and prevents conflicting mutations. Completed removals refresh
-affected folders, invalidate previews, and participate in the browser's existing
-worker shutdown lifecycle. Permanent removal can partially complete before a
-permission/IO error; there is no application-level undo for that operation.
-
-The shared status line and tooltip contain phases/counters, never scanner paths or
-tab titles. Processed counts include discovery and validation operations, not a
-claim of unique files; rate is the average over the run. Elapsed time continues
-updating while the worker is busy with SQL, and supports seconds, minutes and hours.
-The stable prefix and counters precede the changing phase. Browser size updates
-read totals only for the current folder and its immediate child folders; each saved
-total still includes all descendants. Full `scan_folders()` results remain available
-to existing callers; the browser opts into `visible_only=True`.
-
-## Event-driven index updates
-
-Initial scans and partial resumes discover missing branches before verification.
-Each discovery pass attempts a folder at most once: continuously changing folders
-remain partial instead of looping. A finished attempt stays idle even with unreadable
-or unstable folders; **Refresh index** retries them. Recorded folder failures are
-preserved across parent updates and app restarts. Automatic resume skips these
-failed branches while continuing unfinished work elsewhere; explicit Refresh
-permits one retry per failed folder per run. Failed paths are excluded from native
-index watches so they cannot repeatedly schedule work. The live file list retains
-its independent watcher. Notifications after a partial attempt repair their affected
-branches without restarting a full-tree scan. Cancellation retains resume behavior.
-The processed counter includes discovery and verification metadata operations, so
-it can exceed the saved-entry count. An unchanged resume verifies metadata once.
-After completion there is no periodic full-tree validation.
-
-An incomplete view exposes **Index details…** beside the bottom status controls
-(including the shared workspace and detached-window controls). This on-demand,
-read-only worker query lists scan errors with their original messages, unfinished
-enumeration checkpoints, and folders needing recheck. Counts cover the entire
-current subtree; the dialog shows at most 500 rows, with scan errors first.
-Paths appear only in this explicitly opened dialog. Diagnostics never start a scan
-or wait for the index writer. Verification errors preserve the failed file path.
- The first visit to a folder per app session checks its immediate
-entries; later visits read saved sizes without acquiring the index writer. The
-file list still reads live contents independently. Checks are shared by browsers
-using the same cache instance; notifications and explicit Refresh bypass reuse.
-Current-folder filesystem notifications and browser copy/move/rename
-operations check affected folders. New or changed branches are scanned, removed
-branches are purged, and recursive saved totals propagate to indexed ancestors.
-Changes missed in an unwatched folder can remain cached after its first session
-check until the user presses **Refresh**, which validates the entire current subtree.
-
-`DirectoryCache.reconcile_folder()` updates completed generations in one writer
-transaction without copying the whole generation. Independent SQLite read snapshots
-retain their old contents. Cancellation rolls back updates to a completed index, retaining the previous
-saved contents; initial/partial scans retain their durable checkpoint/resume behavior.
-Explicit Refresh validates the subtree in bounded batches in the same generation,
-so saved totals also update in its indexed ancestors. Retired metadata cleanup only
-examines records touched by the update, keeping repeated edits from growing the cache. The
-additive `folder_checks` table records the last immediate-folder check separately
-from full-tree validation timestamps, without rebuilding the index. The status line
-shows last-checked time and distinguishes cached subtree sizes from full validation.
-
-The browser has no visible Pause/Resume scan control. Initial scans finish once;
-explicit Refresh and filesystem changes drive subsequent work. The old pause
-methods and hidden compatibility object remain available to existing callers.
-
-During initial/resumed discovery, open views register lightweight in-memory folder
-priorities. The scanner checks needed ancestors and those folders' immediate entries
-before ordinary pending work, consulting new requests between folders. Priorities
-stop at the visible folder, so the rest of the original scan still completes. Visible
-sizes are published promptly. Navigating inside an active scan keeps the same job,
-generation and root; worker snapshots follow each subscriber's visible folder. Other
-tabs can have different visible folders in the same shared scan. Closing removes
-that view's priority; pausing retains independent subscription cancellation.
-
-The idle **Refresh index** action sits at the bottom-right beside status/activity.
-Docked tabs use one workspace control for the active folder. Detached tabs restore
-their own local status/activity and refresh control; docking again hides that local
-row. Refresh controls hide during indexing. Radial centre double-click goes up one
-folder using the normal Up action, preserving the selected chart mode and browsing
-root boundary.
-
-Disjoint initial-scan roots retain independent jobs and serialize their writers;
-closing a waiting window does not interrupt another window's scan. Priority moves
-folders within an ongoing scan's tree; it does not add unrelated roots to that tree.
-Integration coverage uses real Logistics browser views in two workspaces, tabs and
-floating docks, checking early sizes, shared generations, close/cancel isolation,
-priority cleanup, active-folder Refresh and detach/reattach status visibility.
-
-## Compact cache (schema 3)
-
-`folder_paths` stores a folder's cached absolute address, parent ID, segment name,
-and natural-sort prefix. `entry_nodes` stores a filename, parent folder ID, folded
-name and filename-only sort key. `entry_records` stores immutable metadata versions.
-`generation_entries` stores integer references. Overlapping roots and scan rebuilds
-share unchanged names/metadata; changing a file creates a new metadata version.
-Folder checkpoints, errors and aggregate totals remain generation-specific, with
-their established path-based representation. Returned `Entry.path` values are still
-absolute paths; callers do not need to understand database IDs.
-
-Whole-filesystem scans on macOS omit `/System/Volumes/Data`: macOS firmlinks
-already expose its files through `/Users`, `/Applications` and other ordinary
-paths. Scanning both would count the same files twice. Explicitly indexing Data
-or one of its subfolders remains supported; other volumes remain included.
-The next index update removes this branch from existing whole-filesystem
-generations and recalculates ancestor totals without requiring a full rescan.
-Repair runs under the index writer lock and rolls back on cancellation; old
-display snapshots remain readable. Read-only saved-size loading does not perform
-the repair. Sizes represent logical file bytes, so hard links, APFS clones and
-sparse files can still make totals differ from physical disk usage.
-
-Scoped reads/copies/deletes use indexed folder IDs. Filesystem identities and
-metadata still need validation; compact storage does not turn filesystem enumeration
-into a journal-based index. Natural path order is preserved by combining each cached
-folder prefix with its filename key during reads. Broad result sorting can use a
-SQLite temporary sort; immediate-child charts do not traverse the whole generation.
-Folder reconciliation uses the covering `folder_parent(generation,parent,path)`
-index. Without it, every folder scan examines all saved folder checkpoints. Existing
-schema 3 databases receive this index on the next writer initialization; no metadata
-rebuild is needed. Only one copy of the pending-folder queue index is retained.
-
-Upgrades run under the writer lock. Before upgrading an existing schema 1/2 cache,
-a SQLite backup creates `directory-index.pre-v3.sqlite3` beside the index, including
-committed WAL data. It is retained and never overwritten. Failure/cancellation
-rolls back the migration, and read-only legacy snapshots remain displayable before
-and during upgrade. Completed generations and partial checkpoints are preserved.
-Deleted generations prune only their unreferenced metadata/names; other scopes and
-existing readers retain their versions.
-
-Dropping old tables frees pages for SQLite to reuse, but does not necessarily shrink
-the main file's allocated size immediately. We do not automatically run `VACUUM` on
-large live caches: it adds a full rewrite and can retain extra WAL data while readers
-are active. The recovery copy is also intentionally separate from the new cache.
-
-## Validation
-
-Use isolated temporary databases; never point test browsers at the live user cache.
-Run Qt suites with `QT_QPA_PLATFORM=offscreen`, in separate processes when testing
-many modules. Coverage includes migration/WAL/rollback/cancellation, old snapshots,
-overlapping roots, partial resume, changed metadata, literal/Unicode names, natural
-ordering, scope query plans, indexing subscriptions, preview sizing, file actions,
-and Logistics comic/extension integration.
-
-Profile filesystem metadata, database writes/checkpoints, aggregation and validation
-separately. Record warm/local versus cold/network conditions and fixture sizes.
-Measure SQLite used pages (page count minus freelist) separately from allocated file
-size. For large migration rehearsals, copy committed data into a temporary database
-and verify entry counts plus SQLite integrity/foreign-key checks afterward.
-
-### Radial navigation and breadcrumbs
-
-Opening a radial folder or returning to its parent uses a 240 ms zoom transition.
-Ordinary index updates do not restart it. Hit testing uses the painted geometry,
-and double-click navigation stays available during the transition. Hidden charts
-stop their animation timer. Set `[Storage] radial_animations_bool = false` in
-`ui/settings.ini` to disable transitions.
-
-Breadcrumb separators are painted chevrons centered geometrically, avoiding
-platform-specific font baselines. The bar has a subtle palette-aware backdrop.
-
-### Disconnected drives: current limits
-
-`DirectoryCache.peek()` can read saved data without accessing the drive. However,
-scanning a parent can prune missing child folders, and the index does not yet track
-volume identities. Treat robust offline retention as pending work. A single database
-with volume IDs, availability and last-seen metadata can distinguish unplugging
-from deletion and avoid mixing different drives mounted at the same path. Automatic
-age-based removal is not currently enabled; prefer explicit clearing until volume
-tracking is implemented.
-
-Cancellation of the last shared index subscriber connects its finish callback
-before interrupting the worker and also checks already-finished workers. This
-closes the race where a thread exits before the new callback is connected but
-its GUI completion is still queued; handles always leave the busy state.
-
-File-view keyboard navigation follows the host platform: macOS Command-Up goes
-up, Command-Down/Command-O opens the selection, and Return renames. Windows and
-Linux use Enter to open, F2 to rename, and Alt-Up to go up. Windows also accepts
-Backspace to go up. Alt-Left/Right traverse history. Text fields and inline
-filename editors retain their own keyboard handling.
-
-Radial rendering caches one device-resolution scene until chart data, dimensions,
-font or palette change. Selection and navigation zoom reuse it. Hit testing uses
-ring distance and a binary search of angular sectors rather than checking each
-curved path. The pointer-following tooltip is a reusable `ui.cursor_tooltip`
-component, and hides during loading or when the pointer leaves. Chart data remains
-bounded to four levels and 3,000 displayed entries, independent of index size.
-
-### Snapshot ownership on Windows
-
-Indexed snapshots retain a SQLite read transaction so displayed results stay
-stable while another scan publishes a generation. Release a snapshot with
-`snapshot.close()` when its owner is done, or use it as a context manager.
-`DirectoryCache.close()` releases the snapshots owned by that cache; a cache can
-also be used as a context manager. Close readers before removing a temporary
-cache directory, especially on Windows where open SQLite files cannot be removed.
-Do not close a shared cache while other views still use its snapshots. Browser
-workers and tests must finish before their owning temporary resources are removed.
-
-
-## Reusable file browser
-
-Create a QApplication first, then construct `FileBrowser(root, parent=owner)`.
-Embed it with `owner.setCentralWidget(browser)` or add it to an existing layout.
-The [complete window example](../../README.md#build-a-browser-with-your-own-actions)
-includes close handling. The [feature guide](../features/README.md) shows how to
-add actions, formats, preview panels and double-click behavior.
-
-Useful methods/signals are `selected_objects()`, `refresh()`, `refresh_item(path)`,
-`selection_changed(objects)`, `details_loaded(result)` and `refreshed()`.
-Retain browser bindings and controllers for the lifetime of the window.
-`stop()` returns true while workers are finishing; defer destruction and retry
-on `idle`. `shutdown()` waits during final application exit.
-
-## Indexed search in the browser
-
-The magnifying-glass button or Ctrl/Cmd+F opens inline search below navigation.
-Search reads cached names throughout the current subtree, case-insensitively,
-without starting a separate filesystem scan. It labels partial results and uses
-500-row pages; sorting applies to all matches. Escape or the close button returns
-to ordinary browsing. Results retain previews, context actions and clipboard behavior.
-
-## Selection preview
-
-The Preview toggle shows selected-file information or current-folder properties
-when nothing is selected. It starts enabled and can be resized or hidden.
-Column view has its own final details column; storage charts use a size-ranked
-entry list. Disabling Preview avoids automatic detail loaders.
-`[FileBrowser] preview_enabled` chooses the default for new tabs.
+[Developer hub](../../docs/developer/README.md) · [UI overview](../README.md)
