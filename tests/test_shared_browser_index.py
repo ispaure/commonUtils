@@ -1,7 +1,8 @@
 """Browser subscriptions follow shared jobs under cache-first policy."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event, Thread, Timer
+from threading import Event, Thread
+import sqlite3
 from time import monotonic, sleep
 import unittest
 from unittest.mock import patch
@@ -131,23 +132,26 @@ class SharedBrowserTests(QtTestCase):
             with self.queue._connection() as db:
                 db.execute('BEGIN EXCLUSIVE')
                 entered.set()
-                release.wait(3)
+                release.wait(10)
         worker = Thread(target=writer)
         worker.start()
-        timer = Timer(.7, release.set)
         attempts = []
         def receipt():
             attempts.append(None)
-            return self.queue.status(identity)
+            try:
+                return self.queue.status(identity)
+            except sqlite3.OperationalError:
+                # Keep the real writer lock until the reader observes it;
+                # elapsed timers can fire before a busy CI reader is scheduled.
+                release.set()
+                raise
         try:
             self.assertTrue(entered.wait(3))
-            timer.start()
             job = self.wait(receipt)
             self.assertEqual(job['state'], 'pending')
             self.assertGreater(len(attempts), 1)
         finally:
             release.set()
-            timer.cancel()
             worker.join(5)
             self.assertFalse(worker.is_alive())
 
