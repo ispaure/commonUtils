@@ -19,12 +19,13 @@ class ThemeColors:
     accent: str
     selected_text: str
     hover: str
+    selection_background: str = ''
 
 
 SLATE_LIGHT = ThemeColors('#f0f2f6', '#ffffff', '#f5f7fa', '#202838', '#606b7c',
                           '#c5cedb', '#2563eb', '#ffffff', '#e3eaf7')
 SLATE_DARK = ThemeColors('#1c1f26', '#252a34', '#2d3340', '#eef1f7', '#a6b0c0',
-                         '#495366', '#75a7ff', '#101620', '#35425a')
+                         '#495366', '#75a7ff', '#ffffff', '#35425a', '#356ac3')
 
 
 def theme_palette(colors):
@@ -35,7 +36,7 @@ def theme_palette(colors):
         role.AlternateBase: colors.alternate, role.Button: colors.surface,
         role.ToolTipBase: colors.surface, role.ToolTipText: colors.text,
         role.WindowText: colors.text, role.Text: colors.text, role.ButtonText: colors.text,
-        role.Highlight: colors.accent, role.HighlightedText: colors.selected_text,
+        role.Highlight: colors.selection_background or colors.accent, role.HighlightedText: colors.selected_text,
         role.Link: colors.accent, role.LinkVisited: colors.accent,
         role.BrightText: '#ff7373', role.PlaceholderText: colors.muted,
         role.Light: colors.surface, role.Midlight: colors.hover,
@@ -48,17 +49,18 @@ def theme_palette(colors):
 
 
 def theme_stylesheet(c):
+    highlight = c.selection_background or c.accent
     return f'''
         QToolTip {{ color: {c.text}; background: {c.surface}; border: 1px solid {c.border}; padding: 5px; }}
         QLineEdit, QTextEdit, QPlainTextEdit, QAbstractItemView {{
             background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; border-radius: 6px;
-            selection-background-color: {c.accent}; selection-color: {c.selected_text};
+            selection-background-color: {highlight}; selection-color: {c.selected_text};
         }}
         QLineEdit {{ padding: 1px 5px; }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {c.accent}; }}
         QAbstractItemView::item {{ padding: 4px; margin: 0px; border: none; }}
         QAbstractItemView::item:hover {{ background: {c.hover}; padding: 4px; margin: 0px; border: none; }}
-        QAbstractItemView::item:selected {{ background: {c.accent}; color: {c.selected_text}; padding: 4px; margin: 0px; border: none; }}
+        QAbstractItemView::item:selected {{ background: {highlight}; color: {c.selected_text}; padding: 4px; margin: 0px; border: none; }}
         QHeaderView::section {{ background: {c.window}; color: {c.text}; border: none;
             border-bottom: 1px solid {c.border}; padding: 7px; }}
         QPushButton, QComboBox {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border};
@@ -66,7 +68,7 @@ def theme_stylesheet(c):
         QComboBox, QAbstractSpinBox {{ padding: 1px 8px; border: 1px solid {c.border}; border-radius: 6px;
             background: {c.surface}; color: {c.text}; }}
         QPushButton:hover, QComboBox:hover, QToolButton:hover {{ background: {c.hover}; }}
-        QPushButton:pressed, QPushButton:checked {{ background: {c.accent}; color: {c.selected_text}; }}
+        QPushButton:pressed, QPushButton:checked {{ background: {highlight}; color: {c.selected_text}; }}
         QPushButton:focus, QComboBox:focus, QToolButton:focus {{ border: 1px solid {c.accent}; }}
         QPushButton:disabled, QComboBox:disabled {{ color: {c.muted}; }}
         QComboBox QLineEdit, QAbstractSpinBox QLineEdit,
@@ -86,7 +88,7 @@ def theme_stylesheet(c):
         QProgressBar::chunk {{ background: {c.accent}; border-radius: 4px; }}
         QMenu {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; }}
         QMenu::item {{ padding: 6px 22px; }}
-        QMenu::item:selected {{ background: {c.accent}; color: {c.selected_text}; }}
+        QMenu::item:selected {{ background: {highlight}; color: {c.selected_text}; }}
         QSplitter::handle {{ background: {c.window}; }}
     '''
 
