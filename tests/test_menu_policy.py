@@ -69,7 +69,8 @@ class MenuPolicyTests(QtTestCase):
 
     def test_native_publication_settles_instead_of_rebinding_forever(self):
         with patch('sys.platform', 'darwin'), patch.object(
-                qt.QApplication, 'platformName', return_value='cocoa'):
+                qt.QApplication, 'platformName', return_value='cocoa'), patch(
+                'commonUtils.ui.workspace_cocoa.redraw_menu_bar'):
             host = self.window('Host')
             document = self.window('File', host)
             host.setCentralWidget(document)
