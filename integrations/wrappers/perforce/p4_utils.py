@@ -169,7 +169,7 @@ def exec_p4_command(command: str):
                     f'"{p4_path}"\n\n'
                     f'What to do:\n'
                     f'Ensure Perforce is installed and that the Perforce executable is available at the path above. '
-                    f'If needed, configure the executable through commonUtils.wrappers.perforce.configure_runtime.\n\n'
+                    f'If needed, configure the executable through commonUtils.integrations.wrappers.perforce.configure_runtime.\n\n'
                     f'Perforce operation aborted.'
                 )
                 log(Severity.CRITICAL, 'Perforce Command', msg)

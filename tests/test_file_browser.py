@@ -96,8 +96,8 @@ class BrowserTests(QtTestCase):
         def network(path, **kwargs):
             path = Path(path)
             return path == remote or remote in path.parents
-        with patch('commonUtils.network_filesystems.is_network_location', side_effect=network), \
-             patch('commonUtils.directory.directory_cache.reconcile_folder') as scan:
+        with patch('commonUtils.filesystem.network.is_network_location', side_effect=network), \
+             patch('commonUtils.filesystem.index.directory_cache.reconcile_folder') as scan:
             self.browser.set_directory(remote)
             self.wait()
             self.assertTrue(self.browser.network_location)
@@ -700,7 +700,7 @@ class BrowserTests(QtTestCase):
             release.wait(5)
             from unittest.mock import Mock
             return Mock(folder_stats=lambda **kwargs: {root: FolderStats(files=999)})
-        with patch('commonUtils.directory.directory_cache.reconcile_folder', side_effect=scan):
+        with patch('commonUtils.filesystem.index.directory_cache.reconcile_folder', side_effect=scan):
             try:
                 self.browser.set_folder_sizes_enabled(True)
                 self.assertTrue(entered.wait(2))

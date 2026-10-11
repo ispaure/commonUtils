@@ -1,6 +1,6 @@
 # Maintenance and validation
 
-Start with [architecture](architecture.md) and [compatibility](compatibility.md).
+Start with [architecture](architecture.md) and [integration contracts](contracts.md).
 Keep domain workflows and software manifests in consumers. Reusable behavior and
 its tests belong here. Avoid restructuring Python packages to fit documentation.
 
@@ -8,7 +8,7 @@ its tests belong here. Avoid restructuring Python packages to fit documentation.
 
 | Change | Update |
 | --- | --- |
-| Public import, return value or failure contract | [API map](public-apis.md), owning package reference, compatibility notes when needed |
+| Public import, return value or failure contract | [API map](public-apis.md), owning package reference, integration contracts when needed |
 | Registration, controller or provider protocol | [Extension points](extension-points.md), feature examples and focused tests |
 | Worker, index or persistence lifecycle | [Architecture](architecture.md) and owning technical guide |
 | Shared interactive behavior or settings | Component-local `user_docs/` and relevant embedding guide |
@@ -24,7 +24,7 @@ Do not invent API stability or a supported dependency range from naming alone.
 From the checkout's parent with the project's interpreter:
 
 ```sh
-QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.test_file_registry commonUtils.tests.test_package_compatibility
+QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.test_file_registry commonUtils.tests.test_package_layout
 ```
 
 The [test guide](../../tests/README.md) gives suite commands and PowerShell setup.

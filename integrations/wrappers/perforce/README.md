@@ -34,7 +34,7 @@ preserve existing files. Tagged records include the last entry without requiring
 a trailing blank output line.
 
 BlueHole keeps BlendP4File and scene-reload/filter callbacks in its own adapter.
-Its compatibility modules re-export the exact shared classes and module state.
+Its adapter modules re-export the exact shared classes and module state.
 Tests use fixture outputs and no live server; consumers still configure/install
 Perforce for actual operations.
 

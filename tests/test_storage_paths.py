@@ -26,7 +26,7 @@ class StorageTests(unittest.TestCase):
             ('linux', {'XDG_CACHE_HOME': str(self.home/'custom')}, self.home/'custom'),
             ('linux', {'XDG_CACHE_HOME': 'relative'}, self.home/'.cache'),
             ('linux', {}, self.home/'.cache')]:
-            with self.subTest(platform=platform, env=env), patch('commonUtils.storage.sys.platform', platform), patch.dict(os.environ, env, clear=True):
+            with self.subTest(platform=platform, env=env), patch('commonUtils.filesystem.storage.sys.platform', platform), patch.dict(os.environ, env, clear=True):
                 expected=expected/'commonUtils'
                 persistent = self.home/'Library'/'Application Support'/'commonUtils'/'Cache' if platform == 'darwin' else expected
                 temporary = persistent.parent/'Temp' if platform == 'darwin' else expected/'Temp'
@@ -36,7 +36,7 @@ class StorageTests(unittest.TestCase):
                 self.assertTrue(temporary.is_dir())
 
     def test_workspace_cleanup_keeps_persistent_data(self):
-        with patch('commonUtils.storage.sys.platform', 'darwin'):
+        with patch('commonUtils.filesystem.storage.sys.platform', 'darwin'):
             persistent = cache_directory()/'saved'; persistent.write_bytes(b'cache')
             with temporary_workspace() as folder:
                 workspace=Path(folder); (workspace/'file').write_text('temporary')
@@ -50,7 +50,7 @@ class StorageTests(unittest.TestCase):
         old=self.home/'Library'/'Application Support'/'commonUtils'/'directory-index.sqlite3'
         snapshot=DirectoryCache(database=old).get(root)
         # Open readers keep the source WAL alive; backup must copy logical contents.
-        with patch('commonUtils.storage.sys.platform', 'darwin'):
+        with patch('commonUtils.filesystem.storage.sys.platform', 'darwin'):
             with DirectoryCache() as new:
                 self.assertFalse(new.database.exists())
                 reused=new.get(root)
@@ -80,7 +80,7 @@ class StorageTests(unittest.TestCase):
         (root/'b.txt').write_text('new')
         recent=self.home/'Library'/'Caches'/'commonUtils'/'directory-index.sqlite3'
         DirectoryCache(database=recent).get(root)
-        with patch('commonUtils.storage.sys.platform', 'darwin'):
+        with patch('commonUtils.filesystem.storage.sys.platform', 'darwin'):
             with DirectoryCache() as new:
                 self.assertEqual(new.database, self.home/'Library'/'Application Support'/'commonUtils'/'Cache'/'directory-index.sqlite3')
                 self.assertEqual(new._legacy_database, recent)

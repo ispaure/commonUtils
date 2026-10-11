@@ -38,7 +38,7 @@ class JSONFileTests(unittest.TestCase):
             file.write_json({'invalid': object()})
         with self.assertRaises(ValueError):
             file.write_json(float('nan'))
-        with patch('commonUtils.fileTypes.jsonType.os.replace', side_effect=OSError('failed')):
+        with patch('commonUtils.formats.jsonType.os.replace', side_effect=OSError('failed')):
             with self.assertRaises(OSError):
                 file.write_json({'new': True})
         self.assertEqual(self.path.read_bytes(), before)

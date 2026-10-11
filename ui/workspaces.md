@@ -57,7 +57,7 @@ badges and persistence; these widgets never decide whether an operation is safe.
 ResultWorker captures callback result/error under noninteractive logging. Owners
 consume them after finished and retain workers until retirement. Cancellation
 boundaries and error formatting can be supplied by the caller. Operation retains
-its compatibility completed signal; use OperationProgress for finish-safe delivery
+its completed signal; use OperationProgress for finish-safe delivery
 with progress and cancellation controls.
 
 Workspace tab bars use horizontal dragging to reorder panes. Drag outside the

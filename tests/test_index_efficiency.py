@@ -68,7 +68,7 @@ class IndexEfficiencyTests(unittest.TestCase):
                 with patch.object(cache,'_scan_folder',side_effect=scanning):
                     with self.assertRaises(OperationCancelled):cache.get(root,cancelled=cancel.is_set)
                 self.assertEqual(len(cache.peek(child).entries),1)
-                with patch('commonUtils.directory.os.scandir',side_effect=AssertionError('Completed subtree enumerated again')):
+                with patch('commonUtils.filesystem.index.os.scandir',side_effect=AssertionError('Completed subtree enumerated again')):
                     resumed=cache.get(child)
                 self.assertTrue(resumed.complete)
                 self.assertTrue(resumed.resumed)
@@ -177,7 +177,7 @@ class IndexEfficiencyTests(unittest.TestCase):
                     result=scan(*args)
                     cache._publish_totals(args[0],args[1],args[2],args[5]);args[0].commit()
                     return result
-                with patch.object(cache,'_scan_folder',side_effect=scanning),patch('commonUtils.directory.totals.collect_folder_stats',wraps=collect_folder_stats) as full:
+                with patch.object(cache,'_scan_folder',side_effect=scanning),patch('commonUtils.filesystem.index.totals.collect_folder_stats',wraps=collect_folder_stats) as full:
                     snapshot=cache.get(root)
                 self.assertEqual(full.call_count,1)
                 self.assertEqual(snapshot.folder_stats()[root].size,24)

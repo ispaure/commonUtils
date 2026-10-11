@@ -61,7 +61,7 @@ class INIFileTests(unittest.TestCase):
         self.path.write_text('[S]\nx = old\n')
         ini = INIFile(self.path).read()
         ini.set('S', 'x', 'new')
-        with patch('commonUtils.fileTypes.iniType.os.replace', side_effect=OSError('failure')):
+        with patch('commonUtils.formats.iniType.os.replace', side_effect=OSError('failure')):
             with self.assertRaises(OSError):
                 ini.save()
         self.assertIn('old', self.path.read_text())

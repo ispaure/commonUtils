@@ -48,7 +48,7 @@ Start at the [developer hub](docs/developer/README.md).
 | Understand ownership and lifecycle | [Architecture](docs/developer/architecture.md) |
 | Choose APIs and handle failures | [Public APIs](docs/developer/public-apis.md) |
 | Register formats, actions and information providers | [Extension points](docs/developer/extension-points.md) |
-| Upgrade an existing consumer | [Compatibility](docs/developer/compatibility.md) |
+| Upgrade an existing consumer | [Integration contracts](docs/developer/contracts.md) |
 | Contribute and validate changes | [Maintenance](docs/developer/maintenance.md) |
 
 ## Package overview
@@ -79,11 +79,10 @@ choose which components to expose.
 - [Archive contents and previews](ui/archive_view/user_docs/README.md)
 - [Shared text and INI editors](ui/user_docs/README.md)
 
-## Contributing and compatibility
+## Contributing
 
-Use canonical import paths in new code. Historical aliases share module identity
-and remain important to consumers; they are documented in
-[compatibility](docs/developer/compatibility.md). There is no documented semantic
+Use the current import paths and [integration contracts](docs/developer/contracts.md).
+There is no documented semantic
 versioning or universal API stability promise. Test affected consumers before
 updating pinned or vendored revisions. See [contributor guidance](AGENTS.md).
 

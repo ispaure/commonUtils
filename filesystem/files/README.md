@@ -30,6 +30,6 @@ destination unless force=True. Move retains atomic replacement and cross-volume
 staging. Specialized file types should be reconstructed through their registry
 when format-specific state needs reloading.
 
-The free copy_file/rename_file/move_file functions are compatibility adapters
+The free copy_file/rename_file/move_file functions are convenience adapters
 that delegate to these methods and retain boolean outcomes. User/home/platform
 helpers stay module functions; they are not properties of individual files.

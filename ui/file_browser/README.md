@@ -81,7 +81,7 @@ that every helper is a public API.
 Keep current bounded chart reads (3,000 entries, four radial levels), stale-result
 rejection and row/sector selection correspondence. Radial scene caching depends on
 chart data, size, font and palette; selection/zoom reuse it. Do not turn a chart refresh
-into a filesystem traversal. Hidden pause/chart selector compatibility objects are
+into a filesystem traversal. Hidden pause/chart selector objects are
 not a reason to document visible controls that do not exist.
 
 [Developer hub](../../docs/developer/README.md) · [UI overview](../README.md)

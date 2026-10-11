@@ -3,7 +3,7 @@
 See [maintenance and documentation ownership](../docs/developer/maintenance.md).
 
 Run the suite before changing a consumer's pinned or vendored copy. Tests cover
-file preservation, archive validation, indexing, compatibility imports and Qt
+file preservation, archive validation, indexing, direct package imports and Qt
 worker ownership. External applications, native dialogs and drivers also need
 platform checks.
 

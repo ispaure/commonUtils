@@ -21,7 +21,7 @@ class WheelTests(QtTestCase):
             path = Path(folder)/'settings.ini'
             path.write_text('[WheelNavigation]\nsensitivity=1\ncooldown_ms=250\n')
             policy = PageWheel()
-            with patch('commonUtils.settings.settings_path', return_value=path):
+            with patch('commonUtils.configuration.settings.settings_path', return_value=path):
                 self.assertEqual(policy.direction(wheel(-3,pixels=True),now=10), 0)
                 path.write_text('[WheelNavigation]\nsensitivity=20\ncooldown_ms=250\n')
                 self.assertEqual(policy.direction(wheel(-3,pixels=True),now=10.1), 1)

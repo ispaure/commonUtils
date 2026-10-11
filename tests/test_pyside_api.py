@@ -1,4 +1,4 @@
-"""The organized Qt package keeps the historical facade and customization hooks."""
+"""Qt exports and customization hooks work across implementation components."""
 import importlib
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -8,16 +8,16 @@ from unittest.mock import Mock, patch
 from commonUtils.ui import pyside as qt
 
 
-class PySideCompatibilityTests(QtTestCase):
+class PySideAPITests(QtTestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])
 
-    def test_historical_paths_share_one_module(self):
+    def test_public_exports_share_one_module(self):
         from commonUtils.ui import pyside as pySideUtils
         from commonUtils.ui.pyside import Window, QApplication, OS, get_os
         self.assertIs(pySideUtils, qt)
-        self.assertIs(importlib.import_module('commonUtils.pySideUtils'), qt)
+        self.assertIs(importlib.import_module('commonUtils.ui.pyside'), qt)
         self.assertIs(Window, qt.Window)
         self.assertIs(QApplication, qt.QApplication)
         self.assertIs(OS, qt.OS)

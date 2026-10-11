@@ -22,7 +22,7 @@ class ManagedViewTests(QtTestCase):
         self.root=self.base/'files';self.root.mkdir();(self.root/'item.txt').write_bytes(b'abc')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
         self.addCleanup(self.cache.close)
-        self.patches=[patch(name,self.cache) for name in ('commonUtils.directory.directory_cache',
+        self.patches=[patch(name,self.cache) for name in ('commonUtils.filesystem.index.directory_cache',
             'commonUtils.ui.file_browser.index_worker.directory_cache','commonUtils.ui.file_browser.index_search.directory_cache',
             'commonUtils.ui.file_browser.discovery.directory_cache')]
         for item in self.patches:item.start()

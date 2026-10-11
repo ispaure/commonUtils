@@ -201,7 +201,7 @@ class XMLTests(unittest.TestCase):
             document = XMLFile(path)
             document.read_xml()
             document.set_text('Title', 'New')
-            with patch('commonUtils.fileTypes.xmlType.os.replace', side_effect=OSError('replace failed')):
+            with patch('commonUtils.formats.xmlType.os.replace', side_effect=OSError('replace failed')):
                 with self.assertRaises(OSError):
                     document.write_xml()
             self.assertEqual(path.read_bytes(), original)

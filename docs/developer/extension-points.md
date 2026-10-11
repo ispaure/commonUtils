@@ -114,7 +114,7 @@ physical-pixel size; return an empty result when unavailable. Keep editing in
 separate actions and refresh affected paths afterward.
 
 The older `browser_actions`, `browser_activate`, service/action providers and
-`install_extension` remain compatibility paths. New grouped features should use
+`install_extension` are lower-level APIs. New grouped features should use
 Feature declarations to keep ownership coherent.
 
 ## Other reusable customization boundaries

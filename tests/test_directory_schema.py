@@ -107,7 +107,7 @@ class DirectorySchemaTests(unittest.TestCase):
                 db.execute('INSERT INTO scans VALUES(1,?,1,123)', (temporary,))
                 db.execute("INSERT INTO folders VALUES(1,?,?,'done',NULL)", (temporary, temporary))
                 db.commit()
-                with patch('commonUtils.directory.schema.ensure_folder', side_effect=RuntimeError('fixture failure')):
+                with patch('commonUtils.filesystem.index.schema.ensure_folder', side_effect=RuntimeError('fixture failure')):
                     with self.assertRaisesRegex(RuntimeError, 'fixture failure'):
                         upgrade_entries(db)
                 self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 2)

@@ -26,9 +26,8 @@ Shared workers capture failures there and let the GUI owner present them after
 worker completion. Do not touch widgets or display modal dialogs from workers.
 
 Module configuration such as `verbose_debug`, `write_to_log` and `project_prefix`
-serves legacy consumers. When changing it, use the canonical module rather than
-copying a setting with `from ... import ...`; historical aliases refer to the same
-module state. There is no universal library-wide error policy: consult each
+serves consumers. When changing it, set the value on the module rather than
+copying a setting with `from ... import ...`. There is no universal library-wide error policy: consult each
 operation's contract and inspect both worker errors and per-item results.
 
 [Runtime overview](../README.md) · [Lifecycle guidance](../../docs/developer/architecture.md)

@@ -164,7 +164,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_feature_override_declaration_lazy_references_and_fallback(self):
         feature = Feature(id='override_test', file_type_overrides=[
-            FileTypeOverride('commonUtils.fileTypes.txtType:TXTFile', f'{__name__}:CustomText')])
+            FileTypeOverride('commonUtils.formats.txtType:TXTFile', f'{__name__}:CustomText')])
         handles = feature.register_types()
         for handle in handles:
             self.addCleanup(file_types.unregister, handle)
@@ -183,7 +183,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_invalid_lazy_override_does_not_install_feature_extension_rules(self):
         feature = Feature(id='invalid_override', file_types=[FileType(ProjectFile, 'mustnotregister')],
-                          file_type_overrides=[FileTypeOverride('commonUtils.fileTypes.txtType:TXTFile',
+                          file_type_overrides=[FileTypeOverride('commonUtils.formats.txtType:TXTFile',
                                                                f'{__name__}:ProjectFile')])
         with self.assertRaises(TypeError):
             feature.register_types()

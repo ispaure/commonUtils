@@ -2,7 +2,7 @@
 
 ZIP/TAR listing, creation, safe extraction, editing, integrity checks and bounded previews. Domain operations have no UI dependencies. Passwords, progress and cancellation are supplied by callers.
 
-See [ZIP compatibility](zip_access.md) and the contracts below.
+See [ZIP access](zip_access.md) and the contracts below.
 
 ## Files
 
@@ -19,8 +19,7 @@ See [ZIP compatibility](zip_access.md) and the contracts below.
 
 [Parent guide](../README.md)
 
-`zip_access.py` owns the historical `zip_access` implementation; its compatibility
-package preserves existing consumers.
+`archives.zip_access` provides password-aware ZIP access.
 
 ## ZIP and TAR archives
 

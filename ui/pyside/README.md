@@ -1,6 +1,6 @@
 # PySide backend
 
-Qt application setup, windows, common widgets, messages and progress dialogs. This is the canonical PySide backend; `commonUtils.ui.pyside` is a compatibility alias.
+Qt application setup, windows, common widgets, messages and progress dialogs. This is the canonical PySide backend; import it directly as `commonUtils.ui.pyside`.
 
 Create a `QApplication` before creating widgets. Requires PySide6. Import `from commonUtils.ui import pyside as qt`.
 
@@ -8,7 +8,7 @@ Create a `QApplication` before creating widgets. Requires PySide6. Import `from 
 
 | File | Responsibility / public entry points |
 | --- | --- |
-| [__init__.py](__init__.py) | Backward-compatible Qt facade, organized into focused implementation modules. |
+| [__init__.py](__init__.py) | Qt facade, organized into focused implementation modules. |
 | [_imports.py](_imports.py) | Package exports and imports. |
 | [application.py](application.py) | Application utilities; public API is commonUtils.ui.pyside. |
 | [messages.py](messages.py) | Messages utilities; public API is commonUtils.ui.pyside. |

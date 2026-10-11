@@ -1,8 +1,7 @@
 # Directory index
 
 Import `DirectoryCache`, `directory_cache`, `Entry`, `Snapshot`, `scan_metadata`
-and `storage_totals` from `commonUtils.filesystem.index`. The historical
-`directory_index` import shares module identity. This subsystem owns metadata,
+and `storage_totals` from `commonUtils.filesystem.index`. This subsystem owns metadata,
 persistent search and sizes; [File Browser user workflows](../../ui/file_browser/user_docs/README.md)
 belong with the UI.
 
@@ -41,7 +40,7 @@ phrases; it is not content indexing or a wildcard language.
 `folder_stats(paths=...)` limits aggregate reads to requested paths;
 `children_of=...` requests a folder and its immediate children (mutually exclusive
 with explicit paths). Their sizes still include known descendants. `scan_folders`
-is a compatibility adapter; cancellation there returns None, while underlying
+is an aggregate adapter; cancellation there returns None, while underlying
 index APIs normally raise OperationCancelled.
 
 Close snapshots when their owners finish, or use context managers as above.
