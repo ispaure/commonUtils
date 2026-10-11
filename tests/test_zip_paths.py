@@ -33,6 +33,19 @@ class ZipPathTests(unittest.TestCase):
                 for name, content in entries:
                     archive.writestr(name, content)
 
+    def test_non_zip_extension_publication_failure_is_reported(self):
+        source = self.root / 'pages'
+        source.mkdir()
+        (source / '01.txt').write_text('page')
+        destination = self.root / 'comic.cbz'
+        destination.write_bytes(b'original archive')
+        with patch.object(zipUtils.fileUtils.os, 'replace', side_effect=PermissionError('locked')):
+            with self.assertRaises(PermissionError):
+                zipUtils.zip_file(source, destination, keep_root=False)
+        self.assertEqual(destination.read_bytes(), b'original archive')
+        self.assertTrue(destination.with_suffix('.zip').is_file())
+        self.assertEqual((source / '01.txt').read_text(), 'page')
+
     def test_parent_directory_entries_are_rejected(self):
         self.make_archive([('../outside/', '')])
         self.assertFalse(zipUtils.unzip_file(self.archive, self.dest))

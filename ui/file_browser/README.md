@@ -7,6 +7,26 @@ For workflows and settings, see the [user guide](user_docs/README.md).
 
 ## Construction and navigation
 
+To open a standalone browser at a specific folder, put commonUtils on the Python
+import path, install PySide6, and run this minimal script. Replace the example path
+with an existing directory:
+
+```python
+from pathlib import Path
+from commonUtils.ui import pyside as qt
+from commonUtils.ui.file_browser import FileBrowser
+
+app = qt.initialize_q_app()
+browser = FileBrowser(Path("/path/to/folder"))
+browser.resize(1000, 700)
+browser.show()
+app.exec()
+```
+
+Keep `browser` alive while the event loop runs. Its own close handler waits for
+browser workers to finish; hosts embedding it in another window must handle that
+window's shutdown as described below.
+
 Create QApplication first, then `FileBrowser(root, parent=owner)` and add it to
 an existing layout or main window. The constructor accepts `services`,
 `action_providers`, `folder_fields`, `calculate_folder_sizes` and
