@@ -1,6 +1,4 @@
-# linkUtils
-
-Shared linkUtils API. The public import path is unchanged after moving its implementation into this package.
+# Symbolic links and junctions
 
 Import from `commonUtils.filesystem.links`. Implementation and public exports live in
 [`__init__.py`](__init__.py).

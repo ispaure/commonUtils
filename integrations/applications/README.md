@@ -1,6 +1,4 @@
-# appUtils
-
-Shared appUtils API. The public import path is unchanged after moving its implementation into this package.
+# External applications
 
 Import from `commonUtils.integrations.applications`. Implementation and public exports live in
 [`__init__.py`](__init__.py).

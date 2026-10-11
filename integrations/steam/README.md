@@ -1,16 +1,13 @@
-# steamUtils
+# Steam launch detection
 
-Shared steamUtils API. The public import path is unchanged after moving its implementation into this package.
+`is_linux_steam_big_picture()` checks whether the process was started through
+Linux Steam Big Picture. It does not launch Steam or configure controllers.
 
-Import from `commonUtils.integrations.steam`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+```python
+from commonUtils.integrations.steam import is_linux_steam_big_picture
 
-Public entry points: `is_linux_steam_big_picture`
+if is_linux_steam_big_picture():
+    print('Started through Steam Big Picture')
+```
 
 [Library overview](../../README.md).
-
-## API behavior
-
-| Entry point | Purpose |
-| --- | --- |
-| `is_linux_steam_big_picture` | Return if the application was launched in Linux Steam Big Picture Mode  |

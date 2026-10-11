@@ -1,16 +1,11 @@
-# webUtils
+# Open a web link
 
-Shared webUtils API. The public import path is unchanged after moving its implementation into this package.
+```python
+from commonUtils.integrations.web import open_url
 
-Import from `commonUtils.integrations.web`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+open_url('https://example.com')
+```
 
-Public entry points: `open_url`
-
+The operating system opens the default browser. Callers own URL configuration
+and validation; opening a browser does not prove the remote page loaded.
 [Library overview](../../README.md).
-
-## API behavior
-
-| Entry point | Purpose |
-| --- | --- |
-| `open_url` | Opens a URL in the Default Web Browser |
