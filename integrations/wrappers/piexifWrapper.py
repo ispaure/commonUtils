@@ -1,86 +1,44 @@
-from typing import List
+"""Read JPEG metadata and publish comment changes without partial file writes."""
+from io import BytesIO
+from pathlib import Path
 
 import piexif
 
-from ...filesystem import directories as dirUtils, files as fileUtils
-
+from ...filesystem.traversal import scan_directory
+from ...persistence import atomic_write_bytes
 
 COMMENTS_TAG_ADDRESS = 40092
 
 
 def jpg_batch_set_exif_comments(target_dir, recursive, comments):
-    """
-    In designated folder, batch set EXIF comments for .JPG files to whichever is set in comments.
-    """
-
-    # Gather list of JPG files
-    target_directory = dirUtils.Directory(target_dir)
-    jpg_file_lst: List[fileUtils.File] = target_directory.list_files(recursive=recursive, filter_extension='jpg')
-
-    # For each file, assign comments tag only if it doesn't match
-    for jpg_file in jpg_file_lst:
-        jpg_set_exif_comments(jpg_file.path, comments)
-
-    print('DONE!')
+    """Set Windows EXIF comments on regular JPEG files."""
+    for path in scan_directory(target_dir, recursive=recursive):
+        if not path.is_symlink() and path.suffix.lower() in ('.jpg', '.jpeg'):
+            jpg_set_exif_comments(path, comments)
 
 
 def jpg_set_exif_comments(jpg_file, comments):
-    """
-    Modifies a jpg file by setting the comments tag if the comments doesn't match the file's current comments tag
-    """
+    """Return whether a comment changed; retain a recovery copy before publication."""
+    path = Path(jpg_file)
+    if path.is_symlink():
+        raise ValueError('JPEG metadata edits cannot replace symbolic links.')
+    original = path.read_bytes()
+    metadata = piexif.load(original)
+    encoded = comments.encode('utf-16-le') + b'\0\0'
+    if bytes(metadata['0th'].get(COMMENTS_TAG_ADDRESS, ())) == encoded:
+        return False
+    metadata['0th'][COMMENTS_TAG_ADDRESS] = tuple(encoded)
+    output = BytesIO()
+    piexif.insert(piexif.dump(metadata), original, output)
+    content = output.getvalue()
+    piexif.load(content)  # Validate the staged metadata before touching the source.
 
-    def set_comments():
-        """
-        Has determined comments need to be set. Set it.
-        """
-        # Set comments procedure initiated!
+    def unchanged():
+        if path.is_symlink() or path.read_bytes() != original:
+            raise RuntimeError(f'JPEG changed during metadata editing: {path}')
 
-        # Create comments tuple
-        comments_byte_tuple = tuple(bytes(comments, 'utf-8'))
-
-        # Add 0 between each item and at end
-        comments_byte_tuple = tuple(item for pair in zip(comments_byte_tuple, (0,) * len(comments_byte_tuple)) for item in pair) + (0, 0)
-
-        # Show some debug info (string transformed to bytes)
-        print('"Comments" field to set (in string form): ' + comments)
-        print('"Comments" field to set (in bytes form): ' + str(comments_byte_tuple))
-
-        print('Original dict')
-        print(jpg_exif_dict)
-
-        # Modify the original dict
-        new_jpg_exif_dict = jpg_exif_dict
-        new_jpg_exif_dict['0th'][COMMENTS_TAG_ADDRESS] = comments_byte_tuple
-
-        print('Modified dict')
-        print(new_jpg_exif_dict)
-
-        # Dump back in file
-        piexif.insert(piexif.dump(new_jpg_exif_dict), jpg_file)
-
-    print('\nLoading .JPG file: ' + jpg_file)
-
-    # Load JPG's EXIF
-    jpg_exif_dict = piexif.load(jpg_file)
-    dict_0th = jpg_exif_dict['0th']
-
-    # See if Comments Tag is set
-    if COMMENTS_TAG_ADDRESS in dict_0th.keys():
-        comments_in_file_bytes_tuple = dict_0th[COMMENTS_TAG_ADDRESS]
-        comments_in_file_bytes_tuple_rem_0 = tuple(filter(lambda x: x != 0, comments_in_file_bytes_tuple))
-
-        comments_in_file_str = str(bytes(comments_in_file_bytes_tuple_rem_0).decode('utf-8'))
-
-        print('Found "Comments" Tag: ' + comments_in_file_str)
-        print('Existing "Comments" Bytes Tuple: ' + str(dict_0th[COMMENTS_TAG_ADDRESS]))
-
-        if comments != comments_in_file_str:
-            set_comments()
-            return True
-        else:
-            print('Comments match, no need to do anything.')
-            return False
-    else:
-        print('Did not find a "Comments" Tag.')
-        set_comments()
-        return True
+    backup = path.with_name(path.name + '.before-comments')
+    if not backup.exists():
+        atomic_write_bytes(backup, original, overwrite=False)
+    atomic_write_bytes(path, content, validate=unchanged)
+    return True
