@@ -115,6 +115,34 @@ class SpeechTests(QtTestCase):
         self.assertEqual(len(speech.engine.spoken), 2)
         self.assertFalse(speech.pending)
 
+    def test_single_playback_button_starts_pauses_resumes_and_resets(self):
+        speech = self.speech('A sentence. ' * 800)
+        controls = speech.read.parentWidget().layout().itemAt(3).layout()
+        self.assertEqual(controls.count(), 4)
+        self.assertIs(speech.pause, speech.read)
+        self.assertEqual(speech.read.accessibleName(), 'Play')
+        speech.read.click()
+        pending = list(speech.pending)
+        self.assertEqual(speech.engine.state(), Speech.State.Speaking)
+        self.assertEqual(speech.read.accessibleName(), 'Pause')
+        speech.read.click()
+        self.assertEqual(speech.engine.state(), Speech.State.Paused)
+        self.assertEqual(speech.read.toolTip(), 'Resume')
+        speech.read.click()
+        self.assertEqual(speech.engine.state(), Speech.State.Speaking)
+        self.assertEqual(len(speech.engine.spoken), 1)
+        self.assertEqual(list(speech.pending), pending)
+        speech.stop_button.click()
+        self.assertEqual(speech.read.accessibleName(), 'Play')
+        self.assertTrue(speech.read.isEnabled())
+        speech.read.click()
+        self.assertEqual(len(speech.engine.spoken), 2)
+        speech.pending.clear()
+        speech.engine.change(Speech.State.Ready)
+        self.assertEqual(speech.read.accessibleName(), 'Play')
+        speech.engine.change(Speech.State.Error)
+        self.assertFalse(speech.read.isEnabled())
+
     def test_dismissing_controls_keeps_playback_until_reader_hides(self):
         speech = self.speech('Some text')
         speech.start()
@@ -144,6 +172,9 @@ class SpeechTests(QtTestCase):
         speech.start()
         self.assertFalse(speech.pause.isEnabled())
         self.assertTrue(speech.stop_button.isEnabled())
+        speech.stop_button.click()
+        self.assertTrue(speech.read.isEnabled())
+        self.assertEqual(speech.read.accessibleName(), 'Play')
 
     def test_chunks_and_selected_text_preserve_unicode_and_words(self):
         text = ('paragraph café\n' * 300) + '😀 done'

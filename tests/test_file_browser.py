@@ -221,6 +221,20 @@ class BrowserTests(QtTestCase):
         self.assertEqual(self.browser.tabs.count(), 3)
         menu.deleteLater()
 
+    def test_menu_and_queued_rename_revalidate_removed_paths(self):
+        index = self.select(self.path)
+        menu = self.browser.context_menu_for(index)
+        rename = next(action for action in menu.actions() if action.text() == 'Rename')
+        with patch.object(self.browser.views, 'edit_name') as edit:
+            rename.trigger()
+            self.path.unlink()
+            self.app.processEvents()
+            edit.assert_not_called()
+            with patch.object(self.browser.file_actions, 'rename') as request:
+                rename.trigger()
+                self.assertFalse(request.call_args.args[0].isValid())
+        menu.deleteLater()
+
     def test_mixed_selection_groups_and_deduplicates_feature_actions(self):
         registration = register_file_type(CustomFile, 'project')
         self.addCleanup(file_types.unregister, registration)

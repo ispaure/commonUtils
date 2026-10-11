@@ -138,10 +138,10 @@ class ReadAloud(qt.QObject):
         for button in (self.back, self.forward):
             button.setToolTip(button.accessibleName() + ' (approximate text position)')
         self.read = reader_button(self.panel, 'Play', icon='play')
-        self.pause = reader_button(self.panel, 'Pause', icon='pause')
+        self.pause = self.read  # Preserve the existing handle for shared consumers.
         self.stop_button = reader_button(self.panel, 'Stop', icon='stop')
-        for button, callback in ((self.back, lambda: self.skip(-15)), (self.read, self.start),
-                                 (self.pause, self.toggle_pause), (self.stop_button, self.stop),
+        for button, callback in ((self.back, lambda: self.skip(-15)), (self.read, self.toggle_playback),
+                                 (self.stop_button, self.stop),
                                  (self.forward, lambda: self.skip(15))):
             row.addWidget(button)
             button.clicked.connect(callback)
@@ -329,13 +329,13 @@ class ReadAloud(qt.QObject):
         finished = state == states.Ready and self._speaking
         self._speaking = speaking or paused
         if paused: self._word_events.clear()
-        label = 'Resume' if paused else 'Pause'
+        label = 'Pause' if speaking else 'Resume' if paused else 'Play'
         self.pause.setText(label)
         self.pause.setToolTip(label)
         self.pause.setAccessibleName(label)
-        set_painted_icon(self.pause, ReaderIcon, 'play' if paused else 'pause')
+        set_painted_icon(self.pause, ReaderIcon, 'pause' if speaking else 'play')
         capable = bool(self.engine.engineCapabilities() & self.speech_type.Capability.PauseResume)
-        self.pause.setEnabled(capable and (speaking or paused))
+        self.read.setEnabled(state != states.Error and (capable or not (speaking or paused)))
         self.stop_button.setEnabled(speaking or paused or bool(self.pending))
         for button in (self.back, self.forward):
             button.setEnabled(bool(self._word_starts) and (speaking or paused))
@@ -343,7 +343,6 @@ class ReadAloud(qt.QObject):
             self.word_timer.start(round(1000 / self._words_per_second()))
         elif not speaking:
             self.word_timer.stop()
-        self.read.setEnabled(state != states.Error)
         for control in (self.language, self.voice):
             control.setEnabled(not speaking and not paused)
         if state == states.Error:
@@ -364,6 +363,15 @@ class ReadAloud(qt.QObject):
         self.read.setEnabled(False)
         self.pause.setEnabled(False)
         self.stop_button.setEnabled(False)
+
+    def toggle_playback(self):
+        if self.engine is None:
+            return
+        state = self.engine.state()
+        if state in (self.speech_type.State.Speaking, self.speech_type.State.Paused):
+            self.toggle_pause()
+        elif state == self.speech_type.State.Ready:
+            self.start()
 
     def toggle_pause(self):
         if self.engine:

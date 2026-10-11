@@ -95,9 +95,11 @@ if that theme's image has not been generated. Temporary rendering files are clea
 
 ## Read aloud
 
-Open Read aloud, select a voice/language and press Read. A selected passage takes
-priority; otherwise playback starts from the visible reading area. Speed and available
-pause/resume controls depend on the native speech engine. Back/forward estimate a
+Open Read aloud, select a voice/language and press Play. A selected passage takes
+priority; otherwise playback starts from the visible reading area. The same button
+changes to Pause while speaking and Resume while paused. Engines without pause/resume
+support disable it during playback; Stop remains available. Speed depends on the native
+speech engine. Back/forward estimate a
 15-second jump; highlights may use estimated timing where word events are unavailable.
 
 Playback stops when content is replaced, editing begins, the panel closes or the

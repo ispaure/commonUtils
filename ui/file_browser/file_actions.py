@@ -108,9 +108,14 @@ class FileActions(TrashActionsMixin, qt.QObject):
         if not self.busy and not self.browser.stopping and index.isValid():
             if self.browser.index_search.active:
                 self.browser.index_search.show_in_browser(self.browser.model.filePath(index))
-            persistent = qt.QPersistentModelIndex(index)
-            qt.QTimer.singleShot(0, self.browser, lambda: self.browser.views.edit_name(qt.QModelIndex(persistent))
-                                if persistent.isValid() else None)
+            path = Path(self.browser.model.filePath(index))
+            def edit():
+                if self.browser.stopping or not (path.exists() or path.is_symlink()):
+                    return
+                current = self.browser.model.index(str(path))
+                if current.isValid():
+                    self.browser.views.edit_name(current)
+            qt.QTimer.singleShot(0, self.browser, edit)
 
     def paste_current(self):
         self.paste(self.browser.views.browsing_directory())
