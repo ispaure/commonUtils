@@ -35,7 +35,7 @@ class ScopedTabBar(qt.QTabBar):
             bar = group.tabBar()
             on_bar = bar.mapFromGlobal(global_point)
             rect = qt.QRect(group.mapTo(self.boundary, qt.QPoint()), group.size())
-            if 0 <= on_bar.y() < bar.height():
+            if not group.count() or 0 <= on_bar.y() < bar.height():
                 index = bar.tabAt(on_bar)
                 result = (group, 'tabs', index if index >= 0 else group.count(), rect)
             else:
