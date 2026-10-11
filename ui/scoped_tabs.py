@@ -16,6 +16,8 @@ class ScopedTabBar(qt.QTabBar):
         self.press = self.view = None
         self.dragging = False
         self.preview = qt.QRubberBand(qt.QRubberBand.Shape.Rectangle, boundary)
+        self.destroyed.connect(self.preview.deleteLater)
+        self.setFocusPolicy(qt.Qt.FocusPolicy.StrongFocus)
         self.setElideMode(qt.Qt.TextElideMode.ElideRight)
         self.setUsesScrollButtons(True)
 
@@ -41,6 +43,7 @@ class ScopedTabBar(qt.QTabBar):
 
     def mousePressEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton:
+            self.setFocus(qt.Qt.FocusReason.MouseFocusReason)
             index = self.tabAt(event.position().toPoint())
             self.press = event.globalPosition().toPoint()
             self.view = self.group.widget(index) if index >= 0 else None
