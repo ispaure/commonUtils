@@ -54,6 +54,8 @@ class StylingTests(QtTestCase):
         style_document(reading.document(), reading.palette())
         reading.document().setModified(False)
         self.controller.code_font.bind(editor)
+        self.assertEqual(reading.document().lastBlock().begin().fragment().charFormat().fontFamilies(),
+                         [editor.font().family()])
         original = reading.toPlainText()
         self.store.save({('Styling', 'reading_font_size_int'): '19', ('Styling', 'code_font_size_int'): '13',
                          ('Styling', 'code_font_family_str'): 'Courier New'})

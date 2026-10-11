@@ -17,13 +17,9 @@ COLORS = {'note': '#5f91ed', 'abstract': '#42a7b5', 'info': '#5f91ed', 'todo': '
 
 @lru_cache(maxsize=1)
 def _automatic_monospace_family():
-    # Generic "monospace" can resolve to a proportional fallback in Qt/macOS.
-    # Pick an installed fixed-pitch font; no extra font download is needed.
-    installed = set(qt.QFontDatabase.families())
-    for family in ('Menlo', 'Cascadia Mono', 'Consolas', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New'):
-        if family in installed and qt.QFontDatabase.isFixedPitch(family):
-            return family
-    return qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont).family()
+    # Use the same platform/fixed-pitch fallback as every bound code editor.
+    from ..code_editor.widget import monospace_font
+    return monospace_font().family()
 
 
 def monospace_family():
