@@ -1,5 +1,7 @@
 # Shared code editing components
 
+[User guide](user_docs/README.md) · [Developer API map](../../docs/developer/public-apis.md)
+
 `CodeEdit` is a reusable `QPlainTextEdit` with a palette-aware gutter, current-line
 and bounded bracket emphasis, indentation, optional pairing, font zoom and undoable
 line commands. It owns no file paths, window/session policies or application preferences.
@@ -38,7 +40,8 @@ No existing File class is changed or automatically coupled to an editor.
 `transforms.transform_lines` is Qt independent. `formatting.validate_text` and
 `format_text` are bounded JSON/XML utilities. JSON output preserves lexical tokens;
 XML rejects DTD/entity declarations and refuses formatting mixed content, CDATA
-and xml:space-preserved content. Validation/formatting is limited to 1 MiB.
+and xml:space-preserved content. Validation/formatting is limited to 1,048,576 Python characters (the UI labels this
+“1 MiB of text”).
 
 `CodeEdit` supports bounded multi-cursor editing via `set_cursors`,
 `add_next_occurrence`, `rectangular_selection` and `clear_extra_cursors`. Alt-click
@@ -57,22 +60,14 @@ fold markers and indentation guides follow the editor palette.
 side-by-side and unified views. An optional application callback applies a selected
 change. `apply_change` rejects stale buffers and returns Python-character offsets
 and replacement text; callers convert offsets to Qt positions and own undo/save
-policy. Limits are 1 MiB and 5,000 lines per side.
+policy. Limits are 1,048,576 Python characters and 5,000 lines per side (the UI calls the
+character limit “1 MiB”).
 
 Outside this package, `ui.command_palette` searches/configures caller-owned QAction
 mappings. It imports no application feature modules. `persistence.session.SessionStore`
 provides bounded, atomic, private JSON checkpoints without Qt; callers own record
 schemas, live-instance locking, restoration and worker policy.
 
-
-## Reusable code editing
-
-The optional [code-editor components](README.md) provide a native
-QPlainTextEdit gutter, undoable line commands, bounded asynchronous search and
-palette-aware syntax definitions. They contain no application window or feature
-logic. Qt-independent `commonUtils.persistence.text` supplies strict encoding handling,
-text/binary recognition and lossless atomic saves; existing text/INI/Markdown APIs
-are unchanged. Applications own their document tabs, settings and save prompts.
 
 ## Diff and merge review
 

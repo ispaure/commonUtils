@@ -4,6 +4,9 @@ Use these widgets in your own Qt application. Create one QApplication before
 constructing widgets, retain worker owners until they finish, and keep expensive
 file or command work off the GUI thread.
 
+For shared workflows, see the [user guide directory](../README.md#shared-component-user-guides).
+For integration contracts, start at the [developer hub](../docs/developer/README.md).
+
 ## PySide application setup
 
 Install PySide6, then initialize the application once:
@@ -21,7 +24,7 @@ app.exec()
 
 ## Reusable file browser
 
-Start with the [complete browser window example](../README.md#build-a-browser-with-your-own-actions).
+Start with the [complete browser window example](features/README.md#runnable-example-add-a-menu-action-to-a-browser).
 It opens a folder and adds your own context-menu action. The
 [feature guide](features/README.md) then shows custom file types, information
 panels, double-click handlers and thumbnails.
@@ -34,7 +37,7 @@ your action handlers still run on the GUI thread unless you schedule a worker.
 
 Use [OperationProgress](operation_progress.md) to run cancellable work and show
 progress. Its runnable example includes safe close handling. For streamed external
-processes, use `process_runner.ProcessRunner` and `process_window.ProcessProgressWindow`;
+processes, use `process_runner.ProcessRunner` and `process_progress.ProcessProgressWindow`;
 [command execution](../integrations/wrappers/cmdShellWrapper/README.md) covers the
 non-Qt alternative. [Streams](../runtime/streams/README.md) handles copying and hashing.
 
@@ -44,7 +47,7 @@ non-Qt alternative. [Streams](../runtime/streams/README.md) handles copying and 
 | --- | --- |
 | Markdown reader, source/formatted editing | [Markdown](markdown/README.md) |
 | Code editing, gutters and syntax | [Code editor](code_editor/README.md) |
-| Plain UTF-8 editor and INI settings editor | [Configuration](../configuration/README.md) |
+| Plain UTF-8 editor and INI settings editor | [Configuration](../configuration/README.md), [user guide](user_docs/README.md) |
 | Archive contents and member selection | [Archive view](archive_view/README.md) |
 | Shared reader menus, fullscreen controls and recent paths | [Browser features](features/README.md) |
 
@@ -72,8 +75,8 @@ panels; applications supply editing actions separately.
 ## Shared navigation settings
 
 [Configuration](../configuration/README.md#shared-navigation-settings) describes
-wheel preferences. Browser indexing can be paused per view; ordinary browsing
-remains available. See the [index reference](../filesystem/index/README.md).
+wheel preferences. Browser indexing uses event-driven updates and explicit refresh; ordinary browsing
+remains available. Pause methods remain compatibility APIs, not visible controls. See the [index reference](../filesystem/index/README.md).
 
 ## Opt-in Slate appearance
 

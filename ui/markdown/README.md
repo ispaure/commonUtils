@@ -1,323 +1,95 @@
-# Markdown viewer and editor
+# Markdown integration
 
-`commonUtils.ui.markdown` uses Qt's Markdown/rich-text renderer for headings, lists,
-tables, fenced code, local images and links, without a web-engine dependency.
-Reading uses the application's light/dark palette, comfortable typography and
-spacing, shaded table headers, subtle row separators and padded quote/code blocks.
-The toolbar shares navigation/fullscreen icons and spacing with the book/comic
-readers. **F11** toggles fullscreen; **Escape** closes Contents/Find first, then
-leaves fullscreen. Long document names/status messages stay on one line, with
-their full text in a tooltip.
-**Aa** adjusts reading text from 10–24 pt for this window; **View → Larger text /
-Smaller text / Reset text size** provides the same controls and platform zoom
-shortcuts. Editor/source fonts are independent of the reading-size setting.
-Holding **Alt** while opening a standalone window enables editing centrally;
-buttons and other callers need no modifier handling. Otherwise documents open in
-preview-only mode by default, with no Edit toggle or write
-actions. Pass `allow_edit=True` to `open_markdown`, `MarkdownWindow` or
-`MarkdownViewer` to offer editing for that window/widget; the option stays in
-effect across link navigation and Open. Editing-enabled windows start in Formatted edit mode. **Read** switches to preview
-and **Edit** returns to same-pane editing:
-headings, emphasis, lists, links and tables remain rendered while editing. The
-**Formatted / Source** selector also provides precise Markdown source editing.
-**Read** returns to the rendered read-only document, including unsaved changes. Requires PySide6 and an existing
-QApplication, as described in [Qt application setup](../README.md#pyside-application-setup).
+Use `MarkdownViewer` for embedding and `MarkdownWindow` / `open_markdown` for a
+standalone or document-hosted window. They render Markdown with Qt without a web
+engine. See the [user guide](user_docs/README.md) for reading, editing, YAML properties,
+callouts, local links, optional Mermaid diagrams and speech workflows.
+
+## Create and retain a reader
+
+Create QApplication first. This standalone example needs PySide6:
 
 ```python
-from commonUtils.ui.markdown import MarkdownViewer, open_markdown
+from commonUtils.ui import pyside as qt
+from commonUtils.ui.markdown import open_markdown
 
-# Preview-only window; the helper retains it until closed.
-window = open_markdown('docs/index.md', parent=application_window)
-
-# Explicitly permit editing, or embed an editing-enabled widget.
-editable_window = open_markdown(
-    'notes/index.md', parent=application_window, allow_edit=True)
-viewer = MarkdownViewer('docs/index.md', parent=application_window, allow_edit=True)
-layout.addWidget(viewer)
+app = qt.initialize_q_app()
+window = open_markdown(None, allow_edit=True)
+app.exec()
 ```
 
-`open_document(path, fragment='')` returns whether navigation succeeded.
-`current_path` provides the displayed document path; `path_changed(Path)` signals
-successful loads/saves (or `None` for a new untitled document). Relative file links resolve from the current document, including
-encoded spaces and `#heading-fragments`. Headings receive GitHub-style anchors,
-with duplicate headings suffixed `-1`, `-2`, and so on. Back/Forward (Alt+Left /
-Alt+Right) restore document history and scroll positions. Navigating after going
-Back discards the abandoned forward branch. Navigation buttons use the same native
-reader icons and shared controls as the book/comic readers.
+A concrete path opens a local UTF-8 `.md`/`.markdown` file. `None` with editing
+creates an untitled document. `open_markdown` retains its window until destruction
+and routes through the optional document host; `detached` and `allow_new_tabs`
+control that hosting request. It returns the window.
 
-### Quotes and Obsidian callouts
+`MarkdownViewer(path=None, parent=None, allow_edit=False)` is an embeddable QWidget.
+Preview-only is the default. `allow_edit=True` adds editing actions and starts in
+Formatted mode where supported. Holding Alt when constructing MarkdownWindow also
+enables editing; the bare viewer's option remains explicit. FileBrowser opts into
+editing for registered MarkdownFile activation; feature activations can override it.
 
-Normal `>` quotes appear as padded panels. Reading also supports
-[Obsidian callouts](https://obsidian.md/help/callouts), including titles,
-standard type aliases, nested content, and foldable `+` / `-` titles:
+## Navigation, editing and close contracts
 
-```markdown
-> [!tip] A helpful detail
-> Markdown text, links, lists and nested quotes work here.
+`open_document(path, fragment='')`, `new_document()` and `save_document(path=None)`
+return success booleans. Failures/cancel return false and leave an inline message
+where applicable. `current_path` and `path_changed(Path or None)` identify the
+current document; `is_modified` and `modified_changed(bool)` expose dirty state.
+Relative links use the loaded/saved file's parent; Save As updates that base.
 
-> [!warning]- Read before changing anything
-> This starts collapsed. Click the title to expand it.
-```
+`set_editing(True)` enters editing; `set_edit_mode('source')` selects raw text.
+`markdown_text()` synchronizes formatted edits and returns the current source.
+`viewer.editor` is the source editor; `formatted_editor` is the rich editor.
+Reusable actions such as `save_action`, `find_action` and `open_action` can be placed
+in host menus. Source replacement can reset rich undo history.
 
-`+` starts expanded; `-` starts collapsed. Folding is local to the viewer and
-never changes the file. Unknown types use the note color with their authored
-title. Examples inside fenced code remain literal. Callout documents automatically
-use **Source** for editing: Qt's rich exporter would otherwise escape `[!type]`
-markers after an edit. **Read** displays unsaved source with its callout styling.
-This is a standalone document reader, without Obsidian vault plugins/custom CSS.
+An embedded host must call `can_close()` before destroying/replacing the viewer,
+honor false, and stop its speech/optional diagram work when performing custom
+shutdown. MarkdownWindow handles those duties for its own close event. Document
+hosts must preserve close vetoes through [document-host routing](../workspaces.md).
 
-### Optional Mermaid diagrams
+## Source and save guarantees
 
-Complete top-level `mermaid` code fences remain readable source by default. Choose
-**Diagrams** in the reading toolbar or **View → Render Mermaid diagrams** to
-render them with the locally installed [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli)
-(`mmdc`). Its optional installation command is `npm install -g @mermaid-js/mermaid-cli`;
-restart the application so its PATH includes the executable. The reader never
-downloads tools or uses a hosted diagram service when opening a document.
+Reading, callout folding and unchanged saves do not reserialize original bytes.
+Actual formatted edits use Qt's Markdown writer and can normalize or lose unsupported
+syntax. Source is the precise editing route; callout documents automatically select
+it. Supported live inline/fence editing keeps typed spellings while editing; that is
+not a full extension-aware round-trip guarantee for arbitrary documents.
 
-Rendering runs asynchronously with a 20-second timeout per diagram, up to 12
-diagrams per document. It uses strict Mermaid settings, rejects diagram-level
-configuration/external-resource declarations, and keeps failed diagrams as code.
-Images are bounded to 16 megapixels, fit the available width, and are cached only
-in memory (24 images per viewer). Private work files live in the commonUtils Temp
-workspace and are cleaned after rendering. Authored Markdown is never replaced
-with generated image links. Light/dark diagram images are cached separately;
-render again after a theme change if that theme's image is not yet available.
+Frontmatter handling is separate from the body. Basic property patches preserve
+unrelated header lines/body; complex YAML remains raw. The built-in parser has no
+YAML dependency and implements a deliberate subset, not full YAML validation or
+object construction. An unclosed frontmatter block forces Source mode.
 
-Presentation lives in `presentation.py`; reading/render lifecycle in `reading.py`;
-reading-only syntax transforms in `extensions.py`; optional process/resource
-handling in `diagrams.py`. Editing,
-source synchronization, file IO and public viewer APIs stay separate.
+Saves stage beside the destination, flush and atomically replace, preserving mode
+bits. Changed-on-disk files and symlink destinations are refused. Conflict detection
+is not a writer lock. Edited content is UTF-8 with UTF-8 BOM/uniform CRLF retention
+where present; other line endings can normalize in Qt. Failed saves retain edits.
 
-Standard `[label](https://example.com)` links and local `[[Page]]`, `[[Page|Label]]` or
-`[Page|Label]` aliases are supported in reading and formatted editing. Aliases
-resolve relative to the current document, adding `.md` when no extension is given;
-`[[Page#heading|Label]]` also works. Explicit Markdown destinations retain their
-extension as written. Paired `[label][reference]` links resolve Markdown reference
-definitions when present; otherwise the second bracket names a local page.
-`[page|Label][target]` displays only `Label`. Inactive link brackets and destinations
-have zero width, keeping the visible label aligned with surrounding text. Code examples and escaped links stay literal. In formatted
-editing the cursor or pointer hovering over a link reveals its syntax; Ctrl/Cmd-click follows a link. Ordinary
-clicks place the cursor for editing. Source is retained as authored when saved.
+## Rendering and optional services
 
-**Contents** opens a floating list at the right side of the toolbar, with indented
-headings/subheadings and links to their anchors. It closes after a selection, Escape,
-or clicking outside. It reflects unsaved edits and heading jumps participate in
-Back/Forward history in reading mode. Choosing a heading while editing formatted
-text keeps that editing mode and moves its cursor to the heading. Choosing one
-from source mode switches to reading without discarding edits.
+Local navigation accepts Markdown, including relative/wiki aliases and heading
+fragments. It does not search an Obsidian vault. HTTP/HTTPS/mail links use the OS;
+unsupported local types/schemes do not launch. Embedded HTML remains literal.
+Reading appearance affects the reading pane only, not authored content/editor fonts.
 
-### YAML properties (frontmatter)
+Mermaid is an explicit optional local QProcess operation using `mmdc`, never an
+opening-time download. It has bounded input, per-diagram timeout, bounded image
+size/cache and source-preserving failure. Closing/replacing the document cancels
+work. See [diagram behavior](user_docs/README.md#render-diagrams).
 
-A `---`-delimited YAML mapping at the very beginning of the document appears in a
-**Properties** panel above the body, following
-[Obsidian's frontmatter convention](https://obsidian.md/help/properties). Properties
-are excluded from body rendering and the table of contents. Reading shows values;
-formatted editing enables **+ Add property**, double-click/**Edit**, **Remove**,
-checkbox controls and **… → Edit YAML…**. Right-click a row for the same property
-actions. Edit/Remove are enabled when a row is selected. Empty property panels
-stay hidden, including empty frontmatter; the toolbar's corner **… → Add YAML
-property…** creates the first field. Its **Edit YAML…** action also opens the raw
-header editor. These actions are enabled only in Formatted edit mode. Parse errors
-stay visible even when no rows can be displayed. Source mode still exposes the complete file.
+ReadAloud initializes native QtTextToSpeech on demand. The viewer supplies visible
+text/selection and stops on replacement, editing or close. Native backend and voice
+availability are platform-specific. Custom hosts must retain the same lifecycle.
 
-Supported property editors include text, lists/tags (one text item per line),
-numbers, booleans, ISO dates and date-times. Nested mappings, non-text list items
-and tagged/complex values remain raw and use the YAML/source editor. There is no vault-wide type registry,
-Obsidian indexing or vault-wide file search. Property names must be unique nonempty
-strings. Dates use `YYYY-MM-DD`; date-times use ISO format.
+## Maintenance boundaries
 
-Body edits preserve the frontmatter text, including comments and quoted/multiline
-values. Editing a basic property patches only that property's lines; unrelated
-fields, comments and the Markdown body remain unchanged. Complex values such as
-nested maps, block scalars, anchors and tags are kept as raw YAML and can be edited
-with **Edit YAML…** or Source mode. Invalid basic syntax is shown with an error and
-retained during body edits. An unclosed block switches to Source mode so formatted
-editing cannot swallow the rest of the document.
+`viewer`/`window` own widget/window lifetime; `io` owns Qt-independent loading and
+atomic saves. `editing`, `formatted`, `properties` and `tables` own edit behavior;
+`syntax`, `links`, `live_edit`, `preview` and `document` handle syntax/display/export.
+`reading`, `presentation`, `extensions` and `diagrams` own reading presentation.
+These internals are not alternate embedding entry points. Test source preservation,
+UTF-16 selection accounting, heading collisions, last-paragraph visibility, external
+save conflicts and process/speech retirement when changing them.
 
-There is **no YAML dependency**. The built-in parser supports a deliberate subset:
-plain/quoted text, true/false, null, decimal numbers, ISO dates/date-times, simple
-inline lists and dash lists. It checks duplicate names and common syntax errors;
-it does not fully validate complex YAML, resolve aliases, interpret custom tags,
-or implement the complete YAML specification. Complex input stays raw rather
-than being coerced into basic fields. Arbitrary object constructors are never run.
-
-```python
-from commonUtils.formats.markdown import split_frontmatter, parse_properties, replace_property
-
-text = '---\ntitle: "Example"\ntags: [docs]\n---\n# Body\n'
-parts = split_frontmatter(text)
-assert parse_properties(parts)['tags'] == ['docs']
-updated = replace_property(text, 'published', True)
-assert split_frontmatter(updated).body == parts.body
-```
-
-### Typed Markdown and selection wrapping
-
-Formatted mode follows the [Obsidian Live Preview rule](https://obsidian.md/help/edit-and-read)
-for supported inline spans: hide Markdown markers outside the active span and show
-them when the pointer or caret is inside it or the selection overlaps it. This includes the
-position immediately after the last letter, before the closing marker. Moving or
-selecting does not change the text, dirty flag or undo history. Heading prefixes
-also appear on the active or hovered heading, including headings containing links. Inactive heading prefixes have zero horizontal
-advance, including their trailing space. Active link text and delimiters are white;
-inactive links retain their normal link styling. Bold/italic remain styled while their delimiters
-are visible; incomplete delimiters remain plain so they can be repaired.
-
-Supported emphasis uses `**`/`__`, `*`/`_` and combined triple markers. Inline code
-supports single/double backticks. Typed spellings remain editable; loaded Markdown
-can be normalized by Qt when rich formatting is materialized. Escaped syntax is
-kept literal, and code payloads do not interpret emphasis. Source mode shows all
-syntax and remains preferable for unsupported extensions or exact round trips.
-
-Backspace/Delete edit the actual visible delimiter at the caret. For example,
-removing one closing star from `**bold**` leaves plain `**bold*`; completing it
-restores the style. Interior content edits keep valid surrounding syntax. Undo
-restores the exact text. No whole-document reload occurs during typing/navigation.
-
-Triple-backtick or tilde fences support multiline code, including an optional
-language label such as `python`. Fences are visible when the caret/selection enters
-the code region and hidden outside it. Unfinished fences remain editable without
-an automatically added closing fence. The code uses a monospace font; language
-labels are preserved rather than providing a syntax-highlighting engine. Existing
-tables stay independent of fence edits, including incomplete fences nearby.
-
-With text selected, `*`, `_` or a backtick wraps/formats the selection instead of
-replacing it. One star/underscore applies italic; pressing it a second time with
-the selection still active applies bold. In Source mode the corresponding delimiters
-are inserted on both sides (`*text*`, then `**text**`). The selection remains active.
-Typed conversion/wrapping is undoable with the triggering input, without rebuilding
-the entire document or losing tables and other blocks. Saving remains explicit.
-
-### Table editing
-
-In Formatted editing, use **Table** on the formatting toolbar or right-click in
-the document. **Insert table…** asks for rows (including the header) and columns.
-With the caret in a cell, add rows above/below, columns before/after, delete the
-current row/column, or delete the table. The first row is the Markdown header;
-deleting it promotes the next row. Removing the last row/column removes the table.
-Other cells and surrounding document content are retained. Each operation is one
-undo step and is saved as Markdown with the normal explicit Save action.
-
-Structural actions are disabled outside a table, for selections spanning content,
-in Source mode and in preview-only viewers. Insert is available outside tables;
-nested rich-text tables are not offered. Source mode still permits direct pipe-table
-editing. Adding a column does not merge cells or change the surrounding body/YAML.
-
-### Editing and saving
-
-Standalone windows provide File/Edit/View menus using the platform's normal menu
-placement (the system menu bar on macOS). The toolbar does not display a filesystem path; the title uses the
-document filename. Preview-only windows retain Open, Close, Copy, Select All, Find
-and Contents; write actions and Replace controls are hidden/disabled.
-With `allow_edit=True`, windows provide **File → New / Open / Save / Save As / Close** and an
-Edit menu with Undo/Redo, Cut/Copy/Paste, Select All and Find/Replace. The widget owns reusable actions
-(`new_action`, `open_action`, `save_action`, `save_as_action`, `find_action`, etc.)
-that embedding applications can put in their own menus. Standard platform shortcuts
-are enabled (Command on macOS); Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S and Ctrl+F
-also work explicitly. Both editors support native selection, clipboard and undo/redo.
-The formatting toolbar supplies bold, italic, inline code, links, headings, bullet
-lists and quotes. Ctrl+B/Ctrl+I format text; Ctrl+K inserts a link. Find works in
-reading and both editing modes; Replace/Replace all operate on the active editor. Search
-is literal and case-insensitive; Replace all is one undo step.
-
-```python
-viewer.set_editing(True)  # Same-pane formatted editing is the default.
-# viewer.formatted_editor is the editable QTextEdit.
-viewer.set_edit_mode('source')  # Optional precise editing in viewer.editor.
-# The toolbar formats rich text or inserts source syntax, depending on the mode.
-if viewer.is_modified:
-    saved = viewer.save_document()  # False on failure/cancel; inline error message.
-# An explicit path performs Save As and updates the document's relative-link base.
-saved = viewer.save_document('docs/revised.md')
-```
-
-`new_document()`, `open_document()` and `save_document()` return success booleans.
-A modified document is marked with `*`; `modified_changed(bool)` reports changes.
-Leaving a modified document or closing the standalone window prompts for
-Save/Discard/Cancel. Reading mode and heading jumps retain unsaved edits in memory.
-An embedding application's close handler should call `viewer.can_close()` and
-honor a false result before destroying its parent window.
-
-Formatted editing uses Qt's Markdown reader/writer. Entering formatted mode,
-viewing contents or saving without changes does not reserialize the source: exact
-original bytes are retained. Actual formatted edits convert the document back to
-Markdown, so spacing, table alignment, list markers and code-fence spelling may
-change. Raw HTML, comments, custom extensions and other unsupported syntax can be
-lost during that conversion; use **Source** for documents whose precise syntax
-matters. There is no full HTML editor or extension-aware round-trip guarantee.
-Switching modes retains text and unsaved status; rebuilding the rich document
-after source changes resets its rich undo history. `markdown_text()` returns the
-current Markdown, synchronizing formatted edits into the source editor.
-
-Saves stage a file beside the destination, flush it and replace atomically,
-preserving existing mode bits. A failed save keeps the original and unsaved edits.
-An observed on-disk change prevents saving over the loaded file; use Save As or
-reopen. This check is not a filesystem lock and cannot exclude a write racing with
-the final replacement. Symlink save destinations are refused. Unmodified saves
-retain exact bytes; edited files use UTF-8, preserving a UTF-8 BOM and uniform
-CRLF line endings when present. Editing may normalize other line endings or
-Unicode line separators through Qt's plain-text editor. Saving is explicit:
-there is no autosave.
-
-HTTP/HTTPS and mail links open through the operating system's default application.
-Local navigation accepts UTF-8 (optionally BOM-prefixed) `.md` and `.markdown`
-files. Missing, unreadable, invalid-text or unsupported linked files show an inline
-error while retaining the current page and history. Local non-Markdown files and
-other URL schemes are not launched by this reader. Rendering is Qt Markdown;
-full web-page HTML/CSS, JavaScript and Mermaid diagrams are not supported.
-
-Internally, `ui/markdown/__init__.py` preserves the public imports; `viewer.py`
-owns the embeddable widget and `window.py` the standalone window/lifetime. Editing actions and
-mode synchronization are separated from the properties panel. Shared heading
-iteration keeps reading and formatted-editor anchors consistent, including names
-that collide with generated numeric suffixes. Encoding and atomic file writes
-live in the Qt-independent `io.py` helper. `live_edit.py` owns incremental typed
-syntax editing and selection wrapping. `syntax.py` shares inline/fence parsing and `links.py` shares link parsing, aliases and preview conversion;
-`preview.py` handles cursor-sensitive display without modifying the document;
-`document.py` materializes loaded styles and exports syntax while retaining Qt's
-links/images/table structure. `formatted.py`, `editing.py`, `headings.py`
-and `properties.py` keep mode synchronization, actions, anchors and YAML UI separate. Applications should keep using
-`MarkdownViewer`, `MarkdownWindow` and `open_markdown` rather than these internals.
-
-FileBrowser explicitly enables editing (`allow_edit=True`) for registered MarkdownFile activation;
-applications may still supply a higher-priority activation handler. Keep feature
-user documentation in the consuming application, not the shared library.
-
-
-Embedded HTML is displayed as literal Markdown in reading and formatted modes.
-Qt's HTML-block importer can otherwise silently discard following paragraphs.
-Reader layout is finalized before restoring scroll position; regression fixtures
-check the final paragraph of long documents in all three modes. Source mode remains
-the choice for exact source preservation and unsupported extensions.
-
-## Read aloud
-
-The toolbar and standalone **View** menu offer **Read aloud…**. Select text to
-read a passage, or press **Read** to read the rendered document from the beginning.
-The shared `commonUtils.ui.read_aloud.ReadAloud` panel provides language, voice,
-speed, stop and capability-dependent pause/resume controls using QtTextToSpeech.
-It initializes the native engine only on request and reports missing backends
-inside the panel. No speech API credentials or additional Python dependency are
-required. Playback stops when replacing content, entering edit mode, closing the
-panel or closing the reader. Speech does not edit the document.
-
-`ReadAloud(owner, text_provider, scope=...)` accepts a plain-text callback. The
-caller should connect content replacement to `stop()` and also stop during any
-custom asynchronous shutdown. `reader_text()` prefers a selection and accepts a
-UTF-16 document offset. Bounded utterances advance on Qt's Ready state; clearing
-the queue and its timer prevents playback restarting after cancellation.
-
-
-## Markdown reader
-
-The [Markdown viewer/editor guide](README.md) covers preview-only defaults,
-explicit editing opt-in, typed Markdown formatting, properties, navigation and saving.
-Public imports remain `from commonUtils.ui.markdown import MarkdownViewer, open_markdown`.
-FileBrowser opts into editing; documentation callers get preview-only windows by default.
-
-### Untitled editor windows
-
-`open_markdown(None, allow_edit=True)` creates an empty, editable Markdown window
-with the usual save/unsaved-change handling. A concrete path opens an existing
-document. The host navigation label is Markdown Editor.
+[UI overview](../README.md) · [Developer hub](../../docs/developer/README.md)
