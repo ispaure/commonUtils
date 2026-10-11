@@ -5,7 +5,7 @@ os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.theme import apply_theme, SLATE_LIGHT, SLATE_DARK
+from commonUtils.ui.theme import apply_theme, SLATE_LIGHT, SLATE_DARK, configured_colors
 from commonUtils.ui.workspace import Workspace
 
 
@@ -41,12 +41,15 @@ class ThemeTests(QtTestCase):
             self.assertGreaterEqual(contrast(colors.muted,colors.surface),4.5)
             self.assertEqual(colors.selected_text, '#ffffff')
             self.assertGreaterEqual(contrast(colors.selected_text,colors.selection_background or colors.accent),4.5)
+        for colors in (configured_colors(False), configured_colors(True)):
+            self.assertGreaterEqual(contrast(colors.text, colors.surface), 4.5)
+            self.assertGreaterEqual(contrast(colors.selected_text, colors.selection_background), 4.5)
 
     def test_switching_reuses_controller_and_does_not_grow_stylesheet(self):
         controller=apply_theme(self.app,mode='light');light=self.app.styleSheet()
-        self.assertEqual(self.app.palette().color(qt.QPalette.ColorRole.Highlight).name(),SLATE_LIGHT.accent)
+        self.assertEqual(self.app.palette().color(qt.QPalette.ColorRole.Highlight).name(),configured_colors(False).accent)
         self.assertIs(controller,apply_theme(self.app,mode='dark'))
-        self.assertEqual(self.app.palette().color(qt.QPalette.ColorRole.Base).name(),SLATE_DARK.surface)
+        self.assertEqual(self.app.palette().color(qt.QPalette.ColorRole.Base).name(),configured_colors(True).surface)
         controller.set_mode('light');self.assertEqual(self.app.styleSheet(),light)
         controller.set_mode('system')
         with self.assertRaises(ValueError): controller.set_mode('unknown')
@@ -82,7 +85,7 @@ class ThemeTests(QtTestCase):
         controller=apply_theme(self.app,mode='light')
         workspace=Workspace(lambda argument:qt.QWidget());workspace.resize(650,300)
         first=workspace.add_view();workspace.add_view();workspace.show()
-        for mode, colors in [('light',SLATE_LIGHT),('dark',SLATE_DARK)]:
+        for mode, colors in [('light',configured_colors(False)),('dark',configured_colors(True))]:
             controller.set_mode(mode)
             for _ in range(5):self.app.processEvents()
             bars=[bar for bar in workspace.findChildren(qt.QTabBar) if bar.count()==2]

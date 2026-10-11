@@ -52,11 +52,20 @@ read_launch_value() {
     local output_variable="$2"
     local value
     local status
+    local inputs=("$CONFIG_FILE")
+    if [[ -n "${COMMONUTILS_PERSONAL_CONFIG_FILE:-}" && -f "$COMMONUTILS_PERSONAL_CONFIG_FILE" ]]; then
+        inputs+=("$COMMONUTILS_PERSONAL_CONFIG_FILE")
+    fi
 
     value="$(awk -v wanted="$key" '
         function trim(s) {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
             return s
+        }
+        FNR == 1 {
+            if (matches > 1) exit 2
+            matches = 0
+            in_launch = 0
         }
         {
             sub(/\r$/, "")
@@ -83,17 +92,18 @@ read_launch_value() {
                     found_value = substr(found_value, 2, length(found_value) - 2)
                 }
                 value = found_value
+                found = 1
             }
         }
         END {
             if (matches > 1) {
                 exit 2
             }
-            if (matches == 1) {
+            if (found) {
                 print value
             }
         }
-    ' "$CONFIG_FILE")"
+    ' "${inputs[@]}")"
     status=$?
 
     case $status in

@@ -117,3 +117,8 @@ or headless flows where dialogs are inappropriate.
   close protocols; application policy remains explicit.
 
 [Developer hub](README.md)
+
+## Layered settings and shared styling
+
+- [Layered INI APIs](../../configuration/README.md#software-defaults-and-sparse-personal-overrides): registration, validated reads, sparse saves and editor.
+- [Styling](../../ui/styling.md): font roles, live bindings, accent/tint, application opt-in and host settings callback.

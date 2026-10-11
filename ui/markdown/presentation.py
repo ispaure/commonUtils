@@ -6,6 +6,8 @@ Keeping this out of editing/synchronization protects exact authored source.
 from .. import pyside as qt
 from .document import space_headings
 from functools import lru_cache
+from weakref import ref
+from shiboken6 import isValid
 
 ACCENT = int(qt.QTextFormat.Property.UserProperty) + 701
 COLORS = {'note': '#5f91ed', 'abstract': '#42a7b5', 'info': '#5f91ed', 'todo': '#5f91ed',
@@ -14,7 +16,7 @@ COLORS = {'note': '#5f91ed', 'abstract': '#42a7b5', 'info': '#5f91ed', 'todo': '
 
 
 @lru_cache(maxsize=1)
-def monospace_family():
+def _automatic_monospace_family():
     # Generic "monospace" can resolve to a proportional fallback in Qt/macOS.
     # Pick an installed fixed-pitch font; no extra font download is needed.
     installed = set(qt.QFontDatabase.families())
@@ -22,6 +24,21 @@ def monospace_family():
         if family in installed and qt.QFontDatabase.isFixedPitch(family):
             return family
     return qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont).family()
+
+
+def monospace_family():
+    return _font_values()['code_font_family_str'].strip() or _automatic_monospace_family()
+
+
+def code_point_size():
+    return _font_values()['code_font_size_int']
+
+
+def _font_values():
+    from ..styling import style_values
+    app = qt.QApplication.instance()
+    controller = getattr(app, '_commonutils_styling', None) if app is not None else None
+    return controller.values if controller is not None else style_values()
 
 
 def blend(first, second, amount):
@@ -69,6 +86,7 @@ def style_document(document, palette, *, callouts=None):
             code_cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
             chars = qt.QTextCharFormat()
             chars.setFontFamilies([monospace_family()])
+            chars.setFontPointSize(code_point_size())
             chars.setBackground(alternate)
             chars.setForeground(text)
             code_cursor.mergeCharFormat(chars)
@@ -110,6 +128,7 @@ def style_document(document, palette, *, callouts=None):
             code_cursor.movePosition(qt.QTextCursor.MoveOperation.EndOfBlock, qt.QTextCursor.MoveMode.KeepAnchor)
             chars = qt.QTextCharFormat()
             chars.setFontFamilies([monospace_family()])
+            chars.setFontPointSize(code_point_size())
             chars.setForeground(text)
             code_cursor.mergeCharFormat(chars)
         cursor.clearSelection()
@@ -289,12 +308,36 @@ class MarkdownBrowser(qt.QTextBrowser):
 
 def configure_text(widget, *, source=False):
     modified = widget.document().isModified()
-    font = qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont if source else
-                                     qt.QFontDatabase.SystemFont.GeneralFont)
-    font.setPointSizeF(12 if source else 13)
-    if source:
-        font.setFamily(monospace_family())
-    widget.setFont(font)
+    from ..styling import styling
+    controller = styling()
+    weak_widget = ref(widget)
+    def refresh():
+        target = weak_widget()
+        if target is None or not isValid(target):
+            return
+        document = target.document()
+        modified = document.isModified()
+        block = document.begin()
+        while block.isValid():
+            block_format = block.blockFormat()
+            code_block = (block_format.hasProperty(qt.QTextFormat.Property.BlockCodeLanguage)
+                          or block_format.nonBreakableLines())
+            it = block.begin()
+            while not it.atEnd():
+                fragment = it.fragment()
+                if fragment.isValid() and (code_block or fragment.charFormat().fontFixedPitch()):
+                    cursor = qt.QTextCursor(document)
+                    cursor.setPosition(fragment.position())
+                    cursor.setPosition(fragment.position() + fragment.length(), qt.QTextCursor.MoveMode.KeepAnchor)
+                    fmt = qt.QTextCharFormat()
+                    fmt.setFontFamilies([monospace_family()])
+                    fmt.setFontPointSize(code_point_size())
+                    cursor.mergeCharFormat(fmt)
+                it += 1
+            block = block.next()
+        document.setModified(modified)
+    controller.bind(widget, 'code' if source else 'reading', None if source else refresh)
+    font = widget.font()
     widget.setFrameShape(qt.QFrame.Shape.NoFrame)
     widget.document().setDocumentMargin(28)
     widget.setTabStopDistance(qt.QFontMetricsF(font).horizontalAdvance(' ') * 4)

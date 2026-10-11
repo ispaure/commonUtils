@@ -54,7 +54,11 @@ class MenuPolicy(qt.QObject):
                 continue
             bar.setNativeMenuBar(self.native and not source)
             if restore_sources and source and not self.native:
-                bar.setVisible(bool(bar.actions()))
+                host = bar.window()
+                workspace = getattr(host, 'workspace', None)
+                published = (getattr(host, 'workspace_publish_menus', False)
+                             or getattr(workspace, 'is_detached', False))
+                bar.setVisible(bool(bar.actions()) and not published)
         # Route after restoring sources: detached windows still own their menus.
         for widget in widgets:
             context = getattr(widget, '_workspace_menu_context', None)

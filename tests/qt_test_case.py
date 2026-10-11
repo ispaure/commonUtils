@@ -12,10 +12,11 @@ class QtTestCase(unittest.TestCase):
         app = qt.QApplication.instance()
         existing = set(app.topLevelWidgets()) if app else set()
         if app:
-            palette, stylesheet = app.palette(), app.styleSheet()
+            palette, stylesheet, font = app.palette(), app.styleSheet(), app.font()
             def restore_appearance():
                 app.setStyleSheet(stylesheet)
                 app.setPalette(palette)
+                app.setFont(font)
             self.addCleanup(restore_appearance)
         # Run last, after each fixture's own cleanups, before another test starts.
         self.addCleanup(self._release_windows, existing)

@@ -107,3 +107,11 @@ under noninteractive logging and return them to their GUI owner. Critical
 [diagnostics](../runtime/diagnostics/README.md) raise `DebugException`.
 
 [Library overview](../README.md)
+
+## Styling and settings layers
+
+See [shared styling](styling.md) for the four font roles, accent and dark tint,
+application opt-in, and central-settings navigation callback. `[Styling] theme_mode`
+is the preferred theme source; `[Theme] mode` remains a fallback for older hosts.
+See [layered configuration](../configuration/README.md#software-defaults-and-sparse-personal-overrides)
+for the resettable software/personal editor and host-owned path registration.

@@ -11,16 +11,28 @@ from ..reader_chrome import reader_button, reading_spin, show_reader_popup
 class MarkdownReadingMixin:
     def _build_reading_appearance(self, toolbar):
         self.appearance_popup = None
-        self.reading_size = 13
+        self.reading_size = self.browser.font().pointSize()
         self.appearance_button = reader_button(self, 'Reading appearance', icon='appearance')
         self.appearance_button.clicked.connect(self.show_reading_appearance)
         toolbar.addWidget(self.appearance_button)
         key = qt.QKeySequence.StandardKey
-        self.text_larger_action = self._action('Larger text', lambda: self.set_reading_size(self.reading_size + 1), key.ZoomIn)
-        self.text_smaller_action = self._action('Smaller text', lambda: self.set_reading_size(self.reading_size - 1), key.ZoomOut)
-        self.text_reset_action = self._action('Reset text size', lambda: self.set_reading_size(13))
+        self.text_larger_action = self._action('Larger text', lambda: self.set_reading_size(self.browser.font().pointSize() + 1), key.ZoomIn)
+        self.text_smaller_action = self._action('Smaller text', lambda: self.set_reading_size(self.browser.font().pointSize() - 1), key.ZoomOut)
+        self.text_reset_action = self._action('Reset text size', lambda: self.set_reading_size(self._default_reading_size()))
+
+    def _default_reading_size(self):
+        from .presentation import _font_values
+        return _font_values()['reading_font_size_int']
 
     def set_reading_size(self, size):
+        app = qt.QApplication.instance()
+        if callable(getattr(app, '_commonutils_open_settings', None)):
+            from ...configuration.layered import shared_settings
+            from ..styling import styling
+            shared_settings().save({('Styling', 'reading_font_size_int'): str(max(8, min(48, int(size))))})
+            styling().reload()
+            self.reading_size = self.browser.font().pointSize()
+            return
         self.reading_size = max(10, min(24, int(size)))
         font = self.browser.font()
         font.setPointSizeF(self.reading_size)
@@ -28,6 +40,12 @@ class MarkdownReadingMixin:
         self._render_source(self.markdown_text())
 
     def show_reading_appearance(self):
+        app = qt.QApplication.instance()
+        open_settings = getattr(app, '_commonutils_open_settings', None)
+        if callable(open_settings):
+            open_settings(self, 'commonutils')
+            return
+        self.reading_size = self.browser.font().pointSize()
         if self.appearance_popup is not None:
             self.appearance_popup.close()
             self.appearance_popup.deleteLater()

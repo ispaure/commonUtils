@@ -48,3 +48,12 @@ and documentation, and then update the pinned or vendored source. Keep domain
 workflows in the consuming application.
 
 [Developer hub](README.md)
+
+## Layered configuration and typography
+
+Registered defaults/personal INI paths enable sparse, validated overrides without
+changing unregistered consumers. Reads do not create files; malformed overrides
+remain untouched. Reset removes an explicit personal field, never a software
+schema field. Atomic saves reject concurrent edits. Hosts own migration and paths.
+See the configuration guide for the API, and `ui/styling.md` for live font roles,
+weak widget binding, optional application-font opt-in and settings navigation.
