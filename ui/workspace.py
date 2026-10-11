@@ -624,16 +624,13 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         elif placement == 'tabs':
             self.tabifyDockWidget(other, dock)
         else:
-            # Qt treats splitDockWidget's first argument as a whole tab group.
-            # Remove both anchors to dissolve that group before splitting them.
-            self.removeDockWidget(dock)
-            self.removeDockWidget(other)
-            first, second = (dock, other) if placement == 'left' else (other, dock)
-            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, first)
-            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, second)
-            first.show()
-            second.show()
-            self.splitDockWidget(first, second, qt.Qt.Orientation.Horizontal)
+            from .workspace_layout import split_at
+            transferring = self._transferring
+            self._transferring = True
+            try:
+                split_at(self, dock, other, placement)
+            finally:
+                self._transferring = transferring
         dock.show()
         dock.raise_()
         self._activate(dock)
@@ -685,10 +682,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 self._hide_drop_target()
                 self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
                 qt.QDockWidget.setFloating(dock, False)
-                if previous and placement == 'tabs':
-                    self.tabifyDockWidget(previous, dock)
-                if placement != 'tabs':
-                    self.arrange(dock, placement, anchor=anchor or previous)
+                self.arrange(dock, placement, anchor=anchor or previous)
                 if dock.parentWidget() is not self or dock not in self.docks:
                     raise RuntimeError('Destination did not retain the tab')
         except Exception:

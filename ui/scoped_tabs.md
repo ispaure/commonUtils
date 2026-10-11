@@ -13,3 +13,9 @@ Workspace keeps a single header if hiding it would remove the only new-tab contr
 (a view without `workspace_controls`). Views with a controls layout can continue
 hiding their detached single header. Buttons resolve the current dock owner at
 click time. Tab reordering now emits `tabs_changed` for host persistence.
+
+An optional `can_move(view, target, placement, index)` callback suppresses invalid
+snap previews. The complete header strip accepts insertion, including its empty
+space. Preview bands belong to tab widgets, never to the boundary QSplitter:
+Qt automatically registers direct QWidget children as panes. Cancellation reparents
+the preview to its source before a move can dispose of the target group.
