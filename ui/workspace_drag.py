@@ -8,6 +8,18 @@ MIME = 'application/x-commonutils-workspace-tab'
 _docks = WeakValueDictionary()
 
 
+def horizontal_drop_location(rect, point):
+    """Shared left/center/right snapping geometry, in the caller's coordinates."""
+    fraction = (point.x() - rect.left()) / max(1, rect.width())
+    placement = 'left' if fraction < .25 else 'right' if fraction > .75 else 'tabs'
+    preview = qt.QRect(rect)
+    if placement != 'tabs':
+        preview.setWidth(rect.width() // 2)
+        if placement == 'right':
+            preview.moveRight(rect.right())
+    return placement, preview
+
+
 class DockWindowDrag(qt.QObject):
     """Move the actual pane and resolve drops consistently on every platform."""
     def __init__(self, workspace, dock, point, origin):
@@ -186,13 +198,7 @@ class WorkspaceDragMixin:
         if target is None:
             target = self._docked_anchor(excluding=moving)
         rect = target.geometry() if target else self.contentsRect()
-        fraction = (point.x() - rect.left()) / max(1, rect.width())
-        placement = 'left' if fraction < .25 else 'right' if fraction > .75 else 'tabs'
-        preview = qt.QRect(rect)
-        if placement != 'tabs':
-            preview.setWidth(rect.width() // 2)
-            if placement == 'right':
-                preview.moveRight(rect.right())
+        placement, preview = horizontal_drop_location(rect, point)
         return target, placement, preview
 
     def handle_tab_drop(self, watched, event):
