@@ -303,6 +303,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         for dock in self.docks:
             grouped = not dock.isFloating() and bool(self.tabifiedDockWidgets(dock))
             visible = self.policy is None or header_visible(self.policy, len(self.docks), self.is_detached)
+            visible = visible or (self.allow_new_tabs and getattr(dock.widget(), 'workspace_controls', None) is None)
             height = TAB_HEADER_HEIGHT if visible and not grouped else 0
             self._refresh_view_controls(dock, not visible)
             if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
@@ -378,6 +379,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             self.docks[index] = dock
         if changed:
             self._schedule_tab_headers()
+            self.tabs_changed.emit()
 
     def eventFilter(self, watched, event):
         if isinstance(watched, WorkspaceDock) and self.handle_tab_drop(watched, event):
