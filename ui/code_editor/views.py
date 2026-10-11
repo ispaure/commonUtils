@@ -39,6 +39,7 @@ class EditorViews(qt.QWidget):
                     self.primary.setTextCursor(self.secondary.textCursor())
                     self.activate(self.primary)
                 secondary, self.secondary = self.secondary, None
+                secondary.detach_document()
                 secondary.setParent(None)
                 secondary.deleteLater()
             self.primary.setFocus()
@@ -47,16 +48,7 @@ class EditorViews(qt.QWidget):
         if self.secondary is None:
             source = self.active
             self.secondary = CodeEdit()
-            self.secondary.setDocument(self.primary.document())
-            self.primary.document().contentsChange.connect(self.secondary._external_multicursor_change)
-            self.secondary.bind_folding()
-            self.secondary.setFont(source.font())
-            for name in ("indent_width", "use_tabs", "auto_indent", "auto_pairs", "line_numbers", "comment_prefix", "indent_guides"):
-                setattr(self.secondary, name, getattr(source, name))
-            self.secondary.setLineWrapMode(source.lineWrapMode())
-            self.secondary.setReadOnly(source.isReadOnly())
-            self.secondary.update_tab_width()
-            self.secondary.update_gutter()
+            self.secondary.share_document_from(source)
             self.secondary.setTextCursor(source.textCursor())
             self.splitter.addWidget(self.secondary)
             self._connect(self.secondary)

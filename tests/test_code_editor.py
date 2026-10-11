@@ -17,6 +17,55 @@ class CodeEditorTests(QtTestCase):
         self.editor = CodeEdit()
         self.addCleanup(self.editor.deleteLater)
 
+    def test_shared_view_can_detach_and_reattach_without_old_document_hooks(self):
+        other = CodeEdit()
+        self.addCleanup(other.deleteLater)
+        self.editor.setPlainText('one\ntwo')
+        self.editor.indent_width = 2
+        self.editor.use_tabs = True
+        other.share_document_from(self.editor)
+        other.share_document_from(self.editor)
+        self.assertEqual(other.indent_width, 2)
+        self.assertTrue(other.use_tabs)
+        self.assertIs(other.folding, self.editor.folding)
+        self.assertEqual(sum(ref() is other for ref in other.folding.views), 1)
+        other.insertPlainText('shared')
+        self.assertIn('shared', self.editor.toPlainText())
+        other.detach_document()
+        self.assertFalse(any(ref() is other for ref in self.editor.folding.views))
+        other.setPlainText('independent')
+        self.editor.insertPlainText('original')
+        self.assertEqual(other.toPlainText(), 'independent')
+        other.share_document_from(self.editor)
+        self.assertIs(other.document(), self.editor.document())
+        self.assertEqual(sum(ref() is other for ref in other.folding.views), 1)
+        other.detach_document()
+
+    def test_highlighter_rebind_survives_old_view_destruction_and_palette_change(self):
+        from commonUtils.ui.code_editor.syntax import SyntaxHighlighter
+        owner = qt.QWidget()
+        source, target = CodeEdit(owner), CodeEdit(owner)
+        source.document().setParent(owner)
+        source.setPlainText('value = 1\n')
+        target.share_document_from(source)
+        highlighter = SyntaxHighlighter(source, 'python')
+        with self.assertRaises(ValueError):
+            highlighter.rebind_editor(self.editor)
+        highlighter.rebind_editor(target)
+        self.assertIs(highlighter.theme_timer.parent(), highlighter)
+        source.detach_document()
+        source.deleteLater()
+        self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+        target.insertPlainText('# edit\n')
+        palette = target.palette()
+        palette.setColor(qt.QPalette.ColorRole.Base, qt.QColor('#101010'))
+        target.setPalette(palette)
+        self.app.processEvents()
+        self.assertIs(highlighter.editor, target)
+        self.assertIs(highlighter.document(), target.document())
+        self.assertEqual(target.comment_prefix, '#')
+        self.assertTrue(target.document().firstBlock().layout().formats())
+
     def test_diff_gutter_fits_unequal_line_numbers_after_font_changes(self):
         from types import SimpleNamespace
         from commonUtils.ui.code_editor.diff_bands import DiffEdit
