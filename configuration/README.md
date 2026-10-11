@@ -163,3 +163,20 @@ The checked-in `ui/settings.ini` overrides sensitivity to 100 and cooldown to
 30 ms. These saved values differ from missing/invalid-value fallbacks. Browser
 preview, storage animation and index preferences are explained in the
 [File Browser settings guide](../ui/file_browser/user_docs/README.md#settings-and-their-effects).
+
+## Shared menu placement
+
+`[Menus] macos_native_bool=true` in `ui/settings.ini` enables the macOS system
+menu bar. False uses desktop in-window placement; other platforms ignore the
+flag. Missing/invalid values default to true. The shared application initializer,
+reader menus, Markdown windows and workspace menu router install
+`commonUtils.ui.menu_policy.install_menu_policy(app=None)` once per application.
+Hosts creating their own QApplication can call it directly for all their menus.
+It has no import-time effects and polls saved settings every 500 ms, updating
+existing menu bars and routing contexts without recreating actions. New menu
+bars inherit the application policy. Workspace source bars stay non-native to
+avoid publishing duplicate commands.
+
+Workspace menu publication owns its native-bar rebind events. The application
+policy ignores those events so publication settles instead of repeatedly
+rebinding menus during pointer tracking.

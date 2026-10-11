@@ -52,3 +52,35 @@ continuous scroll is different. [Browser preferences](../file_browser/user_docs/
 have their own guide.
 
 [Configuration integration](../../configuration/README.md) · [All shared guides](../../README.md#shared-component-user-guides)
+
+## Menus in hosted windows
+
+When an application hosts readers or editors in workspace tabs, macOS menus follow
+its selected document or destination as focus changes. Detached windows follow
+their own selected tab. Menu updates preserve the document's commands and keyboard
+focus; opening a menu is not required to refresh the context.
+Creating a document from a tab's + menu uses the same menu switching behavior as
+opening one through the host's document launcher.
+
+## Confined editor tab moves
+
+In applications using confined editor groups, drag a tab onto another group's
+header to combine/reorder tabs, its center to combine groups, or its left/right
+edge to split or reposition a column. The preview follows the current target;
+releasing completes the move even when the pointer crosses into another editor.
+Escape or releasing outside the editor area cancels. Hiding the source or
+switching windows during a gesture also clears the preview. The host controls
+which moves are allowed and keeps ownership of files and unsaved edits.
+
+## macOS menu placement
+
+In Settings → commonUtils, open `ui/settings.ini` and set
+`[Menus] macos_native_bool`. The default `true` places menus in the macOS system
+menu bar. Set it to `false` to use the same in-window placement as Windows/Linux.
+Save to apply within half a second to existing and new editors, readers and tools.
+Attached views show their own menus; detached windows show the active view’s
+menus in their header. Commands and shortcuts stay the same. Windows/Linux
+always use in-window menus. Missing or invalid values use `true`.
+
+Click a menu title once, then move the pointer across neighboring titles to
+browse their options without another click. Press Escape to dismiss the menu.

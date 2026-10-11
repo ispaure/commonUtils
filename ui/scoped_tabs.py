@@ -16,6 +16,7 @@ class ScopedTabBar(qt.QTabBar):
         self.can_move = can_move
         self.press = self.view = None
         self.dragging = False
+        self._observing_gesture = False
         self.preview = qt.QRubberBand(qt.QRubberBand.Shape.Rectangle, group)
         self.destroyed.connect(self.preview.deleteLater)
         self.setFocusPolicy(qt.Qt.FocusPolicy.StrongFocus)
@@ -48,13 +49,19 @@ class ScopedTabBar(qt.QTabBar):
 
     def mousePressEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton:
+            self.cancel_drag()
             self.setFocus(qt.Qt.FocusReason.MouseFocusReason)
             index = self.tabAt(event.position().toPoint())
             self.press = event.globalPosition().toPoint()
             self.view = self.group.widget(index) if index >= 0 else None
+            if self.view is not None:
+                qt.QApplication.instance().installEventFilter(self)
+                self._observing_gesture = True
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self.view is not None and not event.buttons() & qt.Qt.MouseButton.LeftButton:
+            self.cancel_drag()
         if self.view is not None and event.buttons() & qt.Qt.MouseButton.LeftButton:
             point = event.globalPosition().toPoint()
             if self.dragging or (point - self.press).manhattanLength() >= qt.QApplication.startDragDistance():
@@ -85,11 +92,48 @@ class ScopedTabBar(qt.QTabBar):
             self.move_tab(view, *target[:3])
 
     def cancel_drag(self):
+        if self._observing_gesture:
+            qt.QApplication.instance().removeEventFilter(self)
+            self._observing_gesture = False
         self.preview.hide()
         if self.preview.parentWidget() is not self.group:
             self.preview.setParent(self.group)
         self.press = self.view = None
         self.dragging = False
+
+    def eventFilter(self, watched, event):
+        # Native capture can transfer when the pointer crosses child widgets.
+        # Observe only this press/release sequence, so the destination cannot
+        # consume its release and leave the source's snap preview stranded.
+        if self.view is not None:
+            kind = event.type()
+            if kind == qt.QEvent.Type.Hide and watched in (self, self.group, self.boundary):
+                self.cancel_drag()
+            elif kind == qt.QEvent.Type.WindowDeactivate and watched is self.window():
+                self.cancel_drag()
+            elif kind == qt.QEvent.Type.KeyPress and event.key() == qt.Qt.Key.Key_Escape:
+                self.cancel_drag()
+                event.accept()
+                return True
+            elif watched is not self:
+                if kind == qt.QEvent.Type.MouseMove:
+                    if not event.buttons() & qt.Qt.MouseButton.LeftButton:
+                        self.cancel_drag()
+                    else:
+                        self.mouseMoveEvent(self._source_mouse_event(event))
+                        return self.dragging
+                elif kind == qt.QEvent.Type.MouseButtonRelease and event.button() == qt.Qt.MouseButton.LeftButton:
+                    dragging = self.dragging
+                    self.mouseReleaseEvent(self._source_mouse_event(event))
+                    return dragging
+                elif kind == qt.QEvent.Type.MouseButtonPress:
+                    self.cancel_drag()
+        return super().eventFilter(watched, event)
+
+    def _source_mouse_event(self, event):
+        return qt.QMouseEvent(event.type(),
+            qt.QPointF(self.mapFromGlobal(event.globalPosition().toPoint())),
+            event.globalPosition(), event.button(), event.buttons(), event.modifiers())
 
     def keyPressEvent(self, event):
         if event.key() == qt.Qt.Key.Key_Escape:

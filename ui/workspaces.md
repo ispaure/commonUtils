@@ -74,6 +74,25 @@ and `WA_QuitOnClose=False` preserve the document/worker lifecycle.
 
 ## Reader menus and chrome
 
+`workspace_menus.sync_native_menus(container, document)` routes an embedded
+QMainWindow's menus to its host on macOS and to detached container headers on
+other desktops. It refreshes after focus/reparenting settles, on window activation,
+on native focus-window return after popups, and when the source menu bar changes.
+A container with multiple destinations can
+provide `workspace_menu_document()` to resolve its current view at refresh time;
+return None to restore its base menus. Menu refresh does not activate a window or
+move keyboard focus. Original actions and document callbacks remain authoritative.
+On macOS, switching action sets recreates the native menu-bar mapping, including
+after documents are created inside a tab's + menu tracking loop. Refreshes of the
+same action set retain that mapping.
+After publishing a changed context, the focused Cocoa host also invalidates
+AppKit's displayed menu bar. Native menu contents can otherwise be correct while
+macOS continues drawing the prior context until the bar is clicked. The redraw
+briefly toggles application menu-bar visibility off/on synchronously; it preserves
+intentionally hidden bars and does not change window focus or auto-hide settings.
+macOS can briefly hide and redisplay the Dock during this visibility refresh.
+Unchanged widget-focus refreshes do not repeat that redraw.
+
 Desktop readers can reuse `commonUtils.ui.reader_menus.ReaderMenus` for
 File/Edit/View/Navigate menus and platform-standard shortcuts. The caller supplies
 callbacks and adds format-specific navigation actions. `RecentFiles` stores up

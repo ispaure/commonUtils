@@ -12,6 +12,43 @@ from shiboken6 import isValid
 from . import pyside as qt
 
 _bridge = None
+_menu_bridge = None
+
+
+class CocoaMenuBar:
+    """Invalidate AppKit's displayed bar after a context change."""
+    def __init__(self):
+        objc = ctypes.CDLL('/usr/lib/libobjc.A.dylib')
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.objc_getClass.restype = ctypes.c_void_p
+        address = ctypes.cast(objc.objc_msgSend, ctypes.c_void_p).value
+        self.menu_class = objc.objc_getClass(b'NSMenu')
+        self.visible_selector = objc.sel_registerName(b'menuBarVisible')
+        self.set_visible_selector = objc.sel_registerName(b'setMenuBarVisible:')
+        self.visible = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)(address)
+        self.set_visible = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p,
+                                          ctypes.c_bool)(address)
+
+    def redraw(self):
+        # Preserve intentionally hidden bars (including presentation windows).
+        # These calls affect application visibility, not the user's auto-hide
+        # preference. Restore synchronously, without a timer or focus change.
+        if self.visible(self.menu_class, self.visible_selector):
+            try:
+                self.set_visible(self.menu_class, self.set_visible_selector, False)
+            finally:
+                self.set_visible(self.menu_class, self.set_visible_selector, True)
+
+
+def redraw_menu_bar():
+    global _menu_bridge
+    if sys.platform != 'darwin' or qt.QApplication.platformName() != 'cocoa':
+        return
+    if _menu_bridge is None:
+        _menu_bridge = CocoaMenuBar()
+    _menu_bridge.redraw()
 
 
 class CocoaTitleBars(QAbstractNativeEventFilter):
