@@ -9,13 +9,14 @@ class ScopedTabBar(qt.QTabBar):
     move_tab(view, target, placement, index) accepts/rejects the final operation.
     A drop on a header inserts/reorders; content uses shared side snap geometry.
     """
-    def __init__(self, group, boundary, groups, move_tab):
+    def __init__(self, group, boundary, groups, move_tab, can_move=None):
         super().__init__(group)
         self.group, self.boundary = group, boundary
         self.groups, self.move_tab = groups, move_tab
+        self.can_move = can_move
         self.press = self.view = None
         self.dragging = False
-        self.preview = qt.QRubberBand(qt.QRubberBand.Shape.Rectangle, boundary)
+        self.preview = qt.QRubberBand(qt.QRubberBand.Shape.Rectangle, group)
         self.destroyed.connect(self.preview.deleteLater)
         self.setFocusPolicy(qt.Qt.FocusPolicy.StrongFocus)
         self.setElideMode(qt.Qt.TextElideMode.ElideRight)
@@ -34,11 +35,15 @@ class ScopedTabBar(qt.QTabBar):
             bar = group.tabBar()
             on_bar = bar.mapFromGlobal(global_point)
             rect = qt.QRect(group.mapTo(self.boundary, qt.QPoint()), group.size())
-            if bar.rect().contains(on_bar):
+            if 0 <= on_bar.y() < bar.height():
                 index = bar.tabAt(on_bar)
-                return group, 'tabs', index if index >= 0 else group.count(), rect
-            placement, preview = horizontal_drop_location(rect, point)
-            return group, placement, group.count(), preview
+                result = (group, 'tabs', index if index >= 0 else group.count(), rect)
+            else:
+                placement, preview = horizontal_drop_location(rect, point)
+                result = (group, placement, group.count(), preview)
+            if self.view is not None and self.can_move is not None and not self.can_move(self.view, *result[:3]):
+                return None
+            return result
         return None
 
     def mousePressEvent(self, event):
@@ -52,17 +57,26 @@ class ScopedTabBar(qt.QTabBar):
     def mouseMoveEvent(self, event):
         if self.view is not None and event.buttons() & qt.Qt.MouseButton.LeftButton:
             point = event.globalPosition().toPoint()
-            if (point - self.press).manhattanLength() >= qt.QApplication.startDragDistance():
+            if self.dragging or (point - self.press).manhattanLength() >= qt.QApplication.startDragDistance():
                 self.dragging = True
                 target = self.target(point)
-                self.preview.setVisible(target is not None)
                 if target:
-                    self.preview.setGeometry(target[-1])
+                    group, _, _, rect = target
+                    if self.preview.parentWidget() is not group:
+                        self.preview.setParent(group)
+                    local = group.mapFrom(self.boundary, rect.topLeft())
+                    self.preview.setGeometry(qt.QRect(local, rect.size()))
+                    self.preview.show()
                     self.preview.raise_()
+                else:
+                    self.preview.hide()
                 return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if event.button() != qt.Qt.MouseButton.LeftButton:
+            super().mouseReleaseEvent(event)
+            return
         target = self.target(event.globalPosition().toPoint()) if self.dragging else None
         view = self.view
         self.cancel_drag()
@@ -72,6 +86,8 @@ class ScopedTabBar(qt.QTabBar):
 
     def cancel_drag(self):
         self.preview.hide()
+        if self.preview.parentWidget() is not self.group:
+            self.preview.setParent(self.group)
         self.press = self.view = None
         self.dragging = False
 
