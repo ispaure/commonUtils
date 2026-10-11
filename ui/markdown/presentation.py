@@ -313,6 +313,12 @@ def configure_text(widget, *, source=False):
             return
         document = target.document()
         modified = document.isModified()
+        refresh_live = getattr(getattr(target, '_highlighter', None), 'refresh_cursor', None)
+        if callable(refresh_live):
+            # Live preview uses layout formats, retaining exact source and undo.
+            refresh_live()
+            document.setModified(modified)
+            return
         block = document.begin()
         while block.isValid():
             block_format = block.blockFormat()

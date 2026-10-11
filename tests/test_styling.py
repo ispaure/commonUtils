@@ -129,3 +129,37 @@ class StylingTests(QtTestCase):
         self.assertEqual(viewer.markdown_text(), before)
         self.assertFalse(viewer.is_modified)
         self.assertEqual(path.read_text(), source)
+
+    def test_formatted_code_uses_shared_size_immediately_and_preserves_undo_on_reload(self):
+        from commonUtils.ui.markdown.viewer import MarkdownViewer
+        self.store.save({('Styling', 'code_font_family_str'): 'Courier New',
+                         ('Styling', 'code_font_size_int'): '20'})
+        self.controller.reload()
+        path = self.root / 'live-code.md'
+        path.write_text('Read `inline`.\n\n```python\nprint(1)\n```\n')
+        viewer = MarkdownViewer(path, allow_edit=True)
+        self.addCleanup(viewer.deleteLater)
+        viewer.edit_button.setChecked(True)
+        self.app.processEvents()
+        document = viewer.formatted_editor.document()
+        original = viewer.markdown_text()
+        undo = document.availableUndoSteps()
+        def code_formats():
+            block = document.begin()
+            result = []
+            while block.isValid():
+                result.extend(qt.QTextCharFormat(item.format) for item in block.layout().formats()
+                              if item.format.fontFixedPitch())
+                block = block.next()
+            return result
+        self.assertTrue(code_formats())
+        self.assertTrue(all(fmt.fontPointSize() == 20 and fmt.fontFamilies() == ['Courier New']
+                            for fmt in code_formats()))
+        self.store.save({('Styling', 'code_font_size_int'): '21',
+                         ('Styling', 'code_font_family_str'): 'DejaVu Sans Mono'})
+        self.controller.reload()
+        self.assertTrue(all(fmt.fontPointSize() == 21 and fmt.fontFamilies() == ['DejaVu Sans Mono']
+                            for fmt in code_formats()))
+        self.assertEqual(document.availableUndoSteps(), undo)
+        self.assertEqual(viewer.markdown_text(), original)
+        self.assertFalse(viewer.is_modified)
