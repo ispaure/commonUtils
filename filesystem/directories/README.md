@@ -1,10 +1,16 @@
-# dirUtils
+# Folders and file objects
 
-Shared dirUtils API. The public import path is unchanged after moving its implementation into this package.
+Use `Directory` when you want file objects resolved through commonUtils' format
+registry. Listing does not read file contents.
 
-Import from `commonUtils.filesystem.directories`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+```python
+from pathlib import Path
+from commonUtils.filesystem.directories import Directory
 
-Public entry points: `Directory`
+folder = Directory(Path('/data/project'))
+for file in folder.list_files(recursive=False, filter_extension=['txt', 'md']):
+    print(file.path, file.file_name)
+```
 
-[Library overview](../../README.md).
+Use [traversal](../README.md) for plain paths, filename masks and cancellation.
+The [format guide](../../formats/README.md) explains custom file types.

@@ -1,16 +1,20 @@
-# storage
+# Cache and temporary folders
 
-Platform-standard commonUtils caches and private disposable workspaces.
+Use `cache_directory()` for data you keep between runs. Use
+`temporary_workspace()` for disposable work that should be removed automatically.
+These helpers choose a platform-standard commonUtils location.
 
-Import from `commonUtils.filesystem.storage`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+```python
+from pathlib import Path
+from commonUtils.filesystem.storage import cache_directory, temporary_workspace
 
-Public entry points: `cache_directory`, `temporary_directory`, `temporary_workspace`
+cache = cache_directory()
+with temporary_workspace(prefix='my-export-') as directory:
+    staged = Path(directory) / 'result.txt'
+    staged.write_text('Temporary work', encoding='utf-8')
+# The private temporary folder has been removed; the cache remains.
+```
 
-[Library overview](../../README.md).
-
-## API behavior
-
-| Entry point | Purpose |
-| --- | --- |
-| `temporary_workspace` | Return a private TemporaryDirectory context under the shared Temp area. |
+Pass `create=False` to `cache_directory()` or `temporary_directory()` when merely
+resolving a location. For atomic replacement, stage beside the destination instead
+of in temporary storage on another filesystem. See [persistence](../../persistence/README.md).

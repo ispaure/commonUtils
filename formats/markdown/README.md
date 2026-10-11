@@ -1,4 +1,4 @@
-# markdownUtils
+# Markdown text helpers
 
 Dependency-free basic Markdown properties; preserve complex YAML as raw text.
 

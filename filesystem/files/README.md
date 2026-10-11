@@ -1,6 +1,4 @@
-# fileUtils
-
-Shared fileUtils API. The public import path is unchanged after moving its implementation into this package.
+# Files
 
 Import from `commonUtils.filesystem.files`. Implementation and public exports live in
 [`__init__.py`](__init__.py).
