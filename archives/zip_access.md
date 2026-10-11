@@ -20,7 +20,7 @@ create_archive([folder, other_file], 'separate.zip', password=password)
 
 `ZIPFile.open_archive(password=...)`, `ZIPFile.is_encrypted()` and
 `ZIPFile.extract(destination, password=...)` expose these basics on the file type.
-The compatibility `zipUtils.unzip_file(..., pwd=...)` returns a boolean;
+`commonUtils.archives.legacy.unzip_file(..., pwd=...)` returns a boolean;
 `extract_archive` raises errors. Neither prompts. Plain and encrypted extraction
 use the same layout and streaming code. All names are checked before extraction;
 traversal, symbolic links and ambiguous/colliding names are rejected, including

@@ -29,14 +29,14 @@ these checks until it exits. New commands are noninteractive (`stdin=DEVNULL`);
 explicitly pass `stdin=None` when inheriting standard input is intentional.
 Shell strings require `shell=True`.
 
-`exec_cmd()` remains a compatibility API: captured calls return output lines and
-retain their historical idle timeout and inherited stdin. It does not expose
+`exec_cmd()` accepts shell strings: captured calls return output lines and
+retain their idle timeout and inherited stdin. It does not expose
 exit status. A new terminal window returns immediately regardless of
 `wait_for_output`; terminal launch acceptance is not command completion.
 
 ## Basic Usage
 
-`exec_cmd()` is the compatibility entry point for shell strings:
+`exec_cmd()` is the entry point for shell strings:
 
 ```python
 from commonUtils.integrations.wrappers import cmdShellWrapper
@@ -60,7 +60,7 @@ The `time_out` value is an **idle-output timeout**, not a maximum runtime. A com
 
 ### 📄 `__init__.py`
 
-Exports `run_command()`, `CommandResult`, `exec_cmd()` and `minimize_console_window()`. Command execution lives in `result.py` and the compatibility adapter in `command.py`.
+Exports `run_command()`, `CommandResult`, `exec_cmd()` and `minimize_console_window()`. Command execution lives in `result.py` and the shell-string adapter in `command.py`.
 
 When output is captured, stdout and stderr are read concurrently so either stream counts as activity for the idle timeout.
 

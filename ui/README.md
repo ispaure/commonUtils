@@ -76,7 +76,7 @@ panels; applications supply editing actions separately.
 
 [Configuration](../configuration/README.md#shared-navigation-settings) describes
 wheel preferences. Browser indexing uses event-driven updates and explicit refresh; ordinary browsing
-remains available. Pause methods remain compatibility APIs, not visible controls. See the [index reference](../filesystem/index/README.md).
+remains available. Pause methods are programmatic APIs, not visible controls. See the [index reference](../filesystem/index/README.md).
 
 ## Opt-in Slate appearance
 

@@ -35,7 +35,7 @@ class FileObjectOperationTests(unittest.TestCase):
         self.assertEqual(target.read_text(),'contents')
 
     def test_copy_errors_propagate_but_legacy_function_returns_false(self):
-        with patch('commonUtils.fileUtils.copyfile',side_effect=OSError('denied')):
+        with patch('commonUtils.filesystem.files.copyfile',side_effect=OSError('denied')):
             with self.assertRaisesRegex(OSError,'denied'):self.file.copy_file(self.root/'copy.txt')
             self.assertFalse(fileUtils.copy_file(self.source,self.root/'copy.txt'))
 

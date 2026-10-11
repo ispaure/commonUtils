@@ -90,7 +90,7 @@ class OperationProgressTests(QtTestCase):
     def test_worker_critical_log_reports_error_without_opening_a_dialog(self):
         result = []
         self.progress.completed.connect(lambda value, error: result.append((value, error)))
-        with patch('commonUtils.debugUtils.ui.display_msg_box_ok') as popup:
+        with patch('commonUtils.runtime.diagnostics.ui.display_msg_box_ok') as popup:
             self.progress.start(lambda report, cancelled: log(Severity.CRITICAL, 'Test failure', 'worker error'))
             self.wait()
         popup.assert_not_called()

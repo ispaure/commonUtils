@@ -9,8 +9,7 @@ Public entry points: `iter_chunks`, `copy_stream`, `stream_signature`, `file_sha
 
 [Library overview](../../README.md).
 
-`downloads.py` owns the historical `downloads` implementation; its compatibility
-package preserves existing consumers.
+`runtime.streams.downloads` provides verified download publication.
 
 ## API behavior
 

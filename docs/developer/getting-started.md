@@ -18,8 +18,8 @@ python -m venv .venv
 python -m pip install PySide6  # Only needed for Qt components.
 ```
 
-The application owns dependency pins. The root import installs lazy compatibility
-aliases; it does not initialize a GUI or install optional software.
+The application owns dependency pins. Import subsystems through their documented
+module paths. The root import does not initialize a GUI or install optional software.
 
 | Capability | Additional dependency or prerequisite |
 | --- | --- |

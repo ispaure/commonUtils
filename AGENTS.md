@@ -2,10 +2,10 @@
 
 Read [architecture](docs/developer/architecture.md),
 [extension contracts](docs/developer/extension-points.md) and
-[compatibility](docs/developer/compatibility.md) before changing shared interfaces.
+[integration contracts](docs/developer/contracts.md) before changing shared interfaces.
 
 - Keep application workflows, plugin discovery and dependency policy in consumers.
-- Preserve canonical/historical module identity, established public interfaces,
+- Preserve direct module imports and namespace isolation, established public interfaces,
   persisted formats and cooperative UI shutdown. Do not infer stability from names.
 - Update the owning API guide for contract changes and component `user_docs/` for
   shared interactive behavior. Follow [documentation ownership](docs/developer/maintenance.md).

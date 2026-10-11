@@ -55,7 +55,7 @@ class DirectoryIndexTests(unittest.TestCase):
 
     def _check_cache(self, cache, root, file):
         first = cache.get(root)
-        with patch('commonUtils.directory.os.scandir', side_effect=AssertionError('Repeated enumeration')):
+        with patch('commonUtils.filesystem.index.os.scandir', side_effect=AssertionError('Repeated enumeration')):
             reused = cache.get(root)
             self.assertTrue(reused.reused)
             self.assertEqual(reused.scanned_at, first.scanned_at)

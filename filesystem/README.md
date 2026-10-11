@@ -13,16 +13,16 @@ see the [developer API guide](../docs/developer/public-apis.md#files-types-and-d
 | Batch filename changes | [Rename](rename/README.md) |
 | Persistent filename search and recursive sizes | [Directory index](index/README.md) |
 | Cache paths and private temporary workspaces | [Storage](storage/README.md) |
-| Planned copy/move operations | `filesystem.transfers` (historical `file_operations`) |
-| Snapshot removal plans and execution | `filesystem.removal` (historical `file_removal`) |
-| Network-location detection | `filesystem.network` (historical `network_filesystems`) |
+| Planned copy/move operations | `filesystem.transfers` |
+| Snapshot removal plans and execution | `filesystem.removal` |
+| Network-location detection | `filesystem.network` |
 
 `commonUtils.filesystem` exports FilesystemObject, BrowserDetails, BrowserPanel,
 BrowserAction, FolderStats, scan_folders, format_size and format_datetime. These
 information/provider records do not require Qt widgets. File classes can supply
 read-only details and encoded thumbnails; see [metadata extension contracts](../docs/developer/extension-points.md#supply-metadata-and-thumbnails).
 
-`scan_folders()` is a compatibility API backed by the shared persistent index,
+`scan_folders()` is an aggregate API backed by the shared persistent index,
 not an independent traversal. `visible_only=True` limits returned folder totals to
 the root and immediate child folders; their sizes include known descendants.
 Cancellation returns None. Inspect partial/stale metadata rather than assuming
@@ -32,7 +32,6 @@ Storage workspaces are disposable, but replacement staging must remain beside th
 destination for atomic publication. Use [persistence](../persistence/README.md) for
 publication; a temporary directory alone does not provide transaction semantics.
 
-Historical aliases share canonical module identity through the centralized
-[compatibility adapter](../docs/developer/compatibility.md).
+See [integration contracts](../docs/developer/contracts.md) for namespace and data ownership.
 
 [Library overview](../README.md)

@@ -163,7 +163,7 @@ def minimize_console_window() -> bool:
             return True
 
         case OS.MAC | OS.LINUX:
-            title = 'commonUtils.wrappers.cmdShellWrapper.minimize_console_window'
+            title = 'commonUtils.integrations.wrappers.cmdShellWrapper.minimize_console_window'
             msg = (
                 'Minimize Console Window has only been implemented for Windows so far. Please update '
                 'cmdShellWrapper with the cross-platform branches.'

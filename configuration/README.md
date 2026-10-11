@@ -15,7 +15,7 @@ settings visually. Each layer works independently.
 The document and schema have no GUI dependency. The editor requires PySide6 and
 an existing `QApplication`. These modules contain no application-specific paths,
 feature names or settings. Applications own defaults, domain rules and what
-happens after a setting changes. The existing `configUtils` API stays available.
+happens after a setting changes. The standalone configuration helpers live in `commonUtils.configuration.legacy`.
 
 ## Read and update an ordinary INI
 
@@ -128,18 +128,14 @@ to offer Save, Discard or Cancel. File switching should retain editor instances
 if you want pending edits preserved. Each editor refuses external disk changes.
 For custom save rules, subclass the editor and validate before `super().save()`.
 
-## Migration and compatibility
+## Settings adoption
 
 Adopt typed keys gradually. Changing a key name requires updating its consumers;
-keep fallback reads for the old name where compatibility matters. Neither the
+plan how existing saved values will be read. Neither the
 schema nor editor automatically renames existing keys or rewrites legacy files.
 
-Applications can retain compatibility imports or a small wrapper to preserve
-their previous defaults while migrating. New consumers should import the
-commonUtils modules directly.
-
-`settings.py` owns the historical `settings` implementation; its compatibility
-package preserves existing consumers.
+Import shared settings from `commonUtils.configuration.settings`. Applications
+choose their own defaults and supply a custom settings path when needed.
 
 ## Shared navigation settings
 

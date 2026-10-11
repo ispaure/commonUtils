@@ -28,7 +28,7 @@ its own extras; this repository does not supply one exhaustive install command.
 | Platform workflows | Relevant system tools, such as PowerShell, `hdiutil` or Flatpak |
 
 Windows, macOS and Linux are supported at the library level; individual operations
-can remain platform-specific. Route platform choices through `osUtils` and consult
+can remain platform-specific. Route platform choices through `runtime.platform` and consult
 the relevant module before relying on an external tool.
 
 ```python

@@ -128,7 +128,7 @@ archive.extract(Path("output"))
 root_files = archive.get_root_file_lst()
 ```
 
-`extract()` uses the shared archive extraction functionality in `zipUtils.py` and optionally supports progress display.
+`extract()` uses the shared archive extraction functionality in `commonUtils.archives.legacy` and optionally supports progress display.
 
 `get_root_file_lst()` returns files located directly at the root of the ZIP archive.
 
@@ -157,7 +157,7 @@ windows; browser panel loaders may read metadata asynchronously.
 
 ## Base File Functionality
 
-All file types ultimately inherit from `fileUtils.File`, giving them access to the common file abstraction and operations provided by `commonUtils`.
+All file types ultimately inherit from `commonUtils.filesystem.files.File`, giving them access to the common file abstraction and operations provided by `commonUtils`.
 
 For example:
 
@@ -333,7 +333,7 @@ rather than silently changing unrelated settings. Save uses an atomic temporary
 file, preserves existing permissions/BOM/newlines, and refuses external changes
 since `read()`. Callers should serialize writes to the same file; the conflict
 check is not a cross-process lock. Standard I/O and ConfigParser errors propagate.
-The old `configUtils` and `TXTFile` APIs remain unchanged.
+INI parsing is independent of `configuration.legacy` and `TXTFile`.
 
 The optional [typed-key schema and visual editor](../configuration/README.md)
 are separate layers; INIFile itself never interprets suffixes.

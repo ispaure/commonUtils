@@ -35,7 +35,7 @@ class NetworkFilesystemTests(unittest.TestCase):
         root = Path('/').absolute()
         remote = root / 'Volumes/Share'
         local = root / 'Volumes/Local'
-        with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=(remote,)):
+        with patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=(remote,)):
             excluded = scan_exclusions(root, root / 'private/tmp/index/cache.sqlite')
         self.assertTrue(is_excluded(remote / 'deep/folder', excluded))
         self.assertFalse(is_excluded(local, excluded))
@@ -53,12 +53,12 @@ class NetworkFilesystemTests(unittest.TestCase):
             remote = root / 'share'; remote.mkdir()
             (remote / 'cached').write_bytes(b'1234567')
             with DirectoryCache(database=base / 'cache' / 'index.sqlite') as cache:
-                with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=()):
+                with patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=()):
                     original = cache.get(root)
                     self.assertEqual(storage_totals(original)[root], 10)
                     cache.repair_cached_exclusions(root)
-                with patch('commonUtils.directory.exclusions.network_mount_roots', return_value=(remote,)), \
-                     patch('commonUtils.directory.store.os.scandir', side_effect=AssertionError('Share enumeration')):
+                with patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=(remote,)), \
+                     patch('commonUtils.filesystem.index.store.os.scandir', side_effect=AssertionError('Share enumeration')):
                     cache.repair_cached_exclusions(root)
                     self.assertEqual(storage_totals(cache.peek(root))[root], 3)
                     self.assertEqual(storage_totals(original)[root], 10)

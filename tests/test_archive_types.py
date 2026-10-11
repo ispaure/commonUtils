@@ -51,7 +51,7 @@ class ArchiveTypeTests(unittest.TestCase):
 
     def test_importing_format_declarations_does_not_load_qt_or_crypto(self):
         code = ('import sys; from commonUtils.archives import is_supported_archive; '
-                'from commonUtils.fileTypes.archiveType import ArchiveFile; '
+                'from commonUtils.formats.archiveType import ArchiveFile; '
                 'assert is_supported_archive("example.TAR.GZ"); '
                 'assert "pyzipper" not in sys.modules; '
                 'assert not any(name.startswith("PySide6") for name in sys.modules)')

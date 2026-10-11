@@ -2,8 +2,8 @@
 
 The interfaces below have examples, exports, tests or consumer use supporting
 external integration. This is a curated map, not a promise that every public-looking
-name is stable. Concrete UI fields and historical patch targets can still be
-compatibility-sensitive; see [compatibility](compatibility.md).
+name is stable. Concrete UI fields and consumer patch targets can still be
+part of the integration contract; see [integration contracts](contracts.md).
 
 ## Files, types and directories
 

@@ -249,7 +249,7 @@ while prepare_close returns false, retry on idle, and also respect FileBrowser's
 `stop()/idle` worker lifecycle. An existing controller can be supplied explicitly
 with `install_browser(browser, host=window, controller=window_controller)`.
 
-## Lazy references and compatibility
+## Lazy references and lower-level APIs
 
 `FileType.file_class`, `SelectionAction.accepts` and `FileActivation.accepts` can use
 classes or deferred `package.module:Class` strings. Use deferred references when a

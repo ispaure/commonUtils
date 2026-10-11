@@ -71,7 +71,7 @@ paths in natural order and raises `OperationCancelled` on cancellation. Unlike
 `Directory.list_files()`, it does not resolve file-type classes or follow links.
 
 `rename_path(source, target, overwrite=False)` is the single-item primitive,
-which propagates errors and requires an existing parent. `fileUtils.rename_file`
+which propagates errors and requires an existing parent. `filesystem.files.rename_file`
 retains its boolean/logging API and parent creation, but consistently refuses
 existing destinations unless `force=True`. Forced replacement uses `os.replace`
 without first deleting the destination. Same-path renames are successful no-ops

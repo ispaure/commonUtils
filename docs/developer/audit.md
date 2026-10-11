@@ -4,13 +4,13 @@
 
 The previous documentation had useful package-local references but no audience-based
 entry point. The root README repeated the feature guide's complete browser example;
-`_compat.md` combined layout policy, historical migration notes and operation contracts.
+Layout policy and operation contracts were mixed with migration history.
 The browser and index guides mixed UI instructions, database implementation notes,
 application defaults and unrelated speech/icon behavior. Markdown and code editing
 references mixed user tasks with embedding APIs and repeated sections.
 
 The revised structure keeps `docs/developer/` for cross-cutting integration,
-architecture, compatibility and maintenance guidance. Package references retain
+architecture, integration contracts and maintenance guidance. Package references retain
 specialized examples. Component-local `user_docs/` guides own reusable user behavior;
 flat text/INI modules share `ui/user_docs/`. No Python packages move.
 
@@ -21,14 +21,13 @@ flat text/INI modules share `ui/user_docs/`. No Python packages move.
 | Directory traversal and indexing have different link policies | `filesystem/directories`, `filesystem/traversal.py`, index metadata and traversal tests; document each policy separately |
 | File objects are snapshots; object methods and free adapters return different types | File implementation and `test_file_object_operations.py`; explain fresh objects versus boolean adapters |
 | Registration is global, reversible and owner-aware | Registry, feature bindings, `test_file_registry.py`, `test_features.py`, and read-only Logistics call sites |
-| Public-looking internals are consumed in some projects | Compatibility map and consumer browser adapters; avoid promising blanket stability or declaring all internals disposable |
-| No visible browser Pause/Resume control | Browser indexing implementation; distinguish hidden compatibility methods from user controls |
+| Public-looking internals are consumed in some projects | Consumer browser adapters; avoid promising blanket stability or declaring all internals disposable |
+| No visible browser Pause/Resume control | Browser indexing implementation; distinguish programmatic methods from user controls |
 | Cached index data is not a live recursive filesystem view | Scan/reconcile/read implementations and event-driven index tests; document partial/stale results and explicit refresh |
 | Markdown guide both supported and denied Mermaid | Renderer, reading extensions and presentation tests; describe explicit local rendering and failure limits |
 | Read-aloud start position was outdated | Viewer text provider and read-aloud tests; document selection/visible reading position |
 | Wheel defaults confused saved values with fallback values | `ui/settings.ini` versus `configuration/settings.py`; distinguish shipped 100/30 from fallback 20/250 |
 | UI guide named a nonexistent process module | `ui/process_progress.py`; correct the import reference |
-| Prior layout policy prohibited central docs | Reconcile `_compat.md` with this requested audience-based structure; preserve module references |
 
 Source, exports, tests and Logistics call sites were inspected; no Logistics file
 was edited. The commonUtils checkout had no AGENTS.md, packaging manifest or
@@ -52,7 +51,7 @@ modules on three OS runners. Blue Hole was not available for independent validat
 - Code diff/formatting error text calls a Python-character bound “1 MiB”. The
   documentation records the actual measurement; runtime wording is unchanged.
 - No release/version policy or supported dependency range was found. Python 3.10
-  syntax compatibility does not establish a tested Python 3.10 environment.
+  syntax alone does not establish a tested Python 3.10 environment.
 
 These are documentation findings; implementation behavior was not changed.
 
@@ -65,7 +64,7 @@ These are documentation findings; implementation behavior was not changed.
   and the Markdown window event loop/close. GUI examples used offscreen Qt and temporary
   storage; each application example requires its own QApplication lifecycle.
 - Passed 191 focused tests across 22 modules: registry, file operations, traversal,
-  package compatibility/layout, features, index policy/reconciliation/search, settings,
+  package layout, features, index policy/reconciliation/search, settings,
   INI/text editors, Markdown/frontmatter/links/presentation, read aloud, code editing,
   diff/merge and workspaces.
 - Used the available Python 3.12.2 / PySide6 6.6.2 environment. Qt initially aborted
@@ -81,7 +80,7 @@ Windows/Linux runtime behavior, real speech engines, installed Mermaid CLI outpu
 external applications, hosted CI and Blue Hole were not independently exercised.
 
 The overhaul consolidates duplicated root/browser examples into the existing feature
-guide; keeps `_compat.md` as a navigation entry; moves index migration notes to the
+guide; moves index migration notes to the
 index reference and reader menus/chrome to workspace presentation; removes repeated
 code-editor/Markdown summaries; and replaces mixed browser/Markdown narration with
 separate integration and user guides. Specialized archive, persistence, format and
