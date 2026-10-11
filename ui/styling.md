@@ -18,7 +18,8 @@ role, callback=None)` binds a live role without changing other host widgets.
 A 500 ms timer rereads file timestamps and applies saved changes. `changed`
 notifies consumers that own specialized rendering. Bindings use weak references;
 text defaults preserve document modified flags. Markdown refreshes fenced and
-inline code fonts along with reading fonts. Font changes do not save documents.
+inline code fonts along with reading fonts. Font changes do not save documents. Formatted Markdown applies code fonts through
+layout highlighting, so changing appearance does not add editing undo commands.
 
 `styling().code_font.bind(editor)` connects a code editor's zoom signal to the
 shared personal size; `set_size(size)` saves a sparse [Styling] override and updates

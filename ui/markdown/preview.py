@@ -3,7 +3,7 @@ from .. import pyside as qt
 from .syntax import inline_spans, FENCE_OPEN, fence_close, HEADING, fenced_regions
 from .syntax import _units
 from .links import link_spans, reference_destinations
-from .presentation import monospace_family
+from .presentation import monospace_family, code_point_size
 
 
 class LivePreviewHighlighter(qt.QSyntaxHighlighter):
@@ -78,6 +78,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             code = qt.QTextCharFormat()
             code.setFontFixedPitch(True)
             code.setFontFamilies([monospace_family()])
+            code.setFontPointSize(code_point_size())
             code.setFontWeight(qt.QFont.Weight.Normal)
             code.setFontItalic(False)
             self.setFormat(0, _units(text), code)
@@ -119,6 +120,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
             if span.marker.startswith('`'):
                 fmt.setFontFixedPitch(True)
                 fmt.setFontFamilies([monospace_family()])
+                fmt.setFontPointSize(code_point_size())
             else:
                 if len(span.marker) >= 2:
                     fmt.setFontWeight(qt.QFont.Weight.Bold)
