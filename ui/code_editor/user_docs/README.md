@@ -60,3 +60,8 @@ not expose it. JSON/XML formatting is deliberately conservative and bounded; XML
 with mixed content, CDATA or preserved whitespace can be refused rather than altered.
 
 [Developer integration](../README.md) · [All shared guides](../../../README.md#shared-component-user-guides)
+
+PHP files highlight embedded HTML. Laravel `.blade.php` files are detected before
+ordinary PHP and highlight Blade directives and single-line interpolations using
+the shared PHP/HTML grammars. Python stub (`.pyi`) files use Python highlighting.
+Multiline Blade template expressions have limited highlighting.
