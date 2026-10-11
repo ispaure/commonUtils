@@ -14,6 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
       PYTHONPATH: logistics/Python
       UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/logistics/.venv
     steps:
@@ -28,6 +29,17 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12.2'
+      - name: Use native long temporary paths on Windows
+        if: runner.os == 'Windows'
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import tempfile
+          native = str(Path(tempfile.gettempdir()).resolve())
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              for name in ('TEMP', 'TMP', 'TMPDIR'):
+                  stream.write(f'{name}={native}\n')
       - name: Qt system libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0 libdbus-1-3 libpulse0
