@@ -82,6 +82,12 @@ A container with multiple destinations can
 provide `workspace_menu_document()` to resolve its current view at refresh time;
 return None to restore its base menus. Menu refresh does not activate a window or
 move keyboard focus. Original actions and document callbacks remain authoritative.
+Hosts may set `workspace_publish_menus=True` to publish attached views in the
+window header on Windows/Linux as well, hiding the embedded source bar. Optional
+`workspace_menu_actions` are prepended without duplicating identical QAction
+instances, so application navigation remains present across document contexts.
+The `workspace_menu_document()` provider is authoritative during immediate and
+deferred publication, preventing inactive workspaces from replacing active menus.
 On macOS, switching action sets recreates the native menu-bar mapping, including
 after documents are created inside a tab's + menu tracking loop. Refreshes of the
 same action set retain that mapping.
