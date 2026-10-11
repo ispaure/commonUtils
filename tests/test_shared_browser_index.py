@@ -1,13 +1,13 @@
 """Browser subscriptions follow shared jobs under cache-first policy."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event, Thread
+from threading import Event, Thread, Timer
 from time import monotonic, sleep
 import unittest
 from unittest.mock import patch
 
 from commonUtils.filesystem.index import DirectoryCache
-from commonUtils.filesystem.index.coordinator import IndexCoordinator
+from commonUtils.filesystem.index.coordinator import IndexCoordinator, _retry_sql
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
@@ -57,11 +57,14 @@ class SharedBrowserTests(QtTestCase):
 
     def wait(self, predicate):
         deadline = monotonic()+10
-        while not predicate():
+        while True:
+            value = _retry_sql(predicate, cancelled=lambda: monotonic() >= deadline)
+            if value:
+                self.app.processEvents()
+                return value
             self.assertLess(monotonic(), deadline)
             self.app.processEvents()
             sleep(.01)
-        self.app.processEvents()
 
     def browser(self, root):
         browser = FileBrowser(root)
@@ -101,9 +104,11 @@ class SharedBrowserTests(QtTestCase):
         self.worker.start()
         self.wait(lambda: browser.model.folder_totals.get(self.child) is not None
                   and browser.model.folder_totals[self.child].files == 2 and not browser.folder_busy)
-        self.assertEqual(self.queue.status(identity)['state'], 'done')
-        with self.queue._connection() as db:
-            self.assertEqual(db.execute('SELECT count(*) FROM jobs').fetchone()[0], 1)
+        self.assertEqual(self.wait(lambda: self.queue.status(identity))['state'], 'done')
+        def receipt_count():
+            with self.queue._connection() as db:
+                return db.execute('SELECT count(*) FROM jobs').fetchone()
+        self.assertEqual(self.wait(receipt_count)[0], 1)
 
     def test_pausing_a_view_detaches_without_cancelling_durable_request(self):
         identity = self.queue.submit(self.root, full=True)
@@ -113,11 +118,38 @@ class SharedBrowserTests(QtTestCase):
         first._toggle_index_pause()
         self.wait(lambda: first._index_paused and not first.folder_busy)
         self.assertTrue(second.folder_busy)
-        self.assertEqual(self.queue.status(identity)['state'], 'pending')
+        self.assertEqual(self.wait(lambda: self.queue.status(identity))['state'], 'pending')
         self.worker = Thread(target=self.queue.run, args=(self.stop.is_set,))
         self.worker.start()
         self.wait(lambda: not second.folder_busy)
-        self.assertEqual(self.queue.status(identity)['state'], 'done')
+        self.assertEqual(self.wait(lambda: self.queue.status(identity))['state'], 'done')
+
+    def test_receipt_poll_waits_for_a_real_queue_writer_lock(self):
+        identity = self.queue.submit(self.root)
+        entered, release = Event(), Event()
+        def writer():
+            with self.queue._connection() as db:
+                db.execute('BEGIN EXCLUSIVE')
+                entered.set()
+                release.wait(3)
+        worker = Thread(target=writer)
+        worker.start()
+        timer = Timer(.7, release.set)
+        attempts = []
+        def receipt():
+            attempts.append(None)
+            return self.queue.status(identity)
+        try:
+            self.assertTrue(entered.wait(3))
+            timer.start()
+            job = self.wait(receipt)
+            self.assertEqual(job['state'], 'pending')
+            self.assertGreater(len(attempts), 1)
+        finally:
+            release.set()
+            timer.cancel()
+            worker.join(5)
+            self.assertFalse(worker.is_alive())
 
 
 if __name__ == '__main__':
