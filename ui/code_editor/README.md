@@ -107,3 +107,23 @@ PHP/HTML mode carries both Pygments grammar states across blocks, so a PHP openi
 tag on one line still highlights declarations on subsequent lines and resumes
 HTML formatting after the closing tag. Blade retains its documented per-line
 delegating fallback.
+
+## Shared view lifecycle
+
+`CodeEdit.share_document_from(source)` attaches another CodeEdit to the same
+QTextDocument and copies font, indentation, comment, gutter, wrapping and read-only
+settings. It reconnects multicursor/folding hooks without duplicate registrations.
+It does not copy cursor/scroll position or continually synchronize preferences.
+The host must retain the document owner for as long as any view uses the text.
+
+`CodeEdit.detach_document()` disconnects the old editing hooks and gives the view
+an empty, owned plain-text document. Call it before deleting a shared view; the
+view can also be attached again. File identity, unsaved prompts and deciding when
+the last buffer can be deleted remain host responsibilities. EditorViews uses
+these APIs for its own split lifecycle.
+
+`SyntaxHighlighter.rebind_editor(editor)` moves palette observation to another
+view of its existing document. Rebind before detaching/destroying the old view.
+The highlighter and its timer remain owned by the document/highlighter, and the
+lexer instance is retained. A different document raises ValueError. This changes
+neither document ownership nor text, undo history or cursor positions.

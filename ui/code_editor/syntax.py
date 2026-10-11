@@ -175,11 +175,27 @@ class SyntaxHighlighter(qt.QSyntaxHighlighter):
         self.formats = {}
         self.states = {("root",): 0}
         self.reverse_states = {0: ("root",)}
-        self.theme_timer = qt.QTimer(editor)
+        self.theme_timer = qt.QTimer(self)
         self.theme_timer.setSingleShot(True)
         self.theme_timer.timeout.connect(self.refresh_theme)
         editor.installEventFilter(self)
         self.configure(language)
+
+    def rebind_editor(self, editor):
+        """Transfer palette observation to another view of the same document.
+
+        Call before destroying or detaching the previous editor. Text ownership
+        remains with the host; lexer state and this highlighter are retained.
+        """
+        if editor.document() is not self.document():
+            raise ValueError('Highlighter rebinding requires the same document')
+        if editor is not self.editor:
+            self.theme_timer.stop()
+            self.editor.removeEventFilter(self)
+            self.editor = editor
+            editor.installEventFilter(self)
+        editor.comment_prefix = COMMENT_PREFIX.get(self.language)
+        self.refresh_theme()
 
     def configure(self, language):
         self.language = language
