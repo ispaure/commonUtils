@@ -21,7 +21,10 @@ class MarkdownTablesMixin:
             action = self._action(title, lambda key=key: self._edit_table(key))
             self._table_actions[key] = action
             self._table_menu.addAction(action)
-        self.editor_toolbar.addWidget(self.table_button)
+        self.table_button.setParent(self)
+        self.table_button.hide()
+        self._table_menu.setTitle('Table')
+        self.format_menu.addMenu(self._table_menu)
         self.formatted_editor.table_actions = (self.table_insert_action, *self._table_actions.values())
         self.formatted_editor.cursorPositionChanged.connect(self._update_table_actions)
         self.formatted_editor.selectionChanged.connect(self._update_table_actions)
@@ -36,6 +39,7 @@ class MarkdownTablesMixin:
         # Rectangular selections are ambiguous; require a caret in one cell.
         in_table = enabled and cursor.currentTable() is not None and not cursor.hasSelection()
         self.table_button.setEnabled(enabled)
+        self._table_menu.menuAction().setEnabled(enabled)
         self.table_insert_action.setEnabled(enabled and cursor.currentTable() is None)
         for action in self._table_actions.values():
             action.setEnabled(in_table)
