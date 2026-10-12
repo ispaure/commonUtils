@@ -3,6 +3,7 @@ from configparser import Error
 from . import pyside as qt
 from ..configuration.ini_schema import key_type, mode_choices, parse_value
 from .styling import STYLE_FIELDS, validate_style
+from .font_preview import FontPreview
 
 
 class LayeredSettingsEditor(qt.QWidget):
@@ -14,6 +15,7 @@ class LayeredSettingsEditor(qt.QWidget):
         self.only_sections, self.labels = sections, labels or {}
         self.validator = validator
         self.fields, self.resets, self.indicators = {}, {}, {}
+        self.font_previews = {}
         self.pending = {}
         self.building = False
         layout = qt.QVBoxLayout(self)
@@ -74,6 +76,7 @@ class LayeredSettingsEditor(qt.QWidget):
             self.sections.removeTab(0)
             widget.deleteLater()
         self.fields.clear(); self.resets.clear(); self.indicators.clear()
+        self.font_previews.clear()
         forms = {}
         for (section, key), value in self.original.items():
             if key.endswith('_choices_list-str'):
@@ -126,12 +129,14 @@ class LayeredSettingsEditor(qt.QWidget):
             elif control is None and section == 'Styling' and key.endswith('font_family_str'):
                 control = qt.QComboBox()
                 control.setEditable(True)
+                control.setInsertPolicy(qt.QComboBox.InsertPolicy.NoInsert)
+                control.setProperty('monospace_only', key == 'code_font_family_str')
                 control.addItem('Automatic', '')
                 for family in qt.QFontDatabase.families():
-                    control.addItem(family, family)
-                if value and control.findData(value) < 0:
-                    control.addItem(value, value)
-                control.setCurrentIndex(max(0, control.findData(value)))
+                    if key == 'code_font_family_str' and not qt.QFontDatabase.isFixedPitch(family):
+                        continue
+                    self._add_font(control, family)
+                self._select_font(control, value)
                 control.currentTextChanged.connect(lambda v, c=control, i=identity:
                     self._edit(i, '' if c.currentIndex() == 0 and v == 'Automatic' else v))
             elif control is None:
@@ -167,8 +172,59 @@ class LayeredSettingsEditor(qt.QWidget):
             content.addWidget(reset)
             self.fields[identity], self.resets[identity], self.indicators[identity] = control, reset, indicator
             forms[section].addRow(label, row)
+            if section == 'Styling' and key.endswith('font_family_str'):
+                role = key.removesuffix('_font_family_str')
+                self.font_previews[role] = FontPreview(role)
+                forms[section].addRow('', self.font_previews[role])
             self._state(identity)
         self.building = False
+        self._update_font_previews()
+
+    def _add_font(self, control, family):
+        control.addItem(family, family)
+        font = qt.QFont(control.font())
+        font.setFamily(family)
+        control.setItemData(control.count() - 1, font, qt.Qt.ItemDataRole.FontRole)
+
+    def _select_font(self, control, family):
+        index = control.findData(family)
+        if index < 0 and family:
+            if control.property('monospace_only') and not qt.QFontDatabase.isFixedPitch(family):
+                control.setEditText(family)
+                return
+            self._add_font(control, family)
+            index = control.count() - 1
+        control.setCurrentIndex(max(0, index))
+
+    def _update_font_previews(self):
+        if not self.font_previews:
+            return
+        from .styling import styling
+        from .code_editor.widget import monospace_font
+        values = {key: value for (section, key), value in self.original.items() if section == 'Styling'}
+        for (section, key), value in self.pending.items():
+            if section == 'Styling':
+                values[key] = self.defaults.get((section, key), '') if value is None else value
+        ui_font = qt.QFont(styling().base_font)
+        if values.get('ui_font_family_str', '').strip():
+            ui_font.setFamily(values['ui_font_family_str'].strip())
+        for role, preview in self.font_previews.items():
+            font = monospace_font() if role == 'code' else qt.QFont(ui_font)
+            family_key, size_key = f'{role}_font_family_str', f'{role}_font_size_int'
+            family = values.get(family_key, STYLE_FIELDS[family_key][1]).strip()
+            if family:
+                font.setFamily(family)
+            try:
+                validate_style(size_key, values.get(size_key, str(STYLE_FIELDS[size_key][1])))
+                font.setPointSize(int(values.get(size_key, STYLE_FIELDS[size_key][1])))
+            except (ValueError, OverflowError):
+                font.setPointSize(STYLE_FIELDS[size_key][1])
+            preview.set_sample_font(font)
+            control = self.fields['Styling', family_key]
+            # The editable field is an exception to the normal settings font.
+            selected_font = qt.QFont(font)
+            selected_font.setPointSize(qt.QApplication.font().pointSize())
+            control.lineEdit().setFont(selected_font)
 
     def _color(self, control):
         color = qt.QColorDialog.getColor(qt.QColor(control.text()), self, 'Choose color')
@@ -193,6 +249,7 @@ class LayeredSettingsEditor(qt.QWidget):
         self._state(identity)
         self.save_button.setEnabled(bool(self.pending))
         self.status.setText('Unsaved settings.' if self.pending else '')
+        self._update_font_previews()
 
     def _reset(self, identity):
         value = self.defaults.get(identity, '') if self.scope == 'personal' else self.original[identity]
@@ -208,9 +265,7 @@ class LayeredSettingsEditor(qt.QWidget):
                     control.setValue(STYLE_FIELDS[identity[1]][1])
             elif isinstance(control, qt.QComboBox):
                 if identity[0] == 'Styling' and identity[1].endswith('font_family_str'):
-                    if value and control.findData(value) < 0:
-                        control.addItem(value, value)
-                    control.setCurrentIndex(max(0, control.findData(value)))
+                    self._select_font(control, value)
                 else:
                     control.setCurrentText(value)
             elif isinstance(control, qt.QPlainTextEdit):
@@ -225,6 +280,7 @@ class LayeredSettingsEditor(qt.QWidget):
         self._state(identity)
         self.save_button.setEnabled(bool(self.pending))
         self.status.setText('Unsaved settings.' if self.pending else '')
+        self._update_font_previews()
 
     def save(self):
         if not self.pending:

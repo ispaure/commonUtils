@@ -4,6 +4,11 @@ from . import _api
 
 
 def set_font(q_thing):
+    app = _api.QApplication.instance()
+    controller = getattr(app, '_commonutils_styling', None)
+    if controller is not None and controller.apply_application:
+        controller.bind(q_thing, 'ui')
+        return
     if _api.rog_ally:
         modifier = 6
     else:

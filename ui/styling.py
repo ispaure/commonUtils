@@ -58,6 +58,8 @@ def validate_style(key, value):
         raise ValueError('Enter a valid color, such as #75a7ff')
     elif key == 'theme_mode' and value not in choices:
         raise ValueError('Choose System, Light or Dark')
+    elif key == 'code_font_family_str' and value.strip() and not qt.QFontDatabase.isFixedPitch(value.strip()):
+        raise ValueError('Choose a monospace font for code, or Automatic')
 
 
 class Styling(qt.QObject):
@@ -68,6 +70,7 @@ class Styling(qt.QObject):
         self.app = app
         self.base_font = qt.QFont(app.font())
         self.views = WeakKeyDictionary()
+        self.application_controls = WeakSet()
         self.values = {}
         self.apply_application = False
         self.code_font = CodeFontController(self)
@@ -116,6 +119,28 @@ class Styling(qt.QObject):
         if callback is not None:
             callback()
 
+    def _bind_application_control(self, widget):
+        if not isinstance(widget, (qt.QAbstractButton, qt.QMenu, qt.QMenuBar)):
+            return
+        if widget in self.views and widget not in self.application_controls:
+            return  # Respect explicit component bindings.
+        role = 'ui'
+        parent = widget.parentWidget()
+        while parent is not None:
+            if parent.property('font_preview'):
+                return  # Pending preview fonts remain local to settings samples.
+            if isinstance(widget, qt.QAbstractButton) and parent in self.views:
+                role = self.views[parent][0]
+                break
+            parent = parent.parentWidget()
+        self.application_controls.add(widget)
+        self.bind(widget, role)
+
+    def eventFilter(self, watched, event):
+        if self.apply_application and event.type() in (qt.QEvent.Type.Polish, qt.QEvent.Type.Show):
+            self._bind_application_control(watched)
+        return False
+
     def reload(self):
         values = style_values()
         if values == self.values:
@@ -123,14 +148,14 @@ class Styling(qt.QObject):
         previous = self.values
         initial = not previous
         self.values = values
-        if self.apply_application:
-            self.app.setFont(self.font('ui'))
         controller = getattr(self.app, '_commonutils_theme', None)
         if controller is not None and not initial and self.apply_application:
             if values['theme_mode'] != previous['theme_mode']:
                 controller.set_mode(values['theme_mode'])
             else:
                 controller._apply()
+        if self.apply_application:
+            self.app.setFont(self.font('ui'))
         for widget, (role, callback) in tuple(self.views.items()):
             self._update(widget, role, callback)
         self.changed.emit()
@@ -155,6 +180,9 @@ def apply_styling(app=None):
     controller = styling(app)
     controller.apply_application = True
     controller.app.setFont(controller.font('ui'))
+    controller.app.installEventFilter(controller)
+    for widget in controller.app.allWidgets():
+        controller._bind_application_control(widget)
     return controller
 
 

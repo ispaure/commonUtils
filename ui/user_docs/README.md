@@ -91,6 +91,16 @@ Hosts can expose software defaults and personal settings using the shared settin
 editor. Personal fields show Inherited or Override; **↶** removes an override, then
 Save applies it. Software mode edits the defaults INI and ↶ reverts an unsaved
 field. Appearance has four font roles: interface/dialogs, browsers, reading, code.
+Ordinary buttons, including Save and Reload, follow the interface font. Buttons
+inside browser panels follow the browser font; sample buttons use the preview font.
+Font dropdowns display each family name in its own typeface so you can preview
+fonts while browsing. Choose Automatic to use the role's fallback font, or type
+a font family name directly. The selected field also uses the chosen typeface.
+Samples underneath show interface controls, browser entries, reading text or code
+using the pending family and size. Selecting a font, changing its size or resetting
+it updates the sample immediately; the application changes only after Save.
+The code list contains only monospace fonts (equal character widths). Automatic
+uses the platform's monospace fallback; typed code font names must be monospace too.
 Markdown uses the reading font for prose and the code font for source/code blocks.
 Accent and dark surface tint update the theme. In a host with central settings,
 Markdown's appearance button opens that host window; standalone hosts retain a
