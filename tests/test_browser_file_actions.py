@@ -61,6 +61,25 @@ class BrowserFileActionTests(QtTestCase):
         self.menus.append(menu)
         return {action.text(): action for action in menu.actions() if not action.isSeparator()}
 
+    def test_drag_start_exports_selected_local_paths_without_removing_rows(self):
+        from types import SimpleNamespace
+        self.select(self.file)
+        view = self.browser.tree
+        point = view.visualRect(self.index(self.file)).center()
+        controller = self.browser.file_actions.drag_drop
+        press = SimpleNamespace(type=lambda: qt.QEvent.Type.MouseButtonPress,
+            button=lambda: qt.Qt.MouseButton.LeftButton, position=lambda: qt.QPointF(point))
+        controller.eventFilter(view.viewport(), press)
+        move = SimpleNamespace(type=lambda: qt.QEvent.Type.MouseMove,
+            buttons=lambda: qt.Qt.MouseButton.LeftButton,
+            position=lambda: qt.QPointF(point + qt.QPoint(qt.QApplication.startDragDistance() + 5, 0)))
+        with patch.object(qt, 'QDrag') as drag:
+            self.assertTrue(controller.eventFilter(view.viewport(), move))
+            mime = drag.return_value.setMimeData.call_args.args[0]
+            self.assertEqual([Path(url.toLocalFile()) for url in mime.urls()], [self.file])
+            drag.return_value.exec.assert_called_once()
+        self.assertTrue(self.file.exists())
+
     def test_internal_drop_moves_through_worker_without_touching_clipboard(self):
         from commonUtils.ui.file_browser.drag_drop import MIME, SESSION
         set_clipboard_files([self.file], move=False)
