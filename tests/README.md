@@ -36,3 +36,18 @@ On PowerShell, set `$env:QT_QPA_PLATFORM = "offscreen"` and the appropriate
 fixtures and mocked integrations; native dialogs, external applications and system
 installation/mount behavior need separate platform validation. Test consumers
 before updating their submodule references.
+
+## Mobile foundation checks
+
+From the consuming checkout root:
+
+```sh
+PYTHONPATH=Python python -m unittest commonUtils.tests.test_mobile_platform commonUtils.tests.test_mobile_portability -v
+```
+
+These tests simulate five OS identities plus legacy mobile identifiers. Fresh
+interpreters reject optional desktop dependency imports; actual document and ZIP
+I/O uses temporary files on the test host. They do not run a mobile interpreter,
+mobile filesystem provider or mobile UI. Keep real-device results separate from
+these mocked contracts. The [mobile audit](../docs/developer/mobile-foundation.md)
+records policy, integration prerequisites and remaining deployment blockers.

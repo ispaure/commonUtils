@@ -111,3 +111,12 @@ imports neither initialize a GUI nor execute a shell. Boundary tests check mobil
 errors before launching processes, sandbox root requirements and popup-free
 critical errors. Actual Windows, Linux, iOS and Android runtime validation remains
 outstanding; native dialogs and external programs are not exercised by mocks.
+
+Final foundation validation on 2026-10-12: the isolated commonUtils suite completed
+724 tests across 98 modules with zero failing modules (two platform skips). The
+new portability module passed all eight tests separately; the combined detection,
+capability and portability run passed 15 tests. Changed Python files also passed
+the consumer's Ruff correctness configuration. The existing local ui/settings.ini
+edit was excluded from all foundation commits. Logistics consumer regressions are
+run before updating its submodule pin; no mobile-device or native Windows/Linux
+success is inferred from these results.
