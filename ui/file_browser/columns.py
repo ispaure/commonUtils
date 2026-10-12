@@ -34,6 +34,7 @@ class ColumnDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
 
 
 class FolderColumnView(qt.QColumnView):
+    column_created = qt.Signal(object)
     column_context_requested = qt.Signal(object, object)
     selection_input = qt.Signal(object)
     def __init__(self):
@@ -118,4 +119,5 @@ class FolderColumnView(qt.QColumnView):
         column.installEventFilter(self)
         column.viewport().installEventFilter(self)
         column.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.column_created.emit(column)
         return column

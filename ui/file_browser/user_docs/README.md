@@ -165,3 +165,17 @@ Windows link creation still requires validation on a Windows host.
 
 Tile thumbnails can show a small status badge at their top-right when the host's
 file type supplies one. Visible badges refresh as their status changes.
+
+## Drag files and folders
+
+Drag selected files or folders onto a folder, or onto a view's empty background,
+to move them within Logistics. Hold Ctrl (Option on macOS) to copy instead. A
+highlight marks the receiving folder or current-directory background. List, tile,
+and folder-column views support drops. Files dragged in from another application
+are copied; their originals remain in place. Local files can also be dragged out
+to applications that accept file URLs.
+
+Drops use the same progress, cancellation and collision handling as paste.
+Existing destinations are not overwritten; collisions receive numbered copy names.
+Moving a folder into itself or a descendant is refused. Drops do not replace or
+clear the Copy/Cut clipboard. Web URLs are not accepted as filesystem items.
