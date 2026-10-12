@@ -28,7 +28,10 @@ class BrowserPresentationTests(QtTestCase):
                 progress = ['']
                 item.browser_thumbnail_badge = lambda: progress[0]
                 cover = qt.QPixmap(120, 165); cover.fill(qt.QColor('blue'))
-                browser.views.covers.icons[str(path)] = qt.QIcon(cover)
+                # QFileSystemModel uses forward slashes even on Windows. Seed
+                # the same cache key the view reads, not pathlib's native spelling.
+                cache_key = browser.model.filePath(browser.model.index(str(path)))
+                browser.views.covers.icons[cache_key] = qt.QIcon(cover)
                 browser.view_selector.setCurrentIndex(1)
                 self.app.processEvents()
                 tiles = browser.views.tiles
