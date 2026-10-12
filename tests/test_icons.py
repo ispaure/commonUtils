@@ -3,8 +3,8 @@ import gc
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.icons import painted_icon, set_painted_icon
-from commonUtils.ui.reader_chrome import ReaderIcon
+from commonUtils.ui.appearance.icons import painted_icon, set_painted_icon
+from commonUtils.ui.readers.reader_chrome import ReaderIcon
 
 
 class IconTests(QtTestCase):

@@ -37,7 +37,7 @@ your action handlers still run on the GUI thread unless you schedule a worker.
 
 Use [OperationProgress](operation_progress.md) to run cancellable work and show
 progress. Its runnable example includes safe close handling. For streamed external
-processes, use `process_runner.ProcessRunner` and `process_progress.ProcessProgressWindow`;
+processes, use `tasks.process_runner.ProcessRunner` and `tasks.process_progress.ProcessProgressWindow`;
 [command execution](../integrations/wrappers/cmdShellWrapper/README.md) covers the
 non-Qt alternative. [Streams](../runtime/streams/README.md) handles copying and hashing.
 
@@ -118,8 +118,8 @@ for the resettable software/personal editor and host-owned path registration.
 
 ## Module organization
 
-Implementations are grouped by responsibility. Former direct module paths remain
-compatibility aliases to the same modules; use the grouped paths in new code.
+Implementations are grouped by responsibility. Use the grouped module paths for
+imports and mock patch targets; former flat forwarding modules have been removed.
 The UI facade and these packages preserve lazy Qt loading. Shared configuration
 continues to live at `ui/settings.ini`.
 

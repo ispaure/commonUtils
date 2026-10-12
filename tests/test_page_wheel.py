@@ -5,7 +5,7 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.page_wheel import PageWheel
+from commonUtils.ui.readers.page_wheel import PageWheel
 
 
 def wheel(delta, *, pixels=False):

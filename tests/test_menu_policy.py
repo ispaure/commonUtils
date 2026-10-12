@@ -4,7 +4,7 @@ from unittest.mock import patch
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.menu_policy import install_menu_policy, native_menus_enabled
-from commonUtils.ui.workspace_menus import sync_native_menus
+from commonUtils.ui.workspaces.workspace_menus import sync_native_menus
 
 
 class MenuPolicyTests(QtTestCase):
@@ -70,7 +70,7 @@ class MenuPolicyTests(QtTestCase):
     def test_native_publication_settles_instead_of_rebinding_forever(self):
         with patch('sys.platform', 'darwin'), patch.object(
                 qt.QApplication, 'platformName', return_value='cocoa'), patch(
-                'commonUtils.ui.workspace_cocoa.redraw_menu_bar'):
+                'commonUtils.ui.workspaces.workspace_cocoa.redraw_menu_bar'):
             host = self.window('Host')
             document = self.window('File', host)
             host.setCentralWidget(document)

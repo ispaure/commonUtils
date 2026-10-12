@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from commonUtils.runtime.operations import run_batch
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.operation_progress import OperationProgress
+from commonUtils.ui.tasks.operation_progress import OperationProgress
 from commonUtils.runtime.diagnostics import Severity, log
 
 

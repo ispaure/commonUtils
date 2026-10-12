@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.styling import apply_styling, styling, STYLE_FIELDS, validate_style
-from commonUtils.ui.theme import configured_colors
-from commonUtils.ui.layered_settings import LayeredSettingsEditor
+from commonUtils.ui.appearance.styling import apply_styling, styling, STYLE_FIELDS, validate_style
+from commonUtils.ui.appearance.theme import configured_colors
+from commonUtils.ui.settings.layered_settings import LayeredSettingsEditor
 from commonUtils.configuration.layered import register_settings
 from commonUtils.configuration.settings import settings_path
 
@@ -123,7 +123,7 @@ class StylingTests(QtTestCase):
             self.assertNotIn(button, self.controller.views)
 
     def test_interface_fonts_reach_existing_and_new_menus_and_legacy_controls(self):
-        from commonUtils.ui.theme import apply_theme
+        from commonUtils.ui.appearance.theme import apply_theme
         menu = qt.QMenu('Existing')
         bar = qt.QMenuBar()
         for widget in (menu, bar):

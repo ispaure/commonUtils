@@ -61,9 +61,11 @@ weak widget binding, optional application-font opt-in and settings navigation.
 ## Grouped UI imports
 
 See [UI module organization](../../ui/README.md#module-organization) for canonical
-package paths. Former direct UI module imports remain ordinary compatibility
-modules that alias their owning implementation in `sys.modules`. They share class
-identity, mutable registries and patch targets with canonical imports. Aliases use
-relative imports, so vendored namespaces remain independent; no import finder or
-global standalone namespace is installed. Importing a group alone does not import
-Qt. Keep existing guide URLs and `ui/settings.ini` available.
+package paths. Flat forwarding modules for workspace, task, reader, settings and
+appearance implementations have been removed. Update imports, deferred dotted
+references and mock patch targets to their owning package, for example
+`commonUtils.ui.workspaces.workspace_drag` and `commonUtils.ui.appearance.styling`.
+Modules import relatively within the library, so vendored namespaces retain their
+own classes and registries without installing import finders or standalone aliases.
+Importing a group alone does not import Qt. Existing guide URLs and
+`ui/settings.ini` remain available.

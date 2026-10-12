@@ -8,7 +8,7 @@ from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.ini_editor import INISettingsEditor
+from commonUtils.ui.settings.ini_editor import INISettingsEditor
 from commonUtils.configuration.ini_schema import key_type, parse_value, string_list, validate_values
 from commonUtils.formats.iniType import INIFile
 

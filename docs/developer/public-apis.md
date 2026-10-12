@@ -125,8 +125,8 @@ or headless flows where dialogs are inappropriate.
 
 ## Grouped UI modules
 
-- [UI workspaces](../../ui/workspaces/README.md): canonical modules under `ui.workspaces`; former direct UI module imports remain supported.
-- [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`; former direct UI module imports remain supported.
-- [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`; former direct UI module imports remain supported.
-- [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`; former direct UI module imports remain supported.
-- [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`; former direct UI module imports remain supported.
+- [UI workspaces](../../ui/workspaces/README.md): canonical modules under `ui.workspaces`.
+- [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`.
+- [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`.
+- [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`.
+- [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`.

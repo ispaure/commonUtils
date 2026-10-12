@@ -3,9 +3,9 @@
 Reader menus, fullscreen controls, read-aloud presentation and wheel navigation shared by document readers.
 
 Import implementations from `commonUtils.ui.readers.<module>`.
-The former `commonUtils.ui.<module>` paths remain compatibility aliases to the
-same module objects, including their registries and patch targets. Package imports
-do not eagerly load their widgets.
+Import widgets and helpers directly from these modules. Package imports do not
+eagerly load their widgets. Former flat `commonUtils.ui.<module>` forwarding
+modules have been removed; update imports and mock patch targets to this package.
 
 ## Modules
 

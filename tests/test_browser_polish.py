@@ -13,7 +13,7 @@ from commonUtils.ui.file_browser.storage_view import RadialMap
 class BrowserPolishTests(QtTestCase):
     def test_repeated_slate_hover_paints_keep_option_geometry_fixed(self):
         from commonUtils.ui.file_browser.editing import FilenameDelegate
-        from commonUtils.ui.theme import apply_theme
+        from commonUtils.ui.appearance.theme import apply_theme
         app = qt.QApplication.instance() or qt.QApplication([])
         palette, css = app.palette(), app.styleSheet()
         view = qt.QTreeView()

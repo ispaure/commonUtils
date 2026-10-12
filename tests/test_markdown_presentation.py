@@ -14,7 +14,7 @@ from commonUtils.ui.markdown import MarkdownViewer
 from commonUtils.ui.markdown.extensions import reading_source, mermaid_blocks
 from commonUtils.ui.markdown.presentation import ACCENT, tables
 from commonUtils.ui.markdown.diagrams import MermaidRenderer, safe_diagram
-from commonUtils.ui.theme import apply_theme, theme_palette, SLATE_DARK, SLATE_LIGHT
+from commonUtils.ui.appearance.theme import apply_theme, theme_palette, SLATE_DARK, SLATE_LIGHT
 
 
 class MarkdownPresentationTests(QtTestCase):

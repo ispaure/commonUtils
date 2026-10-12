@@ -5,8 +5,8 @@ os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.theme import apply_theme, SLATE_LIGHT, SLATE_DARK, configured_colors
-from commonUtils.ui.workspace import Workspace
+from commonUtils.ui.appearance.theme import apply_theme, SLATE_LIGHT, SLATE_DARK, configured_colors
+from commonUtils.ui.workspaces.workspace import Workspace
 
 
 def contrast(first, second):
@@ -33,7 +33,7 @@ class ThemeTests(QtTestCase):
         self.app.sendPostedEvents(None,qt.QEvent.Type.DeferredDelete)
 
     def test_import_is_opt_in_and_palette_pairs_are_readable(self):
-        import commonUtils.ui.theme as theme
+        import commonUtils.ui.appearance.theme as theme
         importlib.reload(theme)
         self.assertEqual(self.app.styleSheet(),self.old_css)
         for colors in (SLATE_LIGHT,SLATE_DARK):
