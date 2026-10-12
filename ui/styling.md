@@ -19,7 +19,7 @@ Reload/Save and remain separate from application/document state.
 
 `theme_mode` selects system/light/dark. `accent_color_str` accepts a QColor value.
 `dark_tint_int` (0–20 percent) mixes the accent into neutral dark surfaces.
-Selection text chooses black or white for contrast. `ui.theme.configured_colors`
+Selection text chooses black or white for contrast. `ui.appearance.theme.configured_colors`
 returns effective colors; the existing base palette constants remain available.
 
 Hosts call `apply_styling(app)` after QApplication/theme creation to opt into the

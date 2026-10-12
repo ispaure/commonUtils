@@ -9,7 +9,7 @@ from bisect import bisect_right
 import re
 from time import monotonic
 from .. import pyside as qt
-from ..icons import set_painted_icon
+from ..appearance.icons import set_painted_icon
 from .reader_chrome import ReaderIcon, reader_button
 
 

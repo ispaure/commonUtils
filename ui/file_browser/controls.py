@@ -2,7 +2,7 @@
 
 import math
 from .. import pyside as qt
-from ..icons import set_painted_icon
+from ..appearance.icons import set_painted_icon
 
 
 class ViewIcon(qt.QIconEngine):

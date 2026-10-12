@@ -123,10 +123,10 @@ or headless flows where dialogs are inappropriate.
 - [Layered INI APIs](../../configuration/README.md#software-defaults-and-sparse-personal-overrides): registration, validated reads, sparse saves and editor.
 - [Styling](../../ui/styling.md): font roles, live bindings, accent/tint, application opt-in and host settings callback.
 
+## Grouped UI modules
+
 - [UI workspaces](../../ui/workspaces/README.md): canonical modules under `ui.workspaces`; former direct UI module imports remain supported.
-
 - [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`; former direct UI module imports remain supported.
-
 - [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`; former direct UI module imports remain supported.
-
 - [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`; former direct UI module imports remain supported.
+- [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`; former direct UI module imports remain supported.

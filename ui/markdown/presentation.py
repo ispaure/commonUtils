@@ -31,7 +31,7 @@ def code_point_size():
 
 
 def _font_values():
-    from ..styling import style_values
+    from ..appearance.styling import style_values
     app = qt.QApplication.instance()
     controller = getattr(app, '_commonutils_styling', None) if app is not None else None
     return controller.values if controller is not None else style_values()
@@ -304,7 +304,7 @@ class MarkdownBrowser(qt.QTextBrowser):
 
 def configure_text(widget, *, source=False):
     modified = widget.document().isModified()
-    from ..styling import styling
+    from ..appearance.styling import styling
     controller = styling()
     weak_widget = ref(widget)
     def refresh():

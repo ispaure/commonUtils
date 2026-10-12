@@ -1,5 +1,4 @@
 """UI grouping preserves direct imports, patch targets and vendored isolation."""
-from pathlib import Path
 import subprocess
 import sys
 import unittest

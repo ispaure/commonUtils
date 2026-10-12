@@ -2,7 +2,7 @@
 from configparser import Error
 from .. import pyside as qt
 from ...configuration.ini_schema import key_type, mode_choices, parse_value
-from ..styling import STYLE_FIELDS, validate_style
+from ..appearance.styling import STYLE_FIELDS, validate_style
 from .font_preview import FontPreview
 
 
@@ -199,7 +199,7 @@ class LayeredSettingsEditor(qt.QWidget):
     def _update_font_previews(self):
         if not self.font_previews:
             return
-        from ..styling import styling
+        from ..appearance.styling import styling
         from ..code_editor.widget import monospace_font
         values = {key: value for (section, key), value in self.original.items() if section == 'Styling'}
         for (section, key), value in self.pending.items():

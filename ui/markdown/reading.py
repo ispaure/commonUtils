@@ -28,7 +28,7 @@ class MarkdownReadingMixin:
         app = qt.QApplication.instance()
         if callable(getattr(app, '_commonutils_open_settings', None)):
             from ...configuration.layered import shared_settings
-            from ..styling import styling
+            from ..appearance.styling import styling
             shared_settings().save({('Styling', 'reading_font_size_int'): str(max(8, min(48, int(size))))})
             styling().reload()
             self.reading_size = self.browser.font().pointSize()
