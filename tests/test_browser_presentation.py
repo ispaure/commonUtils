@@ -47,7 +47,18 @@ class BrowserPresentationTests(QtTestCase):
                 self.assertLess(max(y for x, y in changed), before.height() / 2)
                 progress[0] = '5/9'
                 browser.views._refresh_badges(); self.app.processEvents()
-                self.assertNotEqual(after, tiles.viewport().grab(rect).toImage())
+                final = tiles.viewport().grab(rect).toImage()
+                if os.environ.get('BROWSER_TEST_ARTIFACTS'):
+                    output = Path(os.environ['BROWSER_TEST_ARTIFACTS'])
+                    output.mkdir(parents=True, exist_ok=True)
+                    for name, image in [('before', before), ('after', after), ('final', final)]:
+                        image.save(str(output / (name + '.png')))
+                    option = qt.QStyleOptionViewItem()
+                    tiles.itemDelegate().initStyleOption(option, index)
+                    print('Badge diagnostics:', tiles.iconSize(), option.decorationSize, option.font.toString(),
+                          list(browser.views.covers.icons), browser.model.filePath(browser.model.index(str(path))),
+                          item.browser_thumbnail_badge(), flush=True)
+                self.assertNotEqual(after, final)
             finally:
                 browser.stop()
                 deadline = monotonic() + 5
