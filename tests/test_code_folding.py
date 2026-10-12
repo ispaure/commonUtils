@@ -4,6 +4,7 @@ import unittest
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.code_editor.views import EditorViews
 from commonUtils.ui.code_editor.folding import fold_ranges
+from commonUtils.ui.code_editor.widget import CodeEdit
 
 
 class FoldingTests(unittest.TestCase):
@@ -17,6 +18,48 @@ class FoldingTests(unittest.TestCase):
         self.assertEqual(ranges, {2: 4, 0: 5})
         self.assertEqual(fold_ranges('<r>\n<!-- <bad> -->\n<a>\nx\n</a>\n</r>', 'xml'), {2: 4, 0: 5})
         self.assertEqual(fold_ranges('x' * (256 * 1024 + 1), 'python'), {})
+
+    def test_rendered_guides_stay_in_whitespace_with_fractional_fonts_tabs_and_zoom(self):
+        editor = CodeEdit()
+        try:
+            palette = editor.palette()
+            palette.setColor(qt.QPalette.ColorRole.Mid, qt.QColor('red'))
+            editor.setPalette(palette)
+            editor.resize(500, 160); editor.show()
+            for size, prefix in ((13.5, ' ' * 16), (17.5, ' \t\t'), (10.5, '\t')):
+                font = qt.QFont('Menlo'); font.setPointSizeF(size); editor.setFont(font)
+                editor.setPlainText(prefix + 'WWWW')
+                self.app.processEvents()
+                image = editor.viewport().grab().toImage()
+                scale = image.devicePixelRatio()
+                pixels = [(x, y) for y in range(image.height()) for x in range(image.width())
+                          if image.pixelColor(x, y) == qt.QColor('red')]
+                self.assertTrue(pixels)
+                line = editor.document().firstBlock().layout().lineAt(0)
+                text_x = line.cursorToX(len(prefix))[0] + editor.contentOffset().x()
+                self.assertLess(max(x for x, y in pixels), text_x * scale)
+                self.assertAlmostEqual(editor.tabStopDistance(), qt.QFontMetricsF(font).horizontalAdvance(' ') * editor.indent_width)
+        finally:
+            editor.deleteLater()
+
+    def test_wrapped_continuation_rows_do_not_receive_indentation_guides(self):
+        editor = CodeEdit()
+        try:
+            palette = editor.palette(); palette.setColor(qt.QPalette.ColorRole.Mid, qt.QColor('red'))
+            editor.setPalette(palette)
+            editor.setLineWrapMode(qt.QPlainTextEdit.LineWrapMode.WidgetWidth)
+            editor.setPlainText('    ' + 'WWWW ' * 30)
+            editor.resize(190, 300); editor.show(); self.app.processEvents()
+            layout = editor.document().firstBlock().layout()
+            self.assertGreater(layout.lineCount(), 1)
+            line = layout.lineAt(0)
+            image = editor.viewport().grab().toImage()
+            rows = [y for y in range(image.height()) if any(image.pixelColor(x, y) == qt.QColor('red') for x in range(image.width()))]
+            self.assertTrue(rows)
+            bottom = editor.contentOffset().y() + line.y() + line.height()
+            self.assertLessEqual(max(rows), bottom * image.devicePixelRatio())
+        finally:
+            editor.deleteLater()
 
     def test_folds_share_views_reveal_search_and_expand_after_edit(self):
         views = EditorViews()

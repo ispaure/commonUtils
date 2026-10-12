@@ -132,3 +132,9 @@ The Qt-independent merge model is imported directly from
 `commonUtils.persistence.merge`. The former `ui.code_editor.merge_model` forwarding
 module has been removed; hosts use the persistence owner for `merge_text`,
 `MergeModel`, `MergeRegion` and `MergeSession`.
+
+Indentation guides use QTextLine cursor positions rather than rounded font metrics.
+They are centered in the leading whitespace cell before each indent boundary and
+painted only over the first visual row of a block, avoiding wrapped continuation
+text. Tab stop distances use QFontMetricsF so font changes and zoom preserve
+fractional glyph advances. The editor's public indentation settings are unchanged.

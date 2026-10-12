@@ -68,3 +68,7 @@ PHP files highlight embedded HTML. Laravel `.blade.php` files are detected befor
 ordinary PHP and highlight Blade directives and single-line interpolations using
 the shared PHP/HTML grammars. Python stub (`.pyi`) files use Python highlighting.
 Multiline Blade template expressions have limited highlighting.
+
+Indentation guides follow the current font and zoom, including mixed tabs and
+spaces. They stay inside leading whitespace and do not cross the text on wrapped
+continuation rows.
