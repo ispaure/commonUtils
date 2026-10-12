@@ -101,6 +101,10 @@ worker ownership through completion. Critical diagnostics raise `DebugException`
 use `runtime.diagnostics.noninteractive_logging` around legacy operations in jobs
 or headless flows where dialogs are inappropriate.
 
+[Application update contracts](../../runtime/updates/README.md) cover exact GitHub
+branch commits and published releases, protected Git/archive transactions,
+rollback receipts and detached apply/restart. Hosts own update policy and UI.
+
 ## UI entry points
 
 - [FileBrowser](../../ui/file_browser/README.md): embedding, selection, extensions,

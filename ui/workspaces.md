@@ -116,3 +116,8 @@ and `leave` from the reader's own commands. It does not install navigation keys
 or choose content formats. Hosts can use the shared margins/spacing constants
 and retain their existing widget handles.
 
+
+Collapsed native dock headers explicitly hide their close/new controls as well as
+reducing header height to zero. Grouped tab bars hide their New Tab button when
+suppressed or retired. The active toolbar/tab strip retains the legitimate New Tab
+action; hidden title-bar children must not leave stray controls during transitions.

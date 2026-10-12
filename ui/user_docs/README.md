@@ -105,3 +105,10 @@ Markdown uses the reading font for prose and the code font for source/code block
 Accent and dark surface tint update the theme. In a host with central settings,
 Markdown's appearance button opens that host window; standalone hosts retain a
 local reading-size popup.
+
+New Tab (+) appears in the active tab strip or the view toolbar when a single-tab
+header is collapsed. Hidden or retired headers do not display extra + buttons.
+
+The Menus settings include **Launch with sidebar**, enabled by default, for hosts
+that support sidebar navigation on their launch screen. Hosts apply the choice
+when opening a workspace.
