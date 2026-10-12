@@ -82,3 +82,7 @@ buttons, storage chart combo box and unused periodic timer have been removed.
 Pause/resume remains an indexing operation, and independent storage dialogs retain
 cooperative shutdown. Watcher notifications and explicit refresh still schedule
 index updates through the reconciliation debounce.
+
+XML text/attribute escaping uses the standard-library HTML escaper with explicit
+XML attribute entities. Portable file-type discovery does not import SAX's URL
+and native proxy adapters; mocked platform tests reject networking imports too.
