@@ -81,7 +81,7 @@ remains available. Pause methods are programmatic APIs, not visible controls. Se
 ## Opt-in Slate appearance
 
 ```python
-from commonUtils.ui.theme import apply_theme
+from commonUtils.ui.appearance.theme import apply_theme
 
 controller = apply_theme(app)
 controller.set_mode('dark')  # 'light' or 'system' also work.
@@ -127,3 +127,4 @@ continues to live at `ui/settings.ini`.
 - [Background task presentation](tasks/README.md): Qt workers, cancellable operation progress, streamed processes and download dialogs. Runtime operations and streams remain outside the UI layer.
 - [Shared reader controls](readers/README.md): Reader menus, fullscreen controls, read-aloud presentation and wheel navigation shared by document readers.
 - [Settings editor widgets](settings/README.md): Typed INI editors, layered overrides, settings sections and font previews. Parsing, persistence and host-owned paths remain in configuration.
+- [Shared UI appearance](appearance/README.md): Opt-in themes, live font styling and palette-aware painted icons.

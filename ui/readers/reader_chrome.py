@@ -4,7 +4,7 @@ No format/loading/navigation policy lives here. Hosts retain their public widget
 handles and supply actions; both text and image readers use the same geometry.
 """
 from .. import pyside as qt
-from ..icons import painted_icon, set_painted_icon
+from ..appearance.icons import painted_icon, set_painted_icon
 
 READER_MARGINS = (8, 2, 8, 3)
 READER_SPACING = 4
