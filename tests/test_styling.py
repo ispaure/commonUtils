@@ -134,7 +134,7 @@ class StylingTests(QtTestCase):
         new_menu.ensurePolished()
         self.app.processEvents()
         for widget in (menu, bar, new_menu, button):
-            self.assertEqual(widget.font().family(), 'Courier New')
+            self.assertEqual(widget.font().family(), 'Courier New', widget.metaObject().className())
             self.assertEqual(widget.font().pointSize(), 18)
         self.assertEqual(self.app.font().family(), 'Courier New')
 

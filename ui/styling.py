@@ -122,6 +122,8 @@ class Styling(qt.QObject):
     def _bind_application_control(self, widget):
         if not isinstance(widget, (qt.QAbstractButton, qt.QMenu, qt.QMenuBar)):
             return
+        if not isValid(widget):
+            return
         if widget in self.views and widget not in self.application_controls:
             return  # Respect explicit component bindings.
         role = 'ui'
@@ -137,6 +139,14 @@ class Styling(qt.QObject):
         self.bind(widget, role)
 
     def eventFilter(self, watched, event):
+        if (self.apply_application and event.type() == qt.QEvent.Type.FontChange
+                and isinstance(watched, (qt.QAbstractButton, qt.QMenu, qt.QMenuBar))
+                and watched in self.views):
+            role, callback = self.views[watched]
+            expected = self.font(role)
+            actual = watched.font()
+            if actual.family() != expected.family() or actual.pointSizeF() != expected.pointSizeF():
+                self._update(watched, role, callback)
         if self.apply_application and event.type() in (qt.QEvent.Type.Polish, qt.QEvent.Type.Show):
             self._bind_application_control(watched)
         return False
