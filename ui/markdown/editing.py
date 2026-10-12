@@ -1,6 +1,6 @@
 """Internal source-editing actions and safe file operations for MarkdownViewer."""
 from ..icons import set_painted_icon
-from ..reader_chrome import ReaderIcon
+from ..readers.reader_chrome import ReaderIcon
 from pathlib import Path
 
 from .. import pyside as qt

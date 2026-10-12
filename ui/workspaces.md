@@ -99,7 +99,7 @@ intentionally hidden bars and does not change window focus or auto-hide settings
 macOS can briefly hide and redisplay the Dock during this visibility refresh.
 Unchanged widget-focus refreshes do not repeat that redraw.
 
-Desktop readers can reuse `commonUtils.ui.reader_menus.ReaderMenus` for
+Desktop readers can reuse `commonUtils.ui.readers.reader_menus.ReaderMenus` for
 File/Edit/View/Navigate menus and platform-standard shortcuts. The caller supplies
 callbacks and adds format-specific navigation actions. `RecentFiles` stores up
 to 40 canonical paths atomically under `commonUtils/Cache/Readers/recent.json`;
@@ -107,7 +107,7 @@ menus show at most 12 existing files matching the reader's suffixes. Pass a
 custom history object/path for an isolated application or tests. The history
 stores paths only, and a read/write failure does not prevent reading a file.
 
-`commonUtils.ui.reader_chrome` provides presentation shared by separate readers:
+`commonUtils.ui.readers.reader_chrome` provides presentation shared by separate readers:
 `reader_button` builds consistently sized, keyboard-accessible controls;
 `ReaderLabel` elides long titles/status visually while retaining full text and a
 tooltip; `ReaderFullscreen(owner, action)` synchronizes the checked action and

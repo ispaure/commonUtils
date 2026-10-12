@@ -125,3 +125,4 @@ continues to live at `ui/settings.ini`.
 
 - [Docking workspaces](workspaces/README.md): Docking, tab gestures, splitting, floating windows and native workspace menus.
 - [Background task presentation](tasks/README.md): Qt workers, cancellable operation progress, streamed processes and download dialogs. Runtime operations and streams remain outside the UI layer.
+- [Shared reader controls](readers/README.md): Reader menus, fullscreen controls, read-aloud presentation and wheel navigation shared by document readers.

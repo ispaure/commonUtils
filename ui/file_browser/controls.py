@@ -150,7 +150,7 @@ class FolderSizeControl(qt.QWidget):
 
 def navigation_button(parent, name, icon):
     button = qt.QToolButton(parent)
-    from ..reader_chrome import ReaderIcon
+    from ..readers.reader_chrome import ReaderIcon
     icons = {qt.QStyle.StandardPixmap.SP_ArrowBack: 'previous',
              qt.QStyle.StandardPixmap.SP_ArrowForward: 'next',
              qt.QStyle.StandardPixmap.SP_ArrowUp: 'up'}
