@@ -10,7 +10,7 @@ settings visually. Each layer works independently.
 | --- | --- | --- |
 | INI document | `commonUtils.formats.iniType.INIFile` | String values, parsing, formatting preservation and safe saves |
 | Optional schema | `commonUtils.configuration.ini_schema` | Typed suffixes, list parsing and dropdown choices |
-| Visual editor | `commonUtils.ui.ini_editor.INISettingsEditor` | Section tabs, key rows, validation and explicit saving |
+| Visual editor | `commonUtils.ui.settings.ini_editor.INISettingsEditor` | Section tabs, key rows, validation and explicit saving |
 
 The document and schema have no GUI dependency. The editor requires PySide6 and
 an existing `QApplication`. These modules contain no application-specific paths,
@@ -101,7 +101,7 @@ using values; an editor save does not prove an application's domain rules hold.
 
 ```python
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.ini_editor import INISettingsEditor
+from commonUtils.ui.settings.ini_editor import INISettingsEditor
 
 app = qt.QApplication.instance() or qt.QApplication([])
 editor = INISettingsEditor("config.ini", typed_keys=True)
@@ -202,7 +202,7 @@ raise rather than corrupting the file. Defaults and personal paths must differ.
 `shared_settings()` uses registered shared UI paths, or a platform-standard
 persistent commonUtils directory when the host has not supplied its own mapping.
 Hosts own discovery, migrations and path policy; shared code does not discover
-application features. `ui.layered_settings.LayeredSettingsEditor` provides explicit
+application features. `ui.settings.layered_settings.LayeredSettingsEditor` provides explicit
 Save/Reload, indicators and per-field ↶ reset for a declared schema. It accepts a
 scope, optional section filter, labels and host validator for domain constraints.
 Dirty editors compare both layers before saving. Choice metadata supplies mode
