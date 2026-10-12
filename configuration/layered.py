@@ -155,6 +155,8 @@ class LayeredSettings:
         # bytes again and atomically preserves encoding, line endings and mode.
         INIFile.parse(ini.text)
         ini.save()
+        from .monitor import settings_monitor
+        settings_monitor().notify((path,))
 
     def safe_values(self, scope='personal'):
         try:

@@ -74,11 +74,11 @@ class Styling(qt.QObject):
         self.values = {}
         self.apply_application = False
         self.code_font = CodeFontController(self)
-        self.timer = qt.QTimer(self)
-        self.timer.setInterval(500)
-        self.timer.timeout.connect(self.reload)
         self.reload()
-        self.timer.start()
+        from ...configuration.layered import shared_settings
+        from ..settings.monitor import subscribe_settings
+        store = shared_settings()
+        self._settings_subscription = subscribe_settings((store.defaults, store.personal), self.reload, self)
 
     def font(self, role):
         if role not in ('ui', 'browser', 'reading', 'code'):
