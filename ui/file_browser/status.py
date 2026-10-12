@@ -238,7 +238,7 @@ class WorkspaceIndexStatus(qt.QObject):
                 browser.index_status.setVisible(floating)
                 browser.index_details_button.setVisible(floating and browser.index_incomplete)
                 browser.index_activity.setVisible(floating and browser.folder_busy and not presentation[3] and not browser.network_location)
-                browser._update_pause_button()
+                browser._update_index_controls()
             if browser not in self.connected:
                 self.connected.add(browser)
                 browser.index_progress.connect(self.refresh)

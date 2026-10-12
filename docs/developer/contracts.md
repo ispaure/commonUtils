@@ -75,3 +75,10 @@ the former `ui.code_editor.merge_model` shim has been removed. Directory-cache
 writers call `filesystem.index.schema.initialize_schema()` directly under their
 existing writer lock; the private `_schema()` forwarding method has been removed.
 Persistent formats, migration and cancellation behavior are unchanged.
+
+Browser hosts select Treemap/Radial through the view selector; embedded storage
+components may use `StorageView.set_chart_mode()`. The former hidden browser
+buttons, storage chart combo box and unused periodic timer have been removed.
+Pause/resume remains an indexing operation, and independent storage dialogs retain
+cooperative shutdown. Watcher notifications and explicit refresh still schedule
+index updates through the reconciliation debounce.

@@ -204,11 +204,6 @@ class StorageView(qt.QWidget):
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         controls = qt.QHBoxLayout()
-        self.chart_selector = qt.QComboBox()
-        self.chart_selector.addItems(['Treemap', 'Radial'])
-        self.chart_selector.setAccessibleName('Storage visualization')
-        self.chart_selector.setToolTip('Treemap shows this folder; Radial shows up to four levels and 3,000 chart entries shared across branches. Gaps can represent omitted entries or incomplete sizes; zero-byte folders have no area. Hover for names and sizes.')
-        self.chart_selector.hide()  # Compatibility API; the toolbar owns chart buttons.
         self.summary = qt.QLabel('')
         self.summary.setWordWrap(True)
         controls.addWidget(self.summary,1)
@@ -223,7 +218,6 @@ class StorageView(qt.QWidget):
             chart.activated.connect(self.activated)
             chart.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             chart.customContextMenuRequested.connect(lambda point, target=chart: self._chart_context(target,point))
-        self.chart_selector.currentIndexChanged.connect(self._chart_changed)
         self.results = qt.QTreeWidget()
         self.results.setHeaderLabels(['File or folder', 'Size', 'Share'])
         self.results.headerItem().setToolTip(0, 'Files and folders, ordered largest first')
@@ -249,7 +243,12 @@ class StorageView(qt.QWidget):
             self._revision += 1
             self.refresh()
 
-    def _chart_changed(self, index):
+    def set_chart_mode(self, index):
+        """Select Treemap (0) or Radial (1) without a hidden selector widget."""
+        if index not in (0, 1):
+            raise ValueError('Chart mode must be 0 (Treemap) or 1 (Radial)')
+        if index == self.charts.currentIndex():
+            return
         self.charts.setCurrentIndex(index)
         if self.browser.views.currentIndex() == 3:
             blocker = qt.QSignalBlocker(self.browser.view_selector)
@@ -324,7 +323,7 @@ class StorageView(qt.QWidget):
         if (self.closing or self.browser.views.currentIndex() != 3 or self.root is None
                 or is_network_location(self.root)):
             return
-        key = (self.root, self.chart_selector.currentIndex(), self._revision)
+        key = (self.root, self.charts.currentIndex(), self._revision)
         if key == self._loaded_key or self.busy and key == self._request_key:
             return
         if self.busy:
@@ -338,7 +337,7 @@ class StorageView(qt.QWidget):
         self._request_key = key
         self.busy = True
         root = self.root
-        radial = self.chart_selector.currentIndex() == 1
+        radial = self.charts.currentIndex() == 1
         operation = Operation(lambda: self._collect(root, radial=radial, cancelled=operation.isInterruptionRequested), self)
         self.operation = operation
         self.operation.completed.connect(lambda result,error: self._loaded(root,result,error, key=key))
@@ -352,7 +351,7 @@ class StorageView(qt.QWidget):
 
     def _loaded(self, root, result, error, *, key=None):
         if self.closing or root != self.root: return
-        if key is not None and key != (self.root, self.chart_selector.currentIndex(), self._revision):
+        if key is not None and key != (self.root, self.charts.currentIndex(), self._revision):
             return
         self._set_loading(False)
         if error:
@@ -387,7 +386,7 @@ class StorageView(qt.QWidget):
         self.summary.setText(f'{format_size(total)} · {len(self.entries):,} entries · '+
                              ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.') +
                              (' · Four levels; up to 3,000 entries. Gaps may be omitted entries; zero-byte folders have no area.'
-                              if self.chart_selector.currentIndex() == 1 else '') +
+                              if self.charts.currentIndex() == 1 else '') +
                              (' · First 3,000 children shown; use List or Search for the full folder.' if len(self.entries) == 3000 else ''))
         self.select_path(self.selected_path) if self.selected_path else None
 

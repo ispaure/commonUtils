@@ -106,11 +106,11 @@ class StorageViewTests(QtTestCase):
                 with patch.object(directory_cache,'get',side_effect=AssertionError('Storage initiated another scan')):
                     browser.view_selector.setCurrentIndex(3);wait()
                     storage=browser.views.storage
-                    self.assertEqual(storage.chart_selector.currentText(),'Treemap')
+                    self.assertIs(storage.charts.currentWidget(), storage.map)
                     self.assertEqual(storage.entries,[(folder,1200),(small,300)])
                     self.assertTrue(browser.preview_panel.isHidden())
                     self.assertTrue(browser.preview_toggle.isHidden())
-                    self.assertTrue(storage.chart_selector.isHidden())
+                    self.assertFalse(hasattr(storage, 'chart_selector'))
                     self.assertEqual(storage.splitter.orientation(), qt.Qt.Orientation.Horizontal)
                     self.assertGreater(storage.results.x(), storage.charts.x())
                     storage.map.selected.emit(folder);wait()
@@ -223,7 +223,8 @@ class StorageViewTests(QtTestCase):
                 with patch.object(SqlEntries,'storage_children',children):
                     browser.view_selector.setCurrentIndex(3);wait()
                     self.assertEqual(seen,[root])
-                    browser.views.storage.chart_selector.setCurrentIndex(1);wait()
+                    browser.views.storage.set_chart_mode(1);wait()
+                    self.assertEqual(browser.view_selector.currentIndex(), 4)
                     self.assertIn(child,seen)
             finally:
                 browser.shutdown();browser.close();app.processEvents()
