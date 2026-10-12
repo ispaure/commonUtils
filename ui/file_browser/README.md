@@ -139,3 +139,7 @@ an overlay at the top-right of a tile's thumbnail. It runs during painting, so i
 must be cheap, bounded and dialog-free; archive parsing belongs in the thumbnail
 worker, not this hook. The visible tile view repaints once per second for live
 labels without invalidating cached covers. The refresh timer stops with FileViews.
+
+Thumbnail caches and queued request/revision keys use `Path` objects internally.
+Qt model lookups and the existing thumbnail-request signal convert to strings at
+the boundary; completion and invalidation accept either spelling on Windows.

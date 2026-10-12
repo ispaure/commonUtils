@@ -682,14 +682,14 @@ class BrowserTests(QtTestCase):
 
     def test_thumbnail_resolution_accounts_for_device_pixel_ratio(self):
         covers = self.browser.views.covers
-        path = str(self.path)
+        path = self.path
         small = qt.QPixmap(120, 165)
         small.fill(qt.QColor('orange'))
         buffer = qt.QBuffer()
         buffer.open(qt.QIODevice.OpenModeFlag.WriteOnly)
         small.save(buffer, 'PNG')
         covers.requested.add(path)
-        covers.complete(path, bytes(buffer.data()))
+        covers.complete(path.as_posix(), bytes(buffer.data()))
         covers.set_resolution(qt.QSize(180, 248), 2.0)
         self.assertEqual(covers.render_size, (360, 496))
         self.assertNotIn(path, covers.icons)
@@ -702,6 +702,10 @@ class BrowserTests(QtTestCase):
         covers.complete(path, bytes(buffer.data()), 2.0, (360, 496))
         self.assertEqual(covers.resolutions[path], (360, 496))
         self.assertFalse(covers.icons[path].isNull())
+        covers.invalidate(str(path))
+        self.assertNotIn(path, covers.icons)
+        self.assertNotIn(path, covers.resolutions)
+        self.assertEqual(covers.revisions[path], 2)
 
     def test_pausing_indexing_preserves_cached_totals_and_discards_late_results(self):
         from threading import Event

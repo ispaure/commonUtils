@@ -295,10 +295,11 @@ class FileViews(qt.QStackedWidget):
         qt.QTimer.singleShot(0, lambda: self._enqueue_cover(path))
 
     def _visible_cover(self, path):
-        index = self.covers.mapFromSource(self.model.index(path))
+        index = self.covers.mapFromSource(self.model.index(str(path)))
         return self.currentIndex() == 1 and self.tiles.visualRect(index).intersects(self.tiles.viewport().rect())
 
     def _enqueue_cover(self, path):
+        path = Path(path)
         if self.closing or not self._visible_cover(path):
             self.covers.requested.discard(path)
             return
@@ -316,7 +317,7 @@ class FileViews(qt.QStackedWidget):
             qt.QTimer.singleShot(0, self._next_cover)
             return
         self.cover_busy = True
-        item = self.model.item(self.model.index(path))
+        item = self.model.item(self.model.index(str(path)))
         size, ratio = self.covers.render_size, self.covers.device_ratio
         self.operation = Operation(lambda: item.browser_thumbnail(size), self)
         revision = self.covers.revisions.get(path, 0)
@@ -325,6 +326,7 @@ class FileViews(qt.QStackedWidget):
         self.operation.start()
 
     def _cover_loaded(self, path, revision, data, ratio=1.0, size=None):
+        path = Path(path)
         if revision == self.covers.revisions.get(path, 0):
             self.covers.complete(path, data, ratio, size)
         else:
