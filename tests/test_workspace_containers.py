@@ -95,6 +95,45 @@ class ContainerTests(QtTestCase):
         self.assertEqual(main.detached_windows, [])
         self.assertFalse(isValid(window))
 
+    def test_collapsed_headers_hide_their_buttons_and_restore_on_single_tab(self):
+        main = self.create(browser=True)
+        main.add_view('first')
+        self.settle()
+        first = main.active_dock
+        self.assertEqual(first.tab_header.height(), 0)
+        self.assertTrue(first.tab_header.new_button.isHidden())
+        self.assertTrue(first.local_new_button.isVisible())
+        main.add_view('second')
+        self.settle()
+        for dock in main.docks:
+            self.assertEqual(dock.tab_header.height(), 0)
+            self.assertTrue(dock.tab_header.new_button.isHidden())
+            self.assertTrue(dock.tab_header.close_button.isHidden())
+        bar = next(bar for bar in main.findChildren(qt.QTabBar) if bar.parent() is main and bar.count() == 2)
+        self.assertTrue(bar.workspace_plus.isVisible())
+        main.close_active()
+        self.settle()
+        self.assertTrue(first.tab_header.new_button.isHidden())
+        self.assertTrue(first.local_new_button.isVisible())
+        if isValid(bar):
+            self.assertTrue(bar.workspace_plus.isHidden())
+
+    def test_full_single_header_restores_buttons_after_group_collapses(self):
+        main = self.create()
+        main.add_view('first')
+        self.settle()
+        first = main.active_dock
+        self.assertTrue(first.tab_header.new_button.isVisible())
+        main.add_view('second')
+        self.settle()
+        self.assertTrue(first.tab_header.new_button.isHidden())
+        main.close_active()
+        self.settle()
+        self.assertTrue(first.tab_header.new_button.isVisible())
+        first.tab_header.new_button.click()
+        self.settle()
+        self.assertEqual(len(main.docks), 2)
+
     def test_native_window_drop_returns_last_browser_tab(self):
         from commonUtils.ui.workspaces.workspace_drag import NativeWindowDrag
         main = self.create(browser=True)

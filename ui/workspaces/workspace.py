@@ -308,11 +308,20 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             self._refresh_view_controls(dock, not visible)
             if dock.tab_header.minimumHeight() != height or dock.tab_header.maximumHeight() != height:
                 dock.tab_header.setFixedHeight(height)
-            dock.tab_header.close_button.setVisible(self.can_close_tab(dock))
+            # Qt collapses dock title widgets instead of hiding them. Explicitly
+            # hide their controls too; otherwise native layout transitions can
+            # leave a child + painted at the header's default position.
+            dock.tab_header.new_button.setVisible(height > 0 and self.allow_new_tabs)
+            dock.tab_header.title.setVisible(height > 0)
+            dock.tab_header.close_button.setVisible(height > 0 and self.can_close_tab(dock))
             dock.tab_header.close_button.setEnabled(self.can_close_tab(dock))
         for bar in self.findChildren(qt.QTabBar):
             # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
-            if bar.parent() is not self or not bar.count() or not self._tab_dock(bar, 0):
+            if bar.parent() is not self:
+                continue
+            if not bar.count() or not self._tab_dock(bar, 0):
+                if hasattr(bar, 'workspace_plus'):
+                    bar.workspace_plus.hide()
                 continue
             visible = self.policy is None or header_visible(self.policy, bar.count(), self.is_detached)
             bar.setFixedHeight(TAB_HEADER_HEIGHT if visible else 0)
@@ -367,7 +376,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                         arrow.setFixedSize(28, 28)
                         arrow.move(bar.width() - 62 + index * 32, 1)
             bar.workspace_plus.move(bar.width() - (94 if overflow else TAB_BUTTON_SIZE + 2), max(0, (bar.height() - TAB_BUTTON_SIZE) // 2))
-            bar.workspace_plus.setVisible(self.allow_new_tabs)
+            bar.workspace_plus.setVisible(visible and self.allow_new_tabs)
             bar.workspace_plus.raise_()
 
     def _tab_order_changed(self, bar):

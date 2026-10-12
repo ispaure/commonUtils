@@ -9,6 +9,7 @@ Import the specific module you need; importing this area loads no GUI backend.
 - `operations`: progress events and cooperative cancellation.
 - `streams`: bounded copying, hashing and verified downloads.
 - `helpers`: small shared helpers.
+- [updates](updates/README.md): branch/release discovery, protected installation transactions and detached restart.
 
 Example: `from commonUtils.runtime.operations import check_cancelled`.
 
