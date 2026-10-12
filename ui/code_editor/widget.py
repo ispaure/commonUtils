@@ -58,6 +58,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         self.auto_indent = True
         self.auto_pairs = False
         self.line_numbers = True
+        self.line_changes = ()
         self.comment_prefix = "#"
         self.search_selections = []
         self.initialize_multicursor()
@@ -106,9 +107,24 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         document.setDocumentLayout(qt.QPlainTextDocumentLayout(document))
         self._bind_document(document)
 
+    def set_line_changes(self, changes, label=''):
+        self.line_changes = tuple(changes)
+        self.gutter.setToolTip(label)
+        self.gutter.update()
+
+    def paint_line_changes(self, painter, block, top, height):
+        number = block.blockNumber()
+        for change in self.line_changes:
+            if change.start <= number < change.end:
+                painter.fillRect(2, top, 4, height, qt.QColor(
+                    '#39a867' if change.kind == 'add' else '#408bd6'))
+            elif change.kind == 'delete' and number == min(change.start, self.blockCount() - 1):
+                y = top if change.start < self.blockCount() else top + height - 3
+                painter.fillRect(0, y, 8, 3, qt.QColor('#e05757'))
+
     def gutter_width(self):
         return (
-            28
+            36
             + max(self.fontMetrics().horizontalAdvance(digit * len(str(max(1, self.blockCount()))))
                   for digit in '0123456789')
             if self.line_numbers
@@ -158,6 +174,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
                     else qt.QPalette.ColorRole.PlaceholderText
                 )
                 painter.setPen(self.palette().color(role))
+                self.paint_line_changes(painter, block, top, height)
                 self.draw_fold_marker(painter, block, top)
                 painter.drawText(
                     0,

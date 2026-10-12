@@ -138,3 +138,14 @@ They are centered in the leading whitespace cell before each indent boundary and
 painted only over the first visual row of a block, avoiding wrapped continuation
 text. Tab stop distances use QFontMetricsF so font changes and zoom preserve
 fractional glyph advances. The editor's public indentation settings are unchanged.
+
+## Host-supplied change markers
+
+`markers.line_changes(before, after)` returns immutable LineChange records with
+zero-based half-open old/new line spans and add/modify/delete kinds. Deletions
+anchor before `start`, including EOF. Hosts call `CodeEdit.set_line_changes(changes,
+label)` to paint a separate eight-pixel lane left of folding and numbers; label is
+the gutter tooltip. Empty changes clear markers. Painting respects visible blocks
+and wrapping. Line-number visibility controls the whole gutter. Hosts own baseline
+selection, background comparison, size limits, invalidation and shared-view fanout.
+The widget performs no Git or filesystem operations.

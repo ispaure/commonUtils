@@ -72,3 +72,7 @@ Multiline Blade template expressions have limited highlighting.
 Indentation guides follow the current font and zoom, including mixed tabs and
 spaces. They stay inside leading whitespace and do not cross the text on wrapped
 continuation rows.
+
+Applications may supply change markers in the gutter: green for added lines, blue
+for replaced lines and red for deleted-line boundaries. Hover for the application's
+baseline label. The marker lane is separate from folding and line numbers.
