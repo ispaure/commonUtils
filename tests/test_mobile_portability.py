@@ -88,7 +88,7 @@ if identity == 'legacy-android':
     sys.getandroidapilevel = lambda: 24
 class BlockDesktop(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, *args):
-        if fullname.split('.')[0] in ('PySide6', 'pwd', 'ctypes', 'pyzipper'):
+        if fullname.split('.')[0] in ('PySide6', 'pwd', 'ctypes', 'pyzipper', 'urllib'):
             raise AssertionError('unnecessary dependency: ' + fullname)
 sys.meta_path.insert(0, BlockDesktop())
 with patch('os.system', side_effect=AssertionError('import shell side effect')) as shell:

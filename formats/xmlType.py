@@ -15,7 +15,7 @@ from typing import *
 from pathlib import Path
 from xml.dom import minidom, Node
 from xml.etree import ElementTree
-from xml.sax.saxutils import escape
+from html import escape as _escape_text
 import os
 import re
 import stat
@@ -23,6 +23,14 @@ from tempfile import NamedTemporaryFile
 
 # Common utilities
 from .txtType import TXTFile
+
+
+def escape(value, entities=None):
+    """Escape XML text without importing SAX's networking/proxy adapters."""
+    value = _escape_text(value, quote=False)
+    for source, replacement in (entities or {}).items():
+        value = value.replace(source, replacement)
+    return value
 
 
 _XMLNS = 'http://www.w3.org/2000/xmlns/'
