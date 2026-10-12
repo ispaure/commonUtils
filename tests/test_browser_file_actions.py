@@ -61,6 +61,43 @@ class BrowserFileActionTests(QtTestCase):
         self.menus.append(menu)
         return {action.text(): action for action in menu.actions() if not action.isSeparator()}
 
+    def test_internal_drop_moves_through_worker_without_touching_clipboard(self):
+        from commonUtils.ui.file_browser.drag_drop import MIME, SESSION
+        set_clipboard_files([self.file], move=False)
+        before = clipboard_files()
+        mime = qt.QMimeData()
+        mime.setUrls([qt.QUrl.fromLocalFile(str(self.file))])
+        mime.setData(MIME, SESSION)
+        view = self.browser.tree
+        point = view.visualRect(self.index(self.folder)).center()
+        event = qt.QDropEvent(qt.QPointF(point), qt.Qt.DropAction.CopyAction | qt.Qt.DropAction.MoveAction,
+                             mime, qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+        self.assertTrue(self.browser.file_actions.drag_drop.eventFilter(view.viewport(), event))
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(event.dropAction(), qt.Qt.DropAction.MoveAction)
+        self.wait()
+        self.assertFalse(self.file.exists())
+        self.assertEqual((self.folder / self.file.name).read_text(), 'original')
+        self.assertEqual(clipboard_files(), before)
+
+    def test_external_drop_copies_and_rejects_nonlocal_urls(self):
+        mime = qt.QMimeData()
+        mime.setUrls([qt.QUrl.fromLocalFile(str(self.file))])
+        view = self.browser.tree
+        point = view.visualRect(self.index(self.folder)).center()
+        event = qt.QDropEvent(qt.QPointF(point), qt.Qt.DropAction.CopyAction | qt.Qt.DropAction.MoveAction,
+                             mime, qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+        self.browser.file_actions.drag_drop.eventFilter(view.viewport(), event)
+        self.assertEqual(event.dropAction(), qt.Qt.DropAction.CopyAction)
+        self.wait()
+        self.assertTrue(self.file.exists())
+        self.assertEqual((self.folder / self.file.name).read_text(), 'original')
+        mime.setUrls([qt.QUrl('https://example.com/file')])
+        rejected = qt.QDropEvent(qt.QPointF(point), qt.Qt.DropAction.CopyAction, mime,
+                                qt.Qt.MouseButton.LeftButton, qt.Qt.KeyboardModifier.NoModifier)
+        self.browser.file_actions.drag_drop.eventFilter(view.viewport(), rejected)
+        self.assertFalse(rejected.isAccepted())
+
     def test_pick_and_drop_links_are_default_actions_and_preserve_clipboard(self):
         from commonUtils.ui.file_browser.link_actions import picked_source
         set_clipboard_files([self.folder])

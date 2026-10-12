@@ -143,3 +143,9 @@ labels without invalidating cached covers. The refresh timer stops with FileView
 Thumbnail caches and queued request/revision keys use `Path` objects internally.
 Qt model lookups and the existing thumbnail-request signal convert to strings at
 the boundary; completion and invalidation accept either spelling on Windows.
+
+FileDragDrop routes local URL drops into FileActions.transfer, sharing paste's
+worker, cancellation and refresh lifecycle. Its own QDrag avoids Qt deleting
+source rows after an asynchronous move. Internal drags are identified within the
+current process; external drops acknowledge CopyAction and preserve their source.
+Qt columns install the controller through column_created as they are created.
