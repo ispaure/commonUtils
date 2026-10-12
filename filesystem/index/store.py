@@ -181,7 +181,7 @@ class DirectoryCache(DirectoryScan):
                         connection.execute('PRAGMA journal_mode=WAL')
                         connection.execute('PRAGMA foreign_keys=ON')
                         connection.set_progress_handler(lambda: int(cancelled()), 10_000)
-                        self._schema(connection, cancelled, report)
+                        initialize_schema(connection, cancelled, report)
                         yield connection
                     except OperationCancelled:
                         # Flush bounded pending work when cancellation arrives between folders.
@@ -223,11 +223,6 @@ class DirectoryCache(DirectoryScan):
             staged.replace(self.database)
         finally:
             staged.unlink(missing_ok=True)
-
-    @staticmethod
-    def _schema(db, cancelled=lambda: False, report=lambda done, total, message: None):
-        """Compatibility entry point; schema ownership lives in directory.schema."""
-        initialize_schema(db, cancelled, report)
 
     @staticmethod
     def _folder_identity(folder, root):

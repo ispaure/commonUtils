@@ -4,7 +4,7 @@ from bisect import bisect_right
 from .. import pyside as qt
 from .widget import CodeEdit
 from .syntax import SyntaxHighlighter, detect_language
-from .merge_model import MergeSession
+from ...persistence.merge import MergeSession
 
 
 def colors(editor, kind):

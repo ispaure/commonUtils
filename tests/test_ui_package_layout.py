@@ -77,3 +77,12 @@ for group, names in {GROUPS!r}.items():
         for namespace in ('commonUtils', '_ui_vendor.commonUtils'):
             assert namespace + '.ui.' + name not in sys.modules
 ''')
+
+    def test_merge_ui_imports_the_persistence_owner_without_a_shim(self):
+        self.run_script("""
+import importlib, importlib.util
+model = importlib.import_module('commonUtils.persistence.merge')
+widget = importlib.import_module('commonUtils.ui.code_editor.merge')
+assert widget.MergeSession is model.MergeSession
+assert importlib.util.find_spec('commonUtils.ui.code_editor.merge_model') is None
+""")

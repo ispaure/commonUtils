@@ -127,3 +127,8 @@ view of its existing document. Rebind before detaching/destroying the old view.
 The highlighter and its timer remain owned by the document/highlighter, and the
 lexer instance is retained. A different document raises ValueError. This changes
 neither document ownership nor text, undo history or cursor positions.
+
+The Qt-independent merge model is imported directly from
+`commonUtils.persistence.merge`. The former `ui.code_editor.merge_model` forwarding
+module has been removed; hosts use the persistence owner for `merge_text`,
+`MergeModel`, `MergeRegion` and `MergeSession`.
