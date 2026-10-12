@@ -79,6 +79,14 @@ fragments. It does not search an Obsidian vault. HTTP/HTTPS/mail links use the O
 unsupported local types/schemes do not launch. Embedded HTML remains literal.
 Reading appearance affects the reading pane only, not authored content/editor fonts.
 
+Reading code fences use continuous padded monospace panels with language labels
+painted outside the document text. Three or more backticks are supported by the
+existing Qt Markdown parser. Reading-only syntax colors use Pygments when it is
+available, including `vbnet`; unknown languages and installations without Pygments
+keep plain monospace text. Token offsets account for UTF-16, including emoji.
+Highlighting is bounded to 64 KiB characters per block group. This does not change
+stored Markdown, formatted edit serialization or source-editor highlighting.
+
 Mermaid is an explicit optional local QProcess operation using `mmdc`, never an
 opening-time download. It has bounded input, per-diagram timeout, bounded image
 size/cache and source-preserving failure. Closing/replacing the document cancels

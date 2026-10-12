@@ -3,6 +3,7 @@ from pathlib import Path
 from ..outline import OutlineEntry, OutlineList
 
 from .. import pyside as qt
+from ..appearance.status_line import StatusLine
 from ..readers.reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button, show_reader_popup
 from .editing import MarkdownEditingMixin
 from .formatted import MarkdownFormattedMixin
@@ -143,7 +144,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self.escape_shortcut = qt.QShortcut(qt.QKeySequence('Escape'), self)
         self.escape_shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.escape_shortcut.activated.connect(self._escape)
-        self.status = ReaderLabel('', muted=True)
+        self.status = StatusLine()
         layout.addWidget(self.status)
         self.back_button.clicked.connect(self.back)
         self.forward_button.clicked.connect(self.forward)

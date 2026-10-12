@@ -24,6 +24,12 @@ Callouts display as quote panels. A `+` callout starts expanded; a `-` callout s
 collapsed. Click its title to fold/unfold it. Folding never changes the file. Embedded
 HTML is shown literally; this is not a full web-page renderer.
 
+Fenced code is shown in a continuous monospace panel, preserving indentation and
+blank lines. A language such as `vbnet` appears as a small label above the code.
+Recognized languages receive syntax colors when Pygments is available; unknown
+languages remain readable plain code. Both triple-backtick and longer fences work.
+Language labels are presentation only and are not added to copied code or source.
+
 ## Choose an editing mode
 
 Some hosts open documents for reading only. Where editing is enabled, **Read** shows
