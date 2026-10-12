@@ -35,7 +35,9 @@ class BrowserPresentationTests(QtTestCase):
                 index = browser.views.covers.mapFromSource(browser.model.index(str(path)))
                 rect = tiles.visualRect(index)
                 before = tiles.viewport().grab(rect).toImage()
-                progress[0] = '45/205'
+                # Keep both counters visible on narrow covers with native fonts:
+                # middle elision can render 45/205 and 46/205 identically.
+                progress[0] = '4/9'
                 browser.views._refresh_badges(); self.app.processEvents()
                 after = tiles.viewport().grab(rect).toImage()
                 changed = [(x, y) for y in range(before.height()) for x in range(before.width())
@@ -43,7 +45,7 @@ class BrowserPresentationTests(QtTestCase):
                 self.assertTrue(changed)
                 self.assertGreater(sum(x for x, y in changed) / len(changed), before.width() / 2)
                 self.assertLess(max(y for x, y in changed), before.height() / 2)
-                progress[0] = '46/205'
+                progress[0] = '5/9'
                 browser.views._refresh_badges(); self.app.processEvents()
                 self.assertNotEqual(after, tiles.viewport().grab(rect).toImage())
             finally:
