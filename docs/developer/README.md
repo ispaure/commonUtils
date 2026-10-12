@@ -15,3 +15,9 @@ For interactive workflows, use the [component user guides](../../README.md#share
 The [audit record](audit.md) explains the restructuring and remaining uncertainties.
 
 [Library overview](../../README.md)
+
+## Platform support
+
+Windows, macOS and Linux retain their existing APIs. iOS and Android have an
+incremental infrastructure foundation, not device-verified application support.
+See the [compatibility audit and deployment blockers](mobile-foundation.md).
