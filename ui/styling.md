@@ -4,8 +4,8 @@
 `ui_font_*` (interface and dialogs), `browser_font_*`, `reading_font_*` (Markdown
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
-with one shared monospace fallback for editors, diffs and Markdown code. Defaults are 11 pt for UI/browser/code and 15 pt Georgia
-for reading. UI/browser sizes allow 7–32 pt, reading 8–48, code 7–48.
+with one shared monospace fallback for editors, diffs and Markdown code. Defaults are 11 pt for UI/browser/code and 15 pt with the automatic interface
+family for reading. UI/browser sizes allow 7–32 pt, reading 8–48, code 7–48.
 Code families must be installed fixed-pitch fonts, or blank for the monospace
 fallback. The layered editor filters its code family list accordingly and validates
 typed names on Save. Existing unavailable or proportional saved code families fall
@@ -18,7 +18,7 @@ browser/reading previews inherit the pending interface family. Samples rebuild o
 Reload/Save and remain separate from application/document state.
 
 `theme_mode` selects system/light/dark. `accent_color_str` accepts a QColor value.
-`dark_tint_int` (0–20 percent) mixes the accent into neutral dark surfaces.
+`dark_tint_int` (0–20 percent, default 6) mixes the accent into neutral dark surfaces.
 Selection text chooses black or white for contrast. `ui.appearance.theme.configured_colors`
 returns effective colors; the existing base palette constants remain available.
 
@@ -31,7 +31,8 @@ to another role (for example browser controls). Explicit bindings and local font
 preview samples take precedence. Legacy `pyside.set_font` controls use that live role
 in opted-in hosts. Theme refresh runs before applying the application font and
 updating role bindings, preserving saved typography through repolishing.
-A 500 ms timer rereads file timestamps and applies saved changes. `changed`
+The shared settings monitor checks for external changes every 500 ms; saved
+changes are delivered through GUI-thread subscriptions. `changed`
 notifies consumers that own specialized rendering. Bindings use weak references;
 text defaults preserve document modified flags. Markdown refreshes fenced and
 inline code fonts along with reading fonts. Font changes do not save documents. Formatted Markdown applies code fonts through

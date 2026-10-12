@@ -268,3 +268,16 @@ class StylingTests(QtTestCase):
         self.assertEqual(document.availableUndoSteps(), undo)
         self.assertEqual(viewer.markdown_text(), original)
         self.assertFalse(viewer.is_modified)
+
+    def test_missing_style_fields_use_the_shipped_defaults(self):
+        from commonUtils.configuration.layered import read_values
+        from commonUtils.ui.appearance.styling import style_values
+        shipped = read_values(settings_path())
+        self.defaults.write_text('[Styling]\n')
+        values = style_values()
+        for key, (_, fallback, _) in STYLE_FIELDS.items():
+            with self.subTest(key=key):
+                expected = shipped['Styling', key]
+                if isinstance(fallback, int):
+                    expected = int(expected)
+                self.assertEqual(values[key], expected)
