@@ -212,3 +212,20 @@ fields are retained on disk but omitted from the software settings form.
 Mobile hosts must register an explicit personal settings path before calling
 `layered.shared_settings()`. Automatic desktop paths are rejected on iOS/Android;
 registration and reads do not create a settings file or grant sandbox access.
+
+## Migration completion
+
+`configuration.migrations.MigrationLedger(path)` keeps host-supplied versioned
+migration IDs outside resettable preferences. `state(id)` reads without creating
+files; `run(id, callback, already_applied=False)` returns whether work ran.
+Completed migrations are skipped. `already_applied=True` adopts a legacy marker
+only when there is no ledger entry. Pending is saved before invoking the callback,
+and completion only after it succeeds, so partial failures retry even if they
+created a destination. Callbacks must be idempotent and preserve newer overrides.
+`complete(*ids)` lets a host deliberately suppress legacy imports during reset.
+
+The caller owns paths, IDs, legacy detection, transforms, error presentation and
+writer coordination. Metadata uses atomic, conflict-checked INI saves; malformed
+files/states propagate errors rather than silently re-running imports. This is
+not a multi-file transaction or a process lock. Keep the ledger outside any
+directory erased by reset, and serialize concurrent migration calls in the host.
