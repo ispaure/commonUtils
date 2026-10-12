@@ -14,23 +14,44 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 class BrowserPresentationTests(QtTestCase):
     def test_live_thumbnail_badge_changes_only_the_top_right_of_cover(self):
+        from commonUtils.filesystem.files import File
+        from commonUtils.formats.registry import register_file_type, file_types
+        # Windows' offscreen Qt backend does not discover system fonts itself.
+        # Without a real font different counters render as identical missing glyphs.
+        if os.name == 'nt' and qt.QApplication.platformName() == 'offscreen':
+            font_id = qt.QFontDatabase.addApplicationFont(str(Path(os.environ['WINDIR']) / 'Fonts' / 'segoeui.ttf'))
+            self.assertGreaterEqual(font_id, 0)
+            self.addCleanup(qt.QFontDatabase.removeApplicationFont, font_id)
+            font = qt.QFont(qt.QFontDatabase.applicationFontFamilies(font_id)[0], 10)
+        else:
+            font = self.app.font()
+        progress = ['']
+        cover = qt.QPixmap(120, 165); cover.fill(qt.QColor('blue'))
+        buffer = qt.QBuffer(); buffer.open(qt.QIODevice.OpenModeFlag.WriteOnly)
+        cover.save(buffer, 'PNG')
+        encoded_cover = bytes(buffer.data())
+        class BadgeFile(File):
+            browser_has_thumbnail = True
+            def browser_thumbnail(self, size):
+                return encoded_cover
+            def browser_thumbnail_badge(self):
+                return progress[0]
+        registration = register_file_type(BadgeFile, ('badge',), owner='badge_test')
+        self.addCleanup(file_types.unregister, registration)
         with TemporaryDirectory() as temp:
             path = Path(temp) / 'comic.badge'; path.write_text('fixture')
             browser = FileBrowser(Path(temp), calculate_folder_sizes=False)
+            browser.setFont(font)
             browser.resize(850, 550); browser.show()
             deadline = monotonic() + 5
             while not browser.model.index(str(path)).isValid():
                 self.assertLess(monotonic(), deadline)
                 self.app.processEvents(); sleep(.005)
             try:
-                item = browser.model.item(browser.model.index(str(path)))
-                item.browser_has_thumbnail = True
-                progress = ['']
-                item.browser_thumbnail_badge = lambda: progress[0]
-                cover = qt.QPixmap(120, 165); cover.fill(qt.QColor('blue'))
-                browser.views.covers.icons[path] = qt.QIcon(cover)
                 browser.view_selector.setCurrentIndex(1)
-                self.app.processEvents()
+                while path not in browser.views.covers.icons or browser.views.cover_busy:
+                    self.assertLess(monotonic(), deadline)
+                    self.app.processEvents(); sleep(.005)
                 tiles = browser.views.tiles
                 index = browser.views.covers.mapFromSource(browser.model.index(str(path)))
                 rect = tiles.visualRect(index)
@@ -53,11 +74,6 @@ class BrowserPresentationTests(QtTestCase):
                     output.mkdir(parents=True, exist_ok=True)
                     for name, image in [('before', before), ('after', after), ('final', final)]:
                         image.save(str(output / (name + '.png')))
-                    option = qt.QStyleOptionViewItem()
-                    tiles.itemDelegate().initStyleOption(option, index)
-                    print('Badge diagnostics:', tiles.iconSize(), option.decorationSize, option.font.toString(),
-                          list(browser.views.covers.icons), browser.model.filePath(browser.model.index(str(path))),
-                          item.browser_thumbnail_badge(), flush=True)
                 self.assertNotEqual(after, final)
             finally:
                 browser.stop()
