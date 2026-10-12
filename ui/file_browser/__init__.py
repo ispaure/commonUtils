@@ -10,9 +10,9 @@ from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folder
 from .model import BrowserFileSystemModel, ByteSortModel, BrowserTree, _BrowserSelection
 from .details import DetailsPanel
 from .controls import ViewModeSelector, FolderSizeControl, ViewIcon
-from ..icons import set_painted_icon
+from ..appearance.icons import set_painted_icon
 from .navigation import NavigationBar
-from ..operations import Operation
+from ..tasks.operations import Operation
 from .views import FileViews
 from .editing import FilenameDelegate
 from .file_actions import FileActions, clipboard_files
@@ -51,7 +51,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
 
     def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None):
         super().__init__(parent)
-        from ..styling import bind_font
+        from ..appearance.styling import bind_font
         bind_font(self, 'browser')
         self.idle.connect(self.close)
         self.services = services or {}

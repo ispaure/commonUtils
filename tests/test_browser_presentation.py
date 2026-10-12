@@ -14,7 +14,7 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 class BrowserPresentationTests(QtTestCase):
     def test_toolbar_stays_inline_and_split_panes_cannot_shrink_into_overlap(self):
-        from commonUtils.ui.workspace import Workspace
+        from commonUtils.ui.workspaces.workspace import Workspace
         host = qt.QWidget()
         workspace = Workspace(lambda path: FileBrowser(calculate_folder_sizes=False), host)
         layout = qt.QVBoxLayout(host)

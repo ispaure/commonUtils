@@ -2,7 +2,7 @@
 from unittest.mock import patch
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.workspace_menus import sync_native_menus
+from commonUtils.ui.workspaces.workspace_menus import sync_native_menus
 
 
 class MenuContextTests(QtTestCase):
@@ -30,7 +30,7 @@ class MenuContextTests(QtTestCase):
     def test_deferred_refresh_uses_latest_context_after_rapid_switches(self):
         first, second = self.document('File'), self.document('View')
         for platform in ('darwin', 'win32', 'linux'):
-            with self.subTest(platform=platform), patch('commonUtils.ui.workspace_menus.sys.platform', platform):
+            with self.subTest(platform=platform), patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', platform):
                 sync_native_menus(self.host, first)
                 sync_native_menus(self.host, second)
                 self.settle()
@@ -39,10 +39,10 @@ class MenuContextTests(QtTestCase):
     def test_native_display_invalidation_coalesces_context_and_focus_changes(self):
         self.host.show(); self.settle()
         first, second = self.document('File'), self.document('Edit')
-        with patch('commonUtils.ui.workspace_menus.sys.platform', 'darwin'), patch.object(
+        with patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', 'darwin'), patch.object(
                 qt.QApplication, 'platformName', return_value='cocoa'), patch.object(
                 qt.QApplication, 'focusWindow', return_value=self.host.windowHandle()), patch(
-                'commonUtils.ui.workspace_cocoa.redraw_menu_bar') as redraw:
+                'commonUtils.ui.workspaces.workspace_cocoa.redraw_menu_bar') as redraw:
             sync_native_menus(self.host, first)
             sync_native_menus(self.host, second)
             self.settle()
@@ -120,7 +120,7 @@ class MenuContextTests(QtTestCase):
         self.host.workspace_menu_actions = [global_menu.menuAction()]
         first, second = self.document('File'), self.document('View')
         for platform in ('darwin', 'win32', 'linux'):
-            with self.subTest(platform=platform), patch('commonUtils.ui.workspace_menus.sys.platform', platform):
+            with self.subTest(platform=platform), patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', platform):
                 self.host.workspace_menu_document = lambda: second
                 sync_native_menus(self.host, first)
                 self.assertEqual(self.titles(), ['Application', 'View'])
@@ -135,7 +135,7 @@ class MenuContextTests(QtTestCase):
 class CocoaMenuRedrawTests(QtTestCase):
     def bridge(self, visible=True):
         from unittest.mock import Mock
-        from commonUtils.ui.workspace_cocoa import CocoaMenuBar
+        from commonUtils.ui.workspaces.workspace_cocoa import CocoaMenuBar
         bridge = CocoaMenuBar.__new__(CocoaMenuBar)
         bridge.menu_class = 1
         bridge.visible_selector = 2

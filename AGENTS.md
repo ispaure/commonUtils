@@ -5,8 +5,10 @@ Read [architecture](docs/developer/architecture.md),
 [integration contracts](docs/developer/contracts.md) before changing shared interfaces.
 
 - Keep application workflows, plugin discovery and dependency policy in consumers.
-- Preserve direct module imports and namespace isolation, established public interfaces,
+- Use canonical direct module imports and preserve namespace isolation, established public interfaces,
   persisted formats and cooperative UI shutdown. Do not infer stability from names.
+- Flat UI forwarding modules have been removed. Use the grouped UI packages for imports
+  and patch targets; do not recreate legacy aliases.
 - Update the owning API guide for contract changes and component `user_docs/` for
   shared interactive behavior. Follow [documentation ownership](docs/developer/maintenance.md).
 - Keep README concise; cross-cutting developer guidance lives in `docs/developer/`,

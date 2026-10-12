@@ -1,7 +1,7 @@
 """Settings scope navigation retains live controls and avoids redundant nesting."""
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.settings_sections import ScopedSettings, SettingsSection
+from commonUtils.ui.settings.settings_sections import ScopedSettings, SettingsSection
 
 
 class SettingsSectionsTests(QtTestCase):

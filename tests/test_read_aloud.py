@@ -2,7 +2,7 @@
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.read_aloud import ReadAloud, reader_text, speech_chunks, visible_text_start
+from commonUtils.ui.readers.read_aloud import ReadAloud, reader_text, speech_chunks, visible_text_start
 from PySide6.QtTextToSpeech import QTextToSpeech as Speech
 
 

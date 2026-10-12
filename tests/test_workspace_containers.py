@@ -4,9 +4,9 @@ from unittest.mock import patch
 from shiboken6 import isValid
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.workspace import Workspace
-from commonUtils.ui.workspace_policy import WorkspacePolicy
-from commonUtils.ui.workspace_drag import tab_mime
+from commonUtils.ui.workspaces.workspace import Workspace
+from commonUtils.ui.workspaces.workspace_policy import WorkspacePolicy
+from commonUtils.ui.workspaces.workspace_drag import tab_mime
 
 
 class View(qt.QWidget):
@@ -96,7 +96,7 @@ class ContainerTests(QtTestCase):
         self.assertFalse(isValid(window))
 
     def test_native_window_drop_returns_last_browser_tab(self):
-        from commonUtils.ui.workspace_drag import NativeWindowDrag
+        from commonUtils.ui.workspaces.workspace_drag import NativeWindowDrag
         main = self.create(browser=True)
         main.add_view('main'); main.add_view('detached')
         window = main.detach_active(); self.settle()
@@ -160,7 +160,7 @@ class ContainerTests(QtTestCase):
         self.assertEqual(main.detached_windows, [])
 
     def test_native_cancel_restores_destination_and_window_geometry(self):
-        from commonUtils.ui.workspace_drag import NativeWindowDrag
+        from commonUtils.ui.workspaces.workspace_drag import NativeWindowDrag
         main = self.create(); main.add_view('detached')
         window = main.detach_active(); self.settle()
         restored = []
@@ -228,7 +228,7 @@ class ContainerTests(QtTestCase):
         source = self.create(group='source'); source.add_view('original'); dock = source.active_dock
         target = self.create(group='other'); self.settle()
         self.assertFalse(target.adopt(dock))
-        with patch('commonUtils.ui.workspace_drag.qt.QDrag') as drag:
+        with patch('commonUtils.ui.workspaces.workspace_drag.qt.QDrag') as drag:
             drag.return_value.exec.return_value = qt.Qt.DropAction.IgnoreAction
             source.drag_tab(dock)
         self.assert_owner(dock, source)
@@ -270,7 +270,7 @@ class ContainerTests(QtTestCase):
 
     def test_direct_mainwindow_views_keep_menus_in_detached_container(self):
         for platform in ('darwin', 'win32', 'linux'):
-            with self.subTest(platform=platform), patch('commonUtils.ui.workspace_menus.sys.platform', platform):
+            with self.subTest(platform=platform), patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', platform):
                 host = qt.QMainWindow(); self.hosts.append(host)
                 workspace = Workspace(lambda unused: qt.QMainWindow(), host, policy=WorkspacePolicy())
                 host.setCentralWidget(workspace); host.show()
@@ -284,8 +284,8 @@ class ContainerTests(QtTestCase):
                     self.assertTrue(view.menuBar().isVisible())
 
     def test_hidden_main_workspace_does_not_replace_active_host_menus(self):
-        from commonUtils.ui.workspace_menus import sync_native_menus
-        with patch('commonUtils.ui.workspace_menus.sys.platform', 'darwin'):
+        from commonUtils.ui.workspaces.workspace_menus import sync_native_menus
+        with patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', 'darwin'):
             host = qt.QMainWindow(); self.hosts.append(host)
             host.menuBar().addMenu('Host')
             workspace = Workspace(lambda unused: qt.QMainWindow(), host, policy=WorkspacePolicy())

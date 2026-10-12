@@ -1,7 +1,7 @@
 from time import monotonic
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.operations import ResultWorker
+from commonUtils.ui.tasks.operations import ResultWorker
 
 
 class ResultWorkerTests(QtTestCase):

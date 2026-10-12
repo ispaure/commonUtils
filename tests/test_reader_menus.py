@@ -6,7 +6,7 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.reader_menus import ReaderMenus, RecentFiles
+from commonUtils.ui.readers.reader_menus import ReaderMenus, RecentFiles
 
 
 class ReaderMenuTests(QtTestCase):

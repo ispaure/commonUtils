@@ -4,7 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.reader_chrome import ReaderFullscreen, ReaderLabel, reader_button
+from commonUtils.ui.readers.reader_chrome import ReaderFullscreen, ReaderLabel, reader_button
 
 
 class ReaderChromeTests(QtTestCase):

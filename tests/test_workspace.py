@@ -5,7 +5,7 @@ import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import Mock, patch
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.workspace import Workspace
+from commonUtils.ui.workspaces.workspace import Workspace
 
 
 class View(qt.QLabel):
@@ -40,7 +40,7 @@ class WorkspaceTests(QtTestCase):
         dock = workspace.active_dock
         drag = Mock()
         drag.exec.return_value = qt.Qt.DropAction.MoveAction
-        with patch('commonUtils.ui.workspace_drag.qt.QDrag', return_value=drag):
+        with patch('commonUtils.ui.workspaces.workspace_drag.qt.QDrag', return_value=drag):
             workspace.drag_tab(dock)
         self.assertEqual(drag.setPixmap.call_args.args[0].size(), dock.grab().size())
         dock.setFloating(True)
@@ -183,7 +183,7 @@ class WorkspaceTests(QtTestCase):
         self.assertEqual(workspace._retiring, [])
 
     def test_dropping_tab_on_either_edge_splits_and_center_rejoins(self):
-        from commonUtils.ui.workspace_drag import tab_mime
+        from commonUtils.ui.workspaces.workspace_drag import tab_mime
         workspace = self.create()
         workspace.add_view('first')
         moving = workspace.active_dock
@@ -306,11 +306,11 @@ class WorkspaceTests(QtTestCase):
         menu = Mock()
         menu.addAction.side_effect = lambda title, callback: (actions.append(title), callbacks.append(callback))
         menu.exec.side_effect = lambda position: callbacks[-1]()
-        with patch('commonUtils.ui.workspace.qt.QMenu', return_value=menu), patch.object(first, 'prepare_close', return_value=False):
+        with patch('commonUtils.ui.workspaces.workspace.qt.QMenu', return_value=menu), patch.object(first, 'prepare_close', return_value=False):
             self.app.sendEvent(bar, event)
         self.assertEqual(actions, ['Close tab'])
         self.assertEqual(len(workspace.docks), 2)
-        with patch('commonUtils.ui.workspace.qt.QMenu', return_value=menu):
+        with patch('commonUtils.ui.workspaces.workspace.qt.QMenu', return_value=menu):
             self.app.sendEvent(bar, event)
         self.settle()
         self.assertEqual(len(workspace.docks), 1)

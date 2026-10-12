@@ -7,15 +7,15 @@ from tempfile import TemporaryDirectory
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.process_runner import ProcessRunner, ProcessUpdate
-from commonUtils.ui.process_progress import ProcessProgressWindow
+from commonUtils.ui.tasks.process_runner import ProcessRunner, ProcessUpdate
+from commonUtils.ui.tasks.process_progress import ProcessProgressWindow
 
 
 class ProcessTests(QtTestCase):
     def test_optional_host_falls_back_when_hidden_closing_or_destroyed(self):
         from unittest.mock import Mock
         from shiboken6 import isValid
-        from commonUtils.ui.process_host import register_process_host, show_process
+        from commonUtils.ui.tasks.process_host import register_process_host, show_process
         host = qt.QWidget()
         host.closing = False
         host.present = Mock()
