@@ -34,3 +34,37 @@ class PlatformDetectionTests(unittest.TestCase):
         for name in ('arm64', 'aarch64'):
             with patch('platform.machine', return_value=name):
                 self.assertIs(get_arch(), Arch.ARM_64)
+
+
+class CapabilityTests(unittest.TestCase):
+    def test_policy_does_not_claim_mobile_support(self):
+        from commonUtils.runtime.platform.capabilities import (
+            Capability, CapabilityState, capability_status, require_capability,
+            UnsupportedCapabilityError, sandbox_restrictions)
+        for name in ('win32', 'darwin', 'linux', 'ios', 'android'):
+            with self.subTest(name=name), patch('sys.platform', name), patch('platform.system', return_value='Darwin'):
+                self.assertIs(capability_status(Capability.FILESYSTEM).state, CapabilityState.UNVERIFIED)
+                self.assertIs(sandbox_restrictions(), True if name in ('ios', 'android') else None)
+                for capability in Capability:
+                    if capability is Capability.FILESYSTEM:
+                        continue
+                    status = capability_status(capability)
+                    self.assertIsNot(status.state, CapabilityState.VERIFIED)
+                    if name in ('ios', 'android'):
+                        with self.assertRaisesRegex(UnsupportedCapabilityError, 'host must provide'):
+                            require_capability(capability, 'example')
+                    else:
+                        require_capability(capability)
+
+    def test_path_probe_uses_real_io_and_leaves_no_files(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from commonUtils.runtime.platform.capabilities import CapabilityState, probe_filesystem
+        with TemporaryDirectory() as directory:
+            path = Path(directory)
+            self.assertIs(probe_filesystem(path).state, CapabilityState.VERIFIED)
+            self.assertIs(probe_filesystem(path, write=True).state, CapabilityState.VERIFIED)
+            self.assertEqual(list(path.iterdir()), [])
+            self.assertIs(probe_filesystem(path / 'missing').state, CapabilityState.UNAVAILABLE)
+            with patch('pathlib.Path.open', side_effect=PermissionError('denied')):
+                self.assertIn('denied', probe_filesystem(path / 'denied').reason)
