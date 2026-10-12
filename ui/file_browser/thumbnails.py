@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 import math
+from pathlib import Path
 from ...filesystem.directories import Directory
 from .. import pyside as qt
 from .model import ByteSortModel
@@ -23,7 +24,7 @@ class CoverModel(ByteSortModel):
     def data(self, index, role=qt.Qt.ItemDataRole.DisplayRole):
         if role == qt.Qt.ItemDataRole.DecorationRole and index.column() == 0:
             source = self.mapToSource(index)
-            path = self.sourceModel().filePath(source)
+            path = Path(self.sourceModel().filePath(source))
             item = self.sourceModel().item(source)
             if item.browser_has_thumbnail:
                 if path in self.icons:
@@ -31,7 +32,7 @@ class CoverModel(ByteSortModel):
                     return self.icons[path]
                 if path not in self.requested:
                     self.requested.add(path)
-                    self.cover_requested.emit(path)
+                    self.cover_requested.emit(str(path))
         value = super().data(index, role)
         if role == qt.Qt.ItemDataRole.DecorationRole and index.column() == 0 and (value is None or value.isNull()):
             source = self.mapToSource(index)
@@ -40,7 +41,8 @@ class CoverModel(ByteSortModel):
         return value
 
     def complete(self, path, data, ratio=1.0, resolution=None):
-        source = self.sourceModel().index(path)
+        path = Path(path)
+        source = self.sourceModel().index(str(path))
         pixmap = qt.QPixmap()
         pixmap.loadFromData(data)
         pixmap.setDevicePixelRatio(ratio)
@@ -59,12 +61,12 @@ class CoverModel(ByteSortModel):
             self.dataChanged.emit(index, index, [qt.Qt.ItemDataRole.DecorationRole])
 
     def invalidate(self, path):
-        path = str(path)
+        path = Path(path)
         self.revisions[path] = self.revisions.get(path, 0) + 1
         self.icons.pop(path, None)
         self.resolutions.pop(path, None)
         self.requested.discard(path)
-        index = self.mapFromSource(self.sourceModel().index(path))
+        index = self.mapFromSource(self.sourceModel().index(str(path)))
         if index.isValid():
             self.dataChanged.emit(index, index, [qt.Qt.ItemDataRole.DecorationRole])
 
