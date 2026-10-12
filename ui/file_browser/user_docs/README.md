@@ -127,6 +127,12 @@ saved metadata current; use explicit refresh when completeness matters.
 
 ## Troubleshooting
 
+The shared **File browser font** setting controls text inside the browser panel:
+file/folder rows and headers, tile captions, folder columns, storage labels,
+path/navigation controls, search and details text. Application navigation,
+settings categories and menus use the interface font. Document readers and
+editors use their reading/code font settings.
+
 - **Files appear but search/sizes are missing:** allow discovery to finish, inspect
   partial-state details, check index policy and whether the path is a network location.
 - **Sizes look old:** refresh the subtree. Reading a cached view alone is not validation.
