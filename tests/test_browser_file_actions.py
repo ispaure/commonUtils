@@ -23,16 +23,21 @@ class BrowserFileActionTests(QtTestCase):
         self.root = Path(self.temp.name)
         self.file = self.root / 'Example.txt'; self.file.write_text('original')
         self.folder = self.root / 'Folder'; self.folder.mkdir()
+        self.menus = []
         self.browser = FileBrowser(self.root, calculate_folder_sizes=False)
         self.browser.resize(1000, 700); self.browser.show(); self.browser.activateWindow()
         self.warning = patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Ok).start()
         self.addCleanup(patch.stopall)
         self.addCleanup(self.cleanup)
         qt.QApplication.clipboard().clear()
+        from commonUtils.ui.file_browser.link_actions import cancel_source
+        cancel_source()
         self.wait()
 
     def cleanup(self):
         qt.QApplication.clipboard().clear()
+        from commonUtils.ui.file_browser.link_actions import cancel_source
+        cancel_source()
         self.browser.close(); self.wait(); self.app.processEvents()
 
     def wait(self):
@@ -53,7 +58,35 @@ class BrowserFileActionTests(QtTestCase):
     def menu(self, path=None, **kwargs):
         menu = self.browser.context_menu_for(self.index(path) if path else qt.QModelIndex(), **kwargs)
         self.addCleanup(menu.deleteLater)
+        self.menus.append(menu)
         return {action.text(): action for action in menu.actions() if not action.isSeparator()}
+
+    def test_pick_and_drop_links_are_default_actions_and_preserve_clipboard(self):
+        from commonUtils.ui.file_browser.link_actions import picked_source
+        set_clipboard_files([self.folder])
+        self.select(self.file)
+        self.menu(self.file)['Pick Link Source'].trigger()
+        self.assertEqual(picked_source(), self.file.resolve())
+        self.assertEqual(clipboard_files()[0], (self.folder,))
+        background = self.menu(directory=self.folder)
+        drop = background['Drop Link As'].menu()
+        choices = {action.text(): action for action in drop.actions()}
+        self.assertIn('Symbolic Link', choices)
+        choices['Hard Link'].trigger()
+        self.wait()
+        self.assertTrue(os.path.samefile(self.folder / self.file.name, self.file))
+        self.assertEqual(picked_source(), self.file.resolve())
+        background['Cancel Link Creation'].trigger()
+        self.assertIsNone(picked_source())
+        self.assertNotIn('Drop Link As', self.menu(directory=self.folder))
+
+    def test_folder_link_menu_offers_symbolic_and_never_hard_link(self):
+        self.select(self.folder)
+        self.menu(self.folder)['Pick Link Source'].trigger()
+        choices = {action.text() for action in self.menu()['Drop Link As'].menu().actions()}
+        self.assertIn('Symbolic Link', choices)
+        self.assertNotIn('Hard Link', choices)
+        self.assertEqual('Junction' in choices, os.name == 'nt')
 
     def editor(self):
         deadline = time.monotonic() + 5
@@ -292,7 +325,7 @@ class BrowserFileActionTests(QtTestCase):
         self.select(self.file)
         menu = self.browser.context_menu_for(self.index(self.file)); self.addCleanup(menu.deleteLater)
         labels = [action.text() for action in menu.actions() if action.text()]
-        self.assertEqual(labels[:5], ['Open in Default App', 'Cut', 'Copy', 'Rename', 'Bulk Rename…'])
+        self.assertEqual(labels[:6], ['Open in Default App', 'Cut', 'Copy', 'Pick Link Source', 'Rename', 'Bulk Rename…'])
         self.assertLess(labels.index('Edit Metadata'), labels.index('Compress Comics'))
         self.assertLess(labels.index('Comics'), labels.index('Archives'))
         self.assertTrue(labels[-1].startswith('Reveal in '))

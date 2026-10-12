@@ -133,9 +133,29 @@ class FileActions(TrashActionsMixin, qt.QObject):
         self.task.start(lambda report, cancelled: transfer_paths(paths, directory, move=move,
                        report=report, cancelled=cancelled), message='Moving files…' if move else 'Copying files…')
 
+    def drop_link(self, source, directory, kind):
+        if self.busy or self.browser.stopping:
+            return
+        from ...filesystem.links.creation import create_link_in_directory
+        self._operation_kind = 'link'
+        self.destination = Path(directory)
+        self.browser.model.setReadOnly(True)
+        def work(report, cancelled):
+            from ...runtime.operations import check_cancelled
+            check_cancelled(cancelled)
+            return create_link_in_directory(source, directory, kind)
+        self.task.start(work, message='Creating link…')
+
     def _completed(self, result, error):
         self.browser.model.setReadOnly(False)
         self.task.hide()
+        if self._operation_kind == 'link':
+            if not self.browser.stopping:
+                self.browser.refresh_changed((self.destination,))
+                if error:
+                    self._error(error)
+            self.browser._maybe_idle()
+            return
         if self._operation_kind == 'remove':
             self._removal_completed(result, error)
             return

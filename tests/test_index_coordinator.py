@@ -299,6 +299,12 @@ class CoordinatorTests(unittest.TestCase):
         with self.assertRaises(OperationCancelled):
             self.queue.submit(self.root, cancelled=lambda: True)
 
+    def test_receipt_read_does_not_require_write_lock_on_existing_schema(self):
+        identity = self.queue.submit(self.root)
+        with self.queue._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            self.assertEqual(self.queue.status(identity)['state'], 'pending')
+
 
 if __name__ == '__main__':
     unittest.main()

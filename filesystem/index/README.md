@@ -209,3 +209,7 @@ and verify entry counts plus SQLite integrity/foreign-key checks afterward.
 
 
 [Developer architecture](../../docs/developer/architecture.md) · [Filesystem overview](../README.md)
+
+Coordinator receipt reads inspect an existing queue schema without requesting a
+DDL write lock, so readers can follow work while another connection holds the
+queue writer reservation. Initial schema creation retains normal SQL retries.

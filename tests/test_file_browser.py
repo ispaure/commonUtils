@@ -188,7 +188,7 @@ class BrowserTests(QtTestCase):
         self.assertNotIn('\\n', text)
         menu = self.browser.context_menu_for(index)
         self.assertEqual([action.text() for action in menu.actions() if not action.isSeparator()],
-                         ['Open in Default App', 'Cut', 'Copy', 'Rename', 'Move to Trash / Recycle Bin…', menu.actions()[-1].text()])
+                         ['Open in Default App', 'Cut', 'Copy', 'Pick Link Source', 'Rename', 'Move to Trash / Recycle Bin…', menu.actions()[-1].text()])
         with patch('commonUtils.ui.desktop_actions.open_default') as opened:
             menu.actions()[0].trigger()
             opened.assert_called_once_with(self.path)
@@ -295,7 +295,7 @@ class BrowserTests(QtTestCase):
         self.assertEqual(self.browser.model.data(index.siblingAtColumn(1)), '6 B')
         menu = self.browser.context_menu_for(index)
         self.assertEqual([action.text() for action in menu.actions() if not action.isSeparator()][:-1],
-                         ['Open', 'Cut', 'Copy', 'Paste', 'Rename', 'Move to Trash / Recycle Bin…'])
+                         ['Open', 'Cut', 'Copy', 'Paste', 'Pick Link Source', 'Rename', 'Move to Trash / Recycle Bin…'])
         self.assertTrue(menu.actions()[-1].text().startswith('Reveal in '))
         menu.deleteLater()
         self.browser._activate(index)

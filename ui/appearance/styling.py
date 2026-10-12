@@ -17,7 +17,7 @@ STYLE_FIELDS = {
     'ui_font_size_int': ('Interface and dialog size (pt)', 11, (7, 32)),
     'browser_font_family_str': ('File browser font', '', None),
     'browser_font_size_int': ('File browser size (pt)', 11, (7, 32)),
-    'reading_font_family_str': ('Reading font (Markdown and EPUB)', '', None),
+    'reading_font_family_str': ('Reading font (Markdown and EPUB)', 'Georgia', None),
     'reading_font_size_int': ('Reading size (pt)', 15, (8, 48)),
     'code_font_family_str': ('Code font (editors and Markdown blocks)', '', None),
     'code_font_size_int': ('Code size (pt)', 11, (7, 48)),

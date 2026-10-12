@@ -94,7 +94,8 @@ field. Appearance has four font roles: interface/dialogs, browsers, reading, cod
 Ordinary buttons, including Save and Reload, follow the interface font. Buttons
 inside browser panels follow the browser font; sample buttons use the preview font.
 Font dropdowns display each family name in its own typeface so you can preview
-fonts while browsing. Choose Automatic to use the role's fallback font, or type
+fonts while browsing. EPUB and Markdown use Georgia at 15 pt by default; personal
+font choices override that default. Choose Automatic to use the role's fallback font, or type
 a font family name directly. The selected field also uses the chosen typeface.
 Samples underneath show interface controls, browser entries, reading text or code
 using the pending family and size. Selecting a font, changing its size or resetting

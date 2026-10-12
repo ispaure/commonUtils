@@ -144,3 +144,21 @@ editors use their reading/code font settings.
   unless permanent removal is explicitly intended.
 
 [Developer integration](../README.md) · [All shared guides](../../../README.md#shared-component-user-guides)
+
+## Pick and drop links
+
+Right-click one file or folder and choose **Pick Link Source**. In the destination
+folder, right-click empty space (or the destination folder) and choose
+**Drop Link As → Symbolic Link**. This creates a reference to the source without
+copying its contents. The picked source is shared across browser views in the
+same application session, remains available for further drops, and does not change
+your Copy/Cut clipboard. **Cancel Link Creation** clears it.
+
+For files, **Hard Link** is available on the same filesystem/volume: both names
+refer to the same file, so editing through either name changes that file. For
+local Windows folders, **Junction** is also available. Symbolic links support files
+and folders; Windows may require Developer Mode or symbolic-link privileges.
+Network folders should use symbolic links. Failures are reported without automatic
+elevation. A missing source disables drop actions. Existing destination files are
+never replaced: name collisions get ` - Link`, then a numbered suffix. Native
+Windows link creation still requires validation on a Windows host.
