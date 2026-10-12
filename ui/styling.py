@@ -140,12 +140,14 @@ class Styling(qt.QObject):
 
     def eventFilter(self, watched, event):
         if (self.apply_application and event.type() == qt.QEvent.Type.FontChange
-                and isinstance(watched, (qt.QAbstractButton, qt.QMenu, qt.QMenuBar))
                 and watched in self.views):
             role, callback = self.views[watched]
             expected = self.font(role)
             actual = watched.font()
-            if actual.family() != expected.family() or actual.pointSizeF() != expected.pointSizeF():
+            # Code editors change their own size while zooming; their controller
+            # handles that signal. Other bound roles must survive repolishing.
+            if (role != 'code' or isinstance(watched, (qt.QAbstractButton, qt.QMenu, qt.QMenuBar))) and (
+                    actual.family() != expected.family() or actual.pointSizeF() != expected.pointSizeF()):
                 self._update(watched, role, callback)
         if self.apply_application and event.type() in (qt.QEvent.Type.Polish, qt.QEvent.Type.Show):
             self._bind_application_control(watched)
