@@ -1,3 +1,5 @@
+
+from ...runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -15,7 +17,7 @@ from pathlib import Path
 from ...runtime.diagnostics import *
 from .. import files as fileUtils, links as linkUtils
 from ...formats.registry import file_from_path
-import os, subprocess, sys
+import os, sys
 from typing import List, Optional, Set, Union
 
 
@@ -55,6 +57,8 @@ class Directory(FilesystemObject):
             log(Severity.CRITICAL, 'Directory.__delete_junction', f'Junction still exists after deletion attempt: "{path}"')
 
     def open(self):
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'open')
+        import subprocess
         path_str = str(self.path)
 
         if self.is_dir():  # Symbolic links and junctions resolving to directories are valid

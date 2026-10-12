@@ -17,3 +17,8 @@ Create a `QApplication` before creating widgets. Requires PySide6. Import `from 
 | [windows.py](windows.py) | Windows utilities; public API is commonUtils.ui.pyside. |
 
 [Parent guide](../README.md)
+
+This is the desktop Qt facade, including its existing file-dialog exports.
+Explicit import on iOS/Android raises `UnsupportedCapabilityError` before loading
+Qt binaries. Portable document/file modules do not import this facade; a mobile
+UI and document picker remain future host integrations.

@@ -1,3 +1,5 @@
+
+from ....runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -48,6 +50,7 @@ def exec_cmd(command: str,
       stdout or stderr continues producing output.
     - For simplicity right now, shell=True is always used for normal command execution.
     """
+    require_capability(Capability.SHELL, 'exec_cmd')
     cwd = str(cwd) if cwd is not None else None
 
     debugUtils.log(debugUtils.Severity.DEBUG, tool_name, f'Executing command: {command}')

@@ -15,7 +15,6 @@ from typing import *
 import errno
 import stat
 from tempfile import TemporaryDirectory
-import subprocess
 from pathlib import Path
 from shutil import rmtree, copyfile, copy2
 import csv
@@ -23,12 +22,6 @@ import csv
 # Common utilities
 from ...runtime.platform import *
 from ...runtime.diagnostics import *
-from ...integrations.wrappers import cmdShellWrapper
-
-
-match get_os():
-    case OS.LINUX:
-        import pwd
 
 
 delete_debug_prompt: bool = False
@@ -125,7 +118,7 @@ class File(FilesystemObject):
             return True
 
         match get_os():
-            case OS.MAC | OS.LINUX:
+            case OS.MAC | OS.LINUX | OS.IOS | OS.ANDROID:
                 st = os.stat(p)
                 if not (st.st_mode & stat.S_IWUSR):
                     os.chmod(p, st.st_mode | stat.S_IWUSR)
@@ -145,6 +138,7 @@ class File(FilesystemObject):
         """
         For macOS / Linux, gets permission of a file to be an executable. Helpful if a file won't run or open
         """
+        from ...integrations.wrappers import cmdShellWrapper
         tool_name = 'MacOS Permission'
         # App Run permissions
         log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{self.path}"')
@@ -219,7 +213,7 @@ def get_split_character():
     match get_os():
         case OS.WIN:
             return '\\'
-        case OS.MAC | OS.LINUX:
+        case OS.MAC | OS.LINUX | OS.IOS | OS.ANDROID:
             return '/'
 
 

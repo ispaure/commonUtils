@@ -8,6 +8,8 @@ Lazy backend loading avoids importing optional dependencies unnecessarily and he
 UI backends and other commonUtils modules.
 """
 
+from ..runtime.platform.capabilities import Capability, require_capability
+
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -60,6 +62,7 @@ def __getattr__(name: str):
 # GENERIC UI
 
 def display_msg_box_ok(title: str, message: str) -> bool:
+    require_capability(Capability.DESKTOP_UI, 'display_msg_box_ok')
     if use_pyside:
         try:
             return _get_backend('pyside').display_msg_box_ok(title, message)
@@ -70,6 +73,7 @@ def display_msg_box_ok(title: str, message: str) -> bool:
 
 
 def display_msg_box_ok_cancel(title: str, message: str) -> bool:
+    require_capability(Capability.DESKTOP_UI, 'display_msg_box_ok_cancel')
     if use_pyside:
         try:
             return _get_backend('pyside').display_msg_box_ok_cancel(title, message)

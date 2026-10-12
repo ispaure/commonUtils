@@ -1,3 +1,5 @@
+
+from ...runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -44,6 +46,7 @@ class DiskApp(App):
         :param fully_detached: Launch application independently from the current process.
         :param open_console: Launch regular applications with a visible console / terminal window.
         """
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'launch')
         match get_os():
             case OS.WIN:
                 self.__launch_windows(fully_detached, open_console)
@@ -185,6 +188,7 @@ class StoreApp(App):
         Use this to get the application user model ID of an application from the Windows Store.
         :return: The application's Application User Model ID, if found.
         """
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'get_application_user_model_id')
         exec_cmd = 'Get-StartApps | Where-Object { $_.Name -like "*NAME*" }'.replace('*NAME*', f'*{self.win_app_name}*')
 
         print(f'Searching for {self.win_app_name}\'s Application User Model ID...')
@@ -203,6 +207,7 @@ class StoreApp(App):
         return None
 
     def launch(self):
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'launch')
         match get_os():
             case OS.WIN:
                 aumid = self.get_application_user_model_id()
@@ -225,6 +230,7 @@ class Flatpak(App):
         self.app_id = app_id
 
     def launch(self):
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'launch')
         try:
             subprocess.run(["flatpak", "run", f'{self.app_id}'], check=True)
         except subprocess.CalledProcessError as e:
@@ -247,6 +253,7 @@ class AppImage(App):
         """
         Launch the AppImage application.
         """
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'launch')
         if not validate_exec(self.name, self.exec_path):
             return
 
@@ -306,6 +313,7 @@ def open_uri(uri: str):
     """
     Open a URI using the operating system's registered protocol handler.
     """
+    require_capability(Capability.EXTERNAL_APPLICATIONS, 'open_uri')
 
     match get_os():
         case OS.WIN:

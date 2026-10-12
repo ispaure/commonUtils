@@ -8,6 +8,8 @@ It primarily serves as the native backend for ``commonUtils.ui`` when a Qt appli
 undesirable. For Qt/PySide-based UI functionality, use ``commonUtils.ui.pyside`` instead.
 """
 
+from ..runtime.platform.capabilities import Capability, require_capability
+
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -216,6 +218,7 @@ def display_msg_box_ok(title: str, message: str) -> bool:
     :return: Whether the dialog was handled.
     :rtype: bool
     """
+    require_capability(Capability.DESKTOP_UI, 'display_msg_box_ok')
     message = _normalize_message(message)
 
     match get_os():
@@ -243,6 +246,7 @@ def display_msg_box_ok_cancel(title: str, message: str) -> bool:
     :return: Whether the user selected OK.
     :rtype: bool
     """
+    require_capability(Capability.DESKTOP_UI, 'display_msg_box_ok_cancel')
     print('Showing dialog box.')
     message = _normalize_message(message)
 

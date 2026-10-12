@@ -18,6 +18,7 @@ from datetime import datetime
 from contextlib import contextmanager
 from contextvars import ContextVar
 from ... import ui
+from ..platform.capabilities import Capability, CapabilityState, capability_status
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -36,9 +37,15 @@ project_prefix: str | None = None
 
 last_timestamp = None
 
-# Enable ANSI escape codes on Windows CMD
-if sys.platform.startswith("win"):
-    os.system("")
+_ansi_initialized = False
+
+
+def _initialize_console():
+    global _ansi_initialized
+    if not _ansi_initialized:
+        if sys.platform == "win32":
+            os.system("")
+        _ansi_initialized = True
 
 
 def print_debug_msg(msg, show_verbose):
@@ -79,6 +86,7 @@ class DebugLogger:
         if severity == Severity.DEBUG and not verbose_debug:
             return
 
+        _initialize_console()
         global last_timestamp
 
         # ------------------------------------------------------------------------------------------------------------------
@@ -151,7 +159,7 @@ class DebugLogger:
             with open(self.log_file, "a") as log_item:
                 log_item.write(full_message_for_print + "\n")
 
-        if (popup or severity == Severity.CRITICAL) and _interactive_logging.get():
+        if (popup or severity == Severity.CRITICAL) and _interactive_logging.get() and capability_status(Capability.DESKTOP_UI).state is CapabilityState.IMPLEMENTED:
             ui.display_msg_box_ok(title, message)
 
         if severity == Severity.CRITICAL:

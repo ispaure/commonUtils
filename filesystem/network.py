@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from time import monotonic
+from ..runtime.platform import OS, get_os
 
 _NETWORK_TYPES = {'nfs', 'nfs4', 'smbfs', 'cifs', 'afpfs', 'afp', 'sshfs', 'fuse.sshfs',
                   'davfs', 'davfs2', 'webdav', 'fuse.rclone', '9p', 'ceph', 'glusterfs',
@@ -25,6 +26,8 @@ def _unescape_mount(path):
 
 
 def _mounted_network_roots():
+    if get_os() in (OS.IOS, OS.ANDROID):
+        return ()
     if sys.platform == 'win32':
         mask = ctypes.windll.kernel32.GetLogicalDrives()
         return tuple(Path(f'{chr(65 + i)}:/') for i in range(26)

@@ -35,3 +35,9 @@ functions have been removed. Use the instance methods above and catch `OSError`
 where a workflow needs a boolean failure result. For directory creation, use
 `Path(path).mkdir(parents=True, exist_ok=True)` or `Directory(path).make_dir()`.
 User/home/platform helpers remain module functions.
+
+Local file operations do not eagerly import pwd or shell wrappers. iOS/Android
+use POSIX separators and native chmod for `make_writable`; actual filesystem
+permission failures propagate. Shell-based executable permissions and external
+editor/application launching remain desktop adapters. See the
+[mobile foundation](../../docs/developer/mobile-foundation.md).

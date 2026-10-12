@@ -8,6 +8,18 @@ import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from ...runtime.platform.capabilities import Capability, require_capability
+
+
+def _host_storage_root():
+    value = os.environ.get('COMMONUTILS_STORAGE_ROOT')
+    if value:
+        root = Path(value)
+        if not root.is_absolute():
+            raise ValueError('COMMONUTILS_STORAGE_ROOT must be an absolute app-private path')
+        return root
+    require_capability(Capability.DEFAULT_STORAGE, 'commonUtils storage; set COMMONUTILS_STORAGE_ROOT')
+    return None
 
 
 def _disposable_directory():
@@ -22,7 +34,8 @@ def _disposable_directory():
 
 
 def cache_directory(*, create=True):
-    folder = (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Cache'
+    root = _host_storage_root()
+    folder = root / 'Cache' if root is not None else (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Cache'
               if sys.platform == 'darwin' else _disposable_directory())
     if create:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -30,7 +43,8 @@ def cache_directory(*, create=True):
 
 
 def temporary_directory(*, create=True):
-    folder = (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Temp'
+    root = _host_storage_root()
+    folder = root / 'Temp' if root is not None else (Path.home() / 'Library' / 'Application Support' / 'commonUtils' / 'Temp'
               if sys.platform == 'darwin' else _disposable_directory() / 'Temp')
     if create:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
