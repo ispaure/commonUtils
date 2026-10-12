@@ -50,6 +50,10 @@ class FileViews(qt.QStackedWidget):
         self.cover_queue = deque()
         self.cover_busy = False
         self.closing = False
+        self.badge_timer = qt.QTimer(self)
+        self.badge_timer.setInterval(1000)
+        self.badge_timer.timeout.connect(self._refresh_badges)
+        self.badge_timer.start()
         self.cover_path = None
         self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
@@ -280,6 +284,10 @@ class FileViews(qt.QStackedWidget):
             self.cover_queue.clear()
             self.tiles.viewport().update()
 
+    def _refresh_badges(self):
+        if not self.closing and self.isVisible() and self.currentIndex() == 1:
+            self.tiles.viewport().update()
+
     def _request_cover(self, path):
         from ...filesystem.network import is_network_location
         if self.closing or is_network_location(path):
@@ -333,6 +341,7 @@ class FileViews(qt.QStackedWidget):
 
     def stop(self):
         self.closing = True
+        self.badge_timer.stop()
         self.cover_queue.clear()
         storage_busy = self.storage.stop()
         return self.cover_busy or storage_busy

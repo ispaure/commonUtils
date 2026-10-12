@@ -131,3 +131,9 @@ Feature declarations to keep ownership coherent.
   checks, undo, offset conversion and persistence; see [code editing](../../ui/code_editor/README.md).
 
 [Developer hub](README.md)
+
+File types can supply `browser_thumbnail_badge()` for a short live thumbnail
+label. This is a GUI-thread painting hook: do not parse archives, block or open
+dialogs. Seed expensive summary metadata from `browser_thumbnail(size)` on its
+worker and read only bounded local state while painting. Empty strings omit the
+badge. FileViews owns periodic repainting and stops it during browser shutdown.

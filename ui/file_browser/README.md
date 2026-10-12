@@ -133,3 +133,9 @@ Drop Link As/Cancel Link Creation when an application-local source is present.
 creation on its existing worker and refreshes the destination through normal
 reconciliation. Busy/stopping guards and close ownership match other file actions.
 Link creation contracts belong to `filesystem/links/README.md`.
+
+`FilesystemObject.browser_thumbnail_badge()` returns an optional short string for
+an overlay at the top-right of a tile's thumbnail. It runs during painting, so it
+must be cheap, bounded and dialog-free; archive parsing belongs in the thumbnail
+worker, not this hook. The visible tile view repaints once per second for live
+labels without invalidating cached covers. The refresh timer stops with FileViews.

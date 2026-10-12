@@ -13,6 +13,46 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 
 class BrowserPresentationTests(QtTestCase):
+    def test_live_thumbnail_badge_changes_only_the_top_right_of_cover(self):
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / 'comic.badge'; path.write_text('fixture')
+            browser = FileBrowser(Path(temp), calculate_folder_sizes=False)
+            browser.resize(850, 550); browser.show()
+            deadline = monotonic() + 5
+            while not browser.model.index(str(path)).isValid():
+                self.assertLess(monotonic(), deadline)
+                self.app.processEvents(); sleep(.005)
+            try:
+                item = browser.model.item(browser.model.index(str(path)))
+                item.browser_has_thumbnail = True
+                progress = ['']
+                item.browser_thumbnail_badge = lambda: progress[0]
+                cover = qt.QPixmap(120, 165); cover.fill(qt.QColor('blue'))
+                browser.views.covers.icons[str(path)] = qt.QIcon(cover)
+                browser.view_selector.setCurrentIndex(1)
+                self.app.processEvents()
+                tiles = browser.views.tiles
+                index = browser.views.covers.mapFromSource(browser.model.index(str(path)))
+                rect = tiles.visualRect(index)
+                before = tiles.viewport().grab(rect).toImage()
+                progress[0] = '45/205'
+                browser.views._refresh_badges(); self.app.processEvents()
+                after = tiles.viewport().grab(rect).toImage()
+                changed = [(x, y) for y in range(before.height()) for x in range(before.width())
+                           if before.pixel(x, y) != after.pixel(x, y)]
+                self.assertTrue(changed)
+                self.assertGreater(sum(x for x, y in changed) / len(changed), before.width() / 2)
+                self.assertLess(max(y for x, y in changed), before.height() / 2)
+                progress[0] = '46/205'
+                browser.views._refresh_badges(); self.app.processEvents()
+                self.assertNotEqual(after, tiles.viewport().grab(rect).toImage())
+            finally:
+                browser.stop()
+                deadline = monotonic() + 5
+                while (browser.busy or browser.folder_busy or browser.views.cover_busy) and monotonic() < deadline:
+                    self.app.processEvents(); sleep(.005)
+                browser.close(); browser.deleteLater(); self.app.processEvents()
+
     def test_toolbar_stays_inline_and_split_panes_cannot_shrink_into_overlap(self):
         from commonUtils.ui.workspaces.workspace import Workspace
         host = qt.QWidget()
