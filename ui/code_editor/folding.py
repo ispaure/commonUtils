@@ -212,6 +212,31 @@ class FoldingCommands:
             painter.drawText(1, top, 14, self.fontMetrics().height(), qt.Qt.AlignmentFlag.AlignCenter,
                              "+" if block.blockNumber() in self.folding.collapsed else "−")
 
+    def _indent_guide_segments(self, block):
+        layout = block.layout()
+        if not layout.lineCount() or self.indent_width <= 0:
+            return []
+        line = layout.lineAt(0)
+        segments = []
+        column = 0
+        boundary = self.indent_width
+        # Only the first visual row contains this block's leading indentation.
+        for index, character in enumerate(block.text()[:line.textLength()]):
+            if character not in ' \t' or column >= 160:
+                break
+            following = column + (self.indent_width - column % self.indent_width if character == '\t' else 1)
+            start = line.cursorToX(index)[0]
+            end = line.cursorToX(index + 1)[0]
+            cell = (end - start) / (following - column)
+            while boundary <= following and boundary < 160:
+                # Center the guide in the whitespace cell before the boundary,
+                # instead of painting on the first letter's leading edge.
+                x = start + (boundary - column - .5) * cell
+                segments.append(qt.QLineF(x, line.y(), x, line.y() + line.height()))
+                boundary += self.indent_width
+            column = following
+        return segments
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if not self.indent_guides:
@@ -220,15 +245,11 @@ class FoldingCommands:
         painter.setPen(self.palette().color(qt.QPalette.ColorRole.Mid))
         block = self.firstVisibleBlock()
         top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        width = self.fontMetrics().horizontalAdvance(" ")
         while block.isValid() and top <= event.rect().bottom():
             height = self.blockBoundingRect(block).height()
             if block.isVisible():
-                text = block.text()
-                indent = len(text[:len(text) - len(text.lstrip(" \t"))].expandtabs(self.indent_width))
-                origin = self.contentOffset().x() + self.document().documentMargin()
-                for column in range(self.indent_width, min(indent + 1, 160), self.indent_width):
-                    x = round(origin + column * width)
-                    painter.drawLine(x, round(top), x, round(top + height))
+                offset = qt.QPointF(self.contentOffset().x(), top)
+                for segment in self._indent_guide_segments(block):
+                    painter.drawLine(segment.translated(offset))
             top += height
             block = block.next()

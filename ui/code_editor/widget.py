@@ -226,7 +226,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
 
     def update_tab_width(self):
         self.setTabStopDistance(
-            self.fontMetrics().horizontalAdvance(" ") * self.indent_width
+            qt.QFontMetricsF(self.font()).horizontalAdvance(" ") * self.indent_width
         )
 
     def set_font_size(self, size):
