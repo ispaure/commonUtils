@@ -39,8 +39,8 @@ class BrowserPresentationTests(QtTestCase):
         registration = register_file_type(BadgeFile, ('badge',), owner='badge_test')
         self.addCleanup(file_types.unregister, registration)
         with TemporaryDirectory() as temp:
-            path = Path(temp) / 'comic.badge'; path.write_text('fixture')
-            browser = FileBrowser(Path(temp), calculate_folder_sizes=False)
+            path = Path(temp).resolve() / 'comic.badge'; path.write_text('fixture')
+            browser = FileBrowser(Path(temp).resolve(), calculate_folder_sizes=False)
             browser.setFont(font)
             browser.resize(850, 550); browser.show()
             deadline = monotonic() + 5
