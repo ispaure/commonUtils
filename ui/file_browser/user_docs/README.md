@@ -162,3 +162,6 @@ Network folders should use symbolic links. Failures are reported without automat
 elevation. A missing source disables drop actions. Existing destination files are
 never replaced: name collisions get ` - Link`, then a numbered suffix. Native
 Windows link creation still requires validation on a Windows host.
+
+Tile thumbnails can show a small status badge at their top-right when the host's
+file type supplies one. Visible badges refresh as their status changes.

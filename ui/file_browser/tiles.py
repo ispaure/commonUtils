@@ -29,6 +29,25 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
             size = pixmap.deviceIndependentSize()
             painter.drawPixmap(qt.QPointF(area.center().x() - size.width()/2,
                                          area.center().y() - size.height()/2), pixmap)
+            source = index.model().mapToSource(index)
+            item = source.model().item(source)
+            text = item.browser_thumbnail_badge()
+            if text:
+                painter.save()
+                font = qt.QFont(option.font)
+                font.setPointSizeF(max(8, min(10, font.pointSizeF() - 1)))
+                painter.setFont(font)
+                metrics = qt.QFontMetricsF(font)
+                text = metrics.elidedText(text, qt.Qt.TextElideMode.ElideMiddle, max(1, int(size.width() - 12)))
+                width, height = metrics.horizontalAdvance(text) + 8, metrics.height() + 4
+                badge = qt.QRectF(area.center().x() + size.width()/2 - width - 3,
+                                 area.center().y() - size.height()/2 + 3, width, height)
+                painter.setPen(qt.Qt.PenStyle.NoPen)
+                painter.setBrush(qt.QColor(0, 0, 0, 200))
+                painter.drawRoundedRect(badge, 4, 4)
+                painter.setPen(qt.QColor('white'))
+                painter.drawText(badge, qt.Qt.AlignmentFlag.AlignCenter, text)
+                painter.restore()
 
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)

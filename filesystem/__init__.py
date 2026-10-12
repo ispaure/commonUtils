@@ -82,6 +82,10 @@ class FilesystemObject:
     def browser_thumbnail(self, size):
         return b''
 
+    def browser_thumbnail_badge(self):
+        """Optional short live label; must be cheap and never open dialogs."""
+        return ''
+
     def browser_activate(self, context):
         return False
 
