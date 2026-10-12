@@ -124,3 +124,4 @@ The UI facade and these packages preserve lazy Qt loading. Shared configuration
 continues to live at `ui/settings.ini`.
 
 - [Docking workspaces](workspaces/README.md): Docking, tab gestures, splitting, floating windows and native workspace menus.
+- [Background task presentation](tasks/README.md): Qt workers, cancellable operation progress, streamed processes and download dialogs. Runtime operations and streams remain outside the UI layer.

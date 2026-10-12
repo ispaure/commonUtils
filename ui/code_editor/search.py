@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import re
 from .. import pyside as qt
-from ..operation_progress import OperationProgress
+from ..tasks.operation_progress import OperationProgress
 
 MATCH_LIMIT = 50000
 

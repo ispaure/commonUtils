@@ -1,6 +1,6 @@
 """On-demand, bounded diagnostics; paths appear only in this explicit dialog."""
 from .. import pyside as qt
-from ..operations import Operation
+from ..tasks.operations import Operation
 
 
 class IndexDetailsDialog(qt.QDialog):

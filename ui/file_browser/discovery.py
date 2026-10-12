@@ -1,7 +1,7 @@
 """Shared scan-dialog lifecycle for storage snapshots."""
 from pathlib import Path
 from .. import pyside as qt
-from ..operation_progress import OperationProgress
+from ..tasks.operation_progress import OperationProgress
 from ...filesystem.index import directory_cache, Snapshot
 from time import time
 from ...runtime.operations import OperationCancelled

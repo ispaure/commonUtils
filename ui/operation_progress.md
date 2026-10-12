@@ -16,7 +16,7 @@ import sys
 from commonUtils.runtime.operations import OperationCancelled, check_cancelled
 from commonUtils.runtime.streams import file_sha256
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.operation_progress import OperationProgress
+from commonUtils.ui.tasks.operation_progress import OperationProgress
 
 class HashDialog(qt.QDialog):
     def __init__(self, paths, parent=None):
@@ -85,7 +85,7 @@ completion it can be closed or restarted. Capture widget values before work star
 and use only signals/reporting to communicate back from the worker. Do not open
 password dialogs, change widgets or destroy the parent from the callback.
 
-For background work without progress controls, `ui.operations.Operation(callback,
+For background work without progress controls, `ui.tasks.operations.Operation(callback,
 parent)` exposes `completed(result, error)` and the QThread `finished` signal.
 The completed signal alone does not establish that its thread has stopped. Use
 `OperationProgress` for the managed completion/close lifecycle, or retain the worker

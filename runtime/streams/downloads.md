@@ -34,7 +34,7 @@ read returns or times out. `DownloadCancelled` is an alias of `OperationCancelle
 For a Qt application with an existing QApplication, use the shared prompt/dialog:
 
 ```python
-from commonUtils.ui.download import ensure_download
+from commonUtils.ui.tasks.download import ensure_download
 
 path = ensure_download(spec, destination, parent=window)
 if path is not None:

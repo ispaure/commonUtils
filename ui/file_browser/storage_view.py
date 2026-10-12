@@ -3,7 +3,7 @@ from pathlib import Path
 import math
 from bisect import bisect_right
 from .. import pyside as qt
-from ..operations import Operation
+from ..tasks.operations import Operation
 from ...filesystem.index import directory_cache
 from ...filesystem import format_size
 from ...configuration.settings import get_setting
