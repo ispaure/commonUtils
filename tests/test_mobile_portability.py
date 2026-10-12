@@ -79,6 +79,10 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 identity = sys.argv[1]
 sys.platform = identity
+if identity == 'legacy-ios':
+    import platform
+    sys.platform = 'darwin'
+    platform.system = lambda: 'iOS'
 if identity == 'legacy-android':
     sys.platform = 'linux'
     sys.getandroidapilevel = lambda: 24
@@ -112,7 +116,7 @@ with patch('os.system', side_effect=AssertionError('import shell side effect')) 
         assert len(Directory(root).list_files()) == 1
         copied = File(source).copy_file(root / 'copy.md')
         assert copied.path.read_bytes() == source.read_bytes()
-        if identity in ('ios', 'android', 'legacy-android'):
+        if identity in ('ios', 'android', 'legacy-android', 'legacy-ios'):
             assert get_split_character() == '/'
             assert copied.make_writable()
         for suffix in ('epub', 'cbz'):
@@ -122,7 +126,7 @@ with patch('os.system', side_effect=AssertionError('import shell side effect')) 
             with open_archive(archive_path) as archive:
                 assert archive.read('content.txt') == b'document'
                 assert copy_member_info(archive.infolist()[0], archive).filename == 'content.txt'
-        if identity in ('ios', 'android', 'legacy-android'):
+        if identity in ('ios', 'android', 'legacy-android', 'legacy-ios'):
             try:
                 import commonUtils.ui.pyside
             except UnsupportedCapabilityError:
@@ -130,7 +134,34 @@ with patch('os.system', side_effect=AssertionError('import shell side effect')) 
             else:
                 raise AssertionError('mobile Qt import should fail before binary initialization')
 '''
-        for identity in ('win32', 'darwin', 'linux', 'ios', 'android', 'legacy-android'):
+        for identity in ('win32', 'darwin', 'linux', 'ios', 'android', 'legacy-android', 'legacy-ios'):
             with self.subTest(identity=identity):
                 result = subprocess.run([sys.executable, '-c', script, identity], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_desktop_uri_dispatch_remains_unchanged(self):
+        from commonUtils.integrations.applications import open_uri
+        for identity, command in (('darwin', 'open'), ('linux', 'xdg-open')):
+            with self.subTest(identity=identity), patch('sys.platform', identity), patch('platform.system', return_value='Darwin'), patch('subprocess.Popen') as launch:
+                self.assertIsNone(open_uri('test:document'))
+                self.assertEqual(launch.call_args.args[0], [command, 'test:document'])
+        with patch('sys.platform', 'win32'), patch('os.startfile', create=True) as launch:
+            self.assertIsNone(open_uri('test:document'))
+            launch.assert_called_once_with('test:document')
+
+    def test_missing_encryption_dependency_fails_without_creating_archive(self):
+        from tempfile import TemporaryDirectory
+        from commonUtils.archives.zip_access import open_archive
+        with TemporaryDirectory() as temporary, patch.dict(sys.modules, {'pyzipper': None}):
+            path = Path(temporary) / 'protected.zip'
+            with self.assertRaisesRegex(RuntimeError, 'optional pyzipper'):
+                with open_archive(path, 'w', password='secret'):
+                    self.fail('Must not silently write an unencrypted archive')
+            self.assertFalse(path.exists())
+
+    def test_denied_write_probe_reports_error_without_success_claim(self):
+        from commonUtils.runtime.platform.capabilities import CapabilityState, probe_filesystem
+        with patch('commonUtils.runtime.platform.capabilities.TemporaryFile', side_effect=PermissionError('sandbox denied')):
+            result = probe_filesystem(Path('.'), write=True)
+        self.assertIs(result.state, CapabilityState.UNAVAILABLE)
+        self.assertIn('sandbox denied', result.reason)
