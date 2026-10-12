@@ -115,3 +115,12 @@ application opt-in, and central-settings navigation callback. `[Styling] theme_m
 is the preferred theme source; `[Theme] mode` remains a fallback for older hosts.
 See [layered configuration](../configuration/README.md#software-defaults-and-sparse-personal-overrides)
 for the resettable software/personal editor and host-owned path registration.
+
+## Module organization
+
+Implementations are grouped by responsibility. Former direct module paths remain
+compatibility aliases to the same modules; use the grouped paths in new code.
+The UI facade and these packages preserve lazy Qt loading. Shared configuration
+continues to live at `ui/settings.ini`.
+
+- [Docking workspaces](workspaces/README.md): Docking, tab gestures, splitting, floating windows and native workspace menus.

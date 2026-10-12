@@ -1,16 +1,5 @@
-"""Optional container policies; legacy Workspace constructors keep their behavior."""
-from dataclasses import dataclass
+"""Compatibility alias for :mod:`commonUtils.ui.workspaces.workspace_policy`."""
+from importlib import import_module as _import_module
+import sys as _sys
 
-
-@dataclass(frozen=True)
-class WorkspacePolicy:
-    allow_last_tab_detach: bool = True
-    show_single_tab_in_main: bool = True
-    show_single_tab_in_detached: bool = True
-    detached_title: str = '{title}'
-    max_tabs: int | None = None
-
-
-def header_visible(policy, count, detached):
-    return count > 1 or count == 1 and (
-        policy.show_single_tab_in_detached if detached else policy.show_single_tab_in_main)
+_sys.modules[__name__] = _import_module(".workspaces.workspace_policy", __package__)

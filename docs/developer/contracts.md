@@ -57,3 +57,13 @@ remain untouched. Reset removes an explicit personal field, never a software
 schema field. Atomic saves reject concurrent edits. Hosts own migration and paths.
 See the configuration guide for the API, and `ui/styling.md` for live font roles,
 weak widget binding, optional application-font opt-in and settings navigation.
+
+## Grouped UI imports
+
+See [UI module organization](../../ui/README.md#module-organization) for canonical
+package paths. Former direct UI module imports remain ordinary compatibility
+modules that alias their owning implementation in `sys.modules`. They share class
+identity, mutable registries and patch targets with canonical imports. Aliases use
+relative imports, so vendored namespaces remain independent; no import finder or
+global standalone namespace is installed. Importing a group alone does not import
+Qt. Keep existing guide URLs and `ui/settings.ini` available.
