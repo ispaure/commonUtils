@@ -45,6 +45,7 @@ transfers and rename plans.
 | INI documents | `INIFile.read/get/set/save`; string values, formatting preservation, parse/I/O errors propagate |
 | Typed INI fields | `configuration.ini_schema`; explicit opt-in suffix validation, separate from INI storage |
 | Shared preferences | `configuration.settings.get_setting`; default's type determines conversion, bad/missing values fall back without rewriting |
+| Migration completion | `configuration.migrations.MigrationLedger`; host-owned IDs/callbacks, explicit pending/done state outside resettable overrides |
 | Raw atomic saves | `persistence.atomic_write_bytes/atomic_write_json`; caller supplies policy, directory and validation |
 | Editable text snapshots | `persistence.text`; strict encoding, bounds, conflict checks and exact unchanged-byte preservation |
 | Recovery / merge | `SessionStore` and `merge_text`/`MergeSession`; callers own schema, locking and apply/save policy |
