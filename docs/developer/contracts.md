@@ -69,3 +69,9 @@ Modules import relatively within the library, so vendored namespaces retain thei
 own classes and registries without installing import finders or standalone aliases.
 Importing a group alone does not import Qt. Existing guide URLs and
 `ui/settings.ini` remain available.
+
+Merge widgets and hosts import the data model directly from `persistence.merge`;
+the former `ui.code_editor.merge_model` shim has been removed. Directory-cache
+writers call `filesystem.index.schema.initialize_schema()` directly under their
+existing writer lock; the private `_schema()` forwarding method has been removed.
+Persistent formats, migration and cancellation behavior are unchanged.
