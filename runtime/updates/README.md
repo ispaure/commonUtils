@@ -8,7 +8,7 @@ cooperative shutdown. Run checks/preparation on a worker.
 downloads that exact source and declared pinned GitHub dependencies. This suits
 applications or addons without releases. `latest_release(channel)` selects a
 published, non-draft release with an uploaded `release.zip` and GitHub SHA-256
-digest. Stable numeric `vX.Y[.Z]` tags belong to main; `-beta[.N]` and `-alpha[.N]`
+digest. Explicit `vX.Y.Z-main.N` tags and legacy numeric `vX.Y[.Z]` tags belong to main; `-beta[.N]` and `-alpha[.N]`
 tags belong to their separate channels. Unknown suffixes are excluded. Selection
 uses the highest numeric version in the requested channel. Main excludes
 prereleases. `has_new_commits(current, target)` lets hosts avoid downgrades.
@@ -47,3 +47,7 @@ recovery and never launch a staged request after shutdown is cancelled.
 Local tests cover Git/submodule rollback, archive preservation/collisions,
 release classification/checksums and detached wait/restart. Native Windows and
 Linux restart launchers remain consuming-application validation responsibilities.
+
+Channel sequence numbers accept leading zeros and sort numerically. Older clients
+without `-main.N` recognition need an alpha update containing this parser or a
+manual installation before they can discover explicitly numbered main releases.
