@@ -5,7 +5,7 @@ from pathlib import Path
 from ...filesystem.directories import Directory
 from .. import pyside as qt
 from ..entry_views import configure_entry_selection
-from ..operations import Operation
+from ..tasks.operations import Operation
 from .tiles import ResponsiveTileView
 from .columns import FolderColumnView, ColumnDelegate
 from .thumbnails import CoverModel

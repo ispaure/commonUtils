@@ -124,3 +124,5 @@ or headless flows where dialogs are inappropriate.
 - [Styling](../../ui/styling.md): font roles, live bindings, accent/tint, application opt-in and host settings callback.
 
 - [UI workspaces](../../ui/workspaces/README.md): canonical modules under `ui.workspaces`; former direct UI module imports remain supported.
+
+- [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`; former direct UI module imports remain supported.

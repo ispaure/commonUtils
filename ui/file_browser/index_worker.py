@@ -3,7 +3,7 @@ from contextlib import ExitStack
 from time import monotonic
 import sqlite3
 from threading import Event, RLock
-from ..operations import Operation
+from ..tasks.operations import Operation
 from .. import pyside as qt
 from ...filesystem.index import directory_cache
 from .status import IndexProgress

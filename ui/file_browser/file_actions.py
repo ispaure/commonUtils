@@ -3,7 +3,7 @@
 from pathlib import Path
 from uuid import uuid4
 from .. import pyside as qt
-from ..operation_progress import OperationProgress
+from ..tasks.operation_progress import OperationProgress
 from ...filesystem.transfers import transfer_paths
 from .trash_actions import TrashActionsMixin
 

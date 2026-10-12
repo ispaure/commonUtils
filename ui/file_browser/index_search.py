@@ -1,7 +1,7 @@
 """Paged recursive name search from cached SQLite data; never scans on a query."""
 from pathlib import Path
 from .. import pyside as qt
-from ..operations import Operation
+from ..tasks.operations import Operation
 from ...filesystem.index import directory_cache
 from ...filesystem import format_size
 from .search_columns import configure_search_columns, describe_search_row
