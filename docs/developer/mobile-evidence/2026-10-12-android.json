@@ -1,0 +1,29 @@
+{
+  "tested_commit": "1b3d7cd8cecf0d2467862510ab7c42d04ff7736a",
+  "run_url": "https://github.com/ispaure/commonUtils/actions/runs/38276280710",
+  "job_id": 114902427694,
+  "observed_date": "2026-10-12",
+  "result": {
+    "environment": "android-emulator",
+    "errors": 0,
+    "expected_tests": [
+      "test_runtime_identity",
+      "test_portable_imports",
+      "test_capability_boundaries",
+      "test_private_storage",
+      "test_text_roundtrip_and_conflict",
+      "test_markdown",
+      "test_plain_zip_containers"
+    ],
+    "failures": 0,
+    "machine": "x86_64",
+    "python": "3.14.7",
+    "schema": 1,
+    "skipped": 0,
+    "success": true,
+    "suite": "commonUtils-mobile-smoke",
+    "sys_platform": "android",
+    "target": "android",
+    "tests_run": 7
+  }
+}

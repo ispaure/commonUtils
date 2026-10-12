@@ -121,6 +121,8 @@ edit was excluded from all foundation commits. Logistics consumer regressions ar
 run before updating its submodule pin; no mobile-device or native Windows/Linux
 success is inferred from these results.
 
-A [manual embedded-runtime test harness](mobile-testing.md) is now available for
-the next validation stage. It has not yet produced simulator/emulator or physical-
-device evidence; the capability policy above remains unchanged.
+The [manual embedded-runtime test harness](mobile-testing.md) passed all seven
+cases on both a hosted Android emulator and iOS Simulator on 2026-10-12 at
+`8ff459a`. The linked guide records exact revisions, runtime reports and the
+initial iOS packaging failure and fix. Physical devices remain unverified; the
+capability policy above remains unchanged.

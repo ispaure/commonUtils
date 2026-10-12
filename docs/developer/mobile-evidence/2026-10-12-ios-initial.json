@@ -1,0 +1,12 @@
+{
+  "tested_commit": "1b3d7cd8cecf0d2467862510ab7c42d04ff7736a",
+  "run_url": "https://github.com/ispaure/commonUtils/actions/runs/38276550955",
+  "job_id": 114903322199,
+  "observed_date": "2026-10-12",
+  "conclusion": "failure",
+  "phase": "testbed package import",
+  "diagnostic": "ModuleNotFoundError: No module named 'commonUtils'",
+  "cause": "Pinned CPython clone --app copies into Testbed/app; the iOS Xcode project bundles iOSTestbed/app.",
+  "fix_commit": "8ff459a6e30100c3f9348d0113794b1a534355a5",
+  "smoke_tests_executed": false
+}

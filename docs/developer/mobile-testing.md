@@ -77,6 +77,16 @@ estimate. Start one target at a time; cancel a clearly stuck job in Actions.
 Artifacts are retained for 14 days, including build/testbed logs on failures.
 There is no release, upload to an app store, external tester dispatch or signing.
 
+### Pinned iOS testbed packaging workaround
+
+CPython's pinned `Apple/testbed clone --app` copies packages into `Testbed/app`,
+but its iOS Xcode project bundles `iOSTestbed/app`. The workflow clones the
+framework without `--app`, then copies the staged commonUtils package into that
+iOS resource directory and checks for the smoke module before building. Recheck
+this workaround when upgrading CPython. The first hosted iOS run exposed this
+as `ModuleNotFoundError: No module named 'commonUtils'` after the simulator
+successfully started Python; no commonUtils smoke cases ran in that attempt.
+
 ## Local validation and evidence status
 
 From the Logistics checkout:
@@ -91,11 +101,24 @@ verifier rejects it. Unit tests check wrong-platform, missing, duplicate,
 failed/skipped reports and packaging exclusions. These host tests are not the
 mobile smoke suite running on a mobile interpreter.
 
-At implementation time the host harness, report tests and workflow lint were
-validated locally. **The mobile workflows have not been dispatched.** No
-simulator/emulator or physical-device pass has been recorded. The local Xcode
-installation had no available simulator devices. The first hosted runs remain
-necessary to validate the complete build/runtime setup.
+On 2026-10-12, [hosted run 38277821906](https://github.com/ispaure/commonUtils/actions/runs/38277821906)
+passed both targets at commonUtils commit `8ff459a6e30100c3f9348d0113794b1a534355a5`.
+Each target executed all seven cases on embedded CPython 3.14.7 with zero failures,
+errors or skips, and passed the runtime evidence verifier:
+
+| Runtime | Recorded environment | Result record |
+| --- | --- | --- |
+| Android | x86_64 Android emulator; pinned API 35 testbed | [Android JSON](mobile-evidence/2026-10-12-android-rerun.json) |
+| iOS | arm64 iPhone 16e simulator, iOS 26.2; Xcode 16.4 (16F6) | [iOS JSON](mobile-evidence/2026-10-12-ios-rerun.json) |
+
+These small records preserve the result payloads retrieved from completed job
+logs, with their source commit and job/run IDs. Full diagnostic artifacts remain
+subject to the 14-day retention period. The original revision `1b3d7cd` passed
+[Android](mobile-evidence/2026-10-12-android.json), while its
+[first iOS attempt](mobile-evidence/2026-10-12-ios-initial.json) failed before
+smoke execution because of the packaging mismatch described above. Both targets
+were rerun after the fix. No physical-device result is claimed. The local Xcode
+installation had no available simulators; these are GitHub-hosted results.
 
 ## Next milestones
 
@@ -112,4 +135,4 @@ Upstream source: [Android testbed instructions](https://github.com/python/cpytho
 The local shared regression run completed 735 tests in 100 isolated modules with
 zero failing modules (two platform skips). The seven-case desktop harness and the
 three report/packaging tests passed; actionlint accepted the workflow. These are
-host validation results, not evidence that either mobile workflow has run.
+host validation results; the hosted runtime evidence is recorded separately above.
