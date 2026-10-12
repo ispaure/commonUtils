@@ -120,3 +120,7 @@ the consumer's Ruff correctness configuration. The existing local ui/settings.in
 edit was excluded from all foundation commits. Logistics consumer regressions are
 run before updating its submodule pin; no mobile-device or native Windows/Linux
 success is inferred from these results.
+
+A [manual embedded-runtime test harness](mobile-testing.md) is now available for
+the next validation stage. It has not yet produced simulator/emulator or physical-
+device evidence; the capability policy above remains unchanged.

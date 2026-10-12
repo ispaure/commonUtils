@@ -51,3 +51,8 @@ I/O uses temporary files on the test host. They do not run a mobile interpreter,
 mobile filesystem provider or mobile UI. Keep real-device results separate from
 these mocked contracts. The [mobile audit](../docs/developer/mobile-foundation.md)
 records policy, integration prerequisites and remaining deployment blockers.
+
+`mobile_smoke.py` is a separate, dependency-free suite for embedded runtimes.
+Unlike the mocked compatibility tests above it does not replace OS identifiers.
+Use `--target host` only to check the harness locally. The manual Android/iOS
+workflow and first-run instructions are in the [mobile test guide](../docs/developer/mobile-testing.md).

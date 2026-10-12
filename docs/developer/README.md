@@ -21,3 +21,6 @@ The [audit record](audit.md) explains the restructuring and remaining uncertaint
 Windows, macOS and Linux retain their existing APIs. iOS and Android have an
 incremental infrastructure foundation, not device-verified application support.
 See the [compatibility audit and deployment blockers](mobile-foundation.md).
+
+[Mobile test guide](mobile-testing.md): manually run the embedded Android/iOS
+smoke harness, inspect evidence and distinguish host checks from mobile results.
