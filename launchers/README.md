@@ -4,6 +4,10 @@ Platform launch scripts bootstrap the consuming Python project. Projects select 
 
 macOS `.command`, Linux `.sh` and Windows `.bat` scripts share the launcher contract. See [project setup](#use-it-in-a-project).
 
+Windows batch scripts must retain CRLF line endings: `cmd.exe` can fail to resolve
+`CALL :label` subroutines in LF-only files. Git attributes enforce this on checkout;
+consumers packaging source archives must also preserve CRLF in their shipped files.
+
 ## Files
 
 | File | Responsibility / public entry points |
