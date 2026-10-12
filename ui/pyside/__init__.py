@@ -3,6 +3,10 @@
 Qt, typing and OS exports remain available for existing consumers. Mutable settings
 and calls between components resolve through this facade to preserve customization.
 """
+from ...runtime.platform.capabilities import Capability, require_capability
+
+require_capability(Capability.DESKTOP_UI, 'ui.pyside')
+
 from ._imports import *
 from ._imports import (__author__, __copyright__, __license__, __maintainer__, __email__, __status__)
 import sys as _sys

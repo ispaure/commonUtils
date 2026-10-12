@@ -23,6 +23,8 @@ def shared_settings():
     defaults = settings_path()
     personal = personal_path(defaults)
     if personal is None:
+        from ..runtime.platform.capabilities import Capability, require_capability
+        require_capability(Capability.DEFAULT_STORAGE, 'shared_settings; register a personal settings path first')
         if sys.platform == 'darwin':
             folder = Path.home() / 'Library' / 'Application Support' / 'commonUtils'
         elif sys.platform == 'win32':

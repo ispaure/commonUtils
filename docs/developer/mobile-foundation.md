@@ -57,3 +57,57 @@ References: [CPython platform identifiers](https://docs.python.org/3/library/sys
 - Validate sandbox entitlements, signing, packaging, distribution and recovery
   after suspension/termination. Verify desktop native integrations on Windows and
   Linux in addition to the local macOS regressions.
+
+## Implemented foundation and integration policy
+
+`runtime.platform.capabilities` centralizes adapter policy for subprocesses,
+shell integration, external applications, desktop UI/file dialogs and default
+storage. IMPLEMENTED means an existing desktop adapter, not a successful runtime
+probe. Mobile adapters are UNAVAILABLE; local filesystem access is UNVERIFIED on
+all platforms until an operation is attempted. `probe_filesystem` reports VERIFIED
+only for the actual path/read or temporary-file write it performed. See the
+[API contract](../../runtime/platform/README.md#capability-policy).
+
+Command entry points, application/URI launchers, directory opening and default
+text editing reject mobile requests with `UnsupportedCapabilityError` before
+side effects. The UI facade/native dialogs and explicit PySide import reject
+mobile desktop UI use before Qt initialization; existing Qt file-dialog exports
+remain part of that desktop-only facade. A mobile host must supply presentation
+and document-selection adapters in future work. Critical diagnostics still raise
+`DebugException` on mobile without attempting a desktop popup. Windows console
+ANSI initialization is deferred until logging, preserving import-only use.
+
+File/Directory/registry, text persistence, Markdown properties and plain ZIP
+operations can be imported without Qt, pwd, ctypes or pyzipper. File permission
+changes on caller-supplied mobile paths use native chmod and propagate permission
+errors; this is not a sandbox escape or a promise that chmod succeeds. Plain ZIP
+access uses stdlib zipfile; encrypted ZIP operations require pyzipper and report a
+clear missing-dependency error. EPUB/CBZ tests exercise container I/O, not format
+rendering, DRM, document-provider URIs or a complete reader.
+
+On mobile, set `COMMONUTILS_STORAGE_ROOT` to an absolute app-private filesystem
+path before importing the directory index or using automatic caches. Cache/Temp
+subdirectories are resolved beneath it; `create=False` does not create them.
+The override also works on desktop and disables legacy cache migration. Without
+it mobile automatic storage fails explicitly instead of choosing desktop paths.
+The index singleton resolves its default path at import; mobile hosts must set
+this root first. Register an explicit personal settings path with
+`configuration.layered.register_settings` before `shared_settings()` on mobile.
+All paths still need actual runtime permission validation.
+
+Desktop-only adapters outside these shared entry points are not a mobile API.
+Direct platform integrations (for example DMG, Perforce, native widgets, external
+archive programs and process-based index owners) still require separate review
+when selected for a mobile application. No global override claims them supported.
+
+## Validation evidence
+
+The baseline commonUtils suite passed on the local macOS host: 717 tests, two
+platform skips. Five-platform detection/capability matrices use mocks. Fresh
+interpreter tests block optional desktop dependencies and exercise File/Directory,
+Markdown/text and ZIP container operations on host temporary files under simulated
+Windows/macOS/Linux/iOS/Android and legacy Android identities. They check that
+imports neither initialize a GUI nor execute a shell. Boundary tests check mobile
+errors before launching processes, sandbox root requirements and popup-free
+critical errors. Actual Windows, Linux, iOS and Android runtime validation remains
+outstanding; native dialogs and external programs are not exercised by mocks.

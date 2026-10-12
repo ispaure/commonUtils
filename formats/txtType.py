@@ -1,3 +1,5 @@
+
+from ..runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -12,7 +14,6 @@ __status__ = 'Production'
 # IMPORTS
 
 from typing import *
-import subprocess
 from pathlib import Path
 from ..runtime.platform import *
 from ..filesystem.files import File
@@ -67,6 +68,8 @@ class TXTFile(File):
                     f.write(line)
 
     def edit_in_default_editor(self):
+        require_capability(Capability.EXTERNAL_APPLICATIONS, 'edit_in_default_editor')
+        import subprocess
         path_str = str(self.path)
 
         match get_os():

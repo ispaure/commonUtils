@@ -14,3 +14,8 @@ for file in folder.list_files(recursive=False, filter_extension=['txt', 'md']):
 
 Use [traversal](../README.md) for plain paths, filename masks and cancellation.
 The [format guide](../../formats/README.md) explains custom file types.
+
+Traversal and file classification remain independent of desktop UI. `open()` is
+a desktop application-launch operation and raises `UnsupportedCapabilityError`
+on mobile before invoking a launcher. Caller-supplied sandbox paths are required
+for portable filesystem operations.

@@ -27,6 +27,8 @@ def directory_index_path():
 
 
 def _legacy_directory_index_path():
+    if os.environ.get('COMMONUTILS_STORAGE_ROOT'):
+        return None
     if sys.platform == 'darwin':
         recent = Path.home() / 'Library' / 'Caches' / 'commonUtils' / 'directory-index.sqlite3'
         if recent.is_file():

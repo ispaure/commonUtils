@@ -1,5 +1,7 @@
 """Shell-free, cancellable command execution with explicit completion outcomes."""
 
+from ....runtime.platform.capabilities import Capability, require_capability
+
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +41,7 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
     timeout bounds elapsed time; idle_timeout bounds time without output. Neither
     limit is enabled by default. Launch errors propagate as OSError.
     """
+    require_capability(Capability.SUBPROCESS, 'run_command')
     if isinstance(arguments, str) != shell:
         raise TypeError('Use an argument sequence, or a string with shell=True')
     for limit in (timeout, idle_timeout):
@@ -46,6 +49,8 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
             raise ValueError('Command timeouts must be positive')
     if cancelled():
         return CommandResult(None, cancelled=True)
+    if shell:
+        require_capability(Capability.SHELL, 'run_command')
     child = subprocess.Popen(arguments, shell=shell, cwd=cwd, stdin=stdin,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              **process.get_process_group_kwargs())

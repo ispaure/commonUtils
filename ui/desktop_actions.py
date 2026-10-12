@@ -1,5 +1,7 @@
 """Open and reveal local items through the platform's file applications."""
 
+from ..runtime.platform.capabilities import Capability, require_capability
+
 from pathlib import Path
 import subprocess
 from urllib.parse import quote
@@ -8,6 +10,7 @@ from . import pyside as qt
 
 
 def open_default(path):
+    require_capability(Capability.EXTERNAL_APPLICATIONS, 'open_default')
     if not qt.QDesktopServices.openUrl(qt.QUrl.fromLocalFile(str(Path(path).absolute()))):
         raise RuntimeError('Could not open the default application')
 
@@ -17,6 +20,7 @@ def reveal_label():
 
 
 def reveal(path):
+    require_capability(Capability.EXTERNAL_APPLICATIONS, 'reveal')
     path = Path(path).absolute()
     platform = get_os()
     if platform == OS.MAC:

@@ -208,3 +208,7 @@ scope, optional section filter, labels and host validator for domain constraints
 Dirty editors compare both layers before saving. Choice metadata supplies mode
 dropdowns rather than appearing as a user preference. Undeclared personal session
 fields are retained on disk but omitted from the software settings form.
+
+Mobile hosts must register an explicit personal settings path before calling
+`layered.shared_settings()`. Automatic desktop paths are rejected on iOS/Android;
+registration and reads do not create a settings file or grant sandbox access.

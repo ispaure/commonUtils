@@ -1,3 +1,5 @@
+
+from ....runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -29,6 +31,7 @@ tool_name = 'commonUtils/wrappers/cmdShellWrapper'
 
 def exec_cmd_new_window(command: str, cwd: Optional[str]):
     """Launch a command in a new terminal window and return immediately."""
+    require_capability(Capability.SHELL, 'exec_cmd_new_window')
     match get_os():
         case OS.WIN:
             return _exec_cmd_new_window_windows(command, cwd)

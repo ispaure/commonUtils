@@ -115,3 +115,8 @@ offered. `context_menu()` builds the selection menu without opening a popup.
 Regression coverage lives in `tests/test_archives.py`, `test_archive_types.py`,
 `test_archive_view.py` and the existing ZIP tests. Consumer tests should focus on
 routing, credential policy, browser refresh, feature toggles and shutdown.
+
+Plain ZIP access through `zip_access` uses the standard library without importing
+pyzipper. Encrypted ZIP access loads pyzipper on demand and raises an explanatory
+RuntimeError if it is absent. This allows unencrypted EPUB/CBZ container I/O in
+portable code; rendering and mobile deployment are separate concerns.

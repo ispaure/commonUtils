@@ -1,3 +1,5 @@
+
+from ...runtime.platform.capabilities import Capability, require_capability
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
 
@@ -18,6 +20,7 @@ from . import cmdShellWrapper
 
 
 def exec_powershell(command, wait_for_output=True):
+    require_capability(Capability.SHELL, 'exec_powershell')
     if wait_for_output is True:
         # Run the command
         result = subprocess.run(

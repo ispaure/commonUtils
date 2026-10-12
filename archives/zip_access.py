@@ -14,7 +14,6 @@ from tempfile import NamedTemporaryFile
 import zipfile
 import zlib
 
-import pyzipper
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
 
@@ -49,7 +48,13 @@ def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLA
         raise ValueError('An encrypted ZIP requires a nonempty password')
     if mode == 'r' and encrypted and not password:
         raise ArchivePasswordError(f'Archive password required: {Path(path).name}')
+    bad_zip_errors = (zipfile.BadZipFile,)
     if encrypted:
+        try:
+            import pyzipper
+        except ImportError as error:
+            raise RuntimeError('Encrypted ZIP access requires the optional pyzipper dependency') from error
+        bad_zip_errors += (pyzipper.BadZipFile,)
         archive = pyzipper.AESZipFile(str(path), mode, compression=compression, compresslevel=compresslevel)
         archive.setpassword(password)
         if mode != 'r':
@@ -63,7 +68,7 @@ def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLA
         if 'password' in str(error).lower():
             raise ArchivePasswordError(f'Archive password incorrect: {Path(path).name}') from None
         raise
-    except (zipfile.BadZipFile, pyzipper.BadZipFile) as error:
+    except bad_zip_errors as error:
         if encrypted and ('hmac' in str(error).lower() or 'bad crc' in str(error).lower()):
             raise ArchivePasswordError(
                 f'Archive password incorrect or encrypted data damaged: {Path(path).name}') from None
@@ -153,7 +158,11 @@ def archive_manifest(path, *, password=None, cancelled=lambda: False, progress=N
 
 def copy_member_info(member, target):
     """ZipInfo types differ between stdlib and pyzipper; copy portable attributes."""
-    cls = pyzipper.zipfile_aes.AESZipInfo if isinstance(target, pyzipper.AESZipFile) else zipfile.ZipInfo
+    if isinstance(target, zipfile.ZipFile):
+        cls = zipfile.ZipInfo
+    else:
+        import pyzipper
+        cls = pyzipper.zipfile_aes.AESZipInfo if isinstance(target, pyzipper.AESZipFile) else zipfile.ZipInfo
     result = cls(member.filename, member.date_time)
     for name in ('comment', 'create_system', 'external_attr', 'internal_attr', 'compress_type'):
         setattr(result, name, getattr(member, name))
