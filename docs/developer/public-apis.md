@@ -109,7 +109,7 @@ or headless flows where dialogs are inappropriate.
   preview by default, explicit editing, boolean save/navigation outcomes.
 - [CodeEdit and companions](../../ui/code_editor/README.md): editing mechanics,
   search, diff/merge and optional syntax; host owns documents and save policy.
-- `ui.text_editor.TextFileEditor` and `ui.ini_editor.INISettingsEditor`: embedding
+- `ui.text_editor.TextFileEditor` and `ui.settings.ini_editor.INISettingsEditor`: embedding
   editors with `save`, `reload`, `is_modified`, `can_close` and `saved(path)`.
 - [ArchiveContents](../../ui/archive_view/README.md): passive navigation and request
   signals; host performs preview/extraction/removal jobs and password handling.
@@ -128,3 +128,5 @@ or headless flows where dialogs are inappropriate.
 - [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`; former direct UI module imports remain supported.
 
 - [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`; former direct UI module imports remain supported.
+
+- [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`; former direct UI module imports remain supported.
