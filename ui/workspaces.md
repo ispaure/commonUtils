@@ -2,7 +2,7 @@
 
 ## Reusable docking workspaces
 
-`commonUtils.ui.workspace.Workspace` owns dockable tabs, full-window dragging,
+`commonUtils.ui.workspaces.workspace.Workspace` owns dockable tabs, full-window dragging,
 left/right splits, grouped tab headers, transfer between compatible workspaces,
 and cooperative closing. It imports no Logistics features. Supply a factory
 returning a QWidget, optionally exposing `view_title`, `title_changed`,

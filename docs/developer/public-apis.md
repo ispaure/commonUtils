@@ -122,3 +122,5 @@ or headless flows where dialogs are inappropriate.
 
 - [Layered INI APIs](../../configuration/README.md#software-defaults-and-sparse-personal-overrides): registration, validated reads, sparse saves and editor.
 - [Styling](../../ui/styling.md): font roles, live bindings, accent/tint, application opt-in and host settings callback.
+
+- [UI workspaces](../../ui/workspaces/README.md): canonical modules under `ui.workspaces`; former direct UI module imports remain supported.
