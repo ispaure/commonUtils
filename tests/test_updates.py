@@ -263,6 +263,16 @@ class ReleaseSourceTests(unittest.TestCase):
         with patch('commonUtils.runtime.updates.github.json_get', return_value=[]):
             self.assertIsNone(GitHubSource('owner/repo').latest_release('main'))
 
+    def test_numbered_main_releases_sort_numerically_and_keep_legacy_tags(self):
+        from commonUtils.runtime.updates.github import GitHubSource, release_channel, release_version
+        self.assertEqual(release_channel('v0.1.0-main.01'), 'main')
+        self.assertEqual(release_channel('v0.1.0'), 'main')
+        self.assertGreater(release_version('v0.1.0-main.10'), release_version('v0.1.0-main.02'))
+        releases = [self.release(tag) for tag in ('v0.1.0-main.02', 'v0.1.0', 'v0.1.0-main.10')]
+        releases.append(self.release('v0.1.0-main.99', prerelease=True))
+        with patch('commonUtils.runtime.updates.github.json_get', side_effect=[releases, {'sha': 'b' * 40}]):
+            self.assertEqual(GitHubSource('owner/repo').latest_release('main')['tag'], 'v0.1.0-main.10')
+
     def test_release_manifest_and_asset_digest_must_both_match(self):
         import hashlib
         import io

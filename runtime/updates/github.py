@@ -133,13 +133,13 @@ class GitHubSource:
 
 
 def release_channel(tag):
-    """Stable vX.Y[.Z] tags are main; explicit alpha/beta prereleases are separate."""
-    match = re.fullmatch(r'v\d+(?:\.\d+){1,2}(?:-(alpha|beta)(?:[.-]\d+)?)?', tag)
+    """Numeric legacy tags and explicit main tags share the stable channel."""
+    match = re.fullmatch(r'v\d+(?:\.\d+){1,2}(?:-(alpha|beta|main)(?:[.-]\d+)?)?', tag)
     return (match[1] or 'main') if match else None
 
 
 def release_version(tag):
-    numeric = re.fullmatch(r'v(\d+)\.(\d+)(?:\.(\d+))?(?:-(?:alpha|beta)(?:[.-](\d+))?)?', tag)
+    numeric = re.fullmatch(r'v(\d+)\.(\d+)(?:\.(\d+))?(?:-(?:alpha|beta|main)(?:[.-](\d+))?)?', tag)
     return tuple(int(value or 0) for value in numeric.groups())
 
 
