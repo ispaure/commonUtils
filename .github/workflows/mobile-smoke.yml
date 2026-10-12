@@ -117,7 +117,11 @@ jobs:
       - name: Create a minimal embedded test application
         working-directory: cpython
         run: |
-          python Apple/testbed clone --platform iOS --framework cross-build/arm64-apple-ios-simulator/Apple/iOS/Frameworks/arm64-iphonesimulator --app "$GITHUB_WORKSPACE/payload/commonUtils" "$GITHUB_WORKSPACE/ios-testbed"
+          python Apple/testbed clone --platform iOS --framework cross-build/arm64-apple-ios-simulator/Apple/iOS/Frameworks/arm64-iphonesimulator "$GITHUB_WORKSPACE/ios-testbed"
+          # The pinned upstream --app option copies into Testbed/app, but its
+          # iOS Xcode project bundles iOSTestbed/app. Populate that resource root.
+          cp -R "$GITHUB_WORKSPACE/payload/commonUtils" "$GITHUB_WORKSPACE/ios-testbed/iOSTestbed/app/commonUtils"
+          test -f "$GITHUB_WORKSPACE/ios-testbed/iOSTestbed/app/commonUtils/tests/mobile_smoke.py"
       - name: Run inside the iOS Simulator testbed application
         run: |
           set -o pipefail
