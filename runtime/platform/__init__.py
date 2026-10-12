@@ -20,10 +20,18 @@ class OS(Enum):
     WIN = "Windows"
     MAC = "macOS"
     LINUX = "Linux"
+    IOS = "iOS"
+    ANDROID = "Android"
     UNKNOWN = "Unknown"
 
 
 def get_os() -> OS:
+    # CPython mobile builds have explicit identifiers. Older Android builds
+    # report Linux but expose the Android-only API-level function.
+    if sys.platform == 'android' or (sys.platform == 'linux' and hasattr(sys, 'getandroidapilevel')):
+        return OS.ANDROID
+    if sys.platform == 'ios' or (sys.platform == 'darwin' and platform.system() in ('iOS', 'iPadOS')):
+        return OS.IOS
     match sys.platform:
         case 'win32':
             return OS.WIN
