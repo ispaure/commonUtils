@@ -5,7 +5,7 @@ from .extensions import reading_source, mermaid_blocks
 from .headings import _iter_headings
 from .links import render_links
 from .presentation import style_document
-from ..reader_chrome import reader_button, reading_spin, show_reader_popup
+from ..readers.reader_chrome import reader_button, reading_spin, show_reader_popup
 
 
 class MarkdownReadingMixin:
