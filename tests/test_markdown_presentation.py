@@ -12,7 +12,7 @@ from unittest.mock import patch
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer
 from commonUtils.ui.markdown.extensions import reading_source, mermaid_blocks
-from commonUtils.ui.markdown.presentation import ACCENT, tables
+from commonUtils.ui.markdown.presentation import ACCENT, CODE_LANGUAGE, tables
 from commonUtils.ui.markdown.diagrams import MermaidRenderer, safe_diagram
 from commonUtils.ui.appearance.theme import apply_theme, theme_palette, SLATE_DARK, SLATE_LIGHT
 
@@ -86,6 +86,34 @@ class MarkdownPresentationTests(QtTestCase):
         table = next(tables(viewer.browser.document().rootFrame()))
         self.assertNotEqual(dark, table.cellAt(0, 0).format().background().color())
         self.assertFalse(viewer.is_modified)
+        self.assertEqual(viewer.markdown_text(), source)
+
+    def test_multiline_vbnet_fences_are_continuous_and_preserve_source(self):
+        for fence in ('```', '````'):
+            source = f'{fence}vbnet\nDim name As String = "Hello 🌍"\n\n    Console.WriteLine(name)\n{fence}\n\nAfter\n'
+            viewer = self.viewer(source)
+            frames = [frame for frame in viewer.browser.document().rootFrame().childFrames()
+                      if frame.format().hasProperty(CODE_LANGUAGE)]
+            self.assertEqual(len(frames), 1)
+            self.assertEqual(frames[0].format().property(CODE_LANGUAGE), 'vbnet')
+            self.assertIn('    Console.WriteLine(name)', viewer.browser.toPlainText())
+            self.assertIn('Hello 🌍', viewer.browser.toPlainText())
+            self.assertIn('After', viewer.browser.toPlainText())
+            self.assertFalse(viewer.is_modified)
+            self.assertEqual(viewer.markdown_text(), source)
+            self.assertEqual(self.path.read_text(), source)
+
+    def test_reading_code_syntax_colors_handle_unicode_and_unknown_languages(self):
+        source = '```vbnet\nDim emoji As String = "🌍"\nDim count As Integer = 1\n```\n\n```unknown-language\nKeep this literal\n```\n'
+        viewer = self.viewer(source)
+        document = viewer.browser.document()
+        position = document.toPlainText().index('Dim')
+        cursor = qt.QTextCursor(document)
+        cursor.setPosition(position)
+        cursor.movePosition(qt.QTextCursor.MoveOperation.NextCharacter, qt.QTextCursor.MoveMode.KeepAnchor)
+        self.assertNotEqual(cursor.charFormat().foreground().color(), viewer.browser.palette().color(qt.QPalette.ColorRole.Text))
+        self.assertIn('Dim count As Integer = 1', viewer.browser.toPlainText())
+        self.assertIn('Keep this literal', viewer.browser.toPlainText())
         self.assertEqual(viewer.markdown_text(), source)
 
     def test_missing_mermaid_renderer_keeps_code_and_explains_optional_install(self):

@@ -70,6 +70,7 @@ class Styling(qt.QObject):
         self.app = app
         self.base_font = qt.QFont(app.font())
         self.views = WeakKeyDictionary()
+        self._updating_widgets = WeakSet()
         self.application_controls = WeakSet()
         self.values = {}
         self.apply_application = False
@@ -101,8 +102,15 @@ class Styling(qt.QObject):
         self._update(widget, role, callback)
 
     def _update(self, widget, role, callback):
-        if not isValid(widget):
+        if not isValid(widget) or widget in self._updating_widgets:
             return
+        self._updating_widgets.add(widget)
+        try:
+            self._update_font(widget, role, callback)
+        finally:
+            self._updating_widgets.discard(widget)
+
+    def _update_font(self, widget, role, callback):
         font = self.font(role)
         widget.setFont(font)
         if isinstance(widget, (qt.QTextEdit, qt.QPlainTextEdit)):

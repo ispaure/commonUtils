@@ -10,6 +10,7 @@ from weakref import ref
 from shiboken6 import isValid
 
 ACCENT = int(qt.QTextFormat.Property.UserProperty) + 701
+CODE_LANGUAGE = int(qt.QTextFormat.Property.UserProperty) + 702
 COLORS = {'note': '#5f91ed', 'abstract': '#42a7b5', 'info': '#5f91ed', 'todo': '#5f91ed',
           'tip': '#35a58a', 'success': '#38a16b', 'question': '#bf922f', 'warning': '#cb9137',
           'failure': '#da6670', 'danger': '#da6670', 'bug': '#da6670', 'example': '#9475d5', 'quote': '#8993a2'}
@@ -144,6 +145,7 @@ def style_document(document, palette, *, callouts=None):
     for table in tables(document.rootFrame()):
         style_table(table, palette)
     if callouts is not None:
+        highlight_code(document, palette)
         frame_quotes(document)
         frame_code(document, alternate)
         clean_frame_boundaries(document)
@@ -220,6 +222,59 @@ def frame_quotes(document):
 
 
 
+def highlight_code(document, palette):
+    """Optional language-aware reading colors; source characters stay untouched."""
+    try:
+        from pygments.lexers import get_lexer_by_name
+        from pygments.token import Comment, Keyword, Literal, Name
+        from pygments.util import ClassNotFound
+    except ImportError:
+        return
+    dark = palette.color(qt.QPalette.ColorRole.Base).lightness() < 128
+    colors = {
+        Comment: palette.color(qt.QPalette.ColorRole.PlaceholderText),
+        Keyword: qt.QColor('#c792ea' if dark else '#7c3cad'),
+        Literal.String: qt.QColor('#a5d6a7' if dark else '#247443'),
+        Literal.Number: qt.QColor('#f0b56c' if dark else '#955522'),
+        Name.Function: qt.QColor('#82b1ff' if dark else '#245da6'),
+    }
+    block = document.begin()
+    while block.isValid():
+        fmt = block.blockFormat()
+        language = fmt.property(qt.QTextFormat.Property.BlockCodeLanguage)
+        if not fmt.nonBreakableLines() or not language or qt.QTextCursor(block).currentTable() is not None:
+            block = block.next()
+            continue
+        start = block.position()
+        lines = [block.text()]
+        while block.next().isValid() and block.next().blockFormat().nonBreakableLines() and \
+                block.next().blockFormat().property(qt.QTextFormat.Property.BlockCodeLanguage) == language:
+            block = block.next()
+            lines.append(block.text())
+        code = '\n'.join(lines)
+        if len(code) <= 65536:
+            try:
+                lexer = get_lexer_by_name(str(language).split()[0], stripnl=False, ensurenl=False)
+            except (ClassNotFound, IndexError):
+                lexer = None
+            if lexer is not None:
+                # Pygments offsets are Python code points; Qt uses UTF-16 units.
+                offsets = [0]
+                for char in code:
+                    offsets.append(offsets[-1] + (2 if ord(char) > 0xffff else 1))
+                for offset, kind, value in lexer.get_tokens_unprocessed(code):
+                    color = next((color for category, color in colors.items() if kind in category), None)
+                    if color is None or not value:
+                        continue
+                    cursor = qt.QTextCursor(document)
+                    cursor.setPosition(start + offsets[offset])
+                    cursor.setPosition(start + offsets[offset + len(value)], qt.QTextCursor.MoveMode.KeepAnchor)
+                    chars = qt.QTextCharFormat()
+                    chars.setForeground(color)
+                    cursor.mergeCharFormat(chars)
+        block = block.next()
+
+
 def frame_code(document, background):
     groups = []
     block = document.begin()
@@ -232,9 +287,9 @@ def frame_code(document, background):
         while block.next().isValid() and block.next().blockFormat().nonBreakableLines() and \
                 block.next().blockFormat().property(qt.QTextFormat.Property.BlockCodeLanguage) == language:
             block = block.next()
-        groups.append((first.position(), block.position() + block.length() - 1))
+        groups.append((first.position(), block.position() + block.length() - 1, language))
         block = block.next()
-    for start, end in reversed(groups):
+    for start, end, language in reversed(groups):
         cursor = qt.QTextCursor(document)
         cursor.setPosition(start)
         cursor.setPosition(end, qt.QTextCursor.MoveMode.KeepAnchor)
@@ -244,6 +299,8 @@ def frame_code(document, background):
         fmt.setPadding(14)
         fmt.setTopMargin(10)
         fmt.setBottomMargin(14)
+        if language:
+            fmt.setProperty(CODE_LANGUAGE, str(language))
         frame = cursor.insertFrame(fmt)
         block = document.findBlock(frame.firstPosition())
         while block.isValid() and block.position() <= frame.lastPosition():
@@ -251,7 +308,7 @@ def frame_code(document, background):
             block_fmt.clearBackground()
             block_fmt.setLeftMargin(0)
             block_fmt.setRightMargin(0)
-            block_fmt.setTopMargin(0)
+            block_fmt.setTopMargin(18 if language and block.position() == frame.firstPosition() else 0)
             block_fmt.setBottomMargin(0)
             qt.QTextCursor(block).setBlockFormat(block_fmt)
             block = block.next()
@@ -283,6 +340,18 @@ class MarkdownBrowser(qt.QTextBrowser):
         painter = qt.QPainter(self.viewport())
         layout = self.document().documentLayout()
         for frame in self.document().rootFrame().childFrames():
+            language = frame.format().property(CODE_LANGUAGE)
+            if language:
+                rect = layout.frameBoundingRect(frame).translated(-self.horizontalScrollBar().value(),
+                                                                 -self.verticalScrollBar().value())
+                painter.save()
+                font = qt.QFont(self.font())
+                font.setPointSizeF(9)
+                painter.setFont(font)
+                painter.setPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
+                painter.drawText(qt.QRectF(rect.left() + 14, rect.top() + 6, rect.width() - 28, 18),
+                                 qt.Qt.AlignmentFlag.AlignLeft | qt.Qt.AlignmentFlag.AlignVCenter, str(language))
+                painter.restore()
             color = frame.format().property(ACCENT)
             if color is not None:
                 rect = layout.frameBoundingRect(frame).translated(-self.horizontalScrollBar().value(),

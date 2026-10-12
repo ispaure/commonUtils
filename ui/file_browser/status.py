@@ -3,6 +3,7 @@ import re
 from threading import RLock
 from time import monotonic
 from .. import pyside as qt
+from ..appearance.status_line import StatusLine
 
 
 def format_duration(seconds):
@@ -127,43 +128,10 @@ class IndexActivityBar(qt.QProgressBar):
         painter.end()
 
 
-class IndexStatusLabel(qt.QLabel):
+class IndexStatusLabel(StatusLine):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.full_text = ''
-        self.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
-        font = self.font()
-        font.setItalic(True)
-        self.setFont(font)
-        self.setTextFormat(qt.Qt.TextFormat.PlainText)
-        self.setWordWrap(False)
-        self.setSizePolicy(qt.QSizePolicy.Policy.Ignored,qt.QSizePolicy.Policy.Fixed)
-        self.setMinimumWidth(0)
-
-    def setText(self, text):
-        if self.full_text == text:
-            return
-        self.full_text = text
-        self.setToolTip(text)
-        self._fit()
-
-    def text(self):
-        return self.full_text
-
-    def _fit(self):
-        metrics = self.fontMetrics()
-        width = max(0,self.contentsRect().width())
-        text = self.full_text
-        super().setText(metrics.elidedText(text,qt.Qt.TextElideMode.ElideMiddle,width))
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event); self._fit()
-
-    def changeEvent(self, event):
-        super().changeEvent(event); self._fit()
-
-    def minimumSizeHint(self):
-        return qt.QSize(0, self.fontMetrics().height()+4)
+        super().__init__(parent=parent)
+        self.setContentsMargins(0, 0, 0, 0)
 
 
 class WorkspaceIndexStatus(qt.QObject):
