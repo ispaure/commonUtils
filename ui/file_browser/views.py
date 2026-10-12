@@ -245,7 +245,7 @@ class FileViews(qt.QStackedWidget):
             self.set_root(directory)
         self.setCurrentIndex(mode)
         if mode == 3:
-            self.storage.chart_selector.setCurrentIndex(chart_mode)
+            self.storage.set_chart_mode(chart_mode)
             self.storage.set_root(directory)
             if selected:
                 self.storage.select_path(Path(self.model.filePath(selected[-1])))

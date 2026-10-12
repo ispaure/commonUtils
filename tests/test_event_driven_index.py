@@ -123,7 +123,6 @@ class EventDrivenIndexTests(QtTestCase):
                 self.wait(lambda: not self.browser.folder_busy and
                           self.cache.peek(self.root).entry(added) is not None)
                 self.assertEqual(get.call_count, 1)
-                self.assertFalse(self.browser.reconcile_timer.isActive())
                 self.assertTrue(self.browser.index_activity.isHidden())
 
     def test_failed_folder_is_unwatched_and_queued_notifications_never_retry_it(self):
@@ -145,9 +144,10 @@ class EventDrivenIndexTests(QtTestCase):
             self.browser.refresh(); self.wait(lambda: not self.browser.folder_busy)
             self.assertEqual(len(attempts), 2)
 
-    def test_completed_scan_has_no_polling_or_pause_control(self):
-        self.assertFalse(self.browser.reconcile_timer.isActive())
-        self.assertTrue(self.browser.index_pause_button.isHidden())
+    def test_completed_scan_has_no_compatibility_timer_or_buttons(self):
+        for name in ('reconcile_timer', 'index_pause_button', 'storage_button'):
+            with self.subTest(attribute=name):
+                self.assertFalse(hasattr(self.browser, name))
         self.assertIn('checked', self.browser.index_status.text().lower())
 
     def test_first_visit_checks_and_reopening_reuses_index_until_refresh(self):
@@ -169,7 +169,6 @@ class EventDrivenIndexTests(QtTestCase):
         self.wait(lambda: not self.browser.folder_busy)
         self.assertEqual(self.browser.model.folder_totals[self.child].size, 10)
         self.assertIsNotNone(self.cache.peek(self.root).entry(second))
-        self.assertFalse(self.browser.reconcile_timer.isActive())
 
     def test_notification_updates_changed_file_without_deep_validation(self):
         self.unwatch()
@@ -189,7 +188,7 @@ class EventDrivenIndexTests(QtTestCase):
 
     def test_pause_keeps_cached_sizes_during_navigation_and_resume_checks_changes(self):
         self.browser._toggle_index_pause()
-        self.assertEqual(self.browser.index_pause_button.text(), 'Resume')
+        self.assertTrue(self.browser._index_paused)
         self.unwatch()
         added = self.child / 'added.txt'; added.write_bytes(b'12345')
         with patch.object(self.cache, 'reconcile_folder', side_effect=AssertionError('Paused scan')):
@@ -198,6 +197,7 @@ class EventDrivenIndexTests(QtTestCase):
         self.assertEqual(self.browser.model.folder_totals[self.child].size, 3)
         self.assertIn('paused', self.browser.index_status.text())
         self.browser._toggle_index_pause()
+        self.assertFalse(self.browser._index_paused)
         self.wait(lambda: not self.browser.folder_busy)
         self.assertEqual(self.browser.model.folder_totals[self.child].size, 8)
 

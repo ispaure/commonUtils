@@ -98,14 +98,12 @@ class BrowserIndexing:
             self.index_progress.emit(self.index_status.text())
         else:
             self.refresh_folder_totals()
-        self._update_pause_button()
+        self._update_index_controls()
 
-    def _update_pause_button(self):
+    def _update_index_controls(self):
         self.index_details_button.setVisible(self.index_incomplete and not getattr(self, 'workspace_status', False))
         self.refresh_button.setVisible(not self.folder_busy and not getattr(self, 'workspace_status', False))
         self.refresh_button.setEnabled(self.calculate_folder_sizes and not self.network_location and self.navigation.directory is not None)
-        self.index_pause_button.setText('Resume' if self._index_paused else 'Pause')
-        self.index_pause_button.hide()
 
     def refresh_folder_totals(self):
         if not self.calculate_folder_sizes or self.network_location:
@@ -146,7 +144,7 @@ class BrowserIndexing:
         self.folder_pending = False
         same_root = self.folder_root == root
         self.folder_root = root
-        self._update_pause_button()
+        self._update_index_controls()
         if not cached_only or not same_root:
             self.index_status.setText('Loading saved sizes…' if cached_only else 'Checking saved index…')
         def scanner(path, cancelled, *, report, reuse_for):
@@ -191,7 +189,7 @@ class BrowserIndexing:
         if self.folder_operation.root != root:
             self._loading_cached_only = False
             self.index_activity.setVisible(not getattr(self, 'workspace_status', False))
-            self._update_pause_button()
+            self._update_index_controls()
         self.index_state_changed.emit()
 
     def _folders_progressed(self, root, result):
@@ -269,7 +267,7 @@ class BrowserIndexing:
         self.folder_busy = False
         self.index_activity.hide()
         self.index_state_changed.emit()
-        self._update_pause_button()
+        self._update_index_controls()
         self.folder_operation.deleteLater()
         if self.stopping:
             self._maybe_idle()

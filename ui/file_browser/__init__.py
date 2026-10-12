@@ -131,10 +131,6 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.reconcile_debounce = qt.QTimer(self)
         self.reconcile_debounce.setSingleShot(True); self.reconcile_debounce.setInterval(400)
         self.reconcile_debounce.timeout.connect(self._reconcile_index)
-        self.reconcile_timer = qt.QTimer(self)
-        self.reconcile_timer.setInterval(60_000)
-        self.reconcile_timer.timeout.connect(self._reconcile_index)
-        # Compatibility timer stays inactive: completed indexes never poll the tree.
         self.clear_search = qt.QShortcut(qt.QKeySequence(qt.Qt.Key.Key_Escape), self)
         self.clear_search.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.clear_search.activated.connect(self.close_search)
@@ -183,18 +179,9 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.search_button.setToolTip('Show or hide search (Ctrl/Cmd+F)')
         self.search_button.toggled.connect(self._search_toggled)
         controls.insertWidget(1, self.search_button)
-        self.storage_button = qt.QPushButton('Size Map…')
-        self.storage_button.clicked.connect(self.open_storage)
-        self.storage_button.hide() # Legacy dialog API; Storage is now a view.
         self.refresh_button = qt.QPushButton('Refresh index')
         self.refresh_button.setToolTip('Check all files and saved sizes below the current folder')
         self.refresh_button.clicked.connect(self.refresh)
-        self.index_pause_button = qt.QToolButton(self)
-        self.index_pause_button.setText('Pause')
-        self.index_pause_button.setToolTip('Pause this tab’s scan; saved search and sizes remain available')
-        self.index_pause_button.clicked.connect(self._toggle_index_pause)
-        self.index_pause_button.hide()
-        # Retained as a hidden compatibility object; scanning has no pause UI.
         return toolbar
 
     def open_search(self):
@@ -412,7 +399,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.search_button.setToolTip('Indexed search disabled for network drives' if network
             else 'Show or hide search (Ctrl/Cmd+F)')
         if network:
-            self.reconcile_debounce.stop(); self.reconcile_timer.stop()
+            self.reconcile_debounce.stop()
             self._changed_paths.clear(); self._full_index_refresh = False
             self.folder_pending = False; self._reconcile_pending = False
             if self.folder_busy: self.folder_operation.requestInterruption()
@@ -427,7 +414,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             if self.views.currentIndex() == 3: self.view_selector.setCurrentIndex(0)
         elif changed:
             self.index_status.setText('Loading saved sizes…')
-        self._update_pause_button()
+        self._update_index_controls()
         self.index_state_changed.emit()
 
     def _directory_opened(self, path):
@@ -771,7 +758,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         from ...filesystem.index import directory_cache
         directory_cache.set_priority_folders(self._index_priority_owner)
         self.stopping = True
-        self.reconcile_debounce.stop(); self.reconcile_timer.stop()
+        self.reconcile_debounce.stop()
         self.index_search.stop()
         for window in tuple(self._scan_windows):
             window.close()

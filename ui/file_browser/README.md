@@ -108,7 +108,21 @@ that every helper is a public API.
 Keep current bounded chart reads (3,000 entries, four radial levels), stale-result
 rejection and row/sector selection correspondence. Radial scene caching depends on
 chart data, size, font and palette; selection/zoom reuse it. Do not turn a chart refresh
-into a filesystem traversal. Hidden pause/chart selector objects are
-not a reason to document visible controls that do not exist.
+into a filesystem traversal. Hosts expose pause/resume through indexing methods;
+the toolbar selects the displayed chart directly.
 
 [Developer hub](../../docs/developer/README.md) · [UI overview](../README.md)
+
+## Index and chart controls
+
+The browser owns filesystem watches and a single-shot reconciliation debounce;
+it creates no periodic polling timer. Index detail and refresh controls reflect
+worker state. Hosts can continue to expose pause/resume through the indexing
+methods without creating a hidden pause button. `open_storage()` remains available
+for hosts that use the independent storage dialog.
+
+Treemap and Radial selection flows from the toolbar into
+`StorageView.set_chart_mode(0 or 1)`. The displayed chart stack is the source of
+truth for cached results and stale-worker checks; no hidden combo box mirrors it.
+Former `reconcile_timer`, `storage_button`, `index_pause_button` and
+`chart_selector` attributes have been removed.
