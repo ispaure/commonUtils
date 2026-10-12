@@ -229,3 +229,23 @@ writer coordination. Metadata uses atomic, conflict-checked INI saves; malformed
 files/states propagate errors rather than silently re-running imports. This is
 not a multi-file transaction or a process lock. Keep the ledger outside any
 directory erased by reset, and serialize concurrent migration calls in the host.
+
+## Change subscriptions
+
+`configuration.monitor.SettingsMonitor` watches explicit paths with
+`subscribe(paths, callback)`, returning an idempotent unsubscribe callable.
+`poll()` detects external file creation, modification, atomic replacement and
+deletion. `notify(paths=None)` publishes completed in-app changes; layered saves
+notify after successful publication. Bound callbacks are weak. Failing subscribers
+are logged without blocking other consumers or turning a completed save into a
+failure. The process/namespace default is `settings_monitor()`.
+
+Core callbacks execute on the notifying thread and have no Qt dependency. GUI
+consumers use `ui.settings.monitor.subscribe_settings(paths, callback, owner)`:
+one QApplication-owned timer polls every 500 ms and all callbacks are queued onto
+the GUI thread. The returned QObject subscription is owned by the supplied QObject;
+destruction unsubscribes even if Python still holds a wrapper. `stop()`/`start()`
+pause/resume it. Hosts pass both defaults and override paths; no feature discovery
+or automatic migration runs here. Dirty editors retain their pending values and
+continue using snapshot conflict checks; notification is not permission to discard
+an unsaved buffer. Other writers may call notify explicitly or rely on detection.

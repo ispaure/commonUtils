@@ -25,20 +25,20 @@ class StylingTests(QtTestCase):
         patcher.start(); self.addCleanup(patcher.stop)
         self.previous = getattr(self.app, '_commonutils_styling', None)
         if self.previous:
-            self.previous.timer.stop()
+            self.previous._settings_subscription.stop()
             del self.app._commonutils_styling
         self.controller = styling()
         self.code_families = [family for family in qt.QFontDatabase.families()
                               if qt.QFontDatabase.isFixedPitch(family)]
-        self.controller.timer.stop()
+        self.controller._settings_subscription.stop()
         self.addCleanup(self._restore)
 
     def _restore(self):
-        self.controller.timer.stop()
+        self.controller._settings_subscription.stop()
         self.controller.deleteLater()
         if self.previous:
             self.app._commonutils_styling = self.previous
-            self.previous.timer.start()
+            self.previous._settings_subscription.start()
         else:
             del self.app._commonutils_styling
 
