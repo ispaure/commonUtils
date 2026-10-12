@@ -513,6 +513,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             standard('Paste', lambda: self.file_actions.paste(destination),
                      enabled=mutating and bool(clipboard_files()[0]) and destination.is_dir(),
                      key=qt.QKeySequence.StandardKey.Paste)
+        from .link_actions import add_link_actions
+        add_link_actions(menu, self, context.selection, destination, mutating)
         if item is None:
             menu.addSeparator()
             standard('Refresh', self.refresh)

@@ -126,3 +126,10 @@ Treemap and Radial selection flows from the toolbar into
 truth for cached results and stale-worker checks; no hidden combo box mirrors it.
 Former `reconcile_timer`, `storage_button`, `index_pause_button` and
 `chart_selector` attributes have been removed.
+
+Default context menus include Pick Link Source for a single selected item and
+Drop Link As/Cancel Link Creation when an application-local source is present.
+`link_actions` owns the transient selection; `FileActions` runs exclusive link
+creation on its existing worker and refreshes the destination through normal
+reconciliation. Busy/stopping guards and close ownership match other file actions.
+Link creation contracts belong to `filesystem/links/README.md`.

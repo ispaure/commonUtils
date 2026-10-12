@@ -96,14 +96,19 @@ class IndexCoordinator:
         db = sqlite3.connect(self.path, timeout=.25)
         db.row_factory = sqlite3.Row
         try:
-            db.execute('CREATE TABLE IF NOT EXISTS jobs ('
+            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            # Existing receipt reads must not request a schema write lock. This
+            # matters during Windows worker handoff and queue contention.
+            if 'jobs' not in tables:
+                db.execute('CREATE TABLE IF NOT EXISTS jobs ('
                        'id TEXT PRIMARY KEY, root TEXT NOT NULL, recursive INTEGER NOT NULL, '
                        'full INTEGER NOT NULL, covers_tree INTEGER NOT NULL, background INTEGER NOT NULL, '
                        'changes TEXT NOT NULL, state TEXT NOT NULL, '
                        'done INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, '
                        "message TEXT NOT NULL DEFAULT 'Waiting for index writer', "
                        "error TEXT NOT NULL DEFAULT '', created REAL NOT NULL, updated REAL NOT NULL)")
-            db.execute('CREATE TABLE IF NOT EXISTS priorities ('
+            if 'priorities' not in tables:
+                db.execute('CREATE TABLE IF NOT EXISTS priorities ('
                        'participant TEXT PRIMARY KEY, paths TEXT NOT NULL, updated REAL NOT NULL)')
             yield db
             db.commit()

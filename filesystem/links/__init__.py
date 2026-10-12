@@ -11,6 +11,8 @@ __status__ = 'Production'
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORTS
 
+from .creation import create_link, create_link_in_directory
+
 import os
 import stat
 from pathlib import Path
