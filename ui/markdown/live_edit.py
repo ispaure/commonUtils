@@ -1,6 +1,7 @@
 """Same-pane Markdown syntax, paired selections and cursor-sensitive preview."""
 from .. import pyside as qt
 from ..text_commands import wrap_selection
+from ..column_guide import ColumnGuide
 from .syntax import _units
 from .links import link_spans, reference_destinations
 from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
@@ -9,7 +10,7 @@ from .syntax import HEADING, fenced_regions
 from .presentation import style_document
 
 
-class SourceMarkdownEdit(qt.QPlainTextEdit):
+class SourceMarkdownEdit(ColumnGuide, qt.QPlainTextEdit):
     """Source editor with paired delimiters around the current selection."""
     def keyPressEvent(self, event):
         cursor = self.textCursor()

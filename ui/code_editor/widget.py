@@ -3,6 +3,7 @@
 from .. import pyside as qt
 from ..appearance.typography import point_size, setting_size
 from ..text_commands import wrap_selection
+from ..column_guide import ColumnGuide
 from .transforms import TransformCommands
 from .multicursor import MultiCursorCommands
 from .folding import FoldingCommands
@@ -44,7 +45,7 @@ class LineNumbers(qt.QWidget):
         self.editor.gutter_click(event.position().toPoint())
 
 
-class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
+class CodeEdit(ColumnGuide, FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlainTextEdit):
     focused = qt.Signal()
     read_only_changed = qt.Signal(bool)
     preferences_changed = qt.Signal()
@@ -113,26 +114,6 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         self.line_changes = tuple(changes)
         self.gutter.setToolTip(label)
         self.gutter.update()
-
-    def set_column_guide(self, column):
-        """Show a visual column boundary; zero disables it without changing text."""
-        if type(column) is not int or not 0 <= column <= 1000:
-            raise ValueError('Column guide must be an integer between 0 and 1000')
-        self.column_guide = column
-        self.viewport().update()
-
-    def column_guide_x(self):
-        return (self.contentOffset().x() + self.document().documentMargin()
-                + qt.QFontMetricsF(self.font()).horizontalAdvance(' ') * self.column_guide)
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if self.column_guide:
-            painter = qt.QPainter(self.viewport())
-            color = self.palette().color(qt.QPalette.ColorRole.Mid)
-            painter.setPen(qt.QPen(color, 1, qt.Qt.PenStyle.DashLine))
-            x = self.column_guide_x()
-            painter.drawLine(qt.QLineF(x, 0, x, self.viewport().height()))
 
     def paint_line_changes(self, painter, block, top, height):
         number = block.blockNumber()
