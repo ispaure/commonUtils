@@ -7,6 +7,15 @@ For workflows and settings, see the [user guide](user_docs/README.md).
 
 ## Construction and navigation
 
+The column view installs its preview before its model. On Qt 6.11+ it applies
+the native preview visibility switch only after attaching a model, avoiding
+Qt 6.12's null-model crash during construction. Earlier Qt versions retain
+the preview host sizing fallback.
+
+Filesystem and sorting models also route Qt's batched `multiData()` role requests
+through their Python `data()` implementations. Native delegates therefore retain
+custom filenames, recursive folder sizes and cached thumbnails on Qt 6.12.
+
 To open a standalone browser at a specific folder, put commonUtils on the Python
 import path, install PySide6, and run this minimal script. Replace the example path
 with an existing directory:

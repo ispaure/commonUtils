@@ -10,6 +10,13 @@ from ...filesystem.transfers import validate_name
 
 
 class BrowserFileSystemModel(qt.QFileSystemModel):
+    def multiData(self, index, roles):
+        # Qt 6.12 delegates request roles in batches. Native implementations
+        # bypass Python data() overrides, including our names and folder sizes.
+        for position in range(roles.size()):
+            role = roles[position]
+            role.setData(self.data(index, role.role()))
+
     edit_failed = qt.Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -101,6 +108,12 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
 
 
 class ByteSortModel(qt.QSortFilterProxyModel):
+    def multiData(self, index, roles):
+        # Preserve data() overrides in subclasses such as CoverModel as well.
+        for position in range(roles.size()):
+            role = roles[position]
+            role.setData(self.data(index, role.role()))
+
     """The list sorts displayed byte totals without changing other view models."""
     def __init__(self, filesystem, parent=None):
         super().__init__(parent)

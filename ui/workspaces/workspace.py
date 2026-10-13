@@ -631,6 +631,10 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         if other is None:
             self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         elif placement == 'tabs':
+            # Newer Qt preserves an existing native tab group when asked to
+            # tabify one of its members elsewhere. Detach just the moving dock
+            # first so the requested anchor determines its destination.
+            self.removeDockWidget(dock)
             self.tabifyDockWidget(other, dock)
         else:
             from .workspace_layout import split_at
