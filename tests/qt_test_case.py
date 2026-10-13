@@ -4,9 +4,30 @@ from time import monotonic, sleep
 from tempfile import TemporaryDirectory
 from concurrent.futures import Future
 import unittest
+import os
+import sys
+from pathlib import Path
 
 from commonUtils.ui import pyside as qt
 from shiboken6 import isValid
+
+
+def _load_windows_test_fonts(app):
+    """Qt's Windows offscreen backend needs explicit outline-font fixtures."""
+    if (sys.platform != 'win32' or qt.QApplication.platformName() != 'offscreen'
+            or hasattr(app, '_commonutils_test_font_ids')):
+        return
+    directory = Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Fonts'
+    font_ids = []
+    for name in ('segoeui.ttf', 'arial.ttf', 'cour.ttf', 'georgia.ttf'):
+        path = directory / name
+        font_id = qt.QFontDatabase.addApplicationFont(str(path))
+        if font_id < 0:
+            raise RuntimeError(f'Cannot load Windows test font: {path}')
+        font_ids.append(font_id)
+    # Keep these available throughout the isolated test process, like system
+    # fonts on the other desktop platforms. No downloads or dependency changes.
+    app._commonutils_test_font_ids = font_ids
 
 
 class _QtTemporaryDirectory(TemporaryDirectory):
@@ -54,6 +75,9 @@ class QtTestCase(unittest.TestCase):
 
     def run(self, result=None):
         app = qt.QApplication.instance()
+        if app is None:
+            app = QtTestCase._test_app = qt.QApplication([])
+        _load_windows_test_fonts(app)
         existing = set(app.topLevelWidgets()) if app else set()
         if app:
             palette, stylesheet, font = app.palette(), app.styleSheet(), app.font()
