@@ -14,18 +14,10 @@ def set_font(q_thing):
     else:
         modifier = 0
 
-    match _api.get_os():
-        case _api.OS.WIN:
-            font_size = 10 + modifier
-        case _api.OS.MAC:
-            font_size = 13 + modifier
-        case _api.OS.LINUX:
-            font_size = 10 + modifier
-        case _:
-            _api.debugUtils.log(_api.debugUtils.Severity.ERROR, 'Set Font', 'Unsupported OS!')
-            return
-
-    q_thing.setFont(_api.QFont('Arial', font_size))
+    from ..appearance.typography import point_size
+    font = _api.QFont('Arial')
+    font.setPointSizeF(point_size(10 + modifier))
+    q_thing.setFont(font)
 
 
 def get_scale_multiplier():
@@ -94,12 +86,6 @@ def initialize_q_app():
 
     # If on Windows, set to dark mode always with a palette (if not, it doesn't handle it properly)
     match _api.get_os():
-        case _api.OS.WIN:
-            _api.os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
-            # palette_cls = Palette()
-            # palette_cls.set_dark()
-            # q_app.setPalette(palette_cls.palette)
-
         case _api.OS.LINUX:
             if _api.steamUtils.is_linux_steam_big_picture():
                 palette_cls = _api.Palette()

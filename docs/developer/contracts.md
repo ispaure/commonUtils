@@ -62,6 +62,10 @@ remain untouched. Reset removes an explicit personal field, never a software
 schema field. Atomic saves reject concurrent edits. Hosts own migration and paths.
 See the configuration guide for the API, and `ui/styling.md` for live font roles,
 weak widget binding, optional application-font opt-in and settings navigation.
+Shared font-size settings use a 96-logical-DPI reference. Convert settings through
+`ui.appearance.typography.point_size()` before assigning Qt point sizes, and use
+`setting_size()` when saving or incrementing a rendered font size. Do not persist
+the platform-adjusted QFont point size or disable Qt's native display scaling.
 
 ## Grouped UI imports
 

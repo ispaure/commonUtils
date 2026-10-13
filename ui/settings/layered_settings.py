@@ -1,6 +1,7 @@
 """Explicit-save fields for repository defaults or sparse personal overrides."""
 from configparser import Error
 from .. import pyside as qt
+from ..appearance.typography import point_size
 from ..pyside.wheel_policy import install_value_wheel_policy
 from ...configuration.ini_schema import key_type, mode_choices, parse_value
 from ..appearance.styling import STYLE_FIELDS, validate_style
@@ -232,14 +233,14 @@ class LayeredSettingsEditor(qt.QWidget):
                 font.setFamily(family)
             try:
                 validate_style(size_key, values.get(size_key, str(STYLE_FIELDS[size_key][1])))
-                font.setPointSize(int(values.get(size_key, STYLE_FIELDS[size_key][1])))
+                font.setPointSizeF(point_size(int(values.get(size_key, STYLE_FIELDS[size_key][1]))))
             except (ValueError, OverflowError):
-                font.setPointSize(STYLE_FIELDS[size_key][1])
+                font.setPointSizeF(point_size(STYLE_FIELDS[size_key][1]))
             preview.set_sample_font(font)
             control = self.fields['Styling', family_key]
             # The editable field is an exception to the normal settings font.
             selected_font = qt.QFont(font)
-            selected_font.setPointSize(qt.QApplication.font().pointSize())
+            selected_font.setPointSizeF(qt.QApplication.font().pointSizeF())
             control.lineEdit().setFont(selected_font)
 
     def _color(self, control):
