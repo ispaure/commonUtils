@@ -287,7 +287,7 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
     def _schedule_tab_headers(self):
         if not self._headers_pending:
             self._headers_pending = True
-            qt.QTimer.singleShot(0, self._refresh_tab_headers)
+            qt.QTimer.singleShot(0, self, self._refresh_tab_headers)
 
     def _tab_dock(self, bar, index):
         # Native dock bars store the dock's C++ identity. Compare identities only;
@@ -297,6 +297,8 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         return next((dock for dock in self.docks if getCppPointer(dock)[0] == identity), None)
 
     def _refresh_tab_headers(self):
+        if not isValid(self):
+            return
         self._headers_pending = False
         if self._closing:
             return
@@ -441,12 +443,12 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
             self._drop_target.show()
 
     def _docking_changed(self, floating):
-        qt.QTimer.singleShot(0, self._update_drop_target)
+        qt.QTimer.singleShot(0, self, self._update_drop_target)
 
     def _dock_location_changed(self, dock, area):
         if area == qt.Qt.DockWidgetArea.TopDockWidgetArea:
             # Wait for Qt to finish its native drop before changing the layout.
-            qt.QTimer.singleShot(0, lambda: dock.workspace._finish_top_docking(dock))
+            qt.QTimer.singleShot(0, dock, lambda: dock.workspace._finish_top_docking(dock))
 
     def _finish_top_docking(self, dock):
         if (self._closing or dock not in self.docks or dock.isFloating()

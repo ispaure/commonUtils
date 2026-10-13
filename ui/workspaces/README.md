@@ -5,6 +5,8 @@ Docking, tab gestures, splitting, floating windows and native workspace menus.
 Moving an existing dock to a different tab group explicitly detaches that dock
 before tabifying it with the requested anchor. This preserves unrelated groups
 on Qt 6.12 as well as earlier Qt versions.
+Deferred header and docking callbacks use their QObject owner as timer context,
+so deleting a workspace or dock cancels its queued callbacks.
 
 Import implementations from `commonUtils.ui.workspaces.<module>`.
 Import widgets and helpers directly from these modules. Package imports do not

@@ -20,6 +20,10 @@ rejected on Save and use a fallback for local previews. Saved unsupported choice
 fall through to software defaults or the role fallback without rewriting the INI.
 Other platforms retain their existing family selection behavior.
 
+Preference reads before GUI startup reject known Windows legacy names but defer
+font-database metadata checks. Qt requires a QGuiApplication for those queries;
+the styling controller performs full family validation after GUI construction.
+
 The layered editor renders font names and its selected editable field in the
 chosen family. Local sample widgets preview pending families/sizes and resets;
 they never bind to the live role controller or save preview changes. Automatic

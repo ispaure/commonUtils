@@ -8,7 +8,7 @@ from weakref import WeakKeyDictionary, WeakMethod, WeakSet, ref
 from shiboken6 import isValid
 from .. import pyside as qt
 from configparser import Error
-from .font_families import supported_font_family
+from .font_families import supported_font_family, font_database_available
 
 STYLE_FIELDS = {
     'theme_mode': ('Theme', 'system', ('system', 'light', 'dark')),
@@ -61,7 +61,8 @@ def validate_style(key, value):
         raise ValueError('Choose System, Light or Dark')
     elif key.endswith('font_family_str') and not supported_font_family(value):
         raise ValueError('Choose a scalable outline font supported on Windows, or Automatic')
-    elif key == 'code_font_family_str' and value.strip() and not qt.QFontDatabase.isFixedPitch(value.strip()):
+    elif (key == 'code_font_family_str' and value.strip() and font_database_available()
+          and not qt.QFontDatabase.isFixedPitch(value.strip())):
         raise ValueError('Choose a monospace font for code, or Automatic')
 
 
