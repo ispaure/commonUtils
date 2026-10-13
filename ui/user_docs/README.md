@@ -99,7 +99,8 @@ field. Font sizes range from 7 to 24 pt. Appearance has four font roles: interfa
 Ordinary buttons, including Save and Reload, follow the interface font. Buttons
 inside browser panels follow the browser font; sample buttons use the preview font.
 Font dropdowns display each family name in its own typeface so you can preview
-fonts while browsing. EPUB and Markdown use Georgia at 15 pt by default; personal
+fonts while browsing. EPUB and Markdown use Arial at 13 pt by default, a neutral
+sans serif for books and technical documentation; personal
 font choices override that default. Choose Automatic to use the role's fallback font, or type
 a font family name directly. The selected field also uses the chosen typeface.
 Samples underneath show interface controls, browser entries, reading text or code
