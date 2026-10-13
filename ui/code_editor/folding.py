@@ -158,7 +158,7 @@ class FoldController(qt.QObject):
                     if starts:
                         editor.setTextCursor(qt.QTextCursor(self.document.findBlockByNumber(min(starts))))
                 editor.viewport().update()
-                editor.gutter.update()
+                editor.update_gutter()
                 editor.updateGeometry()
 
     def reveal(self, line):
@@ -195,7 +195,7 @@ class FoldingCommands:
         self.folding.expand_after_edit()
 
     def gutter_click(self, point):
-        if not self.folding_enabled or not 8 <= point.x() <= 24:
+        if not self.folding_enabled or not 8 <= point.x() < 8 + self.fold_marker_width():
             return
         block = self.firstVisibleBlock()
         top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
@@ -209,7 +209,7 @@ class FoldingCommands:
 
     def draw_fold_marker(self, painter, block, top):
         if self.folding_enabled and block.blockNumber() in self.folding.ranges:
-            painter.drawText(9, top, 14, self.fontMetrics().height(), qt.Qt.AlignmentFlag.AlignCenter,
+            painter.drawText(9, top, self.fold_marker_width() - 2, self.fontMetrics().height(), qt.Qt.AlignmentFlag.AlignCenter,
                              "+" if block.blockNumber() in self.folding.collapsed else "−")
 
     def _indent_guide_segments(self, block):

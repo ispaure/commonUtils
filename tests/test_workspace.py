@@ -144,7 +144,7 @@ class WorkspaceTests(QtTestCase):
         self.settle()
         bar = self.tab_bar(workspace)
         for index in range(bar.count()):
-            self.assertTrue(bar.tabButton(index, qt.QTabBar.ButtonPosition.LeftSide).isEnabled())
+            self.assertTrue(bar.tabButton(index, qt.QTabBar.ButtonPosition.RightSide).isEnabled())
         workspace.arrange(second, 'right', anchor=first)
         self.settle()
         first.tab_header.close_button.click(); self.settle()
@@ -254,7 +254,7 @@ class WorkspaceTests(QtTestCase):
         return next(bar for bar in workspace.findChildren(qt.QTabBar)
                     if bar.parent() is workspace and bar.isVisible() and bar.count() > 1)
 
-    def test_single_tab_uses_full_header_with_close_left_and_plus_right(self):
+    def test_single_tab_uses_full_header_with_close_and_plus_right(self):
         workspace = self.create()
         workspace.empty_new_button.click()
         self.settle()
@@ -262,10 +262,18 @@ class WorkspaceTests(QtTestCase):
         header = dock.tab_header
         self.assertEqual(workspace.findChildren(qt.QToolBar), [])
         self.assertGreater(header.width(), workspace.width() * .95)
-        self.assertLess(header.close_button.x(), 5)
+        self.assertGreaterEqual(header.close_button.x(), header.title.geometry().right())
         self.assertGreater(header.new_button.x(), header.width() - header.new_button.width() - 3)
         self.assertEqual(header.new_button.size(), qt.QSize(28, 28))
         self.assertEqual(header.close_button.size(), qt.QSize(28, 28))
+        self.assertFalse(header.close_button.icon().isNull())
+        image = header.close_button.icon().pixmap(20, 20).toImage()
+        pixels = [(x, y) for y in range(image.height()) for x in range(image.width())
+                  if image.pixelColor(x, y).alpha() > 0]
+        self.assertAlmostEqual((min(x for x, _ in pixels) + max(x for x, _ in pixels)) / 2,
+                               (image.width() - 1) / 2, delta=1)
+        self.assertAlmostEqual((min(y for _, y in pixels) + max(y for _, y in pixels)) / 2,
+                               (image.height() - 1) / 2, delta=1)
         self.assertEqual(header.height(), 30)
         self.assertAlmostEqual(header.new_button.font().pointSizeF(), header.font().pointSizeF() * 1.5)
         header.close_button.click()
@@ -288,7 +296,7 @@ class WorkspaceTests(QtTestCase):
             self.assertLess(abs(sum(widths) - (bar.width() - 32)), 3)
             self.assertGreaterEqual(bar.workspace_plus.x(), bar.tabRect(1).right())
         first_index = next(index for index in range(2) if workspace._tab_dock(bar, index).widget() is first)
-        button = bar.tabButton(first_index, qt.QTabBar.ButtonPosition.LeftSide)
+        button = bar.tabButton(first_index, qt.QTabBar.ButtonPosition.RightSide)
         button.click()
         self.settle()
         self.assertEqual(len(workspace.docks), 1)

@@ -14,6 +14,9 @@ duplicate lines, trim trailing spaces or change indentation; they are undoable.
 
 Line-number gutters follow the editor font and resize when the font or line count
 changes, including when the surrounding window keeps its size.
+Short files keep a compact gutter; space for folding controls appears
+only when the document has foldable blocks. The colored change-marker lane stays
+separate from the numbers.
 
 Alt-click adds cursors; Alt+Shift-drag selects a rectangular column region. Typing
 changes multiple selections as one undo operation. Pasting the same number of lines
@@ -76,3 +79,8 @@ continuation rows.
 Applications may supply change markers in the gutter: green for added lines, blue
 for replaced lines and red for deleted-line boundaries. Hover for the application's
 baseline label. The marker lane is separate from folding and line numbers.
+When a replacement block also removes or adds lines, the edited portion stays
+blue while the extra removed/added lines receive red/green markers.
+Additions use a blue-green vertical band and deletions an orange-red horizontal mark
+to provide a cue besides color. Hosts may also enable a dashed column guide;
+this is a visual line-length reference and does not wrap or restrict your text.

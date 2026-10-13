@@ -14,6 +14,20 @@ class LineChange:
 
 def line_changes(before, after):
     """Zero-based half-open spans; deletions anchor before start (including EOF)."""
-    return tuple(LineChange({'insert': 'add', 'replace': 'modify', 'delete': 'delete'}[tag], a, b, c, d)
-                 for tag, a, b, c, d in SequenceMatcher(None, before.splitlines(keepends=True),
-                     after.splitlines(keepends=True), autojunk=True).get_opcodes() if tag != 'equal')
+    changes = []
+    for tag, a, b, c, d in SequenceMatcher(None, before.splitlines(keepends=True),
+            after.splitlines(keepends=True), autojunk=True).get_opcodes():
+        if tag == 'equal':
+            continue
+        if tag == 'replace':
+            # A replacement can also remove/add whole lines. Pair the common
+            # span as modifications and retain the surplus as a distinct marker.
+            paired = min(b - a, d - c)
+            changes.append(LineChange('modify', a, a + paired, c, c + paired))
+            if b - a > paired:
+                changes.append(LineChange('delete', a + paired, b, d, d))
+            elif d - c > paired:
+                changes.append(LineChange('add', b, b, c + paired, d))
+        else:
+            changes.append(LineChange({'insert': 'add', 'delete': 'delete'}[tag], a, b, c, d))
+    return tuple(changes)

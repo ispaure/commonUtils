@@ -141,6 +141,11 @@ fractional glyph advances. The editor's public indentation settings are unchange
 
 ## Host-supplied change markers
 
+The line-number gutter fits the current digit count and font. It reserves a small
+change-marker lane and adds a folding lane only when foldable blocks exist;
+fold-lane glyphs scale with the editor font. Number painting and fold hit testing
+use separate lanes. Width shrinks again when line counts or fold ranges decrease.
+
 `markers.line_changes(before, after)` returns immutable LineChange records with
 zero-based half-open old/new line spans and add/modify/delete kinds. Deletions
 anchor before `start`, including EOF. Hosts call `CodeEdit.set_line_changes(changes,
@@ -149,3 +154,13 @@ the gutter tooltip. Empty changes clear markers. Painting respects visible block
 and wrapping. Line-number visibility controls the whole gutter. Hosts own baseline
 selection, background comparison, size limits, invalidation and shared-view fanout.
 The widget performs no Git or filesystem operations.
+Added lines use a clean Okabe–Ito blue-green vertical band; deleted
+boundaries use orange-red horizontal marks, so shape also distinguishes them.
+Unequal replacement blocks pair the common old/new span as modifications and
+return surplus removed/added lines as separate delete/add records. Their old/new
+spans partition the block, so hosts can review or restore each part independently.
+
+`set_column_guide(column)` draws a dashed, palette-aware viewport ruler for
+monospace columns. Zero (the shared default) disables it; valid values are 0–1000.
+The ruler follows font metrics and horizontal scrolling, is copied when sharing
+an editor document, and does not change text, wrapping or scroll extents.

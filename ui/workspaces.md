@@ -8,6 +8,10 @@ and cooperative closing. It imports no Logistics features. Supply a factory
 returning a QWidget, optionally exposing `view_title`, `title_changed`,
 `prepare_close()` and an `idle` signal. A view may set `can_retire` to retain its
 worker owners while its visible tab disappears immediately.
+Views may opt into file/type icons with the `workspace_show_icon` Qt property;
+the workspace follows their windowIconChanged signal in single and grouped headers.
+Workspace and scoped editor tabs use the same neutral × tool button to the right
+of the title. New-tab + remains at the end of the tab strip or header.
 
 Set `allow_new_tabs=False` for externally created documents and
 `keep_one_tab=True` to protect the final attached browser tab; floating panes can
