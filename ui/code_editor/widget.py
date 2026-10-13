@@ -248,7 +248,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
 
     def set_font_size(self, size):
         font = self.font()
-        font.setPointSizeF(max(7, min(48, size)))
+        font.setPointSizeF(max(7, min(24, size)))
         self.setFont(font)
         self.update_tab_width()
         self.update_gutter()

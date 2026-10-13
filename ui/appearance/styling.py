@@ -8,19 +8,20 @@ from weakref import WeakKeyDictionary, WeakMethod, WeakSet, ref
 from shiboken6 import isValid
 from .. import pyside as qt
 from configparser import Error
+from .font_families import supported_font_family
 
 STYLE_FIELDS = {
     'theme_mode': ('Theme', 'system', ('system', 'light', 'dark')),
     'accent_color_str': ('Accent color', '#75a7ff', None),
     'dark_tint_int': ('Dark surface tint (%)', 6, (0, 20)),
     'ui_font_family_str': ('Interface and dialog font', '', None),
-    'ui_font_size_int': ('Interface and dialog size (pt)', 11, (7, 32)),
+    'ui_font_size_int': ('Interface and dialog size (pt)', 11, (7, 24)),
     'browser_font_family_str': ('File browser font', '', None),
-    'browser_font_size_int': ('File browser size (pt)', 11, (7, 32)),
+    'browser_font_size_int': ('File browser size (pt)', 11, (7, 24)),
     'reading_font_family_str': ('Reading font (Markdown and EPUB)', 'Georgia', None),
-    'reading_font_size_int': ('Reading size (pt)', 15, (8, 48)),
+    'reading_font_size_int': ('Reading size (pt)', 15, (7, 24)),
     'code_font_family_str': ('Code font (editors and Markdown blocks)', '', None),
-    'code_font_size_int': ('Code size (pt)', 11, (7, 48)),
+    'code_font_size_int': ('Code size (pt)', 11, (7, 24)),
 }
 
 
@@ -58,6 +59,8 @@ def validate_style(key, value):
         raise ValueError('Enter a valid color, such as #75a7ff')
     elif key == 'theme_mode' and value not in choices:
         raise ValueError('Choose System, Light or Dark')
+    elif key.endswith('font_family_str') and not supported_font_family(value):
+        raise ValueError('Choose a scalable outline font supported on Windows, or Automatic')
     elif key == 'code_font_family_str' and value.strip() and not qt.QFontDatabase.isFixedPitch(value.strip()):
         raise ValueError('Choose a monospace font for code, or Automatic')
 
@@ -231,7 +234,7 @@ class CodeFontController:
 
     def set_size(self, size, *, save=True, notify=True):
         from ...configuration.layered import shared_settings
-        size = max(7, min(48, round(size)))
+        size = max(7, min(24, round(size)))
         self.updating = True
         try:
             if save:

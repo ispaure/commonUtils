@@ -1,8 +1,10 @@
 """Explicit-save fields for repository defaults or sparse personal overrides."""
 from configparser import Error
 from .. import pyside as qt
+from ..pyside.wheel_policy import install_value_wheel_policy
 from ...configuration.ini_schema import key_type, mode_choices, parse_value
 from ..appearance.styling import STYLE_FIELDS, validate_style
+from ..appearance.font_families import supported_font_family
 from .font_preview import FontPreview
 
 
@@ -11,6 +13,7 @@ class LayeredSettingsEditor(qt.QWidget):
 
     def __init__(self, store, parent=None, *, scope='personal', sections=None, labels=None, validator=None):
         super().__init__(parent)
+        install_value_wheel_policy()
         self.store, self.scope = store, scope
         self.only_sections, self.labels = sections, labels or {}
         self.validator = validator
@@ -77,6 +80,7 @@ class LayeredSettingsEditor(qt.QWidget):
             widget.deleteLater()
         self.fields.clear(); self.resets.clear(); self.indicators.clear()
         self.font_previews.clear()
+        font_families = None
         forms = {}
         for (section, key), value in self.original.items():
             if key.endswith('_choices_list-str'):
@@ -132,7 +136,10 @@ class LayeredSettingsEditor(qt.QWidget):
                 control.setInsertPolicy(qt.QComboBox.InsertPolicy.NoInsert)
                 control.setProperty('monospace_only', key == 'code_font_family_str')
                 control.addItem('Automatic', '')
-                for family in qt.QFontDatabase.families():
+                if font_families is None:
+                    font_families = [family for family in qt.QFontDatabase.families()
+                                     if supported_font_family(family)]
+                for family in font_families:
                     if key == 'code_font_family_str' and not qt.QFontDatabase.isFixedPitch(family):
                         continue
                     self._add_font(control, family)
@@ -189,7 +196,8 @@ class LayeredSettingsEditor(qt.QWidget):
     def _select_font(self, control, family):
         index = control.findData(family)
         if index < 0 and family:
-            if control.property('monospace_only') and not qt.QFontDatabase.isFixedPitch(family):
+            if (not supported_font_family(family)
+                    or control.property('monospace_only') and not qt.QFontDatabase.isFixedPitch(family)):
                 control.setEditText(family)
                 return
             self._add_font(control, family)
@@ -205,6 +213,14 @@ class LayeredSettingsEditor(qt.QWidget):
         for (section, key), value in self.pending.items():
             if section == 'Styling':
                 values[key] = self.defaults.get((section, key), '') if value is None else value
+        # Keep invalid text visible for correction, but never render it in a
+        # preview or editable field. Save reports the validation error.
+        for key in tuple(values):
+            if key.endswith('font_family_str'):
+                try:
+                    validate_style(key, values[key])
+                except ValueError:
+                    values[key] = ''
         ui_font = qt.QFont(styling().base_font)
         if values.get('ui_font_family_str', '').strip():
             ui_font.setFamily(values['ui_font_family_str'].strip())

@@ -5,11 +5,19 @@
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
 with one shared monospace fallback for editors, diffs and Markdown code. Defaults are 11 pt for UI/browser/code and 15 pt with the automatic interface
-family for reading. UI/browser sizes allow 7–32 pt, reading 8–48, code 7–48.
+family for reading. All four font sizes allow 7–24 pt.
 Code families must be installed fixed-pitch fonts, or blank for the monospace
 fallback. The layered editor filters its code family list accordingly and validates
 typed names on Save. Existing unavailable or proportional saved code families fall
 back at runtime without rewriting configuration.
+
+On Windows, all four family roles require smoothly scalable outline fonts.
+The dropdown excludes legacy GDI bitmap/vector families (including Terminal,
+Fixedsys and MS Sans Serif) before assigning preview fonts, and filters other
+non-scalable families using QFontDatabase metadata. Typed unsupported names are
+rejected on Save and use a fallback for local previews. Saved unsupported choices
+fall through to software defaults or the role fallback without rewriting the INI.
+Other platforms retain their existing family selection behavior.
 
 The layered editor renders font names and its selected editable field in the
 chosen family. Local sample widgets preview pending families/sizes and resets;

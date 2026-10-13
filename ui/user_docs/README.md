@@ -24,6 +24,11 @@ Ordinary INI values are text, even when their names resemble types. If the host 
 into typed keys, booleans become checkboxes and choice fields can become dropdowns;
 numbers and lists are validated before saving. Unrecognized suffixes stay text.
 
+The mouse wheel scrolls settings pages without changing values under the pointer,
+even when a field has focus. This includes numeric, date/time and dropdown fields,
+sliders and dials. Use typing, keyboard arrows or clicks to change values. Open a
+dropdown to scroll its available choices.
+
 Invalid typed fields block Save and switching to Source until corrected or discarded.
 Malformed INI files open in Source for repair. Comments and unrelated formatting are
 preserved where a field can be patched unambiguously. Ambiguous formatting is reported
@@ -90,7 +95,7 @@ browse their options without another click. Press Escape to dismiss the menu.
 Hosts can expose software defaults and personal settings using the shared settings
 editor. Personal fields show Inherited or Override; **↶** removes an override, then
 Save applies it. Software mode edits the defaults INI and ↶ reverts an unsaved
-field. Appearance has four font roles: interface/dialogs, browsers, reading, code.
+field. Font sizes range from 7 to 24 pt. Appearance has four font roles: interface/dialogs, browsers, reading, code.
 Ordinary buttons, including Save and Reload, follow the interface font. Buttons
 inside browser panels follow the browser font; sample buttons use the preview font.
 Font dropdowns display each family name in its own typeface so you can preview
@@ -102,6 +107,9 @@ using the pending family and size. Selecting a font, changing its size or resett
 it updates the sample immediately; the application changes only after Save.
 The code list contains only monospace fonts (equal character widths). Automatic
 uses the platform's monospace fallback; typed code font names must be monospace too.
+On Windows, the lists exclude legacy bitmap/vector fonts such as Terminal and
+Fixedsys. Choose a scalable outline font or Automatic. Unsupported typed names
+use a safe preview and show an error on Save; old saved choices use a fallback.
 Markdown uses the reading font for prose and the code font for source/code blocks.
 Accent and dark surface tint update the theme. In a host with central settings,
 Markdown's appearance button opens that host window; standalone hosts retain a

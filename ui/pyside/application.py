@@ -84,6 +84,8 @@ class Palette:
 def initialize_q_app():
     # Create QApplication, which is the PySide6 UI Application. One per project!
     q_app = _api.QApplication([])
+    from .wheel_policy import install_value_wheel_policy
+    install_value_wheel_policy(q_app)
     from ..menu_policy import install_menu_policy
     install_menu_policy(q_app)
     q_app.setStyle('Fusion')

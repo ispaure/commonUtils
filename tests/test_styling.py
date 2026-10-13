@@ -1,12 +1,14 @@
 """Live font roles, Markdown code, palette contrast and per-field inheritance."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.appearance.styling import apply_styling, styling, STYLE_FIELDS, validate_style
 from commonUtils.ui.appearance.theme import configured_colors
+from commonUtils.ui.appearance.font_families import supported_font_family
 from commonUtils.ui.settings.layered_settings import LayeredSettingsEditor
 from commonUtils.configuration.layered import register_settings
 from commonUtils.configuration.settings import settings_path
@@ -29,7 +31,7 @@ class StylingTests(QtTestCase):
             del self.app._commonutils_styling
         self.controller = styling()
         self.code_families = [family for family in qt.QFontDatabase.families()
-                              if qt.QFontDatabase.isFixedPitch(family)]
+                              if supported_font_family(family) and qt.QFontDatabase.isFixedPitch(family)]
         self.controller._settings_subscription.stop()
         self.addCleanup(self._restore)
 
@@ -73,15 +75,52 @@ class StylingTests(QtTestCase):
 
     def test_code_fonts_reject_proportional_and_unknown_families(self):
         proportional = next((family for family in qt.QFontDatabase.families()
-                             if not qt.QFontDatabase.isFixedPitch(family)), None)
+                             if supported_font_family(family) and not qt.QFontDatabase.isFixedPitch(family)), None)
         if proportional:
             with self.assertRaisesRegex(ValueError, 'monospace'):
                 validate_style('code_font_family_str', proportional)
         validate_style('code_font_family_str', '')
         for family in self.code_families:
             validate_style('code_font_family_str', family)
-        with self.assertRaisesRegex(ValueError, 'monospace'):
+        with self.assertRaises(ValueError):
             validate_style('code_font_family_str', 'Missing font for test 123456')
+
+    def test_windows_legacy_fonts_are_never_offered_or_previewed(self):
+        from commonUtils.ui.appearance.font_families import _WINDOWS_LEGACY
+        family = self._code_family()
+        legacy = [name.title() for name in sorted(_WINDOWS_LEGACY)]
+        self.store.save({('Styling', 'ui_font_family_str'): 'tErMiNaL',
+                         ('Styling', 'code_font_family_str'): 'fIxEdSyS'})
+        original = self.store.personal.read_bytes()
+        with patch('commonUtils.ui.appearance.font_families.sys', SimpleNamespace(platform='win32')), \
+                patch.object(qt.QFontDatabase, 'families', return_value=legacy + ['Other bitmap', family]), \
+                patch.object(qt.QFontDatabase, 'isSmoothlyScalable', side_effect=lambda name: name == family) as scalable:
+            self.controller.reload()
+            self.assertNotIn(self.controller.font('ui').family().casefold(), _WINDOWS_LEGACY)
+            self.assertNotIn(self.controller.font('code').family().casefold(), _WINDOWS_LEGACY)
+            panel = LayeredSettingsEditor(self.store, sections=('Styling',))
+            self.addCleanup(panel.deleteLater)
+            for role in ('ui', 'browser', 'reading', 'code'):
+                identity = 'Styling', f'{role}_font_family_str'
+                field = panel.fields[identity]
+                self.assertEqual([field.itemData(i) for i in range(field.count())], ['', family])
+                for name in legacy + ['Other bitmap']:
+                    with self.subTest(role=role, family=name):
+                        field.setEditText(name)
+                        self.assertNotEqual(field.lineEdit().font().family(), name)
+                        self.assertNotEqual(panel.font_previews[role].sample.font().family(), name)
+                        with self.assertRaisesRegex(ValueError, 'scalable outline'):
+                            validate_style(identity[1], name)
+                        self.assertFalse(panel.save())
+                        self.assertEqual(self.store.personal.read_bytes(), original)
+                field.setEditText(family)
+                self.assertEqual(panel.font_previews[role].sample.font().family(), family)
+            self.assertTrue(panel.save())
+            self.controller.reload()
+            for role in ('ui', 'browser', 'reading', 'code'):
+                self.assertEqual(self.controller.font(role).family(), family)
+            self.assertTrue(all(call.args[0].casefold() not in _WINDOWS_LEGACY
+                                for call in scalable.call_args_list))
 
     def test_buttons_follow_saved_roles_without_overwriting_pending_previews(self):
         panel = LayeredSettingsEditor(self.store)
@@ -281,3 +320,14 @@ class StylingTests(QtTestCase):
                 if isinstance(fallback, int):
                     expected = int(expected)
                 self.assertEqual(values[key], expected)
+
+    def test_all_shared_font_roles_limit_size_to_7_through_24(self):
+        for role in ('ui', 'browser', 'reading', 'code'):
+            key = f'{role}_font_size_int'
+            for value in ('7', '24'):
+                validate_style(key, value)
+            for value in ('6', '25', '48'):
+                with self.assertRaises(ValueError):
+                    validate_style(key, value)
+        self.controller.code_font.set_size(80, save=False)
+        self.assertEqual(self.controller.code_font.size, 24)
