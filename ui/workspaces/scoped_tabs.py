@@ -23,6 +23,20 @@ class ScopedTabBar(qt.QTabBar):
         self.setElideMode(qt.Qt.TextElideMode.ElideRight)
         self.setUsesScrollButtons(True)
 
+    def tabInserted(self, index):
+        super().tabInserted(index)
+        if not self.tabsClosable():
+            return
+        from .workspace import _tab_button
+        button = _tab_button('×', 'Close tab', self)
+        def close():
+            current = self.tabAt(button.pos() + button.rect().center())
+            if current >= 0:
+                self.tabCloseRequested.emit(current)
+        button.clicked.connect(close)
+        self.setTabButton(index, qt.QTabBar.ButtonPosition.LeftSide, None)
+        self.setTabButton(index, qt.QTabBar.ButtonPosition.RightSide, button)
+
     def target(self, global_point):
         point = self.boundary.mapFromGlobal(global_point)
         if not self.boundary.rect().contains(point):

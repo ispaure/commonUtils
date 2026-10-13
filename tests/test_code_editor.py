@@ -96,8 +96,37 @@ class CodeEditorTests(QtTestCase):
             self.app.processEvents()
             self.assertEqual(self.editor.gutter.width(), self.editor.gutter_width())
             self.assertEqual(self.editor.viewportMargins().left(), self.editor.gutter.width())
-            self.assertGreaterEqual(self.editor.gutter.width() - 28,
+            self.assertGreaterEqual(self.editor.gutter.width() - 14 - self.editor.fold_marker_width(),
                                     self.editor.fontMetrics().horizontalAdvance(str(lines)))
+
+    def test_short_file_gutter_shrinks_after_large_file_and_has_no_empty_fold_lane(self):
+        self.editor.resize(600, 300)
+        self.editor.show()
+        self.editor.setPlainText('\n'.join('line' for _ in range(15)))
+        compact = self.editor.gutter_width()
+        self.assertEqual(self.editor.fold_marker_width(), 0)
+        digit_width = max(self.editor.fontMetrics().horizontalAdvance(digit * 2) for digit in '0123456789')
+        self.assertEqual(compact, digit_width + 14)
+        self.editor.setPlainText('\n'.join('line' for _ in range(10000)))
+        self.assertGreater(self.editor.gutter_width(), compact)
+        self.editor.setPlainText('\n'.join('line' for _ in range(15)))
+        self.assertEqual(self.editor.gutter.width(), compact)
+        self.assertEqual(self.editor.viewportMargins().left(), compact)
+
+    def test_fold_lane_grows_and_shrinks_without_overlapping_numbers(self):
+        self.editor.setPlainText('def example():\n    first = 1\n    return first\n')
+        self.editor.folding.configure('python')
+        with_folds = self.editor.gutter_width()
+        lane = self.editor.fold_marker_width()
+        self.assertGreater(lane, 0)
+        self.editor.gutter_click(qt.QPoint(8 + lane // 2, 8))
+        self.assertIn(0, self.editor.folding.collapsed)
+        self.editor.gutter_click(qt.QPoint(10 + lane, 8))
+        self.assertIn(0, self.editor.folding.collapsed)
+        self.editor.setPlainText('first = 1\nsecond = 2\nthird = 3\n')
+        self.editor.folding.expand_after_edit()
+        self.assertEqual(self.editor.fold_marker_width(), 0)
+        self.assertEqual(self.editor.gutter_width(), with_folds - lane)
 
     def test_line_edits_are_undoable_and_unicode_offsets_work(self):
         self.editor.setPlainText("😀 one\ntwo\nthree")

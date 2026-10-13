@@ -31,6 +31,13 @@ def _tab_button(text, tooltip, parent, callback=None):
     button.setAutoRaise(True)
     button.setFixedSize(TAB_BUTTON_SIZE, TAB_BUTTON_SIZE)
     font = button.font(); font.setPointSizeF(font.pointSizeF() * 1.5); button.setFont(font)
+    if text == '×':
+        from ..appearance.icons import set_painted_icon
+        from ..readers.reader_chrome import ReaderIcon
+        button.setText('')
+        button.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        button.setIconSize(qt.QSize(20, 20))
+        set_painted_icon(button, ReaderIcon, 'close')
     if callback is not None:
         button.clicked.connect(callback)
     return button
@@ -44,6 +51,13 @@ class DockTabHeader(qt.QWidget):
         layout.setContentsMargins(2, 0, 2, 0)
         layout.setSpacing(0)
         self.close_button = _tab_button('×', 'Close tab', self, dock.close)
+        self.icon = qt.QLabel(self)
+        self.icon.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        def update_icon(icon):
+            self.icon.setPixmap(icon.pixmap(16, 16))
+            self.icon.setVisible(bool(dock.property('workspace_show_icon')) and not icon.isNull())
+        update_icon(dock.windowIcon())
+        dock.windowIconChanged.connect(update_icon)
         self.title = qt.QLabel(dock.windowTitle(), self)
         self.title.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
         self.title.setMinimumWidth(0)
@@ -51,8 +65,9 @@ class DockTabHeader(qt.QWidget):
         self.title.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.new_button = _tab_button('+', 'New tab', self, lambda: dock.workspace.request_new_view())
         self.new_button.setVisible(dock.workspace.allow_new_tabs)
-        layout.addWidget(self.close_button)
+        layout.addWidget(self.icon)
         layout.addWidget(self.title, 1)
+        layout.addWidget(self.close_button)
         layout.addWidget(self.new_button)
         dock.windowTitleChanged.connect(self.title.setText)
         font = self.title.font(); font.setBold(True); self.title.setFont(font)
@@ -140,6 +155,11 @@ class WorkspaceDock(qt.QDockWidget):
         super().__init__(title, workspace)
         self.workspace = workspace
         self.setWidget(view)
+        if view.property('workspace_show_icon'):
+            self.setProperty('workspace_show_icon', True)
+            self.setWindowIcon(view.windowIcon())
+            view.windowIconChanged.connect(self.setWindowIcon)
+            self.windowIconChanged.connect(lambda: self.workspace._schedule_tab_headers())
         # A floating tab is a document/tool window, never the application's quit owner.
         self.setAttribute(qt.Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setFeatures(qt.QDockWidget.DockWidgetFeature.DockWidgetClosable |
@@ -356,11 +376,13 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 dock = self._tab_dock(bar, index)
                 if dock is None:
                     continue
-                button = bar.tabButton(index, qt.QTabBar.ButtonPosition.LeftSide)
+                if dock.property('workspace_show_icon'):
+                    bar.setTabIcon(index, dock.windowIcon())
+                button = bar.tabButton(index, qt.QTabBar.ButtonPosition.RightSide)
                 if button is None:
                     button = _tab_button('×', 'Close tab', bar)
                     button.clicked.connect(lambda checked=False, owner=button: owner.dock.close())
-                    bar.setTabButton(index, qt.QTabBar.ButtonPosition.LeftSide, button)
+                    bar.setTabButton(index, qt.QTabBar.ButtonPosition.RightSide, button)
                 button.dock = dock
                 button.setVisible(self.can_close_tab(dock))
                 button.setEnabled(self.can_close_tab(dock))

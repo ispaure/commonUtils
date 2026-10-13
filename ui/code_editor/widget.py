@@ -60,6 +60,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         self.auto_pairs = False
         self.line_numbers = True
         self.line_changes = ()
+        self.column_guide = 0
         self.comment_prefix = "#"
         self.search_selections = []
         self.initialize_multicursor()
@@ -95,7 +96,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         self._bind_document(source.document())
         self.setFont(source.font())
         for name in ('indent_width', 'use_tabs', 'auto_indent', 'auto_pairs',
-                     'line_numbers', 'comment_prefix', 'indent_guides'):
+                     'line_numbers', 'comment_prefix', 'indent_guides', 'column_guide'):
             setattr(self, name, getattr(source, name))
         self.setLineWrapMode(source.lineWrapMode())
         self.setReadOnly(source.isReadOnly())
@@ -113,24 +114,49 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         self.gutter.setToolTip(label)
         self.gutter.update()
 
+    def set_column_guide(self, column):
+        """Show a visual column boundary; zero disables it without changing text."""
+        if type(column) is not int or not 0 <= column <= 1000:
+            raise ValueError('Column guide must be an integer between 0 and 1000')
+        self.column_guide = column
+        self.viewport().update()
+
+    def column_guide_x(self):
+        return (self.contentOffset().x() + self.document().documentMargin()
+                + qt.QFontMetricsF(self.font()).horizontalAdvance(' ') * self.column_guide)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.column_guide:
+            painter = qt.QPainter(self.viewport())
+            color = self.palette().color(qt.QPalette.ColorRole.Mid)
+            painter.setPen(qt.QPen(color, 1, qt.Qt.PenStyle.DashLine))
+            x = self.column_guide_x()
+            painter.drawLine(qt.QLineF(x, 0, x, self.viewport().height()))
+
     def paint_line_changes(self, painter, block, top, height):
         number = block.blockNumber()
         for change in self.line_changes:
             if change.start <= number < change.end:
                 painter.fillRect(2, top, 4, height, qt.QColor(
-                    '#39a867' if change.kind == 'add' else '#408bd6'))
+                    '#009e73' if change.kind == 'add' else '#408bd6'))
             elif change.kind == 'delete' and number == min(change.start, self.blockCount() - 1):
                 y = top if change.start < self.blockCount() else top + height - 3
-                painter.fillRect(0, y, 8, 3, qt.QColor('#e05757'))
+                painter.fillRect(0, y, 8, 3, qt.QColor('#d55e00'))
 
     def gutter_width(self):
         return (
-            36
+            14 + self.fold_marker_width()
             + max(self.fontMetrics().horizontalAdvance(digit * len(str(max(1, self.blockCount()))))
                   for digit in '0123456789')
             if self.line_numbers
             else 0
         )
+
+    def fold_marker_width(self):
+        if not self.folding_enabled or not self.folding.ranges:
+            return 0
+        return max(14, self.fontMetrics().horizontalAdvance('+') + 4)
 
     def update_gutter(self, *args):
         self.setViewportMargins(self.gutter_width(), 0, 0, 0)
@@ -177,10 +203,11 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
                 painter.setPen(self.palette().color(role))
                 self.paint_line_changes(painter, block, top, height)
                 self.draw_fold_marker(painter, block, top)
+                number_left = 10 + self.fold_marker_width()
                 painter.drawText(
-                    0,
+                    number_left,
                     top,
-                    self.gutter.width() - 6,
+                    self.gutter.width() - number_left - 4,
                     self.fontMetrics().height(),
                     qt.Qt.AlignmentFlag.AlignRight,
                     str(block.blockNumber() + 1),
