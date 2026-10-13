@@ -347,7 +347,7 @@ class MarkdownBrowser(qt.QTextBrowser):
                                                                  -self.verticalScrollBar().value())
                 painter.save()
                 font = qt.QFont(self.font())
-                font.setPointSizeF(point_size(9))
+                font.setPointSizeF(point_size(6.75))
                 painter.setFont(font)
                 painter.setPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
                 painter.drawText(qt.QRectF(rect.left() + 14, rect.top() + 6, rect.width() - 28, 18),

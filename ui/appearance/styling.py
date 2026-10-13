@@ -16,13 +16,13 @@ STYLE_FIELDS = {
     'accent_color_str': ('Accent color', '#75a7ff', None),
     'dark_tint_int': ('Dark surface tint (%)', 6, (0, 20)),
     'ui_font_family_str': ('Interface and dialog font', '', None),
-    'ui_font_size_int': ('Interface and dialog size (pt)', 11, (7, 24)),
+    'ui_font_size_int': ('Interface and dialog size (pt)', 10, (7, 24)),
     'browser_font_family_str': ('File browser font', '', None),
-    'browser_font_size_int': ('File browser size (pt)', 11, (7, 24)),
+    'browser_font_size_int': ('File browser size (pt)', 10, (7, 24)),
     'reading_font_family_str': ('Reading font (Markdown and EPUB)', 'Arial', None),
-    'reading_font_size_int': ('Reading size (pt)', 13, (7, 24)),
+    'reading_font_size_int': ('Reading size (pt)', 10, (7, 24)),
     'code_font_family_str': ('Code font (editors and Markdown blocks)', '', None),
-    'code_font_size_int': ('Code size (pt)', 11, (7, 24)),
+    'code_font_size_int': ('Code size (pt)', 8, (7, 24)),
 }
 
 

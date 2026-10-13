@@ -5,7 +5,7 @@
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
 with one shared monospace fallback for editors, diffs and Markdown code. Defaults
-are 11 pt for UI/browser/code and Arial at 13 pt for reading. All four font sizes
+are 10 pt for UI/browser, 8 pt for code and Arial at 10 pt for reading. All four font sizes
 allow 7–24 pt.
 Sizes are reference points at 96 logical DPI: an 11 setting occupies about
 15 logical pixels on every platform. `ui.appearance.typography.point_size(size)`
@@ -15,6 +15,9 @@ without overriding Qt's screen scaling. Families retain their native metrics,
 so identical sizes do not guarantee identical glyph widths. Previews, Markdown
 code, reading controls and editor zoom use the same convention. Saved values and
 their 7–24 range remain unchanged; macOS text becomes larger at the same setting.
+The smaller shipped defaults (10 for UI/browser/reading, 8 for code) retain the
+previous macOS proportions across platforms. Existing personal overrides take
+precedence and are never rewritten to the new defaults.
 Code families must be installed fixed-pitch fonts, or blank for the monospace
 fallback. The layered editor filters its code family list accordingly and validates
 typed names on Save. Existing unavailable or proportional saved code families fall
