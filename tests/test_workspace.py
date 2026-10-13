@@ -20,6 +20,19 @@ class View(qt.QLabel):
 
 
 class WorkspaceTests(QtTestCase):
+    def test_queued_header_refresh_is_cancelled_when_workspace_is_deleted(self):
+        from shiboken6 import isValid
+        workspace = Workspace(View)
+        callback = Mock()
+        with patch.object(workspace, '_refresh_tab_headers', callback):
+            workspace._headers_pending = False
+            workspace._schedule_tab_headers()
+            workspace.deleteLater()
+            self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+        self.assertFalse(isValid(workspace))
+        callback.assert_not_called()
+
     def test_floating_pane_has_normal_window_controls_and_reattaches(self):
         workspace = self.create()
         view = workspace.add_view()

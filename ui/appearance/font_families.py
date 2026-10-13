@@ -12,9 +12,17 @@ _WINDOWS_LEGACY = frozenset({
 })
 
 
+def font_database_available():
+    """Font metadata needs a GUI application, even for otherwise pure reads."""
+    return isinstance(qt.QGuiApplication.instance(), qt.QGuiApplication)
+
+
 def supported_font_family(family):
     family = family.strip()
     if not family or sys.platform != 'win32':
         return True
-    return (family.casefold() not in _WINDOWS_LEGACY
-            and qt.QFontDatabase.isSmoothlyScalable(family))
+    if family.casefold() in _WINDOWS_LEGACY:
+        return False
+    # Preference loading can run before the GUI starts. Defer metadata checks
+    # until the styling controller reloads after QApplication construction.
+    return not font_database_available() or qt.QFontDatabase.isSmoothlyScalable(family)
