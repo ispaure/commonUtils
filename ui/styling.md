@@ -4,8 +4,9 @@
 `ui_font_*` (interface and dialogs), `browser_font_*`, `reading_font_*` (Markdown
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
-with one shared monospace fallback for editors, diffs and Markdown code. Defaults are 11 pt for UI/browser/code and 15 pt with the automatic interface
-family for reading. All four font sizes allow 7–24 pt.
+with one shared monospace fallback for editors, diffs and Markdown code. Defaults
+are 11 pt for UI/browser/code and Arial at 13 pt for reading. All four font sizes
+allow 7–24 pt.
 Code families must be installed fixed-pitch fonts, or blank for the monospace
 fallback. The layered editor filters its code family list accordingly and validates
 typed names on Save. Existing unavailable or proportional saved code families fall
