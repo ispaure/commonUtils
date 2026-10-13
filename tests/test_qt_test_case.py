@@ -174,3 +174,20 @@ class QtFixtureTests(unittest.TestCase):
                 patch.object(qt.QFontDatabase, 'addApplicationFont', return_value=-1):
             with self.assertRaisesRegex(RuntimeError, 'Cannot load Windows test font'):
                 _load_windows_test_fonts(SimpleNamespace())
+
+    def test_executor_job_is_retained_when_its_owner_was_already_deleted(self):
+        case = QtTestCase()
+        released = Event()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with case.temporary_directory() as directory:
+                window = qt.QWidget()
+                owner = qt.QObject(window)
+                future = owner.future = executor.submit(released.wait, 5)
+                owner.deleteLater()
+                self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+                self.assertFalse(isValid(owner))
+                qt.QTimer.singleShot(20, self.app, released.set)
+            self.assertTrue(future.done())
+            self.assertTrue(future.result())
+            self.assertFalse(Path(directory).exists())
+        case.doCleanups()

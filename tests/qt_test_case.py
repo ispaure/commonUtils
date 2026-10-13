@@ -2,7 +2,9 @@
 
 from time import monotonic, sleep
 from tempfile import TemporaryDirectory
-from concurrent.futures import Future
+from concurrent.futures import Future, ThreadPoolExecutor
+from threading import Lock
+from unittest.mock import patch
 import unittest
 import os
 import sys
@@ -38,12 +40,35 @@ class _QtTemporaryDirectory(TemporaryDirectory):
         app = qt.QApplication.instance()
         self.existing = set(app.topLevelWidgets()) if app else set()
         self.cleaned = False
+        self.futures = set()
+        self.future_lock = Lock()
+        submit = ThreadPoolExecutor.submit
+        def observed_submit(executor, *args, **kwargs):
+            future = submit(executor, *args, **kwargs)
+            if isinstance(future, Future):
+                with self.future_lock:
+                    self.futures.add(future)
+            return future
+        # A pane can be closed and destroyed inside the test body, before its
+        # fixture sees owner.future. Retain its jobs independently of Qt owners.
+        self.submit_patch = patch.object(ThreadPoolExecutor, 'submit', observed_submit)
+        self.submit_patch.start()
+
+    def futures_finished(self):
+        with self.future_lock:
+            return all(future.done() for future in self.futures)
 
     def cleanup(self):
         if not self.cleaned:
-            self.case._release_windows(self.existing)
-            super().cleanup()
-            self.cleaned = True
+            try:
+                self.case._release_windows(self.existing)
+                self.case.wait_until(self.futures_finished,
+                                     message='Executor tasks outlived closed fixture panes')
+                super().cleanup()
+                self.futures.clear()
+                self.cleaned = True
+            finally:
+                self.submit_patch.stop()
 
 
 class QtTestCase(unittest.TestCase):
