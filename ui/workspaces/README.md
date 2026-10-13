@@ -2,6 +2,10 @@
 
 Docking, tab gestures, splitting, floating windows and native workspace menus.
 
+Moving an existing dock to a different tab group explicitly detaches that dock
+before tabifying it with the requested anchor. This preserves unrelated groups
+on Qt 6.12 as well as earlier Qt versions.
+
 Import implementations from `commonUtils.ui.workspaces.<module>`.
 Import widgets and helpers directly from these modules. Package imports do not
 eagerly load their widgets. Former flat `commonUtils.ui.<module>` forwarding

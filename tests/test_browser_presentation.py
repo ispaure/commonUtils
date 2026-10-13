@@ -11,6 +11,22 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 
 class BrowserPresentationTests(QtTestCase):
+    def test_column_preview_native_visibility_waits_for_model(self):
+        from commonUtils.ui.file_browser.columns import FolderColumnView
+        calls = []
+        def visibility(view, visible):
+            self.assertIsNotNone(view.model())
+            calls.append(visible)
+        with patch.object(FolderColumnView, 'setPreviewColumnVisible', visibility, create=True):
+            view = FolderColumnView()
+            self.addCleanup(view.close)
+            self.assertEqual(calls, [])
+            model = qt.QStandardItemModel(view)
+            view.setModel(model)
+            self.assertEqual(calls, [False])
+            view.set_file_preview_visible(True)
+            self.assertEqual(calls, [False, True])
+
     def test_live_thumbnail_badge_changes_only_the_top_right_of_cover(self):
         from commonUtils.filesystem.files import File
         from commonUtils.formats.registry import register_file_type, file_types
