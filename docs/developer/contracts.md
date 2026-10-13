@@ -37,6 +37,11 @@ The checked-in CI selects Python 3.12.2; the application owns dependency pins.
 There is no formal release/version policy or tested universal dependency range.
 
 Retain owners through cooperative shutdown and respect document close vetoes.
+`initialize_q_app()` installs the Windows DPI-size policy; custom QApplication
+hosts opt in through `install_window_dpi_scale_fixer()`. The helper observes native
+messages without consuming them and only repairs normal-window client QSize
+drift. Keep Qt's DPI awareness and display scaling enabled. See the
+[backend guide](../../ui/pyside/README.md) for lifecycle and validation limits.
 Browser `stop()` returns true while busy; controller `prepare_close()` returns
 false while not ready. See [architecture](architecture.md#initialization-and-shutdown).
 

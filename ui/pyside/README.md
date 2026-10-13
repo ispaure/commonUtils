@@ -16,6 +16,21 @@ installation is idempotent. Shared INI and layered settings editors also install
 it when constructed. Without a containing scroll area, these value controls
 ignore wheel gestures.
 
+On Windows, `initialize_q_app()` also installs `WindowDpiScaleFixer` once for the
+application. It observes native DPI and move/resize messages, saves the logical
+client QSize before a monitor crossing, and restores either dimension if it
+drifts after Qt processes the change. Qt retains control of display scaling,
+position and frame margins. Native resize gestures cancel a pending repair;
+maximized/minimized/fullscreen windows and popups retain native sizing. Queued
+repairs are cancelled when a window is destroyed.
+
+Hosts constructing their own QApplication may call
+`qt.install_window_dpi_scale_fixer(app)`; it returns the existing helper on Windows
+and `None` on other platforms. Call `helper.close()` to uninstall it. The policy
+does not change point sizes or address default-font differences between platforms.
+Tests exercise real widgets with synthetic native Windows message sequences;
+physical mixed-DPI monitor transitions still require Windows hardware validation.
+
 ## Files
 
 | File | Responsibility / public entry points |
@@ -24,6 +39,7 @@ ignore wheel gestures.
 | [_imports.py](_imports.py) | Package exports and imports. |
 | [application.py](application.py) | Application utilities; public API is commonUtils.ui.pyside. |
 | [wheel_policy.py](wheel_policy.py) | Application-wide wheel protection for value controls. |
+| [window_dpi.py](window_dpi.py) | Windows-only preservation of logical window sizes across DPI changes. |
 | [messages.py](messages.py) | Messages utilities; public API is commonUtils.ui.pyside. |
 | [progress.py](progress.py) | Progress utilities; public API is commonUtils.ui.pyside. |
 | [widgets.py](widgets.py) | Widgets utilities; public API is commonUtils.ui.pyside. |
