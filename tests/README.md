@@ -28,6 +28,12 @@ for asynchronous Qt operations. It pumps events, succeeds
 when the condition holds, and fails with the supplied message at the deadline.
 Explicit deferred-deletion draining is reserved for shutdown; ordinary waits do
 not prematurely destroy widgets whose owners are still processing close events.
+Managed directory scopes also retain ThreadPoolExecutor jobs submitted during the
+scope, including jobs whose QObject owner was deleted by the test body. They wait
+for those jobs before removing files and always restore submission instrumentation
+after cleanup, including failed shutdown. This prevents native Windows directory
+handles outliving already-closed panes without ignoring cleanup errors.
+
 Shutdown waits honor pending owners and running QThreads. An executor task exposed
 as an owner's `future` (a `concurrent.futures.Future`) is also awaited after owner
 destruction, allowing cancellation callbacks to release process/file handles.
