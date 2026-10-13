@@ -3,11 +3,13 @@ from pathlib import Path
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from types import SimpleNamespace
+from unittest.mock import patch
 import unittest
 
 from shiboken6 import isValid
 from commonUtils.ui import pyside as qt
-from commonUtils.tests.qt_test_case import QtTestCase
+from commonUtils.tests.qt_test_case import QtTestCase, _load_windows_test_fonts
 
 
 class QtFixtureTests(unittest.TestCase):
@@ -155,3 +157,20 @@ class QtFixtureTests(unittest.TestCase):
             self.assertTrue(future.result())
             self.assertFalse(Path(directory).exists())
         case.doCleanups()
+
+    def test_windows_offscreen_fonts_load_once_and_missing_fonts_report_failure(self):
+        app = SimpleNamespace()
+        with patch('commonUtils.tests.qt_test_case.sys', SimpleNamespace(platform='win32')), \
+                patch.object(qt.QApplication, 'platformName', return_value='offscreen'), \
+                patch.object(qt.QFontDatabase, 'addApplicationFont', side_effect=[1, 2, 3, 4]) as load:
+            _load_windows_test_fonts(app)
+            _load_windows_test_fonts(app)
+            self.assertEqual(load.call_count, 4)
+            self.assertEqual(app._commonutils_test_font_ids, [1, 2, 3, 4])
+            self.assertEqual([Path(call.args[0]).name for call in load.call_args_list],
+                             ['segoeui.ttf', 'arial.ttf', 'cour.ttf', 'georgia.ttf'])
+        with patch('commonUtils.tests.qt_test_case.sys', SimpleNamespace(platform='win32')), \
+                patch.object(qt.QApplication, 'platformName', return_value='offscreen'), \
+                patch.object(qt.QFontDatabase, 'addApplicationFont', return_value=-1):
+            with self.assertRaisesRegex(RuntimeError, 'Cannot load Windows test font'):
+                _load_windows_test_fonts(SimpleNamespace())

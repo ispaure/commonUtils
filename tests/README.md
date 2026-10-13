@@ -34,6 +34,12 @@ destruction, allowing cancellation callbacks to release process/file handles.
 Cleanup errors remain test failures. The base class also releases unscoped windows
 between tests.
 
+The base creates QApplication before fixture setup when needed. On Windows with
+Qt's offscreen backend, it loads Segoe UI, Arial, Courier New and Georgia from the
+existing Windows Fonts directory once per application. This supplies real outline
+font metadata for font validation and prevents font-role coverage from being
+silently skipped. Missing/unreadable fixture fonts fail with their file path.
+
 Keep domain-specific file classes, application configuration and platform software
 manifests in the consuming project. Reusable code should preserve established
 public names, arguments and fields so dependent projects can update safely.
