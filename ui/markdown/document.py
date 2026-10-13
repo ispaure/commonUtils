@@ -24,6 +24,12 @@ def space_headings(document):
 
 
 class LiveMarkdownDocument(qt.QTextDocument):
+    def loadResource(self, kind, url):
+        loader = getattr(self, 'resource_loader', None)
+        if loader is not None:
+            return loader(kind, url)
+        return super().loadResource(kind, url)
+
     def toMarkdown(self, *args, **kwargs):
         """Preserve authored delimiters while Qt serializes tables, links and images.
 

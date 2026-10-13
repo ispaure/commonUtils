@@ -43,3 +43,22 @@ def run_batch(items, work, *, progress=lambda done, total, message: None, cancel
             result.remaining = list(items[index + 1:])
             break
     return result
+
+
+@dataclass(frozen=True)
+class MutationResult:
+    """Observable mutation state, including an interrupted source cleanup.
+
+    removed_paths contains confirmed removals. source_state may be unknown if a
+    provider failed inside a primitive; hosts must refresh before retrying.
+    """
+    destination_published: bool = False
+    source_state: str = 'unchanged'
+    removed_paths: tuple[str, ...] = ()
+
+
+class MutationIncomplete(OSError):
+    """A mutation changed storage but did not complete all requested work."""
+    def __init__(self, message, result):
+        super().__init__(message)
+        self.result = result

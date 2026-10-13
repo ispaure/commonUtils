@@ -1,8 +1,8 @@
-"""Coordinate filesystem views, selection and asynchronous thumbnail loading."""
+"""Shared item views; model adapters own identity, ancestry and source access."""
 
 from collections import deque
-from pathlib import Path
-from ...filesystem.directories import Directory
+from ...runtime.browsing import BrowseRole
+from threading import Event
 from .. import pyside as qt
 from ..entry_views import configure_entry_selection
 from ..tasks.operations import Operation
@@ -11,7 +11,7 @@ from .columns import FolderColumnView, ColumnDelegate
 from .thumbnails import CoverModel
 
 
-class FileViews(qt.QStackedWidget):
+class BrowserViews(qt.QStackedWidget):
     selection_changed = qt.Signal()
     context_requested = qt.Signal(object)
     activated = qt.Signal(object)
@@ -20,17 +20,17 @@ class FileViews(qt.QStackedWidget):
     directory_changed = qt.Signal(object)
     directory_opened = qt.Signal(object)
 
-    def __init__(self, model, tree, parent=None):
+    def __init__(self, model, tree, parent=None, *, directory_handler=None, storage=False):
         super().__init__(parent)
+        self.directory_handler = directory_handler
         self.model = model
         self._switching = False
         self.navigation_root = None
         self._column_extended = False
         self._column_selection_pending = False
         self._column_last_selection = None
-        self._hidden_root = None
-        self._hidden_filter = None
         self.tree = tree
+        self.tree.expanded.connect(self._expanded)
         self.covers = CoverModel(model, self)
         self.tiles = ResponsiveTileView()
         self.tiles.setModel(self.covers)
@@ -49,12 +49,15 @@ class FileViews(qt.QStackedWidget):
         self.columns.setColumnWidths([240, 240, 240, 240])
         self.cover_queue = deque()
         self.cover_busy = False
+        self.cover_jobs = {}
+        self.thumbnail_workers = 2
         self.closing = False
         self.badge_timer = qt.QTimer(self)
         self.badge_timer.setInterval(1000)
         self.badge_timer.timeout.connect(self._refresh_badges)
         self.badge_timer.start()
         self.cover_path = None
+        self.cover_cancelled = Event()
         self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
         self.columns.column_context_requested.connect(self._context)
@@ -70,13 +73,15 @@ class FileViews(qt.QStackedWidget):
             else:
                 view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
             view.doubleClicked.connect(lambda index: self.activated.emit(self.source_index(index)))
-        from .storage_view import StorageView
-        self.storage = StorageView(parent)
-        self.addWidget(self.storage)
-        self.storage.selection_changed.connect(self.selection_changed)
-        self.storage.activated.connect(self._storage_activated)
-        self.storage.context_requested.connect(self._storage_context)
-        self.storage.idle.connect(self.idle)
+        self.storage = None
+        if storage:
+            from .storage_view import StorageView
+            self.storage = StorageView(parent)
+            self.addWidget(self.storage)
+            self.storage.selection_changed.connect(self.selection_changed)
+            self.storage.activated.connect(self._storage_activated)
+            self.storage.context_requested.connect(self._storage_context)
+            self.storage.idle.connect(self.idle)
         self.root = None
 
     def source_index(self, index):
@@ -85,7 +90,7 @@ class FileViews(qt.QStackedWidget):
         return index
 
     def _storage_activated(self, path):
-        index = self.model.index(str(path))
+        index = self.model.browse_index(path)
         if index.isValid():
             self.activated.emit(index)
         else:
@@ -94,11 +99,11 @@ class FileViews(qt.QStackedWidget):
     def _storage_context(self, path, position):
         self.context_directory = self.root
         self.context_position = position
-        self.context_requested.emit(self.model.index(str(path)))
+        self.context_requested.emit(self.model.browse_index(path))
 
     def selected_rows(self):
-        if self.currentIndex() == 3:
-            index = self.model.index(str(self.storage.selected_path)) if self.storage.selected_path else qt.QModelIndex()
+        if self.storage is not None and self.currentWidget() is self.storage:
+            index = self.model.browse_index(self.storage.selected_path) if self.storage.selected_path else qt.QModelIndex()
             return [index] if index.isValid() else []
         rows = list(dict.fromkeys(self.source_index(index) for index in
                                  self.currentWidget().selectionModel().selectedIndexes() if index.column() == 0))
@@ -139,43 +144,52 @@ class FileViews(qt.QStackedWidget):
         self._selection(self.columns)
 
     def _column_selection_key(self):
-        return (self.root, tuple(self.model.filePath(index) for index in self.selected_rows()),
-                self.model.filePath(self.columns.currentIndex()))
+        return (self.root, tuple(self.model.browse_identity(index) for index in self.selected_rows()),
+                self.model.browse_identity(self.columns.currentIndex()))
 
     def current_index(self):
-        if self.currentIndex() == 3:
+        if self.storage is not None and self.currentWidget() is self.storage:
             rows = self.selected_rows()
             return rows[0] if rows else qt.QModelIndex()
         return self.source_index(self.currentWidget().currentIndex())
 
     def browsing_directory(self):
-        if self.currentIndex() == 3:
+        if self.storage is not None and self.currentWidget() is self.storage:
             return self.root
         selected = self.selected_rows()
         index = self.current_index()
         if not any(index == item for item in selected):
             index = selected[-1] if selected else qt.QModelIndex()
         if index.isValid():
-            path = Path(self.model.filePath(index))
-            directory = path if self.currentIndex() == 2 and isinstance(self.model.item(index), Directory) else path.parent
-            if directory == self.root or self.root in directory.parents:
+            path = self.model.browse_identity(index)
+            directory = path if self.currentIndex() == 2 and index.data(BrowseRole.Container) else self.model.browse_parent(path)
+            if self.model.browse_within(directory, self.root):
                 return directory
         return self.root
 
+    def _handled_directory(self, path):
+        return bool(path is not None and self.directory_handler and self.directory_handler(path))
+
+    def _expanded(self, index):
+        if self._handled_directory(self.model.browse_identity(self.source_index(index))):
+            self.tree.collapse(index)
+
     def _selection(self, view):
         if view is self.currentWidget() and not self._switching:
+            if self._handled_directory(self.browsing_directory()):
+                return
             self.directory_changed.emit(self.browsing_directory())
             self.selection_changed.emit()
 
     def _context(self, view, point):
         if view is self.currentWidget() or (self.currentWidget() is self.columns and self.columns.isAncestorOf(view)):
-            self.context_directory = Path(self.model.filePath(self.source_index(view.rootIndex())))
+            self.context_directory = self.model.browse_identity(self.source_index(view.rootIndex()))
             self.context_position = view.viewport().mapToGlobal(point)
             self.context_requested.emit(self.source_index(view.indexAt(point)))
 
     def select_source(self, source):
-        if self.currentIndex() == 3:
-            self.storage.select_path(Path(self.model.filePath(source)))
+        if self.storage is not None and self.currentWidget() is self.storage:
+            self.storage.select_path(self.model.browse_identity(source))
             return
         view = self.currentWidget()
         index = self.covers.mapFromSource(source) if view is self.tiles else source
@@ -185,7 +199,7 @@ class FileViews(qt.QStackedWidget):
         view.setFocus()
 
     def edit_name(self, source):
-        if self.currentIndex() == 3:
+        if self.storage is not None and self.currentWidget() is self.storage:
             self.storage.browser.view_selector.setCurrentIndex(0)
         source = self.source_index(source).siblingAtColumn(0)
         view = self.currentWidget()
@@ -199,27 +213,18 @@ class FileViews(qt.QStackedWidget):
         view.edit(index)
 
     def set_root(self, path):
-        self.root = Path(path)
-        if (self._hidden_root is not None and self.root != self._hidden_root
-                and self._hidden_root not in self.root.parents):
-            self.model.setFilter(self._hidden_filter)
-            self._hidden_root = self._hidden_filter = None
-        index = self.model.index(str(path))
-        if not index.isValid():
-            # Explicitly opening a hidden folder is valid even when it is
-            # excluded from the parent listing or not loaded by Qt yet.
-            if self._hidden_filter is None:
-                self._hidden_filter = self.model.filter()
-                self._hidden_root = self.root
-            self.model.setFilter(self._hidden_filter | qt.QDir.Filter.Hidden)
-            index = self.model.setRootPath(str(path))
+        if self._handled_directory(path):
+            return
+        self.root = path
+        index = self.model.browse_root_index(path)
         for view in (self.tree, self.tiles, self.columns):
             blocker = qt.QSignalBlocker(view.selectionModel())
             view.clearSelection()
             view.setCurrentIndex(qt.QModelIndex())
             view.setRootIndex(self.covers.mapFromSource(index) if view is self.tiles else index)
             blocker.unblock()
-        self.storage.set_root(self.root)
+        if self.storage is not None:
+            self.storage.set_root(self.root)
         self.tree.collapseAll()
         if self.currentWidget() is self.columns:
             self._column_last_selection = self._column_selection_key()
@@ -228,8 +233,9 @@ class FileViews(qt.QStackedWidget):
         self.directory_opened.emit(self.root)
 
     def set_mode(self, mode):
-        from ...filesystem.network import is_network_location
-        if mode >= 3 and self.root is not None and is_network_location(self.root):
+        if mode not in (0, 1, 2, 3, 4) or (mode >= 3 and self.storage is None):
+            raise ValueError('This browser does not offer that view.')
+        if mode >= 3 and self.root is not None and self.model.browse_network(self.root):
             return
         chart_mode = max(0, mode - 3)
         mode = min(mode, 3)  # Both storage buttons share the established storage widget.
@@ -238,11 +244,11 @@ class FileViews(qt.QStackedWidget):
         if mode == 2:
             # A directory already opened in another mode belongs in the first
             # column, with its contents in the next one.
-            focus = selected[-1] if selected else self.model.index(str(directory))
-            parent = Path(self.model.filePath(focus.parent())) if focus.parent().isValid() else None
+            focus = selected[-1] if selected else self.model.browse_index(directory)
+            parent = self.model.browse_identity(focus.parent()) if focus.parent().isValid() else None
             scope = self.navigation_root
             if (focus.isValid() and parent is not None
-                    and (scope is None or parent == scope or scope in parent.parents)):
+                    and (scope is None or self.model.browse_within(parent, scope))):
                 directory = parent
                 selected = selected or [focus]
         if directory != self.root:
@@ -252,7 +258,7 @@ class FileViews(qt.QStackedWidget):
             self.storage.set_chart_mode(chart_mode)
             self.storage.set_root(directory)
             if selected:
-                self.storage.select_path(Path(self.model.filePath(selected[-1])))
+                self.storage.select_path(self.model.browse_identity(selected[-1]))
             self.directory_changed.emit(self.root)
             self.selection_changed.emit()
             return
@@ -270,6 +276,8 @@ class FileViews(qt.QStackedWidget):
             self.currentWidget().scrollTo(index)
         if mode == 2:
             self._column_last_selection = self._column_selection_key()
+        if self._handled_directory(self.browsing_directory()):
+            return
         self.directory_changed.emit(self.browsing_directory())
         self.selection_changed.emit()
 
@@ -289,26 +297,24 @@ class FileViews(qt.QStackedWidget):
             self.tiles.viewport().update()
 
     def _request_cover(self, path):
-        from ...filesystem.network import is_network_location
-        if self.closing or is_network_location(path):
+        if self.closing or self.model.browse_network(path):
             return
         qt.QTimer.singleShot(0, lambda: self._enqueue_cover(path))
 
     def _visible_cover(self, path):
-        index = self.covers.mapFromSource(self.model.index(str(path)))
+        index = self.covers.mapFromSource(self.model.browse_index(path))
         return self.currentIndex() == 1 and self.tiles.visualRect(index).intersects(self.tiles.viewport().rect())
 
     def _enqueue_cover(self, path):
-        path = Path(path)
         if self.closing or not self._visible_cover(path):
             self.covers.requested.discard(path)
             return
-        if path not in self.cover_queue:
+        if path not in self.cover_queue and path not in self.cover_jobs:
             self.cover_queue.append(path)
         self._next_cover()
 
     def _next_cover(self):
-        if self.cover_busy or self.closing or not self.cover_queue:
+        if len(self.cover_jobs) >= self.thumbnail_workers or self.closing or not self.cover_queue:
             return
         self.cover_path = self.cover_queue.popleft()
         path = self.cover_path
@@ -317,33 +323,54 @@ class FileViews(qt.QStackedWidget):
             qt.QTimer.singleShot(0, self._next_cover)
             return
         self.cover_busy = True
-        item = self.model.item(self.model.index(str(path)))
+        thumbnail = self.model.browse_index(path).data(BrowseRole.Thumbnail)
+        if thumbnail is None:
+            self.cover_busy = bool(self.cover_jobs)
+            self.covers.requested.discard(path)
+            self._next_cover()
+            return
         size, ratio = self.covers.render_size, self.covers.device_ratio
-        self.operation = Operation(lambda: item.browser_thumbnail(size), self)
+        worker = Operation(lambda: thumbnail(size, self.cover_cancelled.is_set), self)
+        self.operation = worker
+        self.cover_jobs[path] = worker
         revision = self.covers.revisions.get(path, 0)
-        self.operation.completed.connect(lambda data, error: self._cover_loaded(path, revision, data or b'', ratio, size))
-        self.operation.finished.connect(self._cover_finished)
-        self.operation.start()
+        epoch = self.covers.epoch
+        worker.completed.connect(lambda data, error: self._cover_loaded(path, revision, data or b'', ratio, size, epoch))
+        worker.finished.connect(lambda: self._cover_finished(path, worker))
+        worker.start()
+        self._next_cover()
 
-    def _cover_loaded(self, path, revision, data, ratio=1.0, size=None):
-        path = Path(path)
-        if revision == self.covers.revisions.get(path, 0):
+    def _cover_loaded(self, path, revision, data, ratio=1.0, size=None, epoch=None):
+        if not self.closing and (epoch is None or epoch == self.covers.epoch) and revision == self.covers.revisions.get(path, 0):
             self.covers.complete(path, data, ratio, size)
         else:
             self.covers.requested.discard(path)
             self.tiles.viewport().update()
 
-    def _cover_finished(self):
-        self.cover_busy = False
-        self.operation.deleteLater()
+    def _cover_finished(self, path, worker):
+        self.cover_jobs.pop(path, None)
+        self.cover_busy = bool(self.cover_jobs)
+        worker.deleteLater()
         if self.closing:
-            self.idle.emit()
+            if not self.cover_busy:
+                self.idle.emit()
         else:
             self._next_cover()
+            if not self.cover_busy:
+                self.idle.emit()
 
     def stop(self):
         self.closing = True
         self.badge_timer.stop()
         self.cover_queue.clear()
-        storage_busy = self.storage.stop()
+        self.cover_cancelled.set()
+        self.covers.icons.clear()
+        self.covers.requested.clear()
+        storage_busy = self.storage.stop() if self.storage is not None else False
         return self.cover_busy or storage_busy
+
+
+class FileViews(BrowserViews):
+    """Local browser integration retains its optional indexed storage charts."""
+    def __init__(self, model, tree, parent=None, *, directory_handler=None):
+        super().__init__(model, tree, parent, directory_handler=directory_handler, storage=True)

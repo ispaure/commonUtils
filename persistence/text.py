@@ -173,6 +173,8 @@ def decode_bytes(data, *, path=None, encoding=None, force=False):
 
 
 def read_text_file(path, *, encoding=None, force=False):
+    from ..filesystem.local_access import check_local_path
+    check_local_path(path)
     path = Path(path).resolve()
     with path.open("rb") as stream:
         data = stream.read(MAX_BYTES + 1)
@@ -222,3 +224,31 @@ def write_text_file(path, content, *, expected=None, allow_overwrite=False):
     from . import atomic_write_bytes
     atomic_write_bytes(path, content, validate=check,
                        overwrite=expected is not None or allow_overwrite)
+
+
+class TextSession:
+    """In-memory text baseline, encoding and resource identity; no backend policy.
+
+    Edits may remain in a host widget. Call modified/encode with its draft, then
+    accept only after successful publication. Revisions are opaque provider values.
+    """
+    def __init__(self, name, data, *, key=None, revision=None, max_bytes=MAX_BYTES):
+        self.max_bytes = max_bytes
+        self.accept(name, data, key=key, revision=revision)
+
+    def accept(self, name, data, *, key=None, revision=None):
+        if len(data) > self.max_bytes:
+            raise ValueError('Text exceeds the editing memory limit.')
+        snapshot = decode_bytes(data)
+        self.name, self.key, self.revision = name, key, revision
+        self.data, self.text_snapshot = data, snapshot
+        self.text = snapshot.text
+
+    def modified(self, text):
+        return text != self.text_snapshot.text
+
+    def encode(self, text):
+        data = self.text_snapshot.encode(text)
+        if len(data) > self.max_bytes:
+            raise ValueError('Text exceeds the editing memory limit.')
+        return data

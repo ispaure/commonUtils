@@ -1,6 +1,6 @@
 """Responsive tile layout with bounded, adjustable icons and thumbnails."""
 
-from ...filesystem.directories import Directory
+from ...runtime.browsing import BrowseRole
 from .. import pyside as qt
 from ..appearance.typography import point_size, setting_size
 from .editing import FilenameEditorMixin
@@ -31,8 +31,8 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
             painter.drawPixmap(qt.QPointF(area.center().x() - size.width()/2,
                                          area.center().y() - size.height()/2), pixmap)
             source = index.model().mapToSource(index)
-            item = source.model().item(source)
-            text = item.browser_thumbnail_badge()
+            text = source.data(BrowseRole.Badge) or ''
+            text = text() if callable(text) else text
             if text:
                 painter.save()
                 font = qt.QFont(option.font)
@@ -54,7 +54,7 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
         super().initStyleOption(option, index)
         view = self.parent()
         source = index.model().mapToSource(index)
-        size = (view.folder_icon_size if isinstance(source.model().item(source), Directory)
+        size = (view.folder_icon_size if source.data(BrowseRole.Container)
                 else view.iconSize())
         # Native icon engines and cached covers can supply pixmaps larger than requested.
         # Normalize after Qt initializes the option so its intrinsic size cannot override
@@ -143,7 +143,7 @@ class ResponsiveTileView(qt.QListView):
         root = self.rootIndex()
         for row in range(model.rowCount(root)):
             source = model.mapToSource(model.index(row, 0, root))
-            if not isinstance(source_model.item(source), Directory):
+            if not source.data(BrowseRole.Container):
                 return False
         return True
 

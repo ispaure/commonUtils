@@ -21,9 +21,10 @@ def command(key, modifiers, platform):
 
 
 class BrowserKeyboard(qt.QObject):
-    def __init__(self, browser):
+    def __init__(self, browser, *, execute=None):
         super().__init__(browser)
         self.browser = browser
+        self.execute = execute
         self.platform = sys.platform
         qt.QApplication.instance().installEventFilter(self)
 
@@ -31,10 +32,12 @@ class BrowserKeyboard(qt.QObject):
         if event.type() not in (qt.QEvent.Type.ShortcutOverride, qt.QEvent.Type.KeyPress):
             return False
         browser = self.browser
-        if (browser.stopping or not isinstance(watched, qt.QWidget)
+        if (getattr(browser, 'stopping', getattr(browser, 'closing', False)) or not isinstance(watched, qt.QWidget)
                 or isinstance(watched, (qt.QLineEdit, qt.QTextEdit, qt.QPlainTextEdit))):
             return False
-        panes = (browser.views.currentWidget(), browser.index_search.results)
+        panes = [browser.views.currentWidget()]
+        if getattr(browser, 'index_search', None) is not None:
+            panes.append(browser.index_search.results)
         if not any(watched is pane or pane.isAncestorOf(watched) for pane in panes):
             return False
         action = command(event.key(), event.modifiers(), self.platform)
@@ -42,7 +45,9 @@ class BrowserKeyboard(qt.QObject):
             return False
         event.accept()
         if event.type() == qt.QEvent.Type.KeyPress:
-            if action == 'rename':
+            if self.execute is not None:
+                self.execute(action)
+            elif action == 'rename':
                 browser.file_actions.rename_selected()
             elif action == 'open':
                 selected = browser.selected_objects()

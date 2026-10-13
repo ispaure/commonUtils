@@ -123,3 +123,10 @@ panel explains the problem; available voices depend on the operating system.
 - **Save blocked by external edits:** preserve your version with Save As before reloading.
 
 [Developer integration](../README.md) · [All shared guides](../../../README.md#shared-component-user-guides)
+
+
+Hosts may supply a shared storage browser for Open and Save As. Private storage
+can keep text and embedded images in memory, with Save/Discard/Cancel on close
+and no persistent private drafts. The host decides which locations are available
+and whether opening another document uses a new window. Save failures retain your
+current buffer; inspect a reported saved destination before retrying Save As.

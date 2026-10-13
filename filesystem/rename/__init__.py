@@ -329,6 +329,9 @@ def plan_named_renames(items, *, case_sensitive=False):
 
 
 def _rename_exclusive(source, target):
+    from ..local_access import check_local_path
+    check_local_path(source, recursive=True)
+    check_local_path(target, recursive=True)
     """Publish without replacement, including racing destinations and empty directories."""
     if os.name == 'nt':
         os.rename(source, target)  # Windows rename refuses existing destinations.
@@ -356,6 +359,9 @@ def rename_path(source, target, *, overwrite=False):
     Parents must already exist. Errors propagate to the caller. Identical paths
     are a no-op when the source exists; case-only renames use the batch engine.
     """
+    from ..local_access import check_local_path
+    check_local_path(source, recursive=True)
+    check_local_path(target, recursive=True)
     source, target = _absolute(source), _absolute(target)
     if source == target:
         source.lstat()

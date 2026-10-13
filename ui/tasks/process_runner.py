@@ -34,12 +34,17 @@ class ProcessRunner(qt.QObject):
     progress = qt.Signal(object)
     completed = qt.Signal(object)
 
-    def __init__(self, parent=None, *, parser=None, max_attempts=1, retry_delay_ms=1000):
+    def __init__(self, parent=None, *, parser=None, max_attempts=1, retry_delay_ms=1000, environment=None):
         super().__init__(parent)
         self.parser = parser
         self.max_attempts = max(1, max_attempts)
         self.retry_delay_ms = max(0, retry_delay_ms)
         self.process = qt.QProcess(self)
+        if environment is not None:
+            native_environment = qt.QProcessEnvironment()
+            for name, value in environment.items():
+                native_environment.insert(str(name), str(value))
+            self.process.setProcessEnvironment(native_environment)
         self.process.setProcessChannelMode(qt.QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._read)
         self.process.finished.connect(self._finished)

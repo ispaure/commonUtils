@@ -5,11 +5,8 @@ from pathlib import Path
 def _encode_markdown(text, original, modified):
     if not modified and original is not None:
         return original
-    source = original or b''
-    if b'\r\n' in source and b'\n' not in source.replace(b'\r\n', b''):
-        text = text.replace('\n', '\r\n')
-    encoded = text.encode('utf-8')
-    return b'\xef\xbb\xbf' + encoded if source.startswith(b'\xef\xbb\xbf') else encoded
+    from ...persistence.text import TextSession
+    return TextSession('document.md', original or b'').encode(text)
 
 
 def _write_markdown(destination, data, *, expected=None):

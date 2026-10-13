@@ -22,6 +22,16 @@ class CommandTests(unittest.TestCase):
             self.assertEqual(_exec_cmd_new_window_macos('', folder), [])
             self.assertNotIn('&&', launch.call_args.args[0][2])
 
+    def test_private_child_environment_does_not_change_parent(self):
+        name = 'COMMONUTILS_CHILD_FIXTURE'
+        previous = os.environ.get(name)
+        result = run_command([sys.executable, '-c',
+            'import os; print(os.environ.get("COMMONUTILS_CHILD_FIXTURE", "missing"))'],
+            environment=dict(os.environ, **{name: 'synthetic-value'}))
+        self.assertTrue(result.success)
+        self.assertEqual(result.stdout, ('synthetic-value',))
+        self.assertEqual(os.environ.get(name), previous)
+
     def test_exit_status_and_streams_are_preserved(self):
         result = run_command([sys.executable, '-c',
             'import sys; print("out"); print("err", file=sys.stderr); sys.exit(7)'])

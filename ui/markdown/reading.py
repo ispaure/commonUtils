@@ -110,6 +110,9 @@ class MarkdownReadingMixin:
 
 
     def render_diagrams(self):
+        if self.storage is not None and getattr(self.storage, 'private', False):
+            self.status.setText('Diagram rendering requires temporary files and is disabled for private documents.')
+            return False
         from .diagrams import MermaidRenderer
         if self._diagram_renderer is None:
             self._diagram_renderer = MermaidRenderer(self)

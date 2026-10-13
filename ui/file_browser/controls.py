@@ -71,7 +71,7 @@ class ViewIcon(qt.QIconEngine):
 class ViewModeSelector(qt.QWidget):
     currentIndexChanged = qt.Signal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, modes=(0, 1, 2, 3, 4)):
         super().__init__(parent)
         layout = qt.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -92,6 +92,8 @@ class ViewModeSelector(qt.QWidget):
         storage_layout.addWidget(separator)
         storage_layout.addWidget(qt.QLabel('Size Map'))
         for mode, name in ((1, 'Tiles'), (0, 'List'), (2, 'Columns'), (3, 'Treemap'), (4, 'Radial')):
+            if mode not in modes:
+                continue
             button = qt.QToolButton()
             set_painted_icon(button, ViewIcon, 5 if mode == 4 else mode)
             button.setIconSize(qt.QSize(23, 23))
@@ -163,3 +165,33 @@ def navigation_button(parent, name, icon):
     button.setToolTip(name)
     button.setAccessibleName(name)
     return button
+
+
+def create_search_toggle(parent, toggled):
+    """Shared search affordance for filesystem and provider browsers."""
+    button = qt.QToolButton(parent)
+    set_painted_icon(button, ViewIcon, 6)
+    button.setIconSize(qt.QSize(22, 22))
+    button.setCheckable(True)
+    button.setAutoRaise(True)
+    button.setAccessibleName('Search files and folders')
+    button.setToolTip('Show or hide search (Ctrl/Cmd+F)')
+    button.toggled.connect(toggled)
+    return button
+
+
+def create_search_panel(parent, edit, close):
+    panel = qt.QWidget(parent)
+    layout = qt.QHBoxLayout(panel)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(edit, 1)
+    button = qt.QToolButton(panel)
+    set_painted_icon(button, ViewIcon, 7)
+    button.setIconSize(qt.QSize(20, 20))
+    button.setAutoRaise(True)
+    button.setAccessibleName('Close search')
+    button.setToolTip('Close search and return to browsing (Esc)')
+    button.clicked.connect(close)
+    layout.addWidget(button)
+    panel.hide()
+    return panel, button

@@ -1,0 +1,21 @@
+# Browse native items
+
+Choose **List** for compact rows or **Tiles** for larger cover images. **Previous**
+and **Next** show the next page of items. Select an entry to see file information
+below the list, including available format metadata. Hosts may omit this information
+for an Open/Save picker and supply their own folder and Open buttons.
+
+Covers load in the background. Missing or locked covers leave names selectable;
+view changes and closing stop obsolete work. Thumbnails stay in memory.
+
+
+Tap a folder to enter it when the host enables navigation. **Back** returns to the
+previous successfully loaded location, including a previous storage selection.
+The bounded history lasts only for this browser session and is cleared on closing.
+
+**Search** opens a full-width field to search this folder and its subfolders.
+Folder listings load in the background without reading file contents; scans stop
+after 10,000 entries and report incomplete results. Closing search restores the
+folder listing. Sorting offers natural names, sizes or modified times in either direction;
+folders stay before files. Search resets when navigating elsewhere. Hidden selected
+items are deselected so actions cannot target an item excluded by the filter.

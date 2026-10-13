@@ -126,3 +126,7 @@ Commands launched without captured output or in a new terminal window return imm
 Platform-specific terminal and process behavior is isolated inside the package so callers can generally use the same `exec_cmd()` interface on Windows, macOS, and Linux.
 
 For Windows-specific PowerShell execution, use the separate `powerShellWrapper.py` module.
+
+`run_command(..., environment=mapping)` supplies a complete child environment without
+mutating the parent or including values in command arguments. `None` inherits the
+parent environment. The caller owns filtering and secret lifetime.

@@ -73,6 +73,45 @@ class BrowserTests(QtTestCase):
             time.sleep(.01)
         self.assertFalse(any(pending.values()), f'Browser workers did not settle: {pending}')
 
+    def test_host_managed_directory_routes_all_navigation_without_listing_children(self):
+        managed = self.root / 'managed'
+        managed.mkdir()
+        (managed / 'opaque.bin').write_bytes(b'opaque')
+        calls = []
+        def route(path):
+            if path == managed or managed in path.parents:
+                calls.append(path)
+                return True
+            return False
+        self.browser.directory_handler = route
+        self.browser.model.directory_boundary = lambda path: path == managed or managed in path.parents
+        self.wait()
+        index = self.browser.model.index(str(managed))
+        self.assertTrue(index.isValid())
+        self.assertEqual(self.browser.model.rowCount(index), 0)
+        self.assertFalse(self.browser.model.canFetchMore(index))
+        for invoke in (lambda: self.browser.navigate(managed),
+                       lambda: self.browser.set_directory(managed),
+                       lambda: self.browser.views.set_root(managed),
+                       lambda: self.browser.navigation.requested.emit(managed),
+                       lambda: self.browser.tree.expand(self.browser.sort_model.mapFromSource(index)),
+                       lambda: self.browser._activate_path(managed / 'opaque.bin')):
+            calls.clear()
+            invoke()
+            self.assertEqual(calls, [managed])
+            self.assertEqual(self.browser.navigation.directory, self.root)
+        self.browser.views.set_mode(2)
+        calls.clear()
+        self.browser.views.select_source(index)
+        self.wait()
+        self.assertIn(managed, calls)
+        self.assertEqual(self.browser.navigation.directory, self.root)
+        ordinary = self.root / 'ordinary'
+        ordinary.mkdir()
+        self.browser.navigate(ordinary)
+        self.wait()
+        self.assertEqual(self.browser.navigation.directory, ordinary)
+
     def test_parent_destruction_releases_index_priority(self):
         import gc
         from commonUtils.filesystem.index import directory_cache

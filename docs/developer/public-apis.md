@@ -136,3 +136,19 @@ rollback receipts and detached apply/restart. Hosts own update policy and UI.
 - [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`.
 - [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`.
 - [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`.
+
+Provider-backed file work uses `runtime.local_files.LocalFiles`, contracts and
+capabilities in `runtime.resource_provider`, and complete operations in
+`runtime.resource_mutations`. Use `persistence.publication.save_transaction` for
+backend-specific staged saves and `persistence.text.TextSession` for in-memory
+text baselines. See the [provider API guide](../../ui/resource-providers.md).
+
+
+## Portable and native item browsing
+
+`runtime.browsing` supplies BrowseEntry/BrowseTree snapshots and shared
+`provider_entries` conversion. Qt consumers use EntryModel/BrowserViews; native
+mobile consumers use `ui.native_browser.NativeBrowser` with Toga list/tile views,
+visible thumbnail loading and generic/rich file details. Source work, credentials
+and activation remain host-owned. See the [resource provider contract](../../ui/resource-providers.md#native-list-and-tile-presentation)
+for callback, revision, bounded-cache and shutdown requirements.

@@ -114,3 +114,17 @@ class TextFilesTests(unittest.TestCase):
         converted = snapshot.encode("hello", encoding="utf-16-le")
         self.assertTrue(converted.startswith(codecs.BOM_UTF16_LE))
         self.assertEqual(decode_bytes(converted).text, "hello")
+
+
+class TextSessionTests(unittest.TestCase):
+    def test_encoding_retarget_and_failed_accept(self):
+        from commonUtils.persistence.text import TextSession
+        session = TextSession('old.md', b'\xef\xbb\xbfone\r\ntwo\n', key='old', revision=1, max_bytes=40)
+        self.assertFalse(session.modified('one\ntwo\n'))
+        self.assertEqual(session.encode('one\ntwo\n'), session.data)
+        saved = session.encode('one\nnew\n')
+        session.accept('new.md', saved, key='new', revision=2)
+        self.assertEqual((session.key, session.revision), ('new', 2))
+        self.assertFalse(session.modified('one\nnew\n'))
+        with self.assertRaises(ValueError): session.accept('bad', b'x' * 41)
+        self.assertEqual(session.key, 'new')

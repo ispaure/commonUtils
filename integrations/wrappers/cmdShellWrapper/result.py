@@ -34,7 +34,7 @@ class CommandResult:
 def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path | None = None,
                 timeout: float | None = None, idle_timeout: float | None = None,
                 cancelled: Callable[[], bool] = lambda: False, shell: bool = False,
-                stdin: int | None = subprocess.DEVNULL) -> CommandResult:
+                stdin: int | None = subprocess.DEVNULL, environment: dict[str, str] | None = None) -> CommandResult:
     """Wait for completion and capture both streams; terminate the tree on cancellation.
 
     Pass an argument sequence by default. Shell strings require shell=True.
@@ -52,7 +52,7 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
     if shell:
         require_capability(Capability.SHELL, 'run_command')
     child = subprocess.Popen(arguments, shell=shell, cwd=cwd, stdin=stdin,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment,
                              **process.get_process_group_kwargs())
     events = queue.Queue()
     buffers = {'stdout': bytearray(), 'stderr': bytearray()}

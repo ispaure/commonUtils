@@ -35,3 +35,8 @@ publication; a temporary directory alone does not provide transaction semantics.
 See [integration contracts](../docs/developer/contracts.md) for namespace and data ownership.
 
 [Library overview](../README.md)
+
+`local_access` lets a host reserve physical roots for virtual providers. Shared
+ordinary file operations reject raw access to registered roots, including aliases
+and recursive ancestor operations. See the [provider contract](../ui/resource-providers.md)
+for registration, internal record grants and the scope of this safeguard.

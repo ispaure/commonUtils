@@ -60,6 +60,16 @@ class ProcessTests(QtTestCase):
             time.sleep(.01)
         self.app.processEvents()
 
+    def test_private_child_environment_reaches_qprocess_without_parent_mutation(self):
+        name = 'COMMONUTILS_QPROCESS_FIXTURE'
+        previous = os.environ.get(name)
+        window = self.create(environment=dict(os.environ, **{name: 'synthetic-value'}))
+        window.start(sys.executable, ['-c', 'import os; print(os.environ["COMMONUTILS_QPROCESS_FIXTURE"])'])
+        self.wait(window)
+        self.assertTrue(window.result.succeeded)
+        self.assertIn('synthetic-value', window.log.toPlainText())
+        self.assertEqual(os.environ.get(name), previous)
+
     def test_incremental_output_progress_and_actual_exit_result(self):
         window = self.create(parser=lambda line: ProcessUpdate(1, 2, 'Half done') if line == 'first' else None)
         window.start(sys.executable, ['-u', '-c', "import time; print('first'); time.sleep(.3); print('last'); raise SystemExit(7)"])

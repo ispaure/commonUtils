@@ -158,3 +158,38 @@ worker, cancellation and refresh lifecycle. Its own QDrag avoids Qt deleting
 source rows after an asynchronous move. Internal drags are identified within the
 current process; external drops acknowledge CopyAction and preserve their source.
 Qt columns install the controller through column_created as they are created.
+
+
+### Host-managed directory navigation
+
+`FileBrowser(..., directory_handler=callback, directory_boundary=predicate)`
+lets a host route selected directories to another browser. Both callbacks receive
+an absolute `Path` on the GUI thread and must be inexpensive. The handler returns
+true when it consumes navigation (including refusal or an unlock prompt); the
+regular browser retains its location. Hosts should defer UI replacement until the
+current signal returns and own errors, credentials and replacement-view lifetime.
+The boundary predicate is read-only: the filesystem model does not list or fetch
+children beneath matching directories. It must not open dialogs or navigate.
+
+Routing covers explicit locations, breadcrumbs, activation, tree expansion,
+column navigation and storage/search navigation. Cached file activation routes
+its parent directory before ordinary file launch. The shared browser knows
+nothing about encryption or application backends. Use the host's trusted logical
+location type when cloning a provider tab; raw filesystem locations cannot stand
+in for decoded provider paths.
+
+## Shared provider presentation
+
+List, tile and column presentation is owned by `BrowserViews`; `FileViews` adds
+local indexed storage charts. The local filesystem model supplies shared item roles
+while retaining its watcher and existing file APIs. Provider browsing and pickers
+use the same views through `ProviderEntryModel`. Arbitrary item identities and
+custom properties are available through the UI-independent browse tree and its
+Qt `EntryModel`. See the [item and provider contract](../resource-providers.md#shared-item-presentation)
+for loading, identity, thumbnail, privacy and lifecycle rules.
+
+
+Mobile consumers use [NativeBrowser](../native_browser/README.md), which presents
+list/tile views over the same portable tree and provider-row conversion through
+Toga, rather than importing Qt widgets. Backend-specific presentation stays separate
+while source identities, metadata rows, revisions and mutation contracts are shared.
