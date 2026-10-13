@@ -36,7 +36,7 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
             if text:
                 painter.save()
                 font = qt.QFont(option.font)
-                font.setPointSizeF(point_size(max(8, min(10, setting_size(font) - 1))))
+                font.setPointSizeF(point_size(max(6, min(7.5, setting_size(font) - .75))))
                 painter.setFont(font)
                 metrics = qt.QFontMetricsF(font)
                 text = metrics.elidedText(text, qt.Qt.TextElideMode.ElideMiddle, max(1, int(size.width() - 12)))
