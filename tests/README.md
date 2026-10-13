@@ -15,6 +15,25 @@ platform checks.
 
 ## Development and validation
 
+GUI tests inherit `QtTestCase`. Use `self.temporary_directory()` instead of a raw
+`TemporaryDirectory` for files referenced by Qt widgets. It supports both `with`
+scopes and `.name`/`.cleanup()` fixtures, registers cleanup automatically, and
+destroys the scope's windows/watchers before removing the directory. Register
+fixture-specific callbacks after creating it so buffer discard and private
+database shutdown happen first. Context managers must enclose the widget's whole
+lifetime. Existing windows outside the scope are preserved.
+
+Use `self.wait_until(condition, timeout=5, message='operation description')`
+for asynchronous Qt operations. It pumps events, succeeds
+when the condition holds, and fails with the supplied message at the deadline.
+Explicit deferred-deletion draining is reserved for shutdown; ordinary waits do
+not prematurely destroy widgets whose owners are still processing close events.
+Shutdown waits honor pending owners and running QThreads. An executor task exposed
+as an owner's `future` (a `concurrent.futures.Future`) is also awaited after owner
+destruction, allowing cancellation callbacks to release process/file handles.
+Cleanup errors remain test failures. The base class also releases unscoped windows
+between tests.
+
 Keep domain-specific file classes, application configuration and platform software
 manifests in the consuming project. Reusable code should preserve established
 public names, arguments and fields so dependent projects can update safely.

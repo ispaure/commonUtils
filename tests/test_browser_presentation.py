@@ -2,8 +2,6 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from time import monotonic, sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
@@ -38,20 +36,17 @@ class BrowserPresentationTests(QtTestCase):
                 return progress[0]
         registration = register_file_type(BadgeFile, ('badge',), owner='badge_test')
         self.addCleanup(file_types.unregister, registration)
-        with TemporaryDirectory() as temp:
+        with self.temporary_directory() as temp:
             path = Path(temp).resolve() / 'comic.badge'; path.write_text('fixture')
             browser = FileBrowser(Path(temp).resolve(), calculate_folder_sizes=False)
             browser.setFont(font)
             browser.resize(850, 550); browser.show()
-            deadline = monotonic() + 5
-            while not browser.model.index(str(path)).isValid():
-                self.assertLess(monotonic(), deadline)
-                self.app.processEvents(); sleep(.005)
+            self.wait_until(lambda: browser.model.index(str(path)).isValid(),
+                            message='Browser model did not load the badge fixture')
             try:
                 browser.view_selector.setCurrentIndex(1)
-                while path not in browser.views.covers.icons or browser.views.cover_busy:
-                    self.assertLess(monotonic(), deadline)
-                    self.app.processEvents(); sleep(.005)
+                self.wait_until(lambda: path in browser.views.covers.icons and not browser.views.cover_busy,
+                                message='Browser cover thumbnail did not finish')
                 tiles = browser.views.tiles
                 index = browser.views.covers.mapFromSource(browser.model.index(str(path)))
                 rect = tiles.visualRect(index)
@@ -77,9 +72,8 @@ class BrowserPresentationTests(QtTestCase):
                 self.assertNotEqual(after, final)
             finally:
                 browser.stop()
-                deadline = monotonic() + 5
-                while (browser.busy or browser.folder_busy or browser.views.cover_busy) and monotonic() < deadline:
-                    self.app.processEvents(); sleep(.005)
+                self.wait_until(lambda: not (browser.busy or browser.folder_busy or browser.views.cover_busy),
+                                message='Browser cover workers did not finish shutdown')
                 browser.close(); browser.deleteLater(); self.app.processEvents()
 
     def test_toolbar_stays_inline_and_split_panes_cannot_shrink_into_overlap(self):
@@ -162,18 +156,14 @@ class BrowserPresentationTests(QtTestCase):
         self.assertIn('1m 01s elapsed', message)
 
     def test_columns_force_file_preview_and_other_views_restore_toggle_and_folder_details(self):
-        with TemporaryDirectory() as temporary:
+        with self.temporary_directory() as temporary:
             root = Path(temporary)
             folder = root / 'sub'; folder.mkdir()
             file = root / 'file.txt'; file.write_text('text')
             browser = FileBrowser(root, calculate_folder_sizes=False)
             browser.resize(1000, 600); browser.show()
             def wait(condition):
-                deadline = monotonic() + 5
-                while not condition():
-                    self.assertLess(monotonic(), deadline)
-                    self.app.processEvents(); sleep(.005)
-                self.app.processEvents()
+                self.wait_until(condition, message='Browser presentation did not settle')
             try:
                 wait(lambda: browser.model.index(str(file)).isValid() and not browser.busy)
                 browser.preview_toggle.setChecked(False)
@@ -225,18 +215,14 @@ class BrowserPresentationTests(QtTestCase):
         self.assertEqual(message.rsplit(' · ', 1)[0], loading.rsplit(' · ', 1)[0])
 
     def test_preview_opens_on_selection_and_toggle_suppresses_future_selections(self):
-        with TemporaryDirectory() as folder:
+        with self.temporary_directory() as folder:
             root = Path(folder)
             first = root / 'first.txt'; first.write_text('first')
             second = root / 'second.txt'; second.write_text('second')
             browser = FileBrowser(root, calculate_folder_sizes=False)
             browser.resize(1000, 600); browser.show()
             def wait(condition):
-                deadline = monotonic() + 5
-                while not condition():
-                    self.assertLess(monotonic(), deadline)
-                    self.app.processEvents(); sleep(.005)
-                self.app.processEvents()
+                self.wait_until(condition, message='Browser presentation did not settle')
             try:
                 wait(lambda: browser.model.index(str(first)).isValid())
                 self.assertTrue(browser.preview_toggle.isChecked())

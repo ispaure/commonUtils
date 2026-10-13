@@ -2,6 +2,7 @@
 from configparser import Error as ConfigError
 from ...formats.iniType import INIFile
 from .. import pyside as qt
+from ..pyside.wheel_policy import install_value_wheel_policy
 from ..text_editor import TextFileEditor
 from ...configuration.ini_schema import key_type, mode_choices, parse_value, validate_values
 
@@ -20,6 +21,7 @@ class INISettingsEditor(TextFileEditor):
         self._errors = {}
         self.fields = {}
         super().__init__(path, parent)
+        install_value_wheel_policy()
         self.tabs = qt.QTabWidget()
         self.sections = qt.QTabWidget()
         self.tabs.addTab(self.sections, 'Settings')

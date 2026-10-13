@@ -29,7 +29,7 @@ class MarkdownReadingMixin:
         if callable(getattr(app, '_commonutils_open_settings', None)):
             from ...configuration.layered import shared_settings
             from ..appearance.styling import styling
-            shared_settings().save({('Styling', 'reading_font_size_int'): str(max(8, min(48, int(size))))})
+            shared_settings().save({('Styling', 'reading_font_size_int'): str(max(7, min(24, int(size))))})
             styling().reload()
             self.reading_size = self.browser.font().pointSize()
             return

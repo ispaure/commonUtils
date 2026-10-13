@@ -2,8 +2,7 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from time import monotonic, sleep
+from time import sleep
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
@@ -17,7 +16,7 @@ class IntegratedSearchTests(QtTestCase):
     def setUpClass(cls): cls.app=qt.QApplication.instance() or qt.QApplication([])
 
     def setUp(self):
-        self.temp=TemporaryDirectory();self.base=Path(self.temp.name)
+        self.temp=self.temporary_directory();self.base=Path(self.temp.name)
         self.root=self.base/'Documents';self.root.mkdir();(self.root/'nested').mkdir()
         self.file=self.root/'nested'/'Needle.TXT';self.file.write_text('abc')
         self.cache=DirectoryCache(database=self.base/'cache'/'index.sqlite3')
@@ -38,10 +37,7 @@ class IntegratedSearchTests(QtTestCase):
         self.temp.cleanup()
 
     def wait(self, condition, timeout=8):
-        deadline=monotonic()+timeout
-        while not condition():
-            self.assertLess(monotonic(),deadline)
-            self.app.processEvents();sleep(.01)
+        self.wait_until(condition, timeout=timeout, message='Integrated index search did not settle')
         self.app.processEvents()
 
     def search(self, text, expected):
