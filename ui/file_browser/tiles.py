@@ -2,6 +2,7 @@
 
 from ...filesystem.directories import Directory
 from .. import pyside as qt
+from ..appearance.typography import point_size, setting_size
 from .editing import FilenameEditorMixin
 
 COVER_WIDTH = 142
@@ -35,7 +36,7 @@ class TileDelegate(FilenameEditorMixin, qt.QStyledItemDelegate):
             if text:
                 painter.save()
                 font = qt.QFont(option.font)
-                font.setPointSizeF(max(8, min(10, font.pointSizeF() - 1)))
+                font.setPointSizeF(point_size(max(8, min(10, setting_size(font) - 1))))
                 painter.setFont(font)
                 metrics = qt.QFontMetricsF(font)
                 text = metrics.elidedText(text, qt.Qt.TextElideMode.ElideMiddle, max(1, int(size.width() - 12)))

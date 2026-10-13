@@ -15,6 +15,49 @@ from commonUtils.configuration.settings import settings_path
 
 
 class StylingTests(QtTestCase):
+    def test_reference_sizes_keep_metrics_consistent_at_platform_font_resolutions(self):
+        from commonUtils.ui.appearance.typography import setting_size
+        reference = None
+        for dpi in (96, 72, 120):
+            with self.subTest(dpi=dpi), patch('commonUtils.ui.appearance.typography.font_dpi', return_value=dpi):
+                font = self.controller.font('ui')
+                self.assertAlmostEqual(setting_size(font), 11)
+                image = qt.QImage(400, 100, qt.QImage.Format.Format_ARGB32)
+                image.setDotsPerMeterX(round(dpi / .0254))
+                image.setDotsPerMeterY(round(dpi / .0254))
+                metrics = qt.QFontMetricsF(font, image)
+                measured = (metrics.height(), metrics.horizontalAdvance('Generation settings'))
+                if reference is None:
+                    reference = measured
+                for actual, expected in zip(measured, reference):
+                    self.assertAlmostEqual(actual, expected, delta=1.0)
+
+    def test_mac_font_resolution_preview_zoom_and_markdown_preserve_saved_sizes(self):
+        from commonUtils.ui.appearance.typography import setting_size
+        from commonUtils.ui.code_editor import CodeEdit
+        from commonUtils.ui.markdown.presentation import configure_text, style_document
+        with patch('commonUtils.ui.appearance.typography.font_dpi', return_value=72):
+            editor = CodeEdit()
+            reading = qt.QTextBrowser()
+            panel = LayeredSettingsEditor(self.store, sections=('Styling',))
+            for widget in (editor, reading, panel):
+                self.addCleanup(widget.deleteLater)
+            self.controller.code_font.bind(editor)
+            editor.setPlainText('print(1)')
+            editor.document().setModified(False)
+            reading.setMarkdown('```python\nprint(1)\n```')
+            configure_text(reading)
+            style_document(reading.document(), reading.palette())
+            self.assertAlmostEqual(setting_size(panel.font_previews['code'].sample.font()), 11)
+            editor.set_font_size(setting_size(editor.font()) + 1)
+            self.assertEqual(self.controller.code_font.size, 12)
+            self.assertAlmostEqual(setting_size(editor.font()), 12)
+            self.assertEqual(self.store.overrides()['Styling', 'code_font_size_int'], '12')
+            self.assertFalse(editor.document().isModified())
+            self.assertAlmostEqual(reading.document().lastBlock().begin().fragment().charFormat().fontPointSize(), 16)
+            self.controller.code_font.set_size(80, save=False)
+            self.assertAlmostEqual(setting_size(editor.font()), 24)
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()

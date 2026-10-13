@@ -1,5 +1,6 @@
 """Reading presentation and optional diagrams, independent of editing/IO."""
 from .. import pyside as qt
+from ..appearance.typography import point_size, setting_size
 from ...formats.markdown import split_frontmatter
 from .extensions import reading_source, mermaid_blocks
 from .headings import _iter_headings
@@ -11,13 +12,13 @@ from ..readers.reader_chrome import reader_button, reading_spin, show_reader_pop
 class MarkdownReadingMixin:
     def _build_reading_appearance(self, toolbar):
         self.appearance_popup = None
-        self.reading_size = self.browser.font().pointSize()
+        self.reading_size = round(setting_size(self.browser.font()))
         self.appearance_button = reader_button(self, 'Reading appearance', icon='appearance')
         self.appearance_button.clicked.connect(self.show_reading_appearance)
         toolbar.addWidget(self.appearance_button)
         key = qt.QKeySequence.StandardKey
-        self.text_larger_action = self._action('Larger text', lambda: self.set_reading_size(self.browser.font().pointSize() + 1), key.ZoomIn)
-        self.text_smaller_action = self._action('Smaller text', lambda: self.set_reading_size(self.browser.font().pointSize() - 1), key.ZoomOut)
+        self.text_larger_action = self._action('Larger text', lambda: self.set_reading_size(round(setting_size(self.browser.font())) + 1), key.ZoomIn)
+        self.text_smaller_action = self._action('Smaller text', lambda: self.set_reading_size(round(setting_size(self.browser.font())) - 1), key.ZoomOut)
         self.text_reset_action = self._action('Reset text size', lambda: self.set_reading_size(self._default_reading_size()))
 
     def _default_reading_size(self):
@@ -31,11 +32,11 @@ class MarkdownReadingMixin:
             from ..appearance.styling import styling
             shared_settings().save({('Styling', 'reading_font_size_int'): str(max(7, min(24, int(size))))})
             styling().reload()
-            self.reading_size = self.browser.font().pointSize()
+            self.reading_size = round(setting_size(self.browser.font()))
             return
         self.reading_size = max(10, min(24, int(size)))
         font = self.browser.font()
-        font.setPointSizeF(self.reading_size)
+        font.setPointSizeF(point_size(self.reading_size))
         self.browser.setFont(font)
         self._render_source(self.markdown_text())
 
@@ -45,7 +46,7 @@ class MarkdownReadingMixin:
         if callable(open_settings):
             open_settings(self, 'commonutils')
             return
-        self.reading_size = self.browser.font().pointSize()
+        self.reading_size = round(setting_size(self.browser.font()))
         if self.appearance_popup is not None:
             self.appearance_popup.close()
             self.appearance_popup.deleteLater()

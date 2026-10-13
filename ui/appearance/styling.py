@@ -7,6 +7,7 @@ from weakref import WeakKeyDictionary, WeakMethod, WeakSet, ref
 
 from shiboken6 import isValid
 from .. import pyside as qt
+from .typography import point_size, setting_size
 from configparser import Error
 from .font_families import supported_font_family, font_database_available
 
@@ -96,7 +97,7 @@ class Styling(qt.QObject):
         family = self.values[f'{role}_font_family_str'].strip()
         if family:
             font.setFamily(family)
-        font.setPointSize(self.values[f'{role}_font_size_int'])
+        font.setPointSizeF(point_size(self.values[f'{role}_font_size_int']))
         return font
 
     def bind(self, widget, role, callback=None):
@@ -231,7 +232,7 @@ class CodeFontController:
 
     def changed(self, editor):
         if editor is not None and isValid(editor) and not self.updating:
-            self.set_size(editor.font().pointSizeF())
+            self.set_size(setting_size(editor.font()))
 
     def set_size(self, size, *, save=True, notify=True):
         from ...configuration.layered import shared_settings

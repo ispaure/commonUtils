@@ -4,6 +4,7 @@ Formats affect presentation only; custom callout interpretation is reading-only.
 Keeping this out of editing/synchronization protects exact authored source.
 """
 from .. import pyside as qt
+from ..appearance.typography import point_size
 from .document import space_headings
 from functools import lru_cache
 from weakref import ref
@@ -28,7 +29,7 @@ def monospace_family():
 
 
 def code_point_size():
-    return _font_values()['code_font_size_int']
+    return point_size(_font_values()['code_font_size_int'])
 
 
 def _font_values():
@@ -346,7 +347,7 @@ class MarkdownBrowser(qt.QTextBrowser):
                                                                  -self.verticalScrollBar().value())
                 painter.save()
                 font = qt.QFont(self.font())
-                font.setPointSizeF(9)
+                font.setPointSizeF(point_size(9))
                 painter.setFont(font)
                 painter.setPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
                 painter.drawText(qt.QRectF(rect.left() + 14, rect.top() + 6, rect.width() - 28, 18),

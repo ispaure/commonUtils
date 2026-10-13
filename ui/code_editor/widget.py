@@ -1,6 +1,7 @@
 """Reusable QPlainTextEdit with a gutter and focused code-editing conveniences."""
 
 from .. import pyside as qt
+from ..appearance.typography import point_size, setting_size
 from ..text_commands import wrap_selection
 from .transforms import TransformCommands
 from .multicursor import MultiCursorCommands
@@ -248,7 +249,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
 
     def set_font_size(self, size):
         font = self.font()
-        font.setPointSizeF(max(7, min(24, size)))
+        font.setPointSizeF(point_size(max(7, min(24, size))))
         self.setFont(font)
         self.update_tab_width()
         self.update_gutter()
@@ -258,7 +259,7 @@ class CodeEdit(FoldingCommands, MultiCursorCommands, TransformCommands, qt.QPlai
         if event.modifiers() & qt.Qt.KeyboardModifier.ControlModifier:
             delta = event.angleDelta().y() or event.pixelDelta().y()
             if delta:
-                self.set_font_size(self.font().pointSizeF() + (1 if delta > 0 else -1))
+                self.set_font_size(setting_size(self.font()) + (1 if delta > 0 else -1))
             event.accept()
             return
         super().wheelEvent(event)
