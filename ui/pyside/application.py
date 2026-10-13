@@ -88,6 +88,8 @@ def initialize_q_app():
     install_value_wheel_policy(q_app)
     from ..menu_policy import install_menu_policy
     install_menu_policy(q_app)
+    from .window_dpi import install_window_dpi_scale_fixer
+    install_window_dpi_scale_fixer(q_app)
     q_app.setStyle('Fusion')
 
     # If on Windows, set to dark mode always with a palette (if not, it doesn't handle it properly)
