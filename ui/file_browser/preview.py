@@ -49,9 +49,9 @@ def update_preview_visibility(browser, selected):
     columns = browser.views.columns
     browser.preview_toggle.setVisible(mode in (0, 1))
     if mode == 2:
-        from ...filesystem.directories import Directory
-        items = browser.selected_objects()
-        visible = len(items) == 1 and not isinstance(items[0], Directory)
+        from ...runtime.browsing import BrowseRole
+        items = browser.views.selected_rows()
+        visible = len(items) == 1 and not items[0].data(BrowseRole.Container)
         if browser.preview_panel.parentWidget() is not columns.preview_container:
             browser.preview_panel.setMinimumWidth(0)
             columns.preview_layout.addWidget(browser.preview_panel)

@@ -41,13 +41,15 @@ def is_encrypted(path):
 def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLATED, compresslevel=None):
     """Open plain/ZipCrypto/AES ZIPs; never silently write unencrypted output."""
     password = password_bytes(password)
+    label = Path(path).name if isinstance(path, (str, os.PathLike)) else str(getattr(path, 'name', 'archive'))
+    source = str(path) if isinstance(path, os.PathLike) else path
     if mode not in ('r', 'w', 'x'):
         raise ValueError('Only ZIP read, write and exclusive-create modes are supported')
     encrypted = is_encrypted(path) if mode == 'r' else password is not None
     if mode != 'r' and encrypted and not password:
         raise ValueError('An encrypted ZIP requires a nonempty password')
     if mode == 'r' and encrypted and not password:
-        raise ArchivePasswordError(f'Archive password required: {Path(path).name}')
+        raise ArchivePasswordError(f'Archive password required: {label}')
     bad_zip_errors = (zipfile.BadZipFile,)
     if encrypted:
         try:
@@ -55,7 +57,7 @@ def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLA
         except ImportError as error:
             raise RuntimeError('Encrypted ZIP access requires the optional pyzipper dependency') from error
         bad_zip_errors += (pyzipper.BadZipFile,)
-        archive = pyzipper.AESZipFile(str(path), mode, compression=compression, compresslevel=compresslevel)
+        archive = pyzipper.AESZipFile(source, mode, compression=compression, compresslevel=compresslevel)
         archive.setpassword(password)
         if mode != 'r':
             archive.setencryption(pyzipper.WZ_AES, nbits=256)
@@ -66,17 +68,17 @@ def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLA
             yield archive
     except RuntimeError as error:
         if 'password' in str(error).lower():
-            raise ArchivePasswordError(f'Archive password incorrect: {Path(path).name}') from None
+            raise ArchivePasswordError(f'Archive password incorrect: {label}') from None
         raise
     except bad_zip_errors as error:
         if encrypted and ('hmac' in str(error).lower() or 'bad crc' in str(error).lower()):
             raise ArchivePasswordError(
-                f'Archive password incorrect or encrypted data damaged: {Path(path).name}') from None
+                f'Archive password incorrect or encrypted data damaged: {label}') from None
         raise zipfile.BadZipFile(str(error)) from None
     except zlib.error:
         if encrypted:
             raise ArchivePasswordError(
-                f'Archive password incorrect or encrypted data damaged: {Path(path).name}') from None
+                f'Archive password incorrect or encrypted data damaged: {label}') from None
         raise
 
 

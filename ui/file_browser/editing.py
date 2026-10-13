@@ -1,6 +1,6 @@
 """Shared native-style filename editors for lists, tiles and folder columns."""
 
-from ...filesystem.directories import Directory
+from ...runtime.browsing import BrowseRole
 from .. import pyside as qt
 
 
@@ -28,8 +28,7 @@ class FilenameEditorMixin:
         while isinstance(source.model(), qt.QAbstractProxyModel):
             source = source.model().mapToSource(source)
         if isinstance(editor, qt.QLineEdit):
-            item = source.model().item(source)
-            suffix = '' if isinstance(item, Directory) else item.path.suffix
+            suffix = source.data(BrowseRole.Suffix) or ''
             basename = editor.text()[:-len(suffix)] if suffix else editor.text()
             # QLineEdit positions use UTF-16 units, including two units per emoji.
             length = len(basename.encode('utf-16-le')) // 2

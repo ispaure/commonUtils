@@ -585,6 +585,8 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                              and len(self.docks) >= self.policy.max_tabs):
             return None
         view = self.factory(argument)
+        if view is None:
+            return None
         dock = WorkspaceDock(self, view, getattr(view, 'view_title', 'View'))
         previous = self._docked_anchor()
         self._hide_drop_target()

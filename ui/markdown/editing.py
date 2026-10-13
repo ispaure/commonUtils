@@ -171,6 +171,11 @@ class MarkdownEditingMixin:
         return self._confirm_leave()
 
     def open_dialog(self):
+        if self.storage is not None and callable(getattr(self.storage, 'open_dialog', None)):
+            return self.storage.open_dialog(self)
+        action = getattr(qt.QApplication.instance(), '_commonutils_markdown_resource_action', None)
+        if action:
+            return action(self, 'open')
         path, _ = qt.QFileDialog.getOpenFileName(self, 'Open Markdown',
                                                str(self.current_path.parent) if self.current_path else '',
                                                'Markdown (*.md *.markdown);;All files (*)')
@@ -181,24 +186,66 @@ class MarkdownEditingMixin:
     def save_as_dialog(self):
         if not self.allow_edit:
             return False
+        if self.storage is not None and hasattr(self.storage, 'save_as'):
+            return self.storage.save_as(self)
+        action = getattr(qt.QApplication.instance(), '_commonutils_markdown_resource_action', None)
+        if action:
+            return action(self, 'save')
         path, _ = qt.QFileDialog.getSaveFileName(self, 'Save Markdown As',
                                                str(self.current_path) if self.current_path else 'document.md',
                                                'Markdown (*.md *.markdown)')
         return self.save_document(path) if path else False
 
+    def capture_save(self):
+        """Return a lossless byte snapshot of the current draft for a storage host."""
+        return _encode_markdown(self.markdown_text(), self._source_bytes, self.is_modified)
+
+    def begin_save(self):
+        """Reserve an asynchronous save; False means a save is already pending."""
+        if not self.allow_edit or getattr(self, '_save_pending', False):
+            return False
+        self._save_pending = True
+        return True
+
+    def complete_save(self, destination, data, error=None):
+        """Accept a published snapshot or retain the draft on failure."""
+        self._save_pending = False
+        if error:
+            self.status.setText(f'Cannot save {destination}: {error}')
+            return False
+        return self._finish_save(Path(destination), data)
+
     def save_document(self, path=None):
-        if not self.allow_edit:
+        if not self.allow_edit or getattr(self, '_save_pending', False):
             return False
         destination = Path(path).expanduser().absolute() if path is not None else self.current_path
         if destination is None:
             return self.save_as_dialog()
         try:
-            data = _encode_markdown(self.markdown_text(), self._source_bytes, self.is_modified)
+            data = self.capture_save()
             expected = self._source_bytes if destination == self._loaded_path else None
-            _write_markdown(destination, data, expected=expected)
+            if self.storage is not None and hasattr(self.storage, 'submit_write'):
+                self._save_pending = True
+                self.status.setText('Saving locally…')
+                def completed(error):
+                    self._save_pending = False
+                    if error:
+                        self.status.setText(f'Cannot save {destination}: {error}')
+                    else:
+                        self._finish_save(destination, data)
+                self.storage.submit_write(destination, data, expected, completed)
+                return False  # A close request waits for the host's completion.
+            if self.storage is not None:
+                self.storage.write_bytes(destination, data, expected=expected)
+            else:
+                _write_markdown(destination, data, expected=expected)
         except (OSError, UnicodeError, ValueError) as error:
+            self._save_pending = False
             self.status.setText(f'Cannot save {destination}: {error}')
             return False
+        return self._finish_save(destination, data)
+
+    def _finish_save(self, destination, data):
         self._source_bytes = data
         self._loaded_path = destination
         self.formatted_editor.document().setBaseUrl(qt.QUrl.fromLocalFile(str(destination.parent) + '/'))

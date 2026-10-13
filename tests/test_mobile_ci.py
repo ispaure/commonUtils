@@ -58,6 +58,13 @@ class MobileCITests(unittest.TestCase):
                              ['commonUtils/tests/mobile_smoke.py', 'source.json'])
             with self.assertRaises(ValueError):
                 ci.stage(repo, repo / 'nested')
+            (repo / 'tests/mobile_smoke.py').write_text('# local changes\n')
+            with self.assertRaises(ValueError):
+                ci.stage(repo, root / 'strict')
+            ci.stage(repo, root / 'local', allow_dirty=True)
+            self.assertTrue(json.loads((root / 'local/source.json').read_text())['commonUtils_dirty'])
+            self.assertEqual((root / 'local/commonUtils/tests/mobile_smoke.py').read_text(), '# local changes\n')
+            self.assertFalse((root / 'local/commonUtils/untracked.py').exists())
 
     def test_host_harness_cannot_pass_as_mobile(self):
         for target in ('host', 'ios', 'android'):

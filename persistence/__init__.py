@@ -41,14 +41,20 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
     """Validate before staging and publication, preserve mode, clean failed staging.
 
     No path resolution, encoding, size limit, or symlink policy is imposed here.
-    overwrite=False uses an atomic hard link to avoid clobbering a racing file.
+    overwrite=False uses atomic no-replace publication to reject a racing file.
     """
+    from .publication import save_transaction, rename_exclusive
+    from ..filesystem.local_access import check_local_path
+    requested_validate = validate
+    def validate():
+        check_local_path(path)
+        if requested_validate:
+            requested_validate()
     path = Path(path)
-    if validate:
-        validate()
     mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
     staged = None
-    try:
+    def stage():
+        nonlocal staged
         with NamedTemporaryFile(dir=path.parent, delete=False) as stream:
             staged = Path(stream.name)
             stream.write(content)
@@ -56,16 +62,20 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
             os.fsync(stream.fileno())
         if mode is not None:
             staged.chmod(mode)
-        if validate:
-            validate()
+    def verify():
+        if staged.read_bytes() != content:
+            raise OSError('Staged content verification failed.')
+    def publish():
         if overwrite:
             os.replace(staged, path)
         else:
-            os.link(staged, path)
-        return path
-    finally:
+            rename_exclusive(staged, path)
+    def cleanup():
         if staged is not None:
             staged.unlink(missing_ok=True)
+    save_transaction(stage=stage, verify=verify, validate=validate or (lambda: None),
+                     publish=publish, cleanup=cleanup)
+    return path
 
 
 def atomic_write_json(path, payload, *, ensure_ascii=False, allow_nan=False,

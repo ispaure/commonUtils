@@ -9,7 +9,7 @@ from ...filesystem.directories import Directory
 from ...filesystem import BrowserDetails, BrowserPanel, format_size, scan_folders
 from .model import BrowserFileSystemModel, ByteSortModel, BrowserTree, _BrowserSelection
 from .details import DetailsPanel
-from .controls import ViewModeSelector, FolderSizeControl, ViewIcon
+from .controls import ViewModeSelector, FolderSizeControl, ViewIcon, create_search_toggle, create_search_panel
 from ..appearance.icons import set_painted_icon
 from .navigation import NavigationBar
 from ..tasks.operations import Operation
@@ -49,11 +49,13 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     index_progress = qt.Signal(str)
     index_state_changed = qt.Signal()
 
-    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None):
+    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None, directory_handler=None, directory_boundary=None):
         super().__init__(parent)
         from ..appearance.styling import bind_font
         bind_font(self, 'browser')
         self.idle.connect(self.close)
+        self.directory_handler = directory_handler
+        self.directory_boundary = directory_boundary
         self.services = services or {}
         self.action_providers = tuple(action_providers)
         self.folder_fields = folder_fields
@@ -170,14 +172,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         controls.addWidget(self.view_selector.storage_controls)
         # A host can append local tab controls after the size-map buttons.
         self.workspace_controls = controls
-        self.search_button = qt.QToolButton(self)
-        set_painted_icon(self.search_button, ViewIcon, 6)
-        self.search_button.setIconSize(qt.QSize(22, 22))
-        self.search_button.setCheckable(True)
-        self.search_button.setAutoRaise(True)
-        self.search_button.setAccessibleName('Search files and folders')
-        self.search_button.setToolTip('Show or hide search (Ctrl/Cmd+F)')
-        self.search_button.toggled.connect(self._search_toggled)
+        self.search_button = create_search_toggle(self, self._search_toggled)
         controls.insertWidget(1, self.search_button)
         self.refresh_button = qt.QPushButton('Refresh index')
         self.refresh_button.setToolTip('Check all files and saved sizes below the current folder')
@@ -250,7 +245,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.tree.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
         for column in (1, 3):
             self.tree.header().setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
-        self.views = FileViews(self.model, self.tree, self)
+        self.model.directory_boundary = self.directory_boundary
+        self.views = FileViews(self.model, self.tree, self, directory_handler=self.handle_directory)
         self.views.selection_changed.connect(self._selection_changed)
         self.views.directory_changed.connect(self.navigation.set_directory)
         self.views.directory_changed.connect(self._directory_changed)
@@ -273,18 +269,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.files_panel = qt.QWidget()
         files_layout = qt.QVBoxLayout(self.files_panel)
         files_layout.setContentsMargins(0, 0, 0, 0)
-        self.search_panel = qt.QWidget()
-        search_layout = qt.QHBoxLayout(self.search_panel)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.addWidget(self.search_bar, 1)
-        self.close_search_button = qt.QToolButton()
-        set_painted_icon(self.close_search_button, ViewIcon, 7)
-        self.close_search_button.setIconSize(qt.QSize(20, 20))
-        self.close_search_button.setAutoRaise(True)
-        self.close_search_button.setAccessibleName('Close search')
-        self.close_search_button.setToolTip('Close search and return to browsing (Esc)')
-        self.close_search_button.clicked.connect(self.close_search)
-        search_layout.addWidget(self.close_search_button)
+        self.search_panel, self.close_search_button = create_search_panel(self.files_panel, self.search_bar, self.close_search)
         files_layout.addWidget(self.search_panel)
         files_layout.addWidget(self.list_stack, 1)
         self.search_panel.hide()
@@ -362,6 +347,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     def set_directory(self, directory, *, navigation_root=None):
         path = directory.path if isinstance(directory, Directory) else Path(directory)
         path = path.absolute()
+        if self.handle_directory(path):
+            return
         if not path.is_dir():
             raise NotADirectoryError(path)
         root = Path(navigation_root).absolute() if navigation_root is not None else path
@@ -460,8 +447,13 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._reconcile_pending = False
         self.refresh_folder_totals()
 
+    def handle_directory(self, path):
+        return bool(self.directory_handler and self.directory_handler(Path(path)))
+
     def navigate(self, path):
         path = Path(path)
+        if self.handle_directory(path):
+            return
         root = self.navigation.library
         if root is not None and path.is_dir() and (path == root or root in path.parents):
             self.views.set_root(path)
@@ -580,6 +572,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._activate_item(self.model.object_for_path(path))
 
     def _activate_item(self, item):
+        if self.handle_directory(item.path if isinstance(item, Directory) else item.path.parent):
+            return
         if isinstance(item, Directory):
             self.navigate(item.path)
         else:

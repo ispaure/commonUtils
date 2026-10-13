@@ -81,6 +81,8 @@ def transfer_paths(paths, directory, *, move=False, cancelled=lambda: False, rep
     items. Each copy is staged before exclusive publication; cross-volume moves
     verify unchanged sources before publishing and removing the originals.
     """
+    from .local_access import check_local_path
+    check_local_path(directory)
     directory = Path(directory).resolve()
     if not directory.is_dir():
         raise NotADirectoryError(directory)
@@ -94,6 +96,7 @@ def transfer_paths(paths, directory, *, move=False, cancelled=lambda: False, rep
             return TransferResult(tuple(completed), tuple(failures), True)
         report(count, len(sources), f'{"Moving" if move else "Copying"} {source.name}…')
         try:
+            check_local_path(source, recursive=True)
             source.lstat()
             if source.is_dir() and not source.is_symlink() and (directory == source or source in directory.parents):
                 raise ValueError('A folder cannot be pasted into itself or one of its subfolders.')

@@ -22,9 +22,10 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
     path_changed = qt.Signal(object)
     modified_changed = qt.Signal(bool)
 
-    def __init__(self, path=None, parent=None, *, allow_edit=False):
+    def __init__(self, path=None, parent=None, *, allow_edit=False, storage=None):
         super().__init__(parent)
         self.allow_edit = bool(allow_edit)
+        self.storage = storage
         self.history = []
         self.history_index = -1
         self._source_bytes = None
@@ -92,6 +93,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         configure_text(self.editor, source=True)
         self.formatted_editor.linkActivated.connect(self.follow_link)
         self.formatted_editor.setReadOnly(not self.allow_edit)
+        if storage is not None:
+            self.browser.resource_loader = storage.load_resource
+            self.formatted_editor.document().resource_loader = storage.load_resource
         self.formatted_editor.setAccessibleName('Formatted Markdown editor')
         self.formatted_editor.document().contentsChanged.connect(self._formatted_changed)
         self.formatted_editor.undoAvailable.connect(lambda available: self._update_edit_actions())
@@ -160,6 +164,11 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self._reading_palette_timer.setInterval(0)
         self._reading_palette_timer.timeout.connect(lambda: self._render_source(self.editor.toPlainText()))
         self.browser.installEventFilter(self)
+        if storage is not None:
+            for action in (self.new_action, self.open_action, self.save_as_action):
+                action.setEnabled(False)
+            self.open_action.setEnabled(callable(getattr(storage, 'open_dialog', None)))
+            self.save_as_action.setEnabled(self.allow_edit and callable(getattr(storage, 'save_as', None)))
         if path is not None:
             self.open_document(path)
         if self.allow_edit:
@@ -225,7 +234,10 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         try:
             if path.suffix.lower() not in ('.md', '.markdown'):
                 raise ValueError('This viewer opens Markdown (.md or .markdown) files.')
-            data = path.read_bytes()
+            if self.storage is None:
+                from ...filesystem.local_access import check_local_path
+                check_local_path(path)
+            data = self.storage.read_bytes(path) if self.storage is not None else path.read_bytes()
             text = data.decode('utf-8-sig')
         except (OSError, UnicodeError, ValueError) as error:
             self.status.setText(f'Cannot open {path}: {error}')
@@ -320,7 +332,10 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
             self._update_buttons()
             self.path_changed.emit(self.current_path)
         else:
-            self.open_document(url.toLocalFile(), fragment=url.fragment())
+            if self.storage is not None:
+                self.storage.open_link(Path(url.toLocalFile()), url.fragment())
+            else:
+                self.open_document(url.toLocalFile(), fragment=url.fragment())
 
     def _navigate_history(self, offset):
         index = self.history_index + offset

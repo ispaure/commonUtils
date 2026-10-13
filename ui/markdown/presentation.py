@@ -336,6 +336,12 @@ def tables(frame):
 
 class MarkdownBrowser(qt.QTextBrowser):
     """Native selectable text with slim quote/callout accent rules."""
+    def loadResource(self, kind, url):
+        loader = getattr(self, 'resource_loader', None)
+        if loader is not None:
+            return loader(kind, url)
+        return super().loadResource(kind, url)
+
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = qt.QPainter(self.viewport())

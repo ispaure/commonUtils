@@ -111,3 +111,11 @@ save conflicts and process/speech retirement when changing them.
 Formatting actions share the existing navigation row through a compact Format
 menu. Table actions remain attached to the formatted editor and update their
 enabled state from its current selection; no second formatting row is reserved.
+
+## Provider-backed documents
+
+`MarkdownViewer` and `MarkdownWindow` accept `storage=` for virtual documents.
+See [resource provider contracts](../resource-providers.md#markdown-storage) for
+byte I/O, conflict checks, asynchronous completion, resource loading and private
+presentation. Hosts own providers and worker lifetimes; the shared viewer has no
+backend-specific credential or encryption dependency.

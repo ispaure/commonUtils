@@ -179,3 +179,23 @@ Drops use the same progress, cancellation and collision handling as paste.
 Existing destinations are not overwritten; collisions receive numbered copy names.
 Moving a folder into itself or a descendant is refused. Drops do not replace or
 clear the Copy/Cut clipboard. Web URLs are not accepted as filesystem items.
+
+
+## Storage-aware Open and Save As
+
+Hosts can use a compact, session-only resource browser as their Open/Save As
+window. Select a storage location, navigate folders, and select or enter a name.
+The host supplies available locations and unlock prompts. This picker shares
+navigation with the resource browser but does not expose destructive context
+menu actions. Save As requires an unused name and a valid existing parent folder.
+Closing during a folder read or selection check cancels safely before releasing
+storage. Neither navigation history nor decoded names are saved by this picker.
+
+
+Applications can redirect managed folders into their own browser when you open,
+expand or navigate into them. The regular browser then keeps its previous location
+and does not display the managed folder's underlying files.
+
+## Provider-backed folder browsing
+
+Applications can also present a provider-backed browser. It uses the same compact navigation buttons and clickable folder breadcrumbs with a filterable Name/Size/Modified list, tile view and column navigation. The Size slider adjusts icons and tiles. Its optional Preview panel shows file information and host-supplied metadata on the right in list/tile view or in the final column. Provider browsers omit storage maps. Open/Save As dialogs omit Preview and keep an application-supplied storage selector at the top. The dialog title begins with **🕵️ Private -** when its selected provider declares private storage. Session-only text editor titles also use that prefix and retain it after Save As. Provider thumbnails stay in memory; missing or locked covers use generic icons. Two visible thumbnails can load at once, and closing waits for both workers.

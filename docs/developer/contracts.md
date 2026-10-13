@@ -37,6 +37,8 @@ The checked-in CI selects Python 3.12.2; the application owns dependency pins.
 There is no formal release/version policy or tested universal dependency range.
 
 Retain owners through cooperative shutdown and respect document close vetoes.
+Workspace view factories may return `None` after a cancelled open; `add_view`
+then creates no dock or tab.
 `initialize_q_app()` installs the Windows DPI-size policy; custom QApplication
 hosts opt in through `install_window_dpi_scale_fixer()`. The helper observes native
 messages without consuming them and only repairs normal-window client QSize
@@ -95,3 +97,28 @@ index updates through the reconciliation debounce.
 XML text/attribute escaping uses the standard-library HTML escaper with explicit
 XML attribute entities. Portable file-type discovery does not import SAX's URL
 and native proxy adapters; mocked platform tests reject networking imports too.
+
+## Virtual resources
+
+[Provider contracts](../../ui/resource-providers.md) describe the generic directory,
+archive and Markdown storage boundaries. Virtual paths are identifiers, not an
+invitation to open local files. Consumers own backend selection, credentials,
+provider lifetime and private-content policy.
+
+
+Mobile staging defaults to clean Python sources. The `stage(..., allow_dirty=True)`
+API explicitly permits local development snapshots, copies only tracked Python
+sources, and records `commonUtils_dirty` in the source manifest. Consumers must
+propagate this flag into their release/evidence checks; a local snapshot does not
+certify a committed source revision.
+
+### Shared browser presentation
+
+`runtime.browsing` contains portable item snapshots and ancestry without UI or
+filesystem imports. Qt models expose these entries through shared roles; regular
+and provider browsers use the same `BrowserViews` for list, tiles and columns.
+Filesystem watching, indexing and local actions remain in the local adapter/host.
+Providers retain workers through cancellation and use RAM thumbnail caches. See
+[shared item presentation](../../ui/resource-providers.md#shared-item-presentation).
+Native mobile list/tile views consume the same snapshots, with shared query/sort
+projection, bounded recursive provider search and navigation history. Consumer adapters own local, crypt and remote I/O.

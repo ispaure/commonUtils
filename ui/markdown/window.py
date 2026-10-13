@@ -6,11 +6,12 @@ from .viewer import MarkdownViewer
 class MarkdownWindow(qt.QMainWindow):
     document_editor_name = 'Markdown Editor'
     document_editor_id = 'markdown'
-    def __init__(self, path, parent=None, *, allow_edit=False):
+    def __init__(self, path, parent=None, *, allow_edit=False, storage=None):
         super().__init__(parent)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         allow_edit = bool(allow_edit or qt.QApplication.keyboardModifiers() & qt.Qt.KeyboardModifier.AltModifier)
-        self.viewer = MarkdownViewer(parent=self, allow_edit=allow_edit)
+        self.viewer = MarkdownViewer(parent=self, allow_edit=allow_edit, storage=storage)
+        self.viewer.document_window = self
         self.workspace_controls = self.viewer.workspace_controls
         self.setCentralWidget(self.viewer)
         self.viewer.path_changed.connect(lambda path: self._update_title())
@@ -51,6 +52,10 @@ class MarkdownWindow(qt.QMainWindow):
         self.setWindowTitle(f'{title}{" *" if self.viewer.is_modified else ""} — Markdown')
 
     def closeEvent(self, event):
+        from ..resource_picker import resource_tasks_pending
+        if resource_tasks_pending(self):
+            event.ignore()
+            return
         if self.viewer.can_close():
             self.viewer.speech.stop()
             if self.viewer._diagram_renderer:

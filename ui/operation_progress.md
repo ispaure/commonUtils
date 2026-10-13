@@ -90,3 +90,8 @@ parent)` exposes `completed(result, error)` and the QThread `finished` signal.
 The completed signal alone does not establish that its thread has stopped. Use
 `OperationProgress` for the managed completion/close lifecycle, or retain the worker
 until `finished` and wait for it before destruction.
+
+ProcessRunner and open_process accept an optional `environment` mapping containing
+the complete child environment. Omitting it inherits the system environment; an
+empty mapping supplies none. Values are never added to command arguments or job
+context. The caller owns filtering and the lifetime of sensitive values.

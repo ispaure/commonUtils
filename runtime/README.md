@@ -39,3 +39,26 @@ if get_os() == OS.WIN:
     print('Windows-specific workflow')
 print(get_arch())
 ```
+
+## Virtual resource streams
+
+`resource_provider` defines structural directory and archive source contracts;
+`range_reader.RangeReader` supplies bounded seekable reads without disk caching.
+See [resource provider contracts](../ui/resource-providers.md) for revisions,
+cancellation, staging verification and ownership.
+
+`local_files.LocalFiles` implements rooted storage, while `resource_mutations`
+owns complete verified save/move/delete operations. Providers declare
+`ResourceCapabilities`; mutation results live in `operations`. Atomic publication
+and the shared save transaction belong to `persistence.publication`.
+
+`browsing` supplies portable, bounded entry/column snapshots and an identity-based
+container tree for UI adapters. It requires neither filesystem paths nor a GUI
+toolkit; see the [browsing contract](../ui/resource-providers.md#shared-item-presentation).
+
+
+`browsing.BrowseHistory` owns bounded opaque navigation locations; `query_entries`
+filters and naturally sorts loaded snapshots without storage access.
+`archive_source.LocalArchiveSource` provides revision-checked local ZIP streaming
+and bounded member reads without an overall archive-size limit. Formats and hosts
+choose buffer/header limits and retain domain validation.

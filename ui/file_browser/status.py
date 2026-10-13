@@ -181,7 +181,9 @@ class WorkspaceIndexStatus(qt.QObject):
 
     def refresh(self, *args):
         from shiboken6 import isValid
-        current = {getattr(dock.widget(), 'file_browser', None) for dock in self.workspace.docks}
+        current = {browser for dock in self.workspace.docks
+                   if (browser := getattr(dock.widget(), 'file_browser', None)) is not None
+                   and getattr(browser, 'persistent_index', True)}
         for previous in tuple(self.connected - current):
             dock, destroyed = self._connections[previous]
             if isValid(previous):
@@ -195,7 +197,7 @@ class WorkspaceIndexStatus(qt.QObject):
         for dock in self.workspace.docks:
             view = dock.widget()
             browser = getattr(view,'file_browser',None)
-            if browser is None: continue
+            if browser is None or not getattr(browser, 'persistent_index', True): continue
             browsers.append((view,browser))
             floating = dock.isFloating()
             presentation = (floating, browser.index_incomplete, browser.folder_busy,
@@ -217,6 +219,14 @@ class WorkspaceIndexStatus(qt.QObject):
                 browser.destroyed.connect(destroyed)
         active = self.workspace.active_view
         browser = getattr(active,'file_browser',None)
+        if browser is not None and not getattr(browser, 'persistent_index', True):
+            self.label.setText('Session-only folder · Persistent indexing and previews disabled')
+            self.activity.hide()
+            self.details_button.hide()
+            self.refresh_button.setText('Refresh folder')
+            self.refresh_button.setEnabled(not browser.operation.busy)
+            return
+        self.refresh_button.setText('Refresh index')
         running = len({item.folder_operation.root for _,item in browsers if item.folder_busy and not item.network_location
                        and not getattr(item, '_loading_cached_only', False)})
         message = browser.index_status.text() if browser else 'No folder open.'

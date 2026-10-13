@@ -59,6 +59,8 @@ def remove_items(plan, *, trash=None, permanent=False, cancelled=lambda: False,
         path = item.path
         report(count, len(plan), f'{"Deleting permanently" if permanent else "Moving to Trash"} · {count + 1} of {len(plan)}')
         try:
+            from .local_access import check_local_path
+            check_local_path(path, recursive=True)
             if path.parent.resolve() / path.name != path or _identity(path) != item.identity:
                 raise OSError('This item changed since confirmation. It was left untouched.')
             if path.parent == path or (not path.is_symlink() and os.path.ismount(path)):

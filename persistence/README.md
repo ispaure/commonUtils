@@ -58,3 +58,15 @@ if previous is not None:
 If promotion fails, the helper restores the old path before raising. It refuses
 symbolic links and junctions. Callers supply installation validation and decide
 when recovery copies can be removed.
+
+## Verified publication and text sessions
+
+[publication.py](publication.py) owns the shared staging/verification/publication
+transaction and platform no-replace rename. Ordinary atomic writes and virtual
+resource saves use the same sequence. See the [provider contract](../ui/resource-providers.md)
+for callback ownership, cancellation and partial-failure results.
+
+`text.TextSession` holds an in-memory baseline plus a resource key/revision. Its
+`encode` and `modified` methods accept the host's draft; `accept` updates the
+baseline after publication while preserving encoding and newline behavior. It has
+no filesystem, account, archive or recovery policy.
