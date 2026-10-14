@@ -40,6 +40,11 @@ destruction, allowing cancellation callbacks to release process/file handles.
 Cleanup errors remain test failures. The base class also releases unscoped windows
 between tests.
 
+Raw SQLite fixture connections need explicit closure (for example,
+`contextlib.closing(sqlite3.connect(...))`). A connection's own context manager
+only commits or rolls back; it does not release Windows database file handles
+before temporary-directory cleanup.
+
 The base creates QApplication before fixture setup when needed. On Windows with
 Qt's offscreen backend, it loads Segoe UI, Arial, Courier New and Georgia from the
 existing Windows Fonts directory once per application. This supplies real outline
