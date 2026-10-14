@@ -37,3 +37,11 @@ path at that moment; perform the real operation and handle its errors as usual.
 `sandbox_restrictions()` returns True for mobile and None for desktop (unknown),
 never an unsupported promise of unrestricted desktop access. There is no global
 "enable mobile support" override; future integrations need explicit adapters.
+
+`register_qt_ui_host(application)` admits only `Capability.QT_UI` for a live
+Qt 6.12+ QApplication supplied on its GUI thread. Register before importing
+`ui.pyside` on mobile. This reports IMPLEMENTED, not VERIFIED; exercise each
+component on the target runtime. Desktop UI, file dialogs, default storage,
+shell commands and external application launching remain unavailable on mobile.
+Supply explicit private storage and personal settings paths. The registration
+holds only a weak reference and stops admitting Qt when its host is destroyed.

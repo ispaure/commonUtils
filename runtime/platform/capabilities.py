@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryFile
+import weakref
 
 from . import OS, get_os
 
@@ -19,6 +20,7 @@ class Capability(Enum):
     EXTERNAL_APPLICATIONS = 'external application launching'
     FILE_DIALOGS = 'file dialogs'
     DESKTOP_UI = 'desktop UI'
+    QT_UI = 'hosted Qt UI'
     DEFAULT_STORAGE = 'desktop storage defaults'
 
 
@@ -39,6 +41,28 @@ class UnsupportedCapabilityError(RuntimeError):
     """An operation has no usable adapter in the current runtime."""
 
 
+_qt_host = None
+
+
+def register_qt_ui_host(application):
+    """Admit Qt widgets for an explicitly supplied Qt 6.12+ mobile host.
+
+    This does not admit desktop dialogs, storage, subprocesses or external apps,
+    and does not certify any individual widget or operation on a device.
+    Call on the application's GUI thread before importing commonUtils UI.
+    """
+    from PySide6.QtCore import QThread, qVersion
+    from PySide6.QtWidgets import QApplication
+    if not isinstance(application, QApplication) or QApplication.instance() is not application:
+        raise ValueError('Supply the live QApplication instance')
+    if application.thread() != QThread.currentThread():
+        raise ValueError('Register the Qt host on its GUI thread')
+    if tuple(int(part) for part in qVersion().split('.')[:2]) < (6, 12):
+        raise ValueError('Mobile Qt hosts require Qt 6.12 or newer')
+    global _qt_host
+    _qt_host = weakref.ref(application)
+
+
 def sandbox_restrictions() -> bool | None:
     """True for mobile policy; None means desktop restrictions are unknown.
 
@@ -54,6 +78,13 @@ def capability_status(capability: Capability) -> CapabilityStatus:
         return CapabilityStatus(CapabilityState.UNVERIFIED,
                                 'Access is path-specific; probe or perform the requested operation.')
     if current in (OS.IOS, OS.ANDROID):
+        if capability is Capability.QT_UI and _qt_host is not None:
+            host = _qt_host()
+            if host is not None:
+                from shiboken6 import isValid
+                if isValid(host):
+                    return CapabilityStatus(CapabilityState.IMPLEMENTED,
+                                            'Explicit Qt host; widget operations still require validation.')
         return CapabilityStatus(CapabilityState.UNAVAILABLE,
                                 f'No verified {current.value} adapter; the host must provide mobile integration.')
     return CapabilityStatus(CapabilityState.IMPLEMENTED,
