@@ -1,5 +1,6 @@
 """Both size measures persist, migrate, and update without reading contents."""
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -63,7 +64,7 @@ class AllocationTests(unittest.TestCase):
 
     def test_v3_upgrade_retains_logical_sizes_and_fills_allocation_on_validation(self):
         self.cache.get(self.root).close()
-        with sqlite3.connect(self.cache.database) as db:
+        with closing(sqlite3.connect(self.cache.database)) as db, db:
             db.execute('DROP VIEW indexed_entries')
             db.execute('DROP TABLE entry_allocations')
             db.execute('ALTER TABLE folder_totals DROP COLUMN disk_size')
