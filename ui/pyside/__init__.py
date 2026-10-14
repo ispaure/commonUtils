@@ -5,7 +5,7 @@ and calls between components resolve through this facade to preserve customizati
 """
 from ...runtime.platform.capabilities import Capability, require_capability
 
-require_capability(Capability.DESKTOP_UI, 'ui.pyside')
+require_capability(Capability.QT_UI, 'ui.pyside')
 
 from ._imports import *
 from ._imports import (__author__, __copyright__, __license__, __maintainer__, __email__, __status__)
