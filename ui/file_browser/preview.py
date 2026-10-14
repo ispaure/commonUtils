@@ -58,7 +58,8 @@ def update_preview_visibility(browser, selected):
         columns.set_file_preview_visible(visible)
         browser.preview_panel.setVisible(visible)
         return
-    columns.set_file_preview_visible(False)
+    if columns is not None:
+        columns.set_file_preview_visible(False)
     if browser.preview_panel.parentWidget() is not browser.splitter:
         browser.splitter.addWidget(browser.preview_panel)
         browser.preview_panel.setMinimumWidth(220)

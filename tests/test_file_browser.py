@@ -35,6 +35,25 @@ class CustomFile(File):
 
 
 class BrowserTests(QtTestCase):
+    def test_host_can_omit_column_view_and_keep_list_tile_navigation(self):
+        self.browser.close()
+        self.wait()
+        self.browser = FileBrowser(self.root, column_navigation=False, calculate_folder_sizes=False)
+        self.browser.show()
+        self.wait()
+        self.assertIsNone(self.browser.views.columns)
+        self.assertFalse(self.browser.view_selector.buttons[2].isEnabled())
+        with self.assertRaisesRegex(ValueError, 'disabled column'):
+            self.browser.views.set_mode(2)
+        child = self.root / 'child'
+        child.mkdir()
+        self.browser.set_directory(child, navigation_root=self.root)
+        self.assertEqual(self.browser.views.root, child)
+        self.browser.views.set_mode(1)
+        self.assertEqual(self.browser.views.currentIndex(), 1)
+        self.browser.set_directory(self.root, navigation_root=self.root)
+        self.assertEqual(self.browser.views.root, self.root)
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.temp = TemporaryDirectory()

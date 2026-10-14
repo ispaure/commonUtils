@@ -164,37 +164,37 @@ class CodeEdit(ColumnGuide, FoldingCommands, MultiCursorCommands, TransformComma
         )
 
     def paint_gutter(self, event):
-        painter = qt.QPainter(self.gutter)
-        painter.setFont(self.font())
-        painter.fillRect(
-            event.rect(), self.palette().brush(qt.QPalette.ColorRole.AlternateBase)
-        )
-        block = self.firstVisibleBlock()
-        top = round(
-            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        )
-        while block.isValid() and top <= event.rect().bottom():
-            height = round(self.blockBoundingRect(block).height())
-            if block.isVisible() and top + height >= event.rect().top():
-                role = (
-                    qt.QPalette.ColorRole.Text
-                    if block == self.textCursor().block()
-                    else qt.QPalette.ColorRole.PlaceholderText
-                )
-                painter.setPen(self.palette().color(role))
-                self.paint_line_changes(painter, block, top, height)
-                self.draw_fold_marker(painter, block, top)
-                number_left = 10 + self.fold_marker_width()
-                painter.drawText(
-                    number_left,
-                    top,
-                    self.gutter.width() - number_left - 4,
-                    self.fontMetrics().height(),
-                    qt.Qt.AlignmentFlag.AlignRight,
-                    str(block.blockNumber() + 1),
-                )
-            top += height
-            block = block.next()
+        with qt.QPainter(self.gutter) as painter:
+            painter.setFont(self.font())
+            painter.fillRect(
+                event.rect(), self.palette().brush(qt.QPalette.ColorRole.AlternateBase)
+            )
+            block = self.firstVisibleBlock()
+            top = round(
+                self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+            )
+            while block.isValid() and top <= event.rect().bottom():
+                height = round(self.blockBoundingRect(block).height())
+                if block.isVisible() and top + height >= event.rect().top():
+                    role = (
+                        qt.QPalette.ColorRole.Text
+                        if block == self.textCursor().block()
+                        else qt.QPalette.ColorRole.PlaceholderText
+                    )
+                    painter.setPen(self.palette().color(role))
+                    self.paint_line_changes(painter, block, top, height)
+                    self.draw_fold_marker(painter, block, top)
+                    number_left = 10 + self.fold_marker_width()
+                    painter.drawText(
+                        number_left,
+                        top,
+                        self.gutter.width() - number_left - 4,
+                        self.fontMetrics().height(),
+                        qt.Qt.AlignmentFlag.AlignRight,
+                        str(block.blockNumber() + 1),
+                    )
+                top += height
+                block = block.next()
 
     def highlight_cursor(self):
         selection = qt.QTextEdit.ExtraSelection()

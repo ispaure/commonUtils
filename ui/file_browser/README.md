@@ -171,6 +171,13 @@ current signal returns and own errors, credentials and replacement-view lifetime
 The boundary predicate is read-only: the filesystem model does not list or fetch
 children beneath matching directories. It must not open dialogs or navigate.
 
+Hosts may supply `column_navigation=False` to omit QColumnView entirely while
+keeping list, thumbnails, details and storage modes at their established indices.
+The column button is disabled and requesting mode 2 raises ValueError;
+`views.columns` is None. The default remains True. This is an explicit host choice,
+not a claim that every other mode has been verified on mobile. A consuming iOS
+proof uses it to isolate a Qt 6.12/Python 3.15 column-navigation native crash.
+
 Routing covers explicit locations, breadcrumbs, activation, tree expansion,
 column navigation and storage/search navigation. Cached file activation routes
 its parent directory before ordinary file launch. The shared browser knows

@@ -49,13 +49,14 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     index_progress = qt.Signal(str)
     index_state_changed = qt.Signal()
 
-    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None, directory_handler=None, directory_boundary=None):
+    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None, directory_handler=None, directory_boundary=None, column_navigation=True):
         super().__init__(parent)
         from ..appearance.styling import bind_font
         bind_font(self, 'browser')
         self.idle.connect(self.close)
         self.directory_handler = directory_handler
         self.directory_boundary = directory_boundary
+        self.column_navigation = bool(column_navigation)
         self.services = services or {}
         self.action_providers = tuple(action_providers)
         self.folder_fields = folder_fields
@@ -246,7 +247,9 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         for column in (1, 3):
             self.tree.header().setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
         self.model.directory_boundary = self.directory_boundary
-        self.views = FileViews(self.model, self.tree, self, directory_handler=self.handle_directory)
+        self.views = FileViews(self.model, self.tree, self, directory_handler=self.handle_directory,
+                               column_navigation=self.column_navigation)
+        self.view_selector.buttons[2].setEnabled(self.column_navigation)
         self.views.selection_changed.connect(self._selection_changed)
         self.views.directory_changed.connect(self.navigation.set_directory)
         self.views.directory_changed.connect(self._directory_changed)

@@ -20,7 +20,7 @@ class BrowserViews(qt.QStackedWidget):
     directory_changed = qt.Signal(object)
     directory_opened = qt.Signal(object)
 
-    def __init__(self, model, tree, parent=None, *, directory_handler=None, storage=False):
+    def __init__(self, model, tree, parent=None, *, directory_handler=None, storage=False, column_navigation=True):
         super().__init__(parent)
         self.directory_handler = directory_handler
         self.model = model
@@ -40,13 +40,14 @@ class BrowserViews(qt.QStackedWidget):
         self.tiles.setIconSize(qt.QSize(120, 165))
         self.tiles.setGridSize(qt.QSize(170, 205))
         self.tiles.setWordWrap(True)
-        self.columns = FolderColumnView()
+        self.columns = FolderColumnView() if column_navigation else None
         # Trim two pixels per row from the shared theme's eight-pixel padding.
         # Keep this local to filename lists; other workspaces have their own density.
-        for view in (tree, self.columns):
+        for view in (tree,) + ((self.columns,) if self.columns is not None else ()):
             view.setStyleSheet('QAbstractItemView::item { padding: 3px 4px; }')
-        self.columns.setModel(model)
-        self.columns.setColumnWidths([240, 240, 240, 240])
+        if self.columns is not None:
+            self.columns.setModel(model)
+            self.columns.setColumnWidths([240, 240, 240, 240])
         self.cover_queue = deque()
         self.cover_busy = False
         self.cover_jobs = {}
@@ -60,9 +61,10 @@ class BrowserViews(qt.QStackedWidget):
         self.cover_cancelled = Event()
         self.tiles.metrics_changed.connect(self._tile_metrics)
         self.covers.cover_requested.connect(self._request_cover)
-        self.columns.column_context_requested.connect(self._context)
-        self.columns.selection_input.connect(self._column_input)
-        for view in (tree, self.tiles, self.columns):
+        if self.columns is not None:
+            self.columns.column_context_requested.connect(self._context)
+            self.columns.selection_input.connect(self._column_input)
+        for view in self.navigation_views:
             self.addWidget(view)
             configure_entry_selection(view)
             view.setEditTriggers(qt.QAbstractItemView.EditTrigger.SelectedClicked | qt.QAbstractItemView.EditTrigger.EditKeyPressed)
@@ -73,6 +75,8 @@ class BrowserViews(qt.QStackedWidget):
             else:
                 view.selectionModel().selectionChanged.connect(lambda *args, target=view: self._selection(target))
             view.doubleClicked.connect(lambda index: self.activated.emit(self.source_index(index)))
+        if self.columns is None:
+            self.addWidget(qt.QWidget())  # Preserve established storage-mode indices.
         self.storage = None
         if storage:
             from .storage_view import StorageView
@@ -83,6 +87,10 @@ class BrowserViews(qt.QStackedWidget):
             self.storage.context_requested.connect(self._storage_context)
             self.storage.idle.connect(self.idle)
         self.root = None
+
+    @property
+    def navigation_views(self):
+        return (self.tree, self.tiles) + ((self.columns,) if self.columns is not None else ())
 
     def source_index(self, index):
         if isinstance(index.model(),qt.QAbstractProxyModel):
@@ -217,7 +225,7 @@ class BrowserViews(qt.QStackedWidget):
             return
         self.root = path
         index = self.model.browse_root_index(path)
-        for view in (self.tree, self.tiles, self.columns):
+        for view in self.navigation_views:
             blocker = qt.QSignalBlocker(view.selectionModel())
             view.clearSelection()
             view.setCurrentIndex(qt.QModelIndex())
@@ -235,6 +243,8 @@ class BrowserViews(qt.QStackedWidget):
     def set_mode(self, mode):
         if mode not in (0, 1, 2, 3, 4) or (mode >= 3 and self.storage is None):
             raise ValueError('This browser does not offer that view.')
+        if mode == 2 and self.columns is None:
+            raise ValueError('This host has disabled column navigation.')
         if mode >= 3 and self.root is not None and self.model.browse_network(self.root):
             return
         chart_mode = max(0, mode - 3)
@@ -284,7 +294,7 @@ class BrowserViews(qt.QStackedWidget):
     def set_icon_scale(self, percent):
         self.tiles.set_folder_scale(percent)
         size = round(16 * percent / 50)
-        for view in (self.tree, self.columns):
+        for view in (self.tree,) + ((self.columns,) if self.columns is not None else ()):
             view.setIconSize(qt.QSize(size, size))
 
     def _tile_metrics(self, size, ratio):
@@ -372,5 +382,6 @@ class BrowserViews(qt.QStackedWidget):
 
 class FileViews(BrowserViews):
     """Local browser integration retains its optional indexed storage charts."""
-    def __init__(self, model, tree, parent=None, *, directory_handler=None):
-        super().__init__(model, tree, parent, directory_handler=directory_handler, storage=True)
+    def __init__(self, model, tree, parent=None, *, directory_handler=None, column_navigation=True):
+        super().__init__(model, tree, parent, directory_handler=directory_handler, storage=True,
+                         column_navigation=column_navigation)

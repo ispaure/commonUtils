@@ -1,5 +1,14 @@
 # Integration contracts
 
+## Hosted Qt painting
+
+Widget paint handlers must end every locally owned QPainter before returning,
+using a context manager or try/finally. Do not rely on immediate Python object
+destruction: the Qt 6.12 iOS/Python 3.15 consumer exposed overlapping painters
+when editor gutters and browser breadcrumbs relied on local-variable cleanup.
+Mobile Qt admission is an explicit QApplication host contract documented in
+`runtime/platform/README.md`; it does not admit desktop side effects.
+
 Use the module paths in the [API guide](public-apis.md). The library imports its
 subsystems through ordinary Python packages. Importing the root loads no GUI,
 installs no custom import hooks and initializes no subsystem.

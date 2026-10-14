@@ -14,12 +14,12 @@ class BreadcrumbSeparator(qt.QWidget):
         self.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
     def paintEvent(self, event):
-        painter = qt.QPainter(self)
-        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
-        painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText), 1.5))
-        x, y = self.width()/2, self.height()/2
-        painter.drawLine(qt.QPointF(x-2,y-4), qt.QPointF(x+2,y))
-        painter.drawLine(qt.QPointF(x+2,y), qt.QPointF(x-2,y+4))
+        with qt.QPainter(self) as painter:
+            painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+            painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText), 1.5))
+            x, y = self.width()/2, self.height()/2
+            painter.drawLine(qt.QPointF(x-2,y-4), qt.QPointF(x+2,y))
+            painter.drawLine(qt.QPointF(x+2,y), qt.QPointF(x-2,y+4))
 
 
 class BreadcrumbBar(qt.QWidget):
@@ -60,11 +60,11 @@ class BreadcrumbBar(qt.QWidget):
         self.set_paths([])
 
     def paintEvent(self, event):
-        painter = qt.QPainter(self)
-        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
-        painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Mid), 1))
-        painter.setBrush(self.palette().brush(qt.QPalette.ColorRole.AlternateBase))
-        painter.drawRoundedRect(qt.QRectF(self.rect()).adjusted(.5,.5,-.5,-.5), 5, 5)
+        with qt.QPainter(self) as painter:
+            painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+            painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Mid), 1))
+            painter.setBrush(self.palette().brush(qt.QPalette.ColorRole.AlternateBase))
+            painter.drawRoundedRect(qt.QRectF(self.rect()).adjusted(.5,.5,-.5,-.5), 5, 5)
 
     def set_paths(self, paths):
         self.paths = list(paths)

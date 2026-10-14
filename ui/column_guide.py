@@ -19,9 +19,9 @@ class ColumnGuide:
     def paintEvent(self, event):
         super().paintEvent(event)
         if self.column_guide:
-            painter = qt.QPainter(self.viewport())
-            color = self.palette().color(qt.QPalette.ColorRole.Mid)
-            painter.setPen(qt.QPen(color, 1, qt.Qt.PenStyle.DashLine))
-            x = self.column_guide_x()
-            painter.drawLine(qt.QLineF(x, 0, x, self.viewport().height()))
+            with qt.QPainter(self.viewport()) as painter:
+                color = self.palette().color(qt.QPalette.ColorRole.Mid)
+                painter.setPen(qt.QPen(color, 1, qt.Qt.PenStyle.DashLine))
+                x = self.column_guide_x()
+                painter.drawLine(qt.QLineF(x, 0, x, self.viewport().height()))
 
