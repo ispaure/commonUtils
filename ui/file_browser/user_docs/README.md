@@ -43,15 +43,23 @@ does not start a separate scan.
 
 ## Understand folder sizes
 
-Treemap and Radial views use saved logical file sizes. Larger areas mean more bytes;
-the companion list ranks entries by size. Double-click a folder to explore it.
+Treemap and Radial default to **Size on disk (allocated space)**. The **Measure**
+dropdown above the chart switches to **Size (file contents)**. Size on disk measures
+the space allocated to files, including block rounding and sparse/compressed storage;
+Size measures their content length. Larger areas mean more of the selected measure,
+and the companion list ranks entries by that same measure. Both values are cached;
+switching measures does not scan files again. Double-click a folder to explore it.
 The radial centre can return to the parent within the browser's navigation boundary.
 
 Radial shows at most four levels and 3,000 entries; treemap immediate-child reads
 are also bounded to 3,000. Gaps can represent omitted entries, zero-byte folders or
 incomplete indexing. Root totals can include entries not individually drawn.
-Percentages refer to the current root. Sizes are logical bytes, so hard links,
-clones and sparse files can make them differ from physical disk consumption.
+Percentages refer to the current root and selected measure. Totals count files by
+path, so hard links and clones may count shared storage more than once. Folder and
+filesystem metadata are excluded. Unavailable allocations are excluded from the
+allocated total and reported above the chart; they are never replaced with file
+content size. Saved indexes created before allocation support retain their content
+sizes, and collect allocations on the next metadata validation or Refresh index.
 
 Indexing stores paths and metadata in a local cache, not file contents. It can use
 substantial disk space for large trees. Results stay usable while updates run.

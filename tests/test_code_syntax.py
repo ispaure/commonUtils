@@ -17,6 +17,18 @@ class SyntaxTests(QtTestCase):
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])
 
+    def test_unchanged_palette_skips_relexing_but_language_changes_rehighlight(self):
+        from unittest.mock import patch
+        editor = CodeEdit()
+        highlight = SyntaxHighlighter(editor, 'python')
+        editor.setPlainText('value = 1\n' * 100)
+        with patch.object(highlight, 'rehighlight', wraps=highlight.rehighlight) as rehighlight:
+            for _ in range(20):
+                highlight.refresh_theme()
+            rehighlight.assert_not_called()
+            highlight.configure('javascript')
+            rehighlight.assert_called_once()
+
     def test_all_languages_and_plain_text(self):
         editor = CodeEdit()
         highlight = SyntaxHighlighter(editor)

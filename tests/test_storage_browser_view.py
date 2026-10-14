@@ -11,6 +11,58 @@ from unittest.mock import patch
 
 
 class StorageViewTests(QtTestCase):
+    def test_disk_default_and_metric_switch_use_saved_data_for_both_charts(self):
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with self.temporary_directory() as temporary:
+            root = Path(temporary) / 'files'
+            root.mkdir()
+            tiny = root / 'tiny'
+            sparse = root / 'sparse'
+            tiny.write_bytes(b'x')
+            sparse.write_bytes(b'x' * 10000)
+            allocations = {tiny: 4096, sparse: 512}
+            with patch('commonUtils.filesystem.index.store.allocated_size',
+                       side_effect=lambda path, info: allocations[Path(path)]), \
+                    patch('commonUtils.filesystem.index.metadata.allocated_size',
+                          side_effect=lambda path, info: allocations[Path(path)]):
+                directory_cache.get(root)
+                browser = FileBrowser(root, calculate_folder_sizes=False)
+                browser.resize(1200, 700)
+                browser.show()
+                storage = browser.views.storage
+                self.assertEqual(storage.metric_selector.currentData(), 'disk_size')
+                self.assertIn('allocated space', storage.metric_selector.currentText())
+                self.assertIn('file contents', storage.metric_selector.itemText(1))
+
+                def settled():
+                    self.wait_until(lambda: not storage.busy and not browser.busy,
+                                    message='Size metric update did not finish')
+                    app.processEvents()
+
+                with patch.object(directory_cache, 'get', side_effect=AssertionError('Switch initiated a scan')):
+                    browser.view_selector.setCurrentIndex(3)
+                    settled()
+                    self.assertEqual(storage.entries, [(tiny, 4096), (sparse, 512)])
+                    self.assertEqual(storage.results.headerItem().text(1), 'Size on disk')
+                    self.assertIn('Size on disk:', storage.summary.text())
+                    storage.select_path(tiny)
+                    storage.metric_selector.setCurrentIndex(1)
+                    settled()
+                    self.assertEqual(storage.entries, [(sparse, 10000), (tiny, 1)])
+                    self.assertEqual(storage.selected_path, tiny)
+                    self.assertEqual(storage.results.headerItem().text(1), 'Size')
+                    browser.view_selector.setCurrentIndex(4)
+                    settled()
+                    self.assertEqual(storage.radial.items, [(sparse, 10000), (tiny, 1)])
+                    storage.metric_selector.setCurrentIndex(0)
+                    settled()
+                    self.assertEqual(storage.radial.items, [(tiny, 4096), (sparse, 512)])
+                    # Queued results for the old measurement cannot overwrite this one.
+                    storage._loaded(root, ([(sparse, 10000)], {}, {root: 10000}, True), '',
+                                    key=(root, 1, storage._revision, 'size'))
+                    self.assertEqual(storage.radial.items, [(tiny, 4096), (sparse, 512)])
+                browser.shutdown()
+
     def test_navigation_stays_blank_until_current_folder_sizes_arrive(self):
         app = qt.QApplication.instance() or qt.QApplication([])
         browser = FileBrowser(calculate_folder_sizes=False)
@@ -42,6 +94,7 @@ class StorageViewTests(QtTestCase):
             (child / 'data.bin').write_bytes(b'x' * 100)
             directory_cache.get(root)
             browser = FileBrowser(root, calculate_folder_sizes=False)
+            browser.views.storage.metric_selector.setCurrentIndex(1)
             try:
                 for _ in range(12):
                     for mode in (3, 4, 0, 4, 3):
@@ -95,6 +148,7 @@ class StorageViewTests(QtTestCase):
             small=root/'small.bin';small.write_bytes(b'x'*300)
             directory_cache.get(root)
             browser=FileBrowser(root,calculate_folder_sizes=False)
+            browser.views.storage.metric_selector.setCurrentIndex(1)
             browser.resize(1000,700);browser.show()
             def wait():
                 deadline=time.monotonic()+5
@@ -149,7 +203,7 @@ class StorageViewTests(QtTestCase):
             snapshot = SimpleNamespace(complete=True,
                 storage_children=lambda path, limit, **kw: [(entry.path, entry.directory, sizes[entry.path] if entry.directory else entry.size) for entry in children.get(path, [])[:limit]],
                 folder_stats=lambda paths, **kw: {path: FolderStats(size=sizes[path]) for path in paths})
-            browser = FileBrowser(root,calculate_folder_sizes=False); browser.resize(1000,700); browser.show()
+            browser = FileBrowser(root,calculate_folder_sizes=False); browser.views.storage.metric_selector.setCurrentIndex(1); browser.resize(1000,700); browser.show()
             try:
                 with patch.object(directory_cache,'peek',return_value=snapshot):
                     browser.view_selector.setCurrentIndex(4)
@@ -211,6 +265,7 @@ class StorageViewTests(QtTestCase):
             root=Path(temp);child=root/'child';child.mkdir();(child/'file.txt').write_bytes(b'abc')
             directory_cache.get(root)
             browser=FileBrowser(root,calculate_folder_sizes=False)
+            browser.views.storage.metric_selector.setCurrentIndex(1)
             read=SqlEntries.storage_children;seen=[]
             def children(entries,path,limit,**kwargs):
                 seen.append(path);return read(entries,path,limit,**kwargs)

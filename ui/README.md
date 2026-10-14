@@ -128,3 +128,4 @@ continues to live at `ui/settings.ini`.
 - [Shared reader controls](readers/README.md): Reader menus, fullscreen controls, read-aloud presentation and wheel navigation shared by document readers.
 - [Settings editor widgets](settings/README.md): Typed INI editors, layered overrides, settings sections and font previews. Parsing, persistence and host-owned paths remain in configuration.
 - [Shared UI appearance](appearance/README.md): Opt-in themes, live font styling and palette-aware painted icons.
+- [Optional native Toga components](native/README.md): Configurable destinations, native Back routing, chrome restoration and image gestures. Consumers supply workflows and package the Android bridges.

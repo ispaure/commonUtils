@@ -207,7 +207,7 @@ class DirectorySchemaTests(unittest.TestCase):
                 initialize_schema(db, report=lambda done, total, message: messages.append(message))
                 self.assertEqual(messages, ['Optimizing saved index'])
                 self.assertEqual(db.execute('SELECT path,size FROM entries').fetchone(), (str(path), 3))
-                self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 3)
+                self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 4)
                 with closing(sqlite3.connect(database.with_suffix('.pre-v3.sqlite3'))) as backup:
                     self.assertEqual(backup.execute('PRAGMA user_version').fetchone()[0], 1)
 

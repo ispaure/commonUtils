@@ -16,7 +16,7 @@ from .search import search_sql, search_words
 
 
 def _entry(row):
-    return Entry(Path(row[0]), bool(row[1]), row[2], row[3], bool(row[4]), tuple(json.loads(row[5])))
+    return Entry(Path(row[0]), bool(row[1]), row[2], row[3], bool(row[4]), tuple(json.loads(row[5])), row[6] if len(row) > 6 else -1)
 
 
 class SqlEntries(Sequence):
@@ -38,6 +38,9 @@ class SqlEntries(Sequence):
         self.compact = bool(self.connection.execute(
             "SELECT 1 FROM sqlite_master WHERE name='indexed_entries'").fetchone())
         self.table = 'indexed_entries' if self.compact else 'entries'
+        self.has_allocation = any(row[1] == 'disk_size' for row in self.connection.execute(f'PRAGMA table_info({self.table})'))
+        self.disk_column = 'disk_size' if self.has_allocation else '-1'
+        self.has_disk_totals = any(row[1] == 'disk_size' for row in self.connection.execute('PRAGMA table_info(folder_totals)'))
         self.parent_filter = ('parent_id=(SELECT id FROM folder_paths WHERE path=?)'
                               if self.compact else 'parent=?')
         self.lock = RLock()
@@ -76,7 +79,7 @@ class SqlEntries(Sequence):
             self.connection.set_progress_handler(lambda: int(cancelled()), 10_000)
             try:
                 cursor = self.connection.execute(
-                    f'SELECT path,directory,size,modified,symlink,identity FROM {self.table}'
+                    f'SELECT path,directory,size,modified,symlink,identity,{self.disk_column} FROM {self.table}'
                     + f' WHERE {self.where} '
                     + extra + f' ORDER BY {order}' + (' LIMIT ? OFFSET ?' if limit is not None else ''),
                     self.parameters + parameters + ((limit, offset) if limit is not None else ()))
@@ -108,7 +111,7 @@ class SqlEntries(Sequence):
             raise IndexError(index)
         with self.lock:
             row = self.connection.execute(
-                f'SELECT path,directory,size,modified,symlink,identity FROM {self.table} WHERE {self.where} '
+                f'SELECT path,directory,size,modified,symlink,identity,{self.disk_column} FROM {self.table} WHERE {self.where} '
                 'ORDER BY sort_key,path LIMIT 1 OFFSET ?', self.parameters + (index,)).fetchone()
             return _entry(row)
 
@@ -122,8 +125,12 @@ class SqlEntries(Sequence):
     def children(self, path, limit=None):
         return tuple(self._rows('AND '+self.parent_filter, (str(path),), limit=limit))
 
-    def storage_children(self, path, limit, *, cancelled=lambda: False):
+    def storage_children(self, path, limit, *, cancelled=lambda: False, metric='size'):
         """Largest children and scalar totals, without deserializing subtree metadata."""
+        if metric not in ('size', 'disk_size'):
+            raise ValueError('Storage metric must be size or disk_size')
+        if metric == 'disk_size' and not self.has_disk_totals:
+            return ()  # Old snapshots retain logical size until the writer upgrades.
         path = Path(path)
         if self.scope is not None and path != self.scope and self.scope not in path.parents:
             return ()
@@ -136,7 +143,7 @@ class SqlEntries(Sequence):
                 # Independently cached branches remain useful while their new
                 # parent is only partially indexed. Prefer this generation's total.
                 query = (f'SELECT e.path,e.directory,CASE WHEN e.directory THEN '
-                         'max(coalesce(t.size,0),coalesce(c.size,0)) ELSE e.size END AS bytes '
+                         f'max(coalesce(t.{metric},0),coalesce(c.{metric},0)) ELSE max(0,e.{metric}) END AS bytes '
                          f'FROM {self.table} e LEFT JOIN folder_totals t '
                          'ON t.generation=e.generation AND t.path=e.path '
                          'LEFT JOIN roots r ON r.root=e.path AND r.recursive=1 '
@@ -216,11 +223,12 @@ class SqlEntries(Sequence):
                     source = ('(SELECT t.*,c.checked_at FROM folder_totals t LEFT JOIN folder_checks c '
                               'ON c.generation=t.generation AND c.path=t.path)')
                     stamp = 'coalesce(checked_at,scanned_at)'
-                for row in self.connection.execute(f'SELECT path,size,files,folders,skipped,extensions,complete,{stamp} '
+                disk_fields = 'disk_size,disk_unknown' if self.has_disk_totals else '0,files'
+                for row in self.connection.execute(f'SELECT path,size,files,folders,skipped,extensions,complete,{stamp},{disk_fields} '
                                                    f'FROM {source} WHERE generation=?' + extra, parameters):
                     check_cancelled(cancelled)
-                    path, size, files, folders, skipped, extensions, complete, stamp = row
-                    values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale)
+                    path, size, files, folders, skipped, extensions, complete, stamp, disk, unknown = row
+                    values[Path(path)] = FolderStats(size, files, folders, skipped, json.loads(extensions), bool(complete), stamp, stale, disk, unknown)
                 if children_of is not None:
                     # A visible-only scan has empty/incomplete child aggregates.
                     # Reuse recursive totals saved for an ancestor or for an
@@ -229,7 +237,8 @@ class SqlEntries(Sequence):
                     # so removed children and distant descendants stay excluded.
                     ancestors = tuple(str(path) for path in (Path(children_of), *Path(children_of).parents))
                     cached = self.connection.execute(
-                        'SELECT c.path,c.size,c.files,c.folders,c.skipped,c.extensions,c.complete,c.scanned_at '
+                        'SELECT c.path,c.size,c.files,c.folders,c.skipped,c.extensions,c.complete,c.scanned_at,'
+                        + ('c.disk_size,c.disk_unknown ' if self.has_disk_totals else '0,c.files ') +
                         f'FROM {self.table} e JOIN roots r ON r.recursive=1 AND '
                         f'(r.root IN ({",".join("?" for _ in ancestors)}) OR r.root=e.path) '
                         'JOIN folder_totals c ON c.generation=coalesce(r.building,r.completed) AND c.path=e.path '
@@ -238,12 +247,12 @@ class SqlEntries(Sequence):
                         ancestors + (self.generation, str(children_of), self.generation))
                     for row in cached:
                         check_cancelled(cancelled)
-                        path, size, files, folders, skipped, extensions, complete, stamp = row
+                        path, size, files, folders, skipped, extensions, complete, stamp, disk, unknown = row
                         path = Path(path)
                         current = values.get(path)
                         if current is None or not current.complete and (complete or size > current.size):
                             values[path] = FolderStats(size, files, folders, skipped, json.loads(extensions),
-                                                      bool(complete), stamp, True)
+                                                      bool(complete), stamp, True, disk, unknown)
             except sqlite3.OperationalError:
                 check_cancelled(cancelled)
                 raise

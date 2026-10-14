@@ -46,6 +46,10 @@ change bands. Applying a change is available only when the application provides
 that action; it changes the host buffer according to the host's policy, not necessarily
 the file on disk. Stale comparisons may need to be refreshed before applying.
 
+Unified patch previews keep diff colors when a patch line contains embedded
+paragraph breaks. Extra paragraphs leave old/new line numbers blank; the next
+patch line keeps its original numbering.
+
 In a three-way merge, inspect the left/right sources and editable result. Resolve a
 change with **Left**, **Right**, **Both** (left then right), **Keep Base**, or a manual
 edit followed by marking it resolved. The ancestor can be shown separately. Apply

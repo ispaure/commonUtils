@@ -35,6 +35,11 @@ traversal. It raises filesystem errors, invalid-regex errors and
 is enabled. [Filesystem operations](../../filesystem/README.md) also cover removal,
 transfers and rename plans.
 
+`filesystem.index.Snapshot.folder_stats()` exposes logical `size`, known allocated
+`disk_size`, and `disk_unknown` counts. `Entry.disk_size` uses -1 for unknown allocation.
+`storage_children(..., metric='size'|'disk_size')` selects the ranking measure while
+retaining logical size as the API default. See [index contracts](../../filesystem/index/README.md).
+
 ## Formats, settings and persistence
 
 | Need | Entry point / contract |
@@ -152,3 +157,13 @@ mobile consumers use `ui.native_browser.NativeBrowser` with Toga list/tile views
 visible thumbnail loading and generic/rich file details. Source work, credentials
 and activation remain host-owned. See the [resource provider contract](../../ui/resource-providers.md#native-list-and-tile-presentation)
 for callback, revision, bounded-cache and shutdown requirements.
+
+## Optional native Toga components
+
+`ui.native.navigation_state` supplies toolkit-independent destination state.
+`ui.native.navigation.NativeNavigationHost`, `ui.native.routes.Routes`, and
+`ui.native.image_canvas.ImageCanvas` supply explicitly imported Toga/native
+presentation. Consumers own destinations, document policy and resource lifetimes.
+See [native components](../../ui/native/README.md) for lifecycle, callbacks and
+Android bridge packaging. `tools.mobile_ci.stage` includes their Python/Java
+sources and records untracked local native sources as dirty.

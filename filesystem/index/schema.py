@@ -12,7 +12,7 @@ import sqlite3
 from .order import _sort_key
 from ...runtime.operations import check_cancelled
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def ensure_folder(db, path):
@@ -36,11 +36,11 @@ def ensure_folder(db, path):
     return parent_id
 
 
-def _backup(db, cancelled):
+def _backup(db, cancelled, version=3):
     filename = db.execute('PRAGMA database_list').fetchone()[2]
     if not filename:
         return
-    target = Path(filename).with_suffix('.pre-v3.sqlite3')
+    target = Path(filename).with_suffix(f'.pre-v{version}.sqlite3')
     if target.exists():
         return
     # Backup first, outside the migration transaction; staging avoids retaining an
@@ -61,19 +61,22 @@ def _backup(db, cancelled):
 def ensure_reader_view(db):
     """Expose integer IDs for scoped readers without changing the old row view."""
     separator = os.sep.replace("'", "''")
+    allocation = bool(db.execute("SELECT 1 FROM sqlite_master WHERE name='entry_allocations'").fetchone())
+    disk = 'coalesce(a.disk_size,-1)' if allocation else '-1'
+    join = 'LEFT JOIN entry_allocations a ON a.record_id=r.id' if allocation else ''
     db.execute(f'''CREATE VIEW IF NOT EXISTS indexed_entries AS
         SELECT g.parent_id,g.node_id,g.record_id,g.generation,
                rtrim(f.path,'{separator}')||'{separator}'||n.name AS path,
                f.path AS parent,n.name_fold,r.directory,r.size,r.modified,r.symlink,r.identity,
-               CAST(f.sort_prefix||n.sort_key AS BLOB) AS sort_key
+               CAST(f.sort_prefix||n.sort_key AS BLOB) AS sort_key, {disk} AS disk_size
         FROM generation_entries g JOIN entry_nodes n ON n.id=g.node_id
-        JOIN folder_paths f ON f.id=g.parent_id JOIN entry_records r ON r.id=g.record_id''')
+        JOIN folder_paths f ON f.id=g.parent_id JOIN entry_records r ON r.id=g.record_id {join}''')
 
 
 def upgrade_entries(db, cancelled=lambda: False):
     """Replace repeated entry rows atomically; keep saved generations/checkpoints."""
     version = db.execute('PRAGMA user_version').fetchone()[0]
-    if version == SCHEMA_VERSION:
+    if version in (3, SCHEMA_VERSION):
         return
     if version not in (0, 1, 2):
         raise RuntimeError(f'Unsupported directory index version {version}')
@@ -164,7 +167,7 @@ def upgrade_entries(db, cancelled=lambda: False):
         END''')
         check_cancelled(cancelled)
         ensure_reader_view(db)
-        db.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
+        db.execute('PRAGMA user_version=3')
         db.commit()
     except BaseException:
         # Rollback must remain possible after the progress handler interrupted SQL.
@@ -204,9 +207,9 @@ def delete_entries(db, generation, *, scope=None, exclude=()):
 def write_entries(db, generation, parent_id, rows):
     """Intern one bounded metadata batch with set-based SQL, avoiding row triggers."""
     db.execute('CREATE TEMP TABLE IF NOT EXISTS entry_batch(name TEXT,name_fold TEXT,'
-               'directory INTEGER,size INTEGER,modified INTEGER,symlink INTEGER,identity TEXT,sort_key BLOB)')
+               'directory INTEGER,size INTEGER,modified INTEGER,symlink INTEGER,identity TEXT,sort_key BLOB,disk_size INTEGER)')
     db.execute('DELETE FROM entry_batch')
-    db.executemany('INSERT INTO entry_batch VALUES(?,?,?,?,?,?,?,?)', rows)
+    db.executemany('INSERT INTO entry_batch VALUES(?,?,?,?,?,?,?,?,?)', rows)
     db.execute('INSERT OR IGNORE INTO entry_nodes(parent_id,name,name_fold,sort_key) '
                'SELECT ?,name,name_fold,sort_key FROM entry_batch', (parent_id,))
     db.execute('INSERT OR IGNORE INTO entry_records(node_id,directory,size,modified,symlink,identity) '
@@ -218,6 +221,12 @@ def write_entries(db, generation, parent_id, rows):
                'JOIN entry_records r ON r.node_id=n.id AND r.directory=b.directory '
                'AND r.size=b.size AND r.modified=b.modified AND r.symlink=b.symlink AND r.identity=b.identity',
                (generation,parent_id,parent_id))
+    db.execute('INSERT OR IGNORE INTO entry_allocations '
+               'SELECT r.id,b.disk_size FROM entry_batch b '
+               'JOIN entry_nodes n ON n.parent_id=? AND n.name=b.name '
+               'JOIN entry_records r ON r.node_id=n.id AND r.directory=b.directory '
+               'AND r.size=b.size AND r.modified=b.modified AND r.symlink=b.symlink AND r.identity=b.identity',
+               (parent_id,))
     db.execute('DELETE FROM entry_batch')
 
 
@@ -252,6 +261,11 @@ def retire_generation(db, generation):
 def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, message: None):
     """Create or upgrade the persistent schema under the caller's writer lock."""
     version = db.execute('PRAGMA user_version').fetchone()[0]
+    if version == 3:
+        report(0, 0, 'Adding allocated sizes to the saved index')
+        _backup(db, cancelled, version=4)
+        upgrade_allocation(db, cancelled)
+        version = SCHEMA_VERSION
     if version == SCHEMA_VERSION:
         db.execute('CREATE TABLE IF NOT EXISTS folder_checks('
                    'generation INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,'
@@ -300,3 +314,26 @@ def initialize_schema(db, cancelled=lambda: False, report=lambda done, total, me
     ''')
     db.execute('DROP INDEX IF EXISTS folder_queue_order')
     upgrade_entries(db, cancelled)
+    upgrade_allocation(db, cancelled)
+
+
+def upgrade_allocation(db, cancelled=lambda: False):
+    """Retain logical totals/checkpoints; allocation is filled by metadata validation."""
+    check_cancelled(cancelled)
+    db.execute('SAVEPOINT allocation_upgrade')
+    try:
+        db.execute('CREATE TABLE entry_allocations(record_id INTEGER PRIMARY KEY '
+                   'REFERENCES entry_records(id) ON DELETE CASCADE,disk_size INTEGER NOT NULL)')
+        db.execute('ALTER TABLE folder_totals ADD COLUMN disk_size INTEGER NOT NULL DEFAULT 0')
+        db.execute('ALTER TABLE folder_totals ADD COLUMN disk_unknown INTEGER NOT NULL DEFAULT 0')
+        db.execute('UPDATE folder_totals SET disk_unknown=files')
+        db.execute('DROP VIEW IF EXISTS indexed_entries')
+        ensure_reader_view(db)
+        check_cancelled(cancelled)
+        db.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
+        db.execute('RELEASE allocation_upgrade')
+    except BaseException:
+        db.set_progress_handler(None, 0)
+        db.execute('ROLLBACK TO allocation_upgrade')
+        db.execute('RELEASE allocation_upgrade')
+        raise

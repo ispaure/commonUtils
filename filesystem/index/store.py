@@ -11,7 +11,8 @@ from weakref import WeakSet
 from time import sleep, time, perf_counter
 
 from .scan import DirectoryScan
-from .metadata import Entry, Snapshot, fingerprint
+from .metadata import Entry, Snapshot, fingerprint, entry_fingerprint
+from .allocation import allocated_size
 # Keep these long-standing imports available to existing consumers/instrumentation.
 from .reader import SqlEntries, SqlDirectories, _entry
 from ...runtime.operations import check_cancelled, OperationCancelled
@@ -362,7 +363,7 @@ class DirectoryCache(DirectoryScan):
                         self._checked_entries += 1
                         report(self._checked_entries, 0, f'Checking file metadata · {text}')
                         failed_path = child
-                        if json.dumps(fingerprint(Path(child).lstat())) != identity:
+                        if json.dumps(entry_fingerprint(child, Path(child).lstat())) != identity:
                             valid = False
                             break
             except OSError as error:
@@ -446,10 +447,11 @@ class DirectoryCache(DirectoryScan):
                         self.last_metrics['metadata_seconds'] += perf_counter()-started
                         link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and path.is_junction())
                         directory = not link and stat.S_ISDIR(info.st_mode)
-                        identity = json.dumps(fingerprint(info))
+                        disk = 0 if directory or link else allocated_size(path, info)
+                        identity = json.dumps(entry_fingerprint(path, info, disk))
                         entry_rows.append((path.name, path.name.casefold(), directory,
                                            0 if directory or link else info.st_size, info.st_mtime_ns,
-                                           link, identity, _sort_key(path.name)[1:]))
+                                           link, identity, _sort_key(path.name)[1:], disk))
                         if directory and recursive:
                             seen.add(str(path))
                             folder_rows.append((generation,str(path),text,identity))

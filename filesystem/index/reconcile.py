@@ -10,7 +10,7 @@ import json
 import os
 from pathlib import Path
 from time import time
-from .metadata import fingerprint
+from .metadata import entry_fingerprint
 from ...runtime.operations import check_cancelled
 from .exclusions import scan_exclusions, is_excluded
 
@@ -28,7 +28,7 @@ def _changed(cache, db, generation, folder, source_root, cancelled, report):
             check_cancelled(cancelled)
             cache._checked_entries += 1
             report(cache._checked_entries, 0, 'Checking indexed files')
-            if json.dumps(fingerprint(Path(path).lstat())) != identity:
+            if json.dumps(entry_fingerprint(path, Path(path).lstat())) != identity:
                 return True
     except OSError:
         return True
