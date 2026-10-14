@@ -22,7 +22,7 @@ STYLE_FIELDS = {
     'reading_font_family_str': ('Reading font (Markdown and EPUB)', 'Arial', None),
     'reading_font_size_int': ('Reading size (pt)', 10, (7, 24)),
     'code_font_family_str': ('Code font (editors and Markdown blocks)', '', None),
-    'code_font_size_int': ('Code size (pt)', 8, (7, 24)),
+    'code_font_size_int': ('Code size (pt)', 9, (7, 24)),
 }
 
 
@@ -74,6 +74,7 @@ class Styling(qt.QObject):
         super().__init__(app)
         self.app = app
         self.base_font = qt.QFont(app.font())
+        self._font_cache = {}
         self.views = WeakKeyDictionary()
         self._updating_widgets = WeakSet()
         self.application_controls = WeakSet()
@@ -89,15 +90,21 @@ class Styling(qt.QObject):
     def font(self, role):
         if role not in ('ui', 'browser', 'reading', 'code'):
             raise ValueError('Unknown styling font role')
+        family = self.values[f'{role}_font_family_str'].strip()
+        size = point_size(self.values[f'{role}_font_size_int'])
+        base = self.app.font() if role in ('browser', 'reading') else self.base_font
+        key = (role, family, size, base.key())
+        if key in self._font_cache:
+            return qt.QFont(self._font_cache[key])
         if role == 'code':
             from ..code_editor.widget import monospace_font
             font = monospace_font()
         else:
-            font = qt.QFont(self.app.font() if role in ('browser', 'reading') else self.base_font)
-        family = self.values[f'{role}_font_family_str'].strip()
+            font = qt.QFont(base)
         if family:
             font.setFamily(family)
-        font.setPointSizeF(point_size(self.values[f'{role}_font_size_int']))
+        font.setPointSizeF(size)
+        self._font_cache[key] = qt.QFont(font)
         return font
 
     def bind(self, widget, role, callback=None):
@@ -117,13 +124,16 @@ class Styling(qt.QObject):
 
     def _update_font(self, widget, role, callback):
         font = self.font(role)
-        widget.setFont(font)
+        font_changed = widget.font() != font
+        if font_changed:
+            widget.setFont(font)
         if isinstance(widget, (qt.QTextEdit, qt.QPlainTextEdit)):
             modified = widget.document().isModified()
-            widget.document().setDefaultFont(font)
-            if hasattr(widget, 'update_tab_width'):
+            if widget.document().defaultFont() != font:
+                widget.document().setDefaultFont(font)
+            if font_changed and hasattr(widget, 'update_tab_width'):
                 widget.update_tab_width()
-            if hasattr(widget, 'update_gutter'):
+            if font_changed and hasattr(widget, 'update_gutter'):
                 widget.update_gutter()
             widget.document().setModified(modified)
         if callback is not None:
@@ -149,11 +159,13 @@ class Styling(qt.QObject):
                 break
             parent = parent.parentWidget()
         self.application_controls.add(widget)
+        if widget in self.views and self.views[widget] == (role, None):
+            return
         self.bind(widget, role)
 
     def eventFilter(self, watched, event):
         if (self.apply_application and event.type() == qt.QEvent.Type.FontChange
-                and watched in self.views):
+                and watched in self.views and watched not in self._updating_widgets):
             role, callback = self.views[watched]
             expected = self.font(role)
             actual = watched.font()
@@ -173,13 +185,14 @@ class Styling(qt.QObject):
         previous = self.values
         initial = not previous
         self.values = values
+        self._font_cache.clear()
         controller = getattr(self.app, '_commonutils_theme', None)
         if controller is not None and not initial and self.apply_application:
             if values['theme_mode'] != previous['theme_mode']:
                 controller.set_mode(values['theme_mode'])
             else:
                 controller._apply()
-        if self.apply_application:
+        if self.apply_application and self.app.font() != self.font('ui'):
             self.app.setFont(self.font('ui'))
         for widget, (role, callback) in tuple(self.views.items()):
             self._update(widget, role, callback)

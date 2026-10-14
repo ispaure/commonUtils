@@ -31,3 +31,6 @@ reapply the same widget's role. This preserves component treatments such as
 italic footers with application-wide styling enabled.
 
 [Styling contracts](../styling.md) and [UI setup](../README.md).
+
+Theme changes retain the existing Fusion engine and coalesce system notifications.
+Resolved font roles are cached; repeated control polish does not rebind unchanged roles.

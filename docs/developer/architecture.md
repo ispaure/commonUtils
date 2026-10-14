@@ -50,6 +50,10 @@ retains its own visible folder and cancellation. Writers serialize across proces
 Old read transactions remain consistent while later generations or reconciliations
 are published; release snapshots when their owner is done to avoid retaining WAL
 storage. Network browsing disables automatic indexing and rich metadata work.
+The index retains logical content size and allocated file size separately. Unknown
+allocations stay explicit; folder totals roll up known allocations and unknown counts.
+Files are counted by path, excluding links and filesystem metadata. See the
+[index size contracts](../../filesystem/index/README.md#compact-cache-schema-4).
 Hosts may opt into the durable process-shared coordinator: one OS-elected runner
 handles queued requests, other processes follow progress and take over after exit.
 The host retains/stops its runner independently of browser widgets; see

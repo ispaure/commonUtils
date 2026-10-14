@@ -1,4 +1,6 @@
 """Shared palette-aware unified diff bands and dual line-number gutter."""
+import re
+
 from .. import pyside as qt
 from .widget import CodeEdit
 
@@ -37,8 +39,21 @@ class DiffEdit(CodeEdit):
     def set_diff(self, view, *, raw=False):
         self.setPlainText(view.raw_text if raw else view.text)
         lines = view.raw_lines if raw else view.lines
-        self.diff_rows = [(line.old, line.new, line.kind) for line in lines]
+        # Qt creates paragraphs for CR, LF and Unicode paragraph separators.
+        # One patch line can therefore occupy multiple document blocks. CRLF
+        # spanning the join between patch lines still creates just one block.
+        for index, line in enumerate(lines):
+            text = line.text
+            if index + 1 < len(lines) and text.endswith('\r'):
+                text = text[:-1]
+            parts = re.split(r'\r\n|[\r\n\u2029]', text)
+            self.diff_rows.append((line.old, line.new, line.kind))
+            self.diff_rows.extend(('', '', line.kind) for _ in parts[1:])
         self._update_diff_gutter()
+
+    def _diff_row(self, block):
+        index = block.blockNumber()
+        return self.diff_rows[index] if 0 <= index < len(self.diff_rows) else ('', '', '')
 
     def _update_diff_gutter(self):
         self._bands_key = None
@@ -68,7 +83,10 @@ class DiffEdit(CodeEdit):
 
     def paint_gutter(self, event):
         if not self.diff_rows: return super().paint_gutter(event)
-        painter = qt.QPainter(self.gutter)
+        with qt.QPainter(self.gutter) as painter:
+            self._paint_diff_gutter(painter, event)
+
+    def _paint_diff_gutter(self, painter, event):
         painter.setFont(self.gutter_font())
         painter.fillRect(event.rect(), self.palette().alternateBase())
         block = self.firstVisibleBlock()
@@ -77,7 +95,7 @@ class DiffEdit(CodeEdit):
         while block.isValid() and top <= event.rect().bottom():
             height = round(self.blockBoundingRect(block).height())
             if block.isVisible() and top + height >= event.rect().top():
-                old, new, kind = self.diff_rows[block.blockNumber()]
+                old, new, kind = self._diff_row(block)
                 if kind in ('add', 'remove', 'hunk'):
                     painter.fillRect(0, top, self.gutter.width(), height,
                                      qt.QColor(self.colors(kind)[1]))
@@ -98,7 +116,7 @@ class DiffEdit(CodeEdit):
         selections = []
         top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
         while block.isValid() and top <= self.viewport().height():
-            kind = self.diff_rows[block.blockNumber()][2]
+            kind = self._diff_row(block)[2]
             if kind in ('add', 'remove', 'hunk'):
                 selection = qt.QTextEdit.ExtraSelection()
                 selection.format.setBackground(qt.QColor(self.colors(kind)[1]))

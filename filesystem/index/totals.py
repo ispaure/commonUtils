@@ -24,8 +24,8 @@ def collect_folder_stats(db, generation, root, cancelled=lambda: False):
         value = stats.setdefault(target, FolderStats(complete=False))
         value.skipped += 1; value.complete = False
     directories = []
-    for path, parent, directory, size, link in db.execute(
-            'SELECT path,parent,directory,size,symlink FROM entries WHERE generation=?', (generation,)):
+    for path, parent, directory, size, link, disk in db.execute(
+            'SELECT path,parent,directory,size,symlink,disk_size FROM indexed_entries WHERE generation=?', (generation,)):
         check_cancelled(cancelled)
         value = stats.setdefault(parent, FolderStats(complete=False))
         if link:
@@ -34,6 +34,8 @@ def collect_folder_stats(db, generation, root, cancelled=lambda: False):
             directories.append((path,parent))
         else:
             value.size += size; value.files += 1
+            value.disk_size += max(0, disk)
+            value.disk_unknown += disk < 0
             extension = _extension(path)
             value.extension_counts[extension] = value.extension_counts.get(extension, 0) + 1
     # Sort folders alone, rather than every indexed file in a SQLite temp table.
@@ -55,21 +57,24 @@ def collect_changed_stats(db, generation, root, paths, cancelled):
             continue
         value = FolderStats(complete=row[0]=='done')
         # A single indexed lookup reads immediate entries and their saved aggregates.
-        children = db.execute('SELECT e.path,e.directory,e.size,e.symlink,t.size,t.files,t.folders,t.skipped,t.extensions,t.complete '
-                              'FROM entries AS e LEFT JOIN folder_totals AS t '
+        children = db.execute('SELECT e.path,e.directory,e.size,e.symlink,t.size,t.files,t.folders,t.skipped,t.extensions,t.complete,'
+                              'e.disk_size,t.disk_size,t.disk_unknown FROM indexed_entries AS e LEFT JOIN folder_totals AS t '
                               'ON t.generation=e.generation AND t.path=e.path WHERE e.generation=? AND e.parent=?',(generation,text))
-        for child,directory,size,link,child_size,files,folders,skipped,extensions,complete in children:
+        for child,directory,size,link,child_size,files,folders,skipped,extensions,complete,disk,child_disk,unknown in children:
             check_cancelled(cancelled)
             if link:
                 value.skipped += 1
             elif directory:
                 cached = values.get(Path(child))
                 if cached is None:
-                    cached = (FolderStats(child_size,files,folders,skipped,json.loads(extensions),bool(complete))
+                    cached = (FolderStats(child_size,files,folders,skipped,json.loads(extensions),bool(complete),
+                                          disk_size=child_disk, disk_unknown=unknown)
                               if child_size is not None else FolderStats(complete=False))
                 value.include(cached)
             else:
                 value.size += size; value.files += 1
+                value.disk_size += max(0, disk)
+                value.disk_unknown += disk < 0
                 extension = _extension(child)
                 value.extension_counts[extension] = value.extension_counts.get(extension,0)+1
         prefix = text.rstrip(os.sep)+os.sep
@@ -95,15 +100,17 @@ def store_folder_stats(db, generation, root, cancelled=lambda: False, *, paths=N
                        '(SELECT path FROM folders WHERE generation=?)', (generation, generation))
         for path, value in stats.items():
             check_cancelled(cancelled)
-            db.execute('INSERT INTO folder_totals VALUES(?,?,?,?,?,?,?,?,?) '
+            db.execute('INSERT INTO folder_totals VALUES(?,?,?,?,?,?,?,?,?,?,?) '
                        'ON CONFLICT(generation,path) DO UPDATE SET size=excluded.size,files=excluded.files,'
                        'folders=excluded.folders,skipped=excluded.skipped,extensions=excluded.extensions,'
-                       'complete=excluded.complete,scanned_at=excluded.scanned_at WHERE '
+                       'complete=excluded.complete,scanned_at=excluded.scanned_at,'
+                       'disk_size=excluded.disk_size,disk_unknown=excluded.disk_unknown WHERE '
+                       'folder_totals.disk_size!=excluded.disk_size OR folder_totals.disk_unknown!=excluded.disk_unknown OR '
                        'folder_totals.size!=excluded.size OR folder_totals.files!=excluded.files OR '
                        'folder_totals.folders!=excluded.folders OR folder_totals.skipped!=excluded.skipped OR '
                        'folder_totals.extensions!=excluded.extensions OR folder_totals.complete!=excluded.complete',
                        (generation, str(path), value.size, value.files, value.folders, value.skipped,
-                        json.dumps(value.extension_counts), value.complete, stamp))
+                        json.dumps(value.extension_counts), value.complete, stamp, value.disk_size, value.disk_unknown))
         db.execute('RELEASE aggregate_totals')
     except BaseException:
         db.execute('ROLLBACK TO aggregate_totals'); db.execute('RELEASE aggregate_totals')

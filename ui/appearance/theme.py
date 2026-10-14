@@ -125,13 +125,23 @@ class ThemeController(qt.QObject):
         self.app = app
         self._base_stylesheet = app.styleSheet()
         self._initial_dark = app.palette().color(qt.QPalette.ColorRole.Window).lightness() < 128
+        # Stylesheets wrap the underlying style; their wrapper has no Fusion
+        # object name. Select the engine once, before installing our stylesheet.
+        if app.style().objectName().lower() != 'fusion':
+            app.setStyle('Fusion')
+        self._applied_colors = None
+        self._applied_palette = None
         self.mode = 'system'
+        self._applying = False
+        self._system_timer = qt.QTimer(self)
+        self._system_timer.setSingleShot(True)
+        self._system_timer.timeout.connect(self._apply)
         app.styleHints().colorSchemeChanged.connect(self._system_changed)
         self.set_mode(mode)
 
     def _system_changed(self, scheme):
         if self.mode == 'system':
-            self._apply()
+            self._system_timer.start(0)
 
     def set_mode(self, mode):
         if mode not in ('system', 'light', 'dark'):
@@ -140,13 +150,35 @@ class ThemeController(qt.QObject):
         self._apply()
 
     def _apply(self):
+        if self._applying:
+            return
+        self._applying = True
+        try:
+            self._apply_colors()
+        finally:
+            self._applying = False
+
+    def _apply_colors(self):
         scheme = self.app.styleHints().colorScheme()
         dark = (self.mode == 'dark' or self.mode == 'system' and
                 (scheme == qt.Qt.ColorScheme.Dark or scheme == qt.Qt.ColorScheme.Unknown and self._initial_dark))
         self.colors = configured_colors(dark)
-        self.app.setStyle('Fusion')
-        self.app.setPalette(theme_palette(self.colors))
-        self.app.setStyleSheet(theme_stylesheet(self.colors) + '\n' + self._base_stylesheet)
+        palette = theme_palette(self.colors)
+        stylesheet = theme_stylesheet(self.colors) + '\n' + self._base_stylesheet
+        if (self.colors == self._applied_colors and self.app.styleSheet() == stylesheet
+                and self.app.palette() == self._applied_palette):
+            return
+        changed = False
+        if self.app.palette() != palette:
+            self.app.setPalette(palette)
+            changed = True
+        if self.app.styleSheet() != stylesheet:
+            self.app.setStyleSheet(stylesheet)
+            changed = True
+        if not changed:
+            return
+        self._applied_colors = self.colors
+        self._applied_palette = qt.QPalette(self.app.palette())
         self.changed.emit('dark' if dark else 'light')
 
 

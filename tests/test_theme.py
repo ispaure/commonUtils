@@ -3,6 +3,7 @@ import importlib
 import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import unittest
+from unittest.mock import patch
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.appearance.theme import apply_theme, SLATE_LIGHT, SLATE_DARK, configured_colors
@@ -53,6 +54,36 @@ class ThemeTests(QtTestCase):
         controller.set_mode('light');self.assertEqual(self.app.styleSheet(),light)
         controller.set_mode('system')
         with self.assertRaises(ValueError): controller.set_mode('unknown')
+
+    def test_mode_switch_keeps_style_engine_and_repeated_apply_does_no_work(self):
+        controller = apply_theme(self.app, mode='light')
+        style = self.app.style()
+        with patch.object(self.app, 'setStyle', wraps=self.app.setStyle) as set_style:
+            controller.set_mode('dark')
+            set_style.assert_not_called()
+        self.assertIs(self.app.style(), style)
+        with patch.object(self.app, 'setPalette') as set_palette, \
+                patch.object(self.app, 'setStyleSheet') as set_sheet:
+            controller._apply()
+            set_palette.assert_not_called()
+            set_sheet.assert_not_called()
+
+    def test_system_notifications_coalesce_and_theme_application_is_not_reentrant(self):
+        controller = apply_theme(self.app, mode='system')
+        with patch.object(controller, '_apply_colors', wraps=controller._apply_colors) as apply:
+            for _ in range(20):
+                controller._system_changed(qt.Qt.ColorScheme.Dark)
+            self.app.processEvents()
+            self.assertEqual(apply.call_count, 1)
+        original = self.app.setPalette
+
+        def nested_palette(value):
+            original(value)
+            controller._apply()
+
+        with patch.object(self.app, 'setPalette', side_effect=nested_palette) as set_palette:
+            controller.set_mode('dark')
+            self.assertLessEqual(set_palette.call_count, 1)
 
     def test_compact_form_fields_have_room_for_text_in_both_modes(self):
         controller = apply_theme(self.app, mode='light')

@@ -207,6 +207,21 @@ class StorageView(qt.QWidget):
         self.summary = qt.QLabel('')
         self.summary.setWordWrap(True)
         controls.addWidget(self.summary,1)
+        measure_label = qt.QLabel('Measure:')
+        controls.addWidget(measure_label)
+        self.metric_selector = qt.QComboBox()
+        self.metric_selector.setAccessibleName('Size map measurement')
+        self.metric_selector.addItem('Size on disk (allocated space)', 'disk_size')
+        self.metric_selector.addItem('Size (file contents)', 'size')
+        explanation = ('Size on disk: storage allocated to files, including block rounding and sparse/compressed storage.\n'
+                       'Size: length of file contents, regardless of storage allocated.\n'
+                       'Both count files by path; shared hard links/clones may be counted more than once. '
+                       'Folder and filesystem metadata are excluded.')
+        self.metric_selector.setToolTip(explanation)
+        for index in range(2):
+            self.metric_selector.setItemData(index, explanation, qt.Qt.ItemDataRole.ToolTipRole)
+        measure_label.setBuddy(self.metric_selector)
+        controls.addWidget(self.metric_selector)
         layout.addLayout(controls)
         self.charts = qt.QStackedWidget()
         self.map = Treemap()
@@ -219,7 +234,7 @@ class StorageView(qt.QWidget):
             chart.setContextMenuPolicy(qt.Qt.ContextMenuPolicy.CustomContextMenu)
             chart.customContextMenuRequested.connect(lambda point, target=chart: self._chart_context(target,point))
         self.results = qt.QTreeWidget()
-        self.results.setHeaderLabels(['File or folder', 'Size', 'Share'])
+        self.results.setHeaderLabels(['File or folder', 'Size on disk', 'Share'])
         self.results.headerItem().setToolTip(0, 'Files and folders, ordered largest first')
         self.results.setRootIsDecorated(True)
         self.results.setUniformRowHeights(True)
@@ -237,6 +252,23 @@ class StorageView(qt.QWidget):
         self.splitter.setStretchFactor(0,7); self.splitter.setStretchFactor(1,3)
         self.splitter.setSizes([700,300]); layout.addWidget(self.splitter,1)
         browser.index_updated.connect(self._index_changed)
+        self.metric_selector.currentIndexChanged.connect(self._metric_changed)
+
+    def _metric_changed(self, *args):
+        self._last_result = None
+        blocker = qt.QSignalBlocker(self.results)
+        self.results.clear()
+        blocker.unblock()
+        self._rows = {}
+        self.map.set_items([])
+        self.radial.nodes = {}
+        self.radial.set_items([])
+        self.summary.clear()
+        self._set_loading(True)
+        label = 'Size on disk' if self.metric_selector.currentData() == 'disk_size' else 'Size'
+        self.results.headerItem().setText(1, label)
+        self.results.headerItem().setToolTip(1, self.metric_selector.currentText())
+        self.refresh()
 
     def _index_changed(self, path):
         if path == self.root:
@@ -323,7 +355,7 @@ class StorageView(qt.QWidget):
         if (self.closing or self.browser.views.currentIndex() != 3 or self.root is None
                 or is_network_location(self.root)):
             return
-        key = (self.root, self.charts.currentIndex(), self._revision)
+        key = (self.root, self.charts.currentIndex(), self._revision, self.metric_selector.currentData())
         if key == self._loaded_key or self.busy and key == self._request_key:
             return
         if self.busy:
@@ -338,20 +370,21 @@ class StorageView(qt.QWidget):
         self.busy = True
         root = self.root
         radial = self.charts.currentIndex() == 1
-        operation = Operation(lambda: self._collect(root, radial=radial, cancelled=operation.isInterruptionRequested), self)
+        metric = self.metric_selector.currentData()
+        operation = Operation(lambda: self._collect(root, radial=radial, metric=metric, cancelled=operation.isInterruptionRequested), self)
         self.operation = operation
         self.operation.completed.connect(lambda result,error: self._loaded(root,result,error, key=key))
         self.operation.finished.connect(self._finished)
         self.operation.start()
 
-    def _collect(self, root, *, radial=False, cancelled=None):
+    def _collect(self, root, *, radial=False, metric='disk_size', cancelled=None):
         from .storage_data import collect_storage
-        return collect_storage(directory_cache, root, radial=radial,
+        return collect_storage(directory_cache, root, radial=radial, metric=metric, include_unknown=True,
                                cancelled=cancelled or self.operation.isInterruptionRequested)
 
     def _loaded(self, root, result, error, *, key=None):
         if self.closing or root != self.root: return
-        if key is not None and key != (self.root, self.charts.currentIndex(), self._revision):
+        if key is not None and key != (self.root, self.charts.currentIndex(), self._revision, self.metric_selector.currentData()):
             return
         self._set_loading(False)
         if error:
@@ -363,7 +396,11 @@ class StorageView(qt.QWidget):
         if self._last_result == (root, result):
             return
         self._last_result = (root, result)
-        self.entries,self.nodes,node_totals,complete = result
+        self.entries,self.nodes,node_totals,complete = result[:4]
+        unknown = result[4] if len(result) > 4 else 0
+        label = 'Size on disk' if self.metric_selector.currentData() == 'disk_size' else 'Size'
+        self.results.headerItem().setText(1, label)
+        self.results.headerItem().setToolTip(1, self.metric_selector.currentText())
         self.map.set_items(self.entries)
         self.radial.root = root; self.radial.nodes = self.nodes; self.radial.totals = node_totals; self.radial.set_items(self.entries)
         self.radial.animate_navigation(self._navigation_zoom)
@@ -376,14 +413,16 @@ class StorageView(qt.QWidget):
             for path,size in items:
                 item = qt.QTreeWidgetItem([path.name,format_size(size),f'{100*size/total:.1f}%' if total else '0%'])
                 item.setData(0,qt.Qt.ItemDataRole.UserRole,path); item.setToolTip(0,str(path))
-                item.setToolTip(2, 'Share of the current folder total')
+                item.setToolTip(1, f'{label}: {format_size(size)}')
+                item.setToolTip(2, f'Share of the current folder total ({label.lower()})')
                 if parent is None: self.results.addTopLevelItem(item)
                 else: parent.addChild(item)
                 self._rows[path] = item
                 add_rows(self.nodes.get(path, ()), item)
         add_rows(self.entries)
         blocker.unblock()
-        self.summary.setText(f'{format_size(total)} · {len(self.entries):,} entries · '+
+        self.summary.setText(f'{label}: {format_size(total)} · {len(self.entries):,} entries · '+
+                             (f'Allocation unavailable for {unknown:,} files; total includes known allocations only. ' if unknown else '')+
                              ('Partial index; chart fills as indexing progresses.' if not complete else 'Double-click folders to explore.') +
                              (' · Four levels; up to 3,000 entries. Gaps may be omitted entries; zero-byte folders have no area.'
                               if self.charts.currentIndex() == 1 else '') +

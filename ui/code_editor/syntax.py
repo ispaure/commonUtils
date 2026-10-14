@@ -200,6 +200,7 @@ class SyntaxHighlighter(qt.QSyntaxHighlighter):
     def configure(self, language):
         self.language = language
         self.lexer = None
+        self.style = None
         self.formats.clear()
         self.states = {("root",): 0}
         self.reverse_states = {0: ("root",)}
@@ -229,7 +230,10 @@ class SyntaxHighlighter(qt.QSyntaxHighlighter):
                 self.editor.palette().color(qt.QPalette.ColorRole.Base).lightness()
                 < 128
             )
-            self.style = get_style_by_name("native" if dark else "default")
+            style = get_style_by_name("native" if dark else "default")
+            if style is self.style:
+                return
+            self.style = style
             self.formats.clear()
             self.rehighlight()
         except ImportError:

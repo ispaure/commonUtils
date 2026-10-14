@@ -71,6 +71,11 @@ schemas, live-instance locking, restoration and worker policy.
 
 ## Diff and merge review
 
+`diff_bands.DiffEdit.set_diff()` maps patch-line metadata to Qt document blocks,
+including embedded carriage returns and Unicode paragraph separators. Continuation
+blocks retain the line's diff color and leave old/new numbers blank. Blocks without
+metadata render without diff annotations, including during document changes.
+
 `DiffDialog` now uses resizable panes, syntax highlighting, linked scrolling,
 connecting change bands and per-hunk arrows. Apply callbacks may return the new
 buffer text to refresh the comparison immediately; callbacks returning `None`

@@ -71,7 +71,7 @@ class CodeEditorTests(QtTestCase):
         from commonUtils.ui.code_editor.diff_bands import DiffEdit
         editor = DiffEdit()
         self.addCleanup(editor.deleteLater)
-        rows = [SimpleNamespace(old='97', new='12345', kind=None)]
+        rows = [SimpleNamespace(text=' context', old='97', new='12345', kind=None)]
         editor.set_diff(SimpleNamespace(text=' context', lines=rows))
         editor.resize(500, 200); editor.show()
         for size in (10, 16, 24):

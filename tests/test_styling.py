@@ -15,6 +15,25 @@ from commonUtils.configuration.settings import settings_path
 
 
 class StylingTests(QtTestCase):
+    def test_palette_switch_does_not_rebind_controls_or_resolve_code_fonts_repeatedly(self):
+        from commonUtils.ui.appearance.theme import apply_theme
+        from commonUtils.ui.code_editor.widget import monospace_font
+        apply_styling(self.app)
+        button = qt.QPushButton('Bound once')
+        self.controller._bind_application_control(button)
+        with patch.object(self.controller, '_update', wraps=self.controller._update) as update:
+            for _ in range(20):
+                self.controller._bind_application_control(button)
+            update.assert_not_called()
+        self.controller._font_cache.clear()
+        with patch('commonUtils.ui.code_editor.widget.monospace_font', wraps=monospace_font) as resolve:
+            for _ in range(20):
+                self.controller.font('code')
+            resolve.assert_called_once()
+        controller = apply_theme(self.app, mode='light')
+        controller.set_mode('dark')
+        self.assertEqual(button.font().pointSizeF(), self.controller.font('ui').pointSizeF())
+
     def test_reference_sizes_keep_metrics_consistent_at_platform_font_resolutions(self):
         from commonUtils.ui.appearance.typography import setting_size
         reference = None
@@ -48,13 +67,13 @@ class StylingTests(QtTestCase):
             reading.setMarkdown('```python\nprint(1)\n```')
             configure_text(reading)
             style_document(reading.document(), reading.palette())
-            self.assertAlmostEqual(setting_size(panel.font_previews['code'].sample.font()), 8)
+            self.assertAlmostEqual(setting_size(panel.font_previews['code'].sample.font()), 9)
             editor.set_font_size(setting_size(editor.font()) + 1)
-            self.assertEqual(self.controller.code_font.size, 9)
-            self.assertAlmostEqual(setting_size(editor.font()), 9)
-            self.assertEqual(self.store.overrides()['Styling', 'code_font_size_int'], '9')
+            self.assertEqual(self.controller.code_font.size, 10)
+            self.assertAlmostEqual(setting_size(editor.font()), 10)
+            self.assertEqual(self.store.overrides()['Styling', 'code_font_size_int'], '10')
             self.assertFalse(editor.document().isModified())
-            self.assertAlmostEqual(reading.document().lastBlock().begin().fragment().charFormat().fontPointSize(), 12)
+            self.assertAlmostEqual(reading.document().lastBlock().begin().fragment().charFormat().fontPointSize(), 40 / 3)
             self.controller.code_font.set_size(80, save=False)
             self.assertAlmostEqual(setting_size(editor.font()), 24)
 
@@ -267,7 +286,7 @@ class StylingTests(QtTestCase):
         self.assertEqual(len(personal.fields), len(STYLE_FIELDS))
         self.assertEqual(personal.indicators[identity].text(), 'Override')
         personal.resets[identity].click()
-        self.assertEqual(personal.fields[identity].value(), 8)
+        self.assertEqual(personal.fields[identity].value(), 9)
         self.assertEqual(personal.indicators[identity].text(), 'Inherited')
         self.assertTrue(personal.save())
         self.assertNotIn(identity, self.store.overrides())

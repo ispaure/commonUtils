@@ -101,9 +101,13 @@ class FolderStats:
     complete: bool = True
     scanned_at: float = 0
     stale: bool = False
+    disk_size: int = 0
+    disk_unknown: int = 0
 
     def include(self, other):
         self.size += other.size
+        self.disk_size += other.disk_size
+        self.disk_unknown += other.disk_unknown
         self.files += other.files
         self.folders += other.folders + 1
         self.skipped += other.skipped

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from collections.abc import Sequence
 from pathlib import Path
 import os
+import stat
+from .allocation import allocated_size
 from time import time
 from ...runtime.operations import check_cancelled
 from ..traversal import natural_path_key
@@ -17,6 +19,7 @@ class Entry:
     modified_ns: int
     symlink: bool = False
     identity: tuple = ()
+    disk_size: int = -1
 
 
 @dataclass(frozen=True)
@@ -65,6 +68,8 @@ class Snapshot:
                 parent.include(stats.setdefault(entry.path, FolderStats(complete=self.complete, scanned_at=self.scanned_at)))
             else:
                 parent.size += entry.size; parent.files += 1
+                parent.disk_size += max(0, entry.disk_size)
+                parent.disk_unknown += entry.disk_size < 0
                 ext = entry.path.suffix.lower().lstrip('.')
                 parent.extension_counts[ext] = parent.extension_counts.get(ext, 0) + 1
         if children_of is not None:
@@ -83,11 +88,14 @@ class Snapshot:
                 matches.append(entry)
         return tuple(matches)
 
-    def storage_children(self, path, limit, *, cancelled=lambda: False):
+    def storage_children(self, path, limit, *, cancelled=lambda: False, metric='size'):
+        if metric not in ('size', 'disk_size'):
+            raise ValueError('Storage metric must be size or disk_size')
         if hasattr(self.entries, 'storage_children'):
-            return self.entries.storage_children(path, limit, cancelled=cancelled)
+            return self.entries.storage_children(path, limit, cancelled=cancelled, metric=metric)
         totals = self.folder_stats(cancelled=cancelled)
-        items = [(entry.path, entry.directory, totals[entry.path].size if entry.directory and entry.path in totals else entry.size)
+        items = [(entry.path, entry.directory, getattr(totals[entry.path], metric) if entry.directory and entry.path in totals
+                  else max(0, getattr(entry, metric)))
                  for entry in self.children(path) if not entry.symlink]
         check_cancelled(cancelled)
         return tuple(sorted(items, key=lambda item: (-item[2], item[0].name.casefold()))[:limit])
@@ -138,8 +146,9 @@ def scan_metadata(root, recursive=True, *, cancelled=lambda: False,
                         info = child.stat(follow_symlinks=False)
                         link = child.is_symlink() or path.is_junction()
                         directory = not link and child.is_dir(follow_symlinks=False)
+                        disk = 0 if directory or link else allocated_size(path, info)
                         entries.append(Entry(path, directory, 0 if directory or link else info.st_size,
-                                             info.st_mtime_ns, link, fingerprint(info)))
+                                             info.st_mtime_ns, link, entry_fingerprint(path, info, disk), disk))
                         if directory and recursive:
                             stack.append(path)
                         report(len(entries), 0, f'Scanning {folder}')
@@ -172,3 +181,10 @@ def storage_totals(snapshot, *, cancelled=lambda: False):
 
 def fingerprint(info):
     return info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def entry_fingerprint(path, info, disk_size=None):
+    identity = fingerprint(info)
+    if stat.S_ISREG(info.st_mode):
+        identity += (allocated_size(path, info) if disk_size is None else disk_size,)
+    return identity

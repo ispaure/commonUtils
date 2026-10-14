@@ -118,7 +118,7 @@ class DirectoryScan:
                 if completed and not refresh:
                     copy_entries(db, building, completed)
                     db.execute('INSERT INTO folders SELECT ?,path,parent,status,identity FROM folders WHERE generation=?', (building, completed))
-                    db.execute('INSERT INTO folder_totals SELECT ?,path,size,files,folders,skipped,extensions,complete,scanned_at FROM folder_totals WHERE generation=?',(building,completed))
+                    db.execute('INSERT INTO folder_totals SELECT ?,path,size,files,folders,skipped,extensions,complete,scanned_at,disk_size,disk_unknown FROM folder_totals WHERE generation=?',(building,completed))
                 else:
                     db.execute("INSERT INTO folders VALUES(?,?,?,'pending',NULL)", (building, str(root), ''))
                 db.execute('UPDATE roots SET building=? WHERE root=? AND recursive=?', (building, str(root), recursive))
