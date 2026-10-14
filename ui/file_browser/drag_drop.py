@@ -15,11 +15,12 @@ class FileDragDrop(qt.QObject):
         self.indicators = {}
         self.press = None
         browser = actions.browser
-        for view in (browser.tree, browser.views.tiles, browser.views.columns):
+        for view in browser.views.navigation_views:
             self.install(view)
-        browser.views.columns.column_created.connect(self.install)
-        for view in browser.views.columns.findChildren(qt.QListView):
-            self.install(view)
+        if browser.views.columns is not None:
+            browser.views.columns.column_created.connect(self.install)
+            for view in browser.views.columns.findChildren(qt.QListView):
+                self.install(view)
 
     def install(self, view):
         viewport = view.viewport()

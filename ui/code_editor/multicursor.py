@@ -106,11 +106,11 @@ class MultiCursorCommands:
     def paintEvent(self, event):
         super().paintEvent(event)
         if self.extra_cursors and self.hasFocus():
-            painter = qt.QPainter(self.viewport())
-            painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
-            for cursor in self.extra_cursors:
-                rect = self.cursorRect(cursor)
-                painter.drawLine(rect.topLeft(), rect.bottomLeft())
+            with qt.QPainter(self.viewport()) as painter:
+                painter.setPen(self.palette().color(qt.QPalette.ColorRole.Text))
+                for cursor in self.extra_cursors:
+                    rect = self.cursorRect(cursor)
+                    painter.drawLine(rect.topLeft(), rect.bottomLeft())
 
     def mousePressEvent(self, event):
         if event.button() == qt.Qt.MouseButton.LeftButton and event.modifiers() & qt.Qt.KeyboardModifier.AltModifier:

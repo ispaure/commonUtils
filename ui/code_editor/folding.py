@@ -241,15 +241,15 @@ class FoldingCommands:
         super().paintEvent(event)
         if not self.indent_guides:
             return
-        painter = qt.QPainter(self.viewport())
-        painter.setPen(self.palette().color(qt.QPalette.ColorRole.Mid))
-        block = self.firstVisibleBlock()
-        top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        while block.isValid() and top <= event.rect().bottom():
-            height = self.blockBoundingRect(block).height()
-            if block.isVisible():
-                offset = qt.QPointF(self.contentOffset().x(), top)
-                for segment in self._indent_guide_segments(block):
-                    painter.drawLine(segment.translated(offset))
-            top += height
-            block = block.next()
+        with qt.QPainter(self.viewport()) as painter:
+            painter.setPen(self.palette().color(qt.QPalette.ColorRole.Mid))
+            block = self.firstVisibleBlock()
+            top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+            while block.isValid() and top <= event.rect().bottom():
+                height = self.blockBoundingRect(block).height()
+                if block.isVisible():
+                    offset = qt.QPointF(self.contentOffset().x(), top)
+                    for segment in self._indent_guide_segments(block):
+                        painter.drawLine(segment.translated(offset))
+                top += height
+                block = block.next()
