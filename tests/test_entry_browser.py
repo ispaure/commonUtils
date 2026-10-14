@@ -25,7 +25,7 @@ def picture():
 
 
 class MemoryProvider:
-    root = Path('/virtual/collection')
+    root = Path('/virtual/collection').absolute()
     def __init__(self):
         self.reads = []
         self.data = picture()
