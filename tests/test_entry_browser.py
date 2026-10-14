@@ -32,7 +32,7 @@ class MemoryProvider:
 
     def relative(self, path):
         path = Path(path)
-        value = path.relative_to(self.root).as_posix() if path.is_absolute() else str(path)
+        value = path.relative_to(self.root).as_posix() if path.is_absolute() else path.as_posix()
         return '' if value == '.' else value
 
     def list(self, path='', *, cancelled=lambda: False):
