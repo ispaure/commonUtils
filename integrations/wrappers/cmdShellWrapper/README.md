@@ -130,3 +130,9 @@ For Windows-specific PowerShell execution, use the separate `powerShellWrapper.p
 `run_command(..., environment=mapping)` supplies a complete child environment without
 mutating the parent or including values in command arguments. `None` inherits the
 parent environment. The caller owns filtering and secret lifetime.
+
+`binary.run_bytes()` accepts bounded binary output and an optional `input_writer`
+callback. The callback receives a write-only, nonseekable binary stream. Archive
+writers therefore use streaming headers on every platform, including Windows
+pipes whose native seek operations can appear to succeed. The wrapper drains
+stderr without retaining it and applies cancellation and elapsed time limits.

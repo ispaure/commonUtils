@@ -1,8 +1,26 @@
 """Bounded, shell-free binary subprocess I/O with cooperative cancellation."""
+from io import RawIOBase
 import subprocess
 import threading
 import time
 from .process import get_process_group_kwargs, terminate_process_tree
+
+
+class _BinarySink(RawIOBase):
+    """A pipe is append-only, even when Windows reports a successful seek."""
+    def __init__(self, stream):
+        super().__init__()
+        self.stream = stream
+
+    def writable(self):
+        return True
+
+    def write(self, data):
+        return self.stream.write(data)
+
+    def flush(self):
+        if not self.stream.closed:
+            self.stream.flush()
 
 
 def run_bytes(arguments, *, environment=None, input_data=None, input_writer=None, max_output=1024 * 1024,
@@ -32,7 +50,7 @@ def run_bytes(arguments, *, environment=None, input_data=None, input_writer=None
     def write():
         try:
             if input_writer is not None:
-                input_writer(child.stdin)
+                input_writer(_BinarySink(child.stdin))
             else:
                 for offset in range(0, len(input_data), 65536):
                     child.stdin.write(input_data[offset:offset + 65536])
