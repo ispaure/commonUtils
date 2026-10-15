@@ -62,3 +62,14 @@ filters and naturally sorts loaded snapshots without storage access.
 `archive_source.LocalArchiveSource` provides revision-checked local ZIP streaming
 and bounded member reads without an overall archive-size limit. Formats and hosts
 choose buffer/header limits and retain domain validation.
+
+## Optional device-protected keys
+
+`protected_keys.AndroidKeys(alias_prefix=..., aad_prefix=...)` wraps 32-byte
+keys using AndroidKeyStore AES-GCM. `IOSKeys(service=..., label=...,
+label_prefix=...)` stores 32-byte keys in unlocked/device-only, non-synchronizing
+Keychain items. Native dependencies load only when constructing the relevant
+adapter. Missing/inaccessible keys raise `KeyStoreUnavailable`; no plaintext
+fallback is provided. Hosts own namespace constants, backup exclusions, metadata
+records and encrypted payloads. Changing a namespace/AAD string makes existing
+keys inaccessible; preserve those strings during consumer migrations.

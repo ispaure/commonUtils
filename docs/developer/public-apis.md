@@ -191,3 +191,6 @@ ZIP adapters. Format-specific metadata and publication policy remain host-owned.
 
 `filesystem.relocation.relocate_directory` provides verified non-overwriting
 relocation with link rebasing; hosts choose storage locations and migration timing.
+
+`runtime.protected_keys` supplies explicitly namespaced Android/iOS 256-bit key
+adapters; consumers own record formats and credential storage policy.
