@@ -12,6 +12,20 @@ class NativeDocumentsTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 await export_stream(None, name, lambda: BytesIO(b'data'))
 
+    async def test_window_disconnection_cancels_only_its_picker(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from commonUtils.ui.native.documents import cancel_document_picker
+        first = asyncio.get_running_loop().create_future()
+        other = asyncio.get_running_loop().create_future()
+        with patch('commonUtils.ui.native.documents._ios_pickers', {'first': (first,), 'other': (other,)}):
+            cancel_document_picker(SimpleNamespace(id='first'))
+            cancel_document_picker(SimpleNamespace(id='absent'))
+        self.assertTrue(first.cancelled())
+        self.assertFalse(other.done())
+        other.cancel()
+
     def test_failed_stream_preserves_original_and_cleans_stage(self):
         class Failing(BytesIO):
             def read(self, limit=-1):
