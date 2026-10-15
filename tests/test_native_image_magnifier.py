@@ -1,9 +1,18 @@
 """Lens image transforms and lifetime, without a UIKit runtime."""
 import sys
+import importlib.util
+from pathlib import Path
 import unittest
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
-from commonUtils.ui.native.image_canvas import apple_backend
+# Load the backend under an isolated name: the test models UIKit and does not
+# require Toga, which is intentionally absent from desktop regression installs.
+with patch.dict(sys.modules, {'toga': NS(ImageView=object)}):
+    spec = importlib.util.spec_from_file_location('native_magnifier_under_test',
+        Path(__file__).resolve().parents[1] / 'ui/native/image_canvas.py')
+    canvas = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(canvas)
+    apple_backend = canvas.apple_backend
 
 
 def rect(origin, size):
@@ -83,7 +92,7 @@ class AppleLensTests(unittest.TestCase):
 
 class AppleHoldLifecycleTests(unittest.TestCase):
     def test_release_cancel_pinch_and_detach_clear_the_lens(self):
-        from commonUtils.ui.native import image_canvas
+        image_canvas = canvas
         class Scroll:
             def __init_subclass__(cls, protocols=()):
                 pass
