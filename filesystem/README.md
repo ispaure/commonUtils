@@ -40,3 +40,13 @@ See [integration contracts](../docs/developer/contracts.md) for namespace and da
 ordinary file operations reject raw access to registered roots, including aliases
 and recursive ancestor operations. See the [provider contract](../ui/resource-providers.md)
 for registration, internal record grants and the scope of this safeguard.
+
+## Verified content snapshots
+
+`snapshots.file_revision(path)` returns device/inode/size/mtime-ns/ctime-ns.
+`verified_file_snapshot(path, cancelled=...)` returns that revision and SHA-256
+bytes, checking both descriptor and pathname before/after hashing. Callers choose
+link policy. `tree_content_state(root, cancelled=..., max_entries=10000)` rejects
+links/junctions, special files and hard-linked files and returns relative names
+with SHA-256 hex (None for directories). Each file is verified independently;
+the tree inventory is not a writer lock or atomic whole-tree snapshot.
