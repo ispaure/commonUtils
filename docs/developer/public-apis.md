@@ -170,3 +170,6 @@ sources and records untracked local native sources as dirty.
 
 `ui.native.event_loop.bind_cooperative_loop(loop)` supplies the optional Toga
 cooperative-dispatch context repair; it does not create or run an event loop.
+
+`ui.native.memory.MemoryPressure` supplies disposable native pressure/configuration
+notifications with host callbacks; see the native component lifecycle guide.

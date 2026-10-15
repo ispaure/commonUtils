@@ -67,3 +67,11 @@ imports; real iOS/Android checks cover containment, gestures, Back and layout.
 around Toga 0.5.7 Android cooperative dispatch, then restores the native caller's
 context. Repeated binding is idempotent; loops without `run_delayed_tasks` are
 unchanged. This imports asyncio only, without selecting a UI backend.
+
+## Memory and configuration notifications
+
+`memory.MemoryPressure(app, on_pressure=..., on_configuration=None)` subscribes
+to iOS memory warnings and Android component callbacks. Delivery uses the app's
+asyncio loop; bound callbacks are weakly held. `dispose()` unregisters listeners
+and suppresses already queued notifications. The host owns active-window guards,
+resource release and theme updates. Unsupported backends install no native hooks.
