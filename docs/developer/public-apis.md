@@ -173,3 +173,6 @@ cooperative-dispatch context repair; it does not create or run an event loop.
 
 `ui.native.memory.MemoryPressure` supplies disposable native pressure/configuration
 notifications with host callbacks; see the native component lifecycle guide.
+
+System document references use `runtime.document_access` adapters and explicitly
+imported `ui.native.documents` pickers/stream export; see native components.
