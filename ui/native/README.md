@@ -44,7 +44,7 @@ the recognizers' original enabled states; explicit Back buttons remain available
 
 ## Native image canvas
 
-`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, description=..., **kwargs)`
+`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, description=..., **kwargs)`
 extends Toga ImageView. It fits and centers an image, bounds zoom to 1–6, allows
 pan while zoomed, and emits left/right paging callbacks at fit scale. It does not
 load files, determine page order, decrypt content or save positions. Supply a
@@ -52,6 +52,13 @@ description appropriate to the consumer's content.
 Set `page_swipes_at_edges=True` to accept Apple paging swipes within the outer
 24 points too. The host must also reserve paging through `chrome.set_page_swipes`
 to prevent navigation pop gestures from competing; tap edge filtering is retained.
+
+Set `magnifier_enabled=True` to opt into the iOS/Android hold lens (off by
+default). Hold 400 ms, drag to move the 2.5× lens, release to dismiss. The lens
+reuses decoded image pixels in memory and suppresses tap/paging while active.
+A second finger cancels it. Disabling the property, replacing the image, resizing,
+detaching or disposing clears the overlay and pending hold. Hosts own eligibility
+such as fullscreen-only use; the canvas has no comic or fullscreen policy.
 
 Use `set_zoom(value)` and `fit_page()` for commands. `dispose()` clears image,
 callbacks and native gesture ownership before a page is permanently retired.
