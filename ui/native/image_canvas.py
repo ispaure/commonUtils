@@ -30,6 +30,26 @@ def apple_scroll_class():
                     self.owner.center_image()
 
             @objc_method
+            def scrollViewWillBeginZooming_withView_(self, scroll, view) -> None:
+                if self.owner is not None:
+                    self.owner.hold.enabled = False
+                    self.owner.hide_magnifier()
+
+            @objc_method
+            def scrollViewDidEndZooming_withView_atScale_(self, scroll, view, scale: float) -> None:
+                if self.owner is not None:
+                    self.owner.hold.enabled = self.owner.interface.magnifier_enabled
+
+            @objc_method
+            def gestureRecognizer_shouldRecognizeSimultaneouslyWithGestureRecognizer_(self, gesture, other) -> bool:
+                if self.owner is None:
+                    return False
+                # A second finger must still be able to start pinch zoom after
+                # the hold has won; the zoom delegate cancels the lens.
+                return ((gesture == self.owner.hold and other == self.pinchGestureRecognizer)
+                        or (other == self.owner.hold and gesture == self.pinchGestureRecognizer))
+
+            @objc_method
             def gestureRecognizerShouldBegin_(self, gesture) -> bool:
                 if self.owner is not None and gesture in self.owner.swipes:
                     return self.zoomScale <= 1.05
@@ -46,6 +66,23 @@ def apple_scroll_class():
                     return True
                 x = touch.locationInView(self).x
                 return 24 < x < self.bounds.size.width - 24
+
+            @objc_method
+            def magnify_(self, gesture) -> None:
+                if self.owner is not None:
+                    if gesture.state in (1, 2):  # began / changed
+                        self.owner.show_magnifier(gesture)
+                    else:
+                        self.owner.hide_magnifier()
+
+            @objc_method
+            def didMoveToWindow(self) -> None:
+                send_super(CommonUtilsImageScroll, self, 'didMoveToWindow')
+                window = self.window
+                if callable(window):
+                    window = window()
+                if self.owner is not None and window is None:
+                    self.owner.hide_magnifier()
 
             @objc_method
             def toggleControls_(self, gesture) -> None:
@@ -68,6 +105,7 @@ def apple_backend(interface):
             self.picture = ObjCClass('UIImageView').alloc().init()
             self.picture.contentMode = 1
             self.last_size = None
+            self.lens = self.lens_picture = None
             self.native = apple_scroll_class().alloc().init()
             self.native.owner = self
             self.native.delegate = self.native
@@ -94,9 +132,71 @@ def apple_backend(interface):
             self.native.addGestureRecognizer(self.tap)
             for gesture in self.swipes:
                 self.tap.requireGestureRecognizerToFail(gesture)
+            self.hold = ObjCClass('UILongPressGestureRecognizer').alloc().initWithTarget(self.native, action=SEL('magnify:'))
+            self.hold.delegate = self.native
+            self.hold.minimumPressDuration = .4
+            self.hold.allowableMovement = 10
+            self.hold.numberOfTouchesRequired = 1
+            self.hold.enabled = self.interface.magnifier_enabled
+            self.native.addGestureRecognizer(self.hold)
+            self.tap.requireGestureRecognizerToFail(self.hold)
+            self.native.panGestureRecognizer.requireGestureRecognizerToFail(self.hold)
             self.add_constraints()
 
+        def set_magnifier_enabled(self, enabled):
+            self.hold.enabled = enabled
+            if not enabled:
+                self.hide_magnifier()
+
+        def hide_magnifier(self):
+            if self.lens is not None:
+                self.lens_picture.image = None
+                self.lens.removeFromSuperview()
+                self.lens = self.lens_picture = None
+
+        def show_magnifier(self, gesture):
+            parent = self.native.superview
+            if callable(parent):
+                parent = parent()
+            if parent is None or self.picture.image is None or not self.interface.magnifier_enabled:
+                self.hide_magnifier()
+                return
+            source = gesture.locationInView(self.picture)
+            size = self.picture.bounds.size
+            if self.lens is None:
+                # Ignore holds in the letterbox, but allow an active lens to
+                # follow the thumb across page edges without changing gestures.
+                if not (0 <= source.x <= size.width and 0 <= source.y <= size.height):
+                    return
+                self.lens = ObjCClass('UIView').alloc().init()
+                self.lens.userInteractionEnabled = False
+                self.lens.clipsToBounds = True
+                self.lens.layer.cornerRadius = 24
+                self.lens.layer.borderWidth = 2
+                self.lens.layer.borderColor = ObjCClass('UIColor').whiteColor.CGColor
+                self.lens.backgroundColor = ObjCClass('UIColor').blackColor
+                self.lens_picture = ObjCClass('UIImageView').alloc().init()
+                self.lens_picture.image = self.picture.image
+                self.lens.addSubview(self.lens_picture)
+                parent.addSubview(self.lens)
+            # Convert through the native hierarchy: scroll offsets, fit margins
+            # and zoom are all included, and the lens itself never scrolls.
+            thumb = gesture.locationInView(parent)
+            rect = self.native.convertRect(self.native.bounds, toView=parent)
+            width, height = min(180, rect.size.width), min(140, rect.size.height)
+            x = max(rect.origin.x, min(thumb.x - width / 2, rect.origin.x + rect.size.width - width))
+            y = thumb.y - height - 36
+            if y < rect.origin.y:
+                y = thumb.y + 36
+            y = max(rect.origin.y, min(y, rect.origin.y + rect.size.height - height))
+            self.lens.frame = CGRect((x, y), (width, height))
+            scale = 2.5 * float(self.native.zoomScale)
+            sx, sy = max(0, min(source.x, size.width)), max(0, min(source.y, size.height))
+            self.lens_picture.frame = CGRect((width / 2 - sx * scale, height / 2 - sy * scale),
+                                              (size.width * scale, size.height * scale))
+
         def set_image(self, image):
+            self.hide_magnifier()
             self.native.setZoomScale(1, animated=False)
             self.picture.image = image._impl.native if image else None
             self.last_size = None
@@ -111,6 +211,7 @@ def apple_backend(interface):
             if key == self.last_size:
                 self.center_image()
                 return
+            self.hide_magnifier()
             self.last_size = key
             zoom = float(self.native.zoomScale)
             self.native.setZoomScale(1, animated=False)
@@ -151,6 +252,10 @@ def android_backend(interface):
                     owner.interface.toggle_controls()
             self.listener = Listener()
             self.native.setPageListener(self.listener)
+            self.native.setMagnifierEnabled(self.interface.magnifier_enabled)
+
+        def set_magnifier_enabled(self, enabled):
+            self.native.setMagnifierEnabled(enabled)
 
         def rehint(self):
             super().rehint()
@@ -159,7 +264,8 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
-    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+        self._magnifier_enabled = bool(magnifier_enabled)
         self.description = description
         self.page_swipes_at_edges = page_swipes_at_edges
         self.on_page = on_page
@@ -173,6 +279,17 @@ class ImageCanvas(toga.ImageView):
         if backend.startswith('toga_android.'):
             return android_backend(self)
         return super()._create()
+
+    @property
+    def magnifier_enabled(self):
+        return self._magnifier_enabled
+
+    @magnifier_enabled.setter
+    def magnifier_enabled(self, enabled):
+        self._magnifier_enabled = bool(enabled)
+        setter = getattr(self._impl, 'set_magnifier_enabled', None)
+        if setter is not None:
+            setter(self._magnifier_enabled)
 
     def page(self, direction):
         if self.on_page is not None and self.image is not None and self.zoom_scale <= 1.05:
@@ -207,6 +324,7 @@ class ImageCanvas(toga.ImageView):
 
     def dispose(self):
         """Retire callbacks and native gesture ownership before dropping a page."""
+        self.magnifier_enabled = False
         self.on_page = self.on_toggle = None
         self.image = None
         if hasattr(self._impl, 'picture'):
