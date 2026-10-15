@@ -179,3 +179,6 @@ imported `ui.native.documents` pickers/stream export; see native components.
 
 `ui.native.menus.NativeMenu` and `ui.native.presentation` expose native presentation
 mechanics. Hosts supply guarded invocation, activity context and fallback commands.
+
+`ui.native.editor_search.EditorSearch` binds explicit Toga editor/container widgets
+without a consumer controller; hosts notify it of text changes.

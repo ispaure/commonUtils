@@ -87,6 +87,32 @@ assert canvas.on_page is None and canvas.on_toggle is None
 host.activate('notes')
 assert routes.body().children[0] is draft
 host.dispose()
+from commonUtils.ui.native.editor_search import EditorSearch
+from toga.style import Pack
+from toga.style.pack import COLUMN
+editor = toga.MultilineTextInput(value='😀 Cat cat')
+container = toga.Box(children=[editor], style=Pack(direction=COLUMN))
+search = EditorSearch(editor, container)
+search.query.value = 'cat'
+search.find()
+assert search.span == (2, 5)
+search.find()
+assert search.span == (6, 9)
+search.find()
+assert search.span == (2, 5)
+search.find(backwards=True)
+assert search.span == (6, 9)
+search.case.value = True
+search.changed()
+search.find()
+assert search.span == (6, 9)
+search.replacement.value = r'\1'
+search.replace_all()
+assert editor.value == '😀 Cat ' + r'\1'
+search.toggle()
+assert search.box in container.children
+search.toggle()
+assert search.box not in container.children
 assert not any(name.startswith('logisticsmobile') for name in sys.modules)
 '''
         self.run_isolated(script, dummy=True)
