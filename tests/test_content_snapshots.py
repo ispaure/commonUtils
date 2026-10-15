@@ -31,6 +31,21 @@ class ContentSnapshots(unittest.TestCase):
             with patch('commonUtils.filesystem.snapshots.stream_signature', side_effect=changing):
                 with self.assertRaisesRegex(ValueError, 'changed'): verified_file_snapshot(path)
 
+    def test_path_and_descriptor_ctimes_need_not_have_the_same_meaning(self):
+        from types import SimpleNamespace
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'file'
+            path.write_bytes(b'payload')
+            info = path.stat()
+            fields = dict(st_dev=info.st_dev, st_ino=info.st_ino, st_size=info.st_size,
+                          st_mtime_ns=info.st_mtime_ns, st_ctime_ns=info.st_ctime_ns + 123456789)
+            descriptor = SimpleNamespace(**fields)
+            with patch('commonUtils.filesystem.snapshots.os.fstat', return_value=descriptor):
+                self.assertEqual(verified_file_snapshot(path)[1], sha256(b'payload').digest())
+            changed = SimpleNamespace(**(fields | {'st_ctime_ns': fields['st_ctime_ns'] + 1}))
+            with patch('commonUtils.filesystem.snapshots.os.fstat', side_effect=[descriptor, changed]):
+                with self.assertRaisesRegex(ValueError, 'changed'): verified_file_snapshot(path)
+
     def test_hard_links_are_rejected(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

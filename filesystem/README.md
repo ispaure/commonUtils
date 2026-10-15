@@ -60,3 +60,8 @@ links retain their targets; internal links rebase onto the relocated tree.
 Hard-linked/special files are rejected during copy verification. A linked root is
 relocated as a link. Cleanup after publication may fail with both copies retained;
 callers own recovery and migration decisions.
+
+File snapshots compare pathname and descriptor identity/size/mtime across APIs,
+then compare each full revision before/after reading. Windows can report creation
+time through pathname `stat` and change time through `fstat`; their ctime fields
+are not compared to one another. Both still participate in their own stability checks.
