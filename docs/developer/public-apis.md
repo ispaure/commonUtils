@@ -177,6 +177,8 @@ for callback, revision, bounded-cache and shutdown requirements.
 `ui.native.navigation.NativeNavigationHost`, `ui.native.routes.Routes`, and
 `ui.native.image_canvas.ImageCanvas` supply explicitly imported Toga/native
 presentation. Consumers own destinations, document policy and resource lifetimes.
+`host.chrome.set_page_swipes(active, navigation=None)` reserves Apple horizontal
+gestures for a visible reader; see the [native component contract](../../ui/native/README.md).
 
 | Need | Explicit native module / entry point |
 | --- | --- |

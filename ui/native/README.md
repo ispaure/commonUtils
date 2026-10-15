@@ -27,15 +27,28 @@ Install/uninstall routes with their host to register/remove native Back delegate
 `host.chrome.set_hidden(hidden, navigation=None)` hides native bars and restores
 their previous visibility. A consumer with a custom split/detail controller can
 supply that navigation controller explicitly. Screen changes must reconcile
-visibility. `chrome.restore()` runs during host uninstallation.
+visibility. On Android, hidden mode also hides system status/navigation bars with
+`WindowInsetsControllerCompat` and allows temporary edge-swipe revelation. It
+snapshots each bar's original visibility and system-bar behavior once per hidden
+context and restores them on exit. Insets are reapplied so host content can use
+the newly available viewport. `chrome.restore()` runs during host uninstallation.
+
+`host.chrome.set_page_swipes(active, navigation=None)` reserves horizontal reader
+gestures by disabling the Apple navigation controller's edge and, when available,
+content-pop recognizers. Hosts reconcile it on screen changes independently of
+bar visibility. Leaving the reader, changing controllers or uninstalling restores
+the recognizers' original enabled states; explicit Back buttons remain available.
 
 ## Native image canvas
 
-`ImageCanvas(image=None, on_page=None, on_toggle=None, description=..., **kwargs)`
+`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, description=..., **kwargs)`
 extends Toga ImageView. It fits and centers an image, bounds zoom to 1–6, allows
 pan while zoomed, and emits left/right paging callbacks at fit scale. It does not
 load files, determine page order, decrypt content or save positions. Supply a
 description appropriate to the consumer's content.
+Set `page_swipes_at_edges=True` to accept Apple paging swipes within the outer
+24 points too. The host must also reserve paging through `chrome.set_page_swipes`
+to prevent navigation pop gestures from competing; tap edge filtering is retained.
 
 Use `set_zoom(value)` and `fit_page()` for commands. `dispose()` clears image,
 callbacks and native gesture ownership before a page is permanently retired.

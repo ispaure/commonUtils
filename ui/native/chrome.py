@@ -6,8 +6,38 @@ class NavigationChrome:
         self.host = host
         self.restore_callbacks = []
         self.context = None
+        self.page_navigation = None
+        self.page_gestures = []
+
+    def restore_page_swipes(self):
+        for gesture, enabled in self.page_gestures:
+            gesture.setEnabled(enabled)
+        self.page_gestures.clear()
+        self.page_navigation = None
+
+    def set_page_swipes(self, active, *, navigation=None):
+        """Reserve horizontal gestures for reader paging, independently of bars."""
+        adapter = self.host.adapter
+        if adapter is None or not hasattr(adapter, 'navigation'):
+            self.restore_page_swipes()
+            return
+        navigation = navigation or adapter.navigation[self.host.destinations.index(self.host.state.destination)]
+        if not active or navigation != self.page_navigation:
+            self.restore_page_swipes()
+        if not active:
+            return
+        from rubicon.objc import SEL
+        self.page_navigation = navigation
+        for name in ('interactivePopGestureRecognizer', 'interactiveContentPopGestureRecognizer'):
+            if navigation.respondsToSelector(SEL(name)):
+                gesture = getattr(navigation, name)
+                if gesture is not None:
+                    if not any(saved == gesture for saved, _ in self.page_gestures):
+                        self.page_gestures.append((gesture, bool(gesture.isEnabled())))
+                    gesture.setEnabled(False)
 
     def restore(self):
+        self.restore_page_swipes()
         for callback in reversed(self.restore_callbacks):
             callback()
         self.restore_callbacks.clear()
@@ -57,3 +87,29 @@ class NavigationChrome:
                 if capture:
                     self.restore_callbacks.append(lambda: title.show() if visible else title.hide())
                 title.hide()
+
+            # Hiding application bars alone leaves Android's status/navigation
+            # insets consuming the reading viewport. Use immersive system bars
+            # and restore each original visibility bit when leaving this route.
+            from java import jclass
+            WindowCompat = jclass('androidx.core.view.WindowCompat')
+            ViewCompat = jclass('androidx.core.view.ViewCompat')
+            Types = jclass('androidx.core.view.WindowInsetsCompat$Type')
+            Controller = jclass('androidx.core.view.WindowInsetsControllerCompat')
+            window = adapter.impl._native_activity.getWindow()
+            decor = window.getDecorView()
+            controller = WindowCompat.getInsetsController(window, decor)
+            if capture:
+                insets = ViewCompat.getRootWindowInsets(decor)
+                states = [(kind, bool(insets.isVisible(kind)) if insets is not None else True)
+                          for kind in (Types.statusBars(), Types.navigationBars())]
+                behavior = controller.getSystemBarsBehavior()
+                def restore_system_bars():
+                    controller.setSystemBarsBehavior(behavior)
+                    for kind, visible in states:
+                        controller.show(kind) if visible else controller.hide(kind)
+                    ViewCompat.requestApplyInsets(decor)
+                self.restore_callbacks.append(restore_system_bars)
+            controller.setSystemBarsBehavior(Controller.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE)
+            controller.hide(Types.systemBars())
+            ViewCompat.requestApplyInsets(decor)

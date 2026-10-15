@@ -328,7 +328,10 @@ creates a native Toga component. Hosts publish prepared BrowseTree snapshots via
 both native and Qt models. Arbitrary identities/properties remain available through
 `set_tree`, without treating JSON/archive identities as disk paths.
 
-List and Tiles retain selection and page through 24/16 entries respectively.
+List and Tiles retain selection and page through 24/16 entries respectively by
+default. Hosts can override the `page_size` property to bound a larger scrolling
+listing. Generic folders use a text glyph with no image load. Image widgets are
+created only for files with a thumbnail loader or cached thumbnail.
 Thumbnail workers receive `(row_payload, pixel_size, cancelled)` and return encoded
 image bytes; rich details receive `(row_payload, cancelled)` and return label/value
 pairs. Generic Name/Type/Size/Modified fields appear immediately below entries.
