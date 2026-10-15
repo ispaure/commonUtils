@@ -185,3 +185,6 @@ without a consumer controller; hosts notify it of text changes.
 
 `filesystem.snapshots` supplies revision-verified file hashes and bounded tree
 content inventories; persisted job formats and conflict policy belong to callers.
+
+`archives.rebuilding` shares manifests and selected-member replacement across open
+ZIP adapters. Format-specific metadata and publication policy remain host-owned.

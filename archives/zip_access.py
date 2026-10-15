@@ -138,24 +138,8 @@ def archive_manifest(path, *, password=None, cancelled=lambda: False, progress=N
     """Authenticate every entry and compare decrypted bytes independently of CRCs."""
     with open_archive(path, password=password) as archive:
         validate_members(archive)
-        result = {}
-        done = 0
-        total = sum(info.file_size for info in archive.infolist())
-        for info in archive.infolist():
-            check_cancelled(cancelled)
-            def advanced(size):
-                nonlocal done
-                done += size
-                if progress:
-                    progress(done, total, f'Verifying {info.filename}')
-            if info.is_dir():
-                with archive.open(info) as stream:
-                    stream_signature(stream, cancelled=cancelled, progress=advanced)
-                result[info.filename] = None
-            else:
-                with archive.open(info) as stream:
-                    result[info.filename] = stream_signature(stream, cancelled=cancelled, progress=advanced)
-        return result
+        from .rebuilding import content_manifest
+        return content_manifest(archive, cancelled=cancelled, progress=progress)
 
 
 def copy_member_info(member, target):
