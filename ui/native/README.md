@@ -102,3 +102,11 @@ native callbacks and rejects stale actions. Hosts retain the menu with its view.
 `presentation` supplies `surface`, `list_button`, `template_icon` and
 `scroll_content`: optional native colour/tint/row behavior and fresh scroll parenting
 for the pinned Toga layout engine. They do not choose destinations or document policy.
+
+## Native text search
+
+`editor_search.EditorSearch(editor, container, insertion_index=1)` supplies literal
+Find/Replace, case matching, wrapping and native UTF-16 selection for a Toga text
+input. `toggle()` inserts/removes its panel. Call `changed()` when editor text
+changes to invalidate the retained match. The host owns drafts, session guards,
+read-only policy and saving. No Qt search widget is imported.
