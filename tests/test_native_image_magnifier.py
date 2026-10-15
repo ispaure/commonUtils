@@ -37,14 +37,18 @@ class AppleLensTests(unittest.TestCase):
         self.modules = patch.dict(sys.modules, {
             'toga_iOS.widgets.imageview': NS(ImageView=ImageView),
             'rubicon.objc': NS(ObjCClass=objc_class, CGRect=rect, CGSize=Mock(),
-                               CGPoint=Mock(), UIEdgeInsets=Mock(), SEL=lambda x: x),
+                               CGPoint=lambda x, y: NS(x=x, y=y), UIEdgeInsets=Mock(), SEL=lambda x: x),
         })
         self.modules.start()
         self.addCleanup(self.modules.stop)
         self.backend = apple_backend(NS(magnifier_enabled=True))
         self.backend.lens = self.backend.lens_picture = None
-        self.backend.picture = NS(image=object(), bounds=rect((0, 0), (200, 300)))
+        # Model a panned/zoomed page with its origin at (20, 100) in the parent.
+        self.backend.picture = NS(image=object(), bounds=rect((0, 0), (200, 300)),
+            convertPoint=Mock(side_effect=lambda point, **kw: NS(
+                x=(point.x - 20) / 2, y=(point.y - 100) / 2)))
         self.backend.native = Mock(zoomScale=2)
+        self.backend.native.superview = NS(addSubview=Mock())
         self.backend.native.convertRect.return_value = rect((0, 0), (400, 800))
         self.backend.hold = NS(enabled=True)
 
@@ -52,19 +56,31 @@ class AppleLensTests(unittest.TestCase):
         return NS(locationInView=lambda target: NS(x=image_x, y=image_y)
                   if target is self.backend.picture else NS(x=thumb_x, y=thumb_y))
 
-    def test_uses_original_pixels_and_image_coordinates_at_current_zoom(self):
+    def test_uses_original_pixels_beneath_lens_center_at_current_zoom(self):
         backend = self.backend
         backend.show_magnifier(self.gesture())
         self.assertIs(backend.lens_picture.image, backend.picture.image)
         frame = backend.lens_picture.frame
         self.assertEqual((frame.size.width, frame.size.height), (1000, 1500))
-        self.assertEqual((frame.origin.x, frame.origin.y), (-110, -230))
+        self.assertEqual((frame.origin.x, frame.origin.y), (-110, -415))
+        point = backend.picture.convertPoint.call_args.args[0]
+        self.assertEqual((point.x, point.y), (100, 294))
+        self.assertIs(backend.picture.convertPoint.call_args.kwargs['fromView'], backend.native.superview)
         self.assertEqual(backend.lens.frame.origin.y, 224)
         # Moving keeps the same image and overlay, and clamps to the viewport.
         lens = backend.lens
         backend.show_magnifier(self.gesture(thumb_x=399, thumb_y=10))
         self.assertIs(backend.lens, lens)
         self.assertEqual((lens.frame.origin.x, lens.frame.origin.y), (220, 46))
+        frame = backend.lens_picture.frame
+        self.assertEqual((frame.origin.x, frame.origin.y), (-635, 30))
+
+    def test_lens_over_letterbox_does_not_shift_sample_to_page_edge(self):
+        backend = self.backend
+        backend.show_magnifier(self.gesture(thumb_y=180))
+        self.assertEqual(backend.lens.frame.origin.y, 4)
+        # The center is above the page; preserve that blank margin in the lens.
+        self.assertEqual(backend.lens_picture.frame.origin.y, 135)
 
     def test_ignores_initial_letterbox_hold_and_clears_pixels_when_disabled(self):
         backend = self.backend

@@ -190,9 +190,11 @@ def apple_backend(interface):
                 y = thumb.y + 36
             y = max(rect.origin.y, min(y, rect.origin.y + rect.size.height - height))
             self.lens.frame = CGRect((x, y), (width, height))
+            # Sample the page beneath the positioned lens, including its edge
+            # clamping, rather than the separate thumb position.
+            source = self.picture.convertPoint(CGPoint(x + width / 2, y + height / 2), fromView=parent)
             scale = 2.5 * float(self.native.zoomScale)
-            sx, sy = max(0, min(source.x, size.width)), max(0, min(source.y, size.height))
-            self.lens_picture.frame = CGRect((width / 2 - sx * scale, height / 2 - sy * scale),
+            self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
                                               (size.width * scale, size.height * scale))
 
         def set_image(self, image):

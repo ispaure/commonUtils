@@ -12,6 +12,10 @@ Readers can reserve horizontal swipes, including screen-edge swipes, for paging.
 In those readers, use the application's Back button to leave the screen. Dragging
 a zoomed image continues to pan; fit the image before swiping to another page.
 
+When the application enables the magnifying bubble, hold the image briefly,
+then drag to move the bubble. It enlarges the image beneath the bubble’s center,
+above your finger. Release to dismiss it; a second finger cancels it for pinch zoom.
+
 Applications can also use system document pickers. Opening a document grants
 scoped access while it is being imported; the application chooses where to keep
 its copy. Export asks you to choose a destination. Cancelling leaves the original
