@@ -60,3 +60,10 @@ with every Toga version. Host tests cover consumer independence and portable
 imports; real iOS/Android checks cover containment, gestures, Back and layout.
 
 [Shared UI guide](../README.md)
+
+## Cooperative event loops
+
+`event_loop.bind_cooperative_loop(loop)` restores the owned running-loop context
+around Toga 0.5.7 Android cooperative dispatch, then restores the native caller's
+context. Repeated binding is idempotent; loops without `run_delayed_tasks` are
+unchanged. This imports asyncio only, without selecting a UI backend.

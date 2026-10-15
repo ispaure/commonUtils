@@ -167,3 +167,6 @@ presentation. Consumers own destinations, document policy and resource lifetimes
 See [native components](../../ui/native/README.md) for lifecycle, callbacks and
 Android bridge packaging. `tools.mobile_ci.stage` includes their Python/Java
 sources and records untracked local native sources as dirty.
+
+`ui.native.event_loop.bind_cooperative_loop(loop)` supplies the optional Toga
+cooperative-dispatch context repair; it does not create or run an event loop.
