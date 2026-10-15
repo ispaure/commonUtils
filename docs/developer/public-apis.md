@@ -40,6 +40,11 @@ transfers and rename plans.
 `storage_children(..., metric='size'|'disk_size')` selects the ranking measure while
 retaining logical size as the API default. See [index contracts](../../filesystem/index/README.md).
 
+`filesystem.snapshots` supplies revision-verified file hashes and bounded tree
+content inventories. `filesystem.relocation.relocate_directory` supplies verified,
+non-overwriting relocation with link rebasing. Persisted schemas, migration timing
+and conflict policy belong to callers. See [filesystem](../../filesystem/README.md).
+
 ## Formats, settings and persistence
 
 | Need | Entry point / contract |
@@ -60,6 +65,10 @@ See [formats](../../formats/README.md), [configuration](../../configuration/READ
 and [persistence](../../persistence/README.md). Conflict checks are not locks;
 coordinate concurrent writers. Do not equate an INI editor's type validation with
 application domain validation.
+
+`archives.rebuilding` supplies manifests and selected-member replacement across
+open ZIP adapters. Hosts own format-specific metadata and publication policy.
+See [archives](../../archives/README.md).
 
 ## Index data
 
@@ -109,6 +118,10 @@ or headless flows where dialogs are inappropriate.
 [Application update contracts](../../runtime/updates/README.md) cover exact GitHub
 branch commits and published releases, protected Git/archive transactions,
 rollback receipts and detached apply/restart. Hosts own update policy and UI.
+
+`runtime.protected_keys` supplies explicitly namespaced Android/iOS 256-bit key
+adapters. Consumers own credential records, backup exclusions and key namespaces.
+See [runtime](../../runtime/README.md).
 
 ## UI entry points
 
@@ -164,33 +177,17 @@ for callback, revision, bounded-cache and shutdown requirements.
 `ui.native.navigation.NativeNavigationHost`, `ui.native.routes.Routes`, and
 `ui.native.image_canvas.ImageCanvas` supply explicitly imported Toga/native
 presentation. Consumers own destinations, document policy and resource lifetimes.
+
+| Need | Explicit native module / entry point |
+| --- | --- |
+| Cooperative dispatch context repair | `event_loop.bind_cooperative_loop(loop)`; no loop creation |
+| Disposable pressure/configuration notifications | `memory.MemoryPressure`; host callbacks choose effects |
+| System document selection / stream export | `documents.pick_document`, `export_stream`, `cancel_document_picker` |
+| Scoped native document byte access | `runtime.document_access`; no retained permission/bookmark |
+| Native action menus | `menus.NativeMenu`; host supplies guarded invocation/context/fallback |
+| Optional native row/tint/layout mechanics | `presentation` |
+| Literal Find/Replace | `editor_search.EditorSearch(editor, container)`; host notifies text changes |
+
 See [native components](../../ui/native/README.md) for lifecycle, callbacks and
 Android bridge packaging. `tools.mobile_ci.stage` includes their Python/Java
 sources and records untracked local native sources as dirty.
-
-`ui.native.event_loop.bind_cooperative_loop(loop)` supplies the optional Toga
-cooperative-dispatch context repair; it does not create or run an event loop.
-
-`ui.native.memory.MemoryPressure` supplies disposable native pressure/configuration
-notifications with host callbacks; see the native component lifecycle guide.
-
-System document references use `runtime.document_access` adapters and explicitly
-imported `ui.native.documents` pickers/stream export; see native components.
-
-`ui.native.menus.NativeMenu` and `ui.native.presentation` expose native presentation
-mechanics. Hosts supply guarded invocation, activity context and fallback commands.
-
-`ui.native.editor_search.EditorSearch` binds explicit Toga editor/container widgets
-without a consumer controller; hosts notify it of text changes.
-
-`filesystem.snapshots` supplies revision-verified file hashes and bounded tree
-content inventories; persisted job formats and conflict policy belong to callers.
-
-`archives.rebuilding` shares manifests and selected-member replacement across open
-ZIP adapters. Format-specific metadata and publication policy remain host-owned.
-
-`filesystem.relocation.relocate_directory` provides verified non-overwriting
-relocation with link rebasing; hosts choose storage locations and migration timing.
-
-`runtime.protected_keys` supplies explicitly namespaced Android/iOS 256-bit key
-adapters; consumers own record formats and credential storage policy.
