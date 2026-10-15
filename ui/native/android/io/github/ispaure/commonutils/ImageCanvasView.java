@@ -67,7 +67,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         canvas.drawColor(Color.BLACK);
         canvas.translate(rect.centerX(), rect.centerY());
         canvas.scale(2.5f, 2.5f);
-        canvas.translate(-lastX+getPaddingLeft(), -lastY+getPaddingTop());
+        // Magnify the page beneath the lens center after viewport clamping.
+        canvas.translate(-rect.centerX()+getPaddingLeft(), -rect.centerY()+getPaddingTop());
         canvas.concat(matrix);
         // Reuse original decoded pixels, rather than enlarging a screenshot.
         getDrawable().draw(canvas);
