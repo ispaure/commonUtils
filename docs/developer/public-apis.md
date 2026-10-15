@@ -182,3 +182,6 @@ mechanics. Hosts supply guarded invocation, activity context and fallback comman
 
 `ui.native.editor_search.EditorSearch` binds explicit Toga editor/container widgets
 without a consumer controller; hosts notify it of text changes.
+
+`filesystem.snapshots` supplies revision-verified file hashes and bounded tree
+content inventories; persisted job formats and conflict policy belong to callers.
