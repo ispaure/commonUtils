@@ -211,13 +211,18 @@ class NativeBrowser:
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
 
+    @property
+    def page_size(self):
+        """Maximum widgets per page; hosts can choose a larger scrolling list."""
+        return 16 if self.mode == 'Tiles' else 24
+
     def render(self):
         if self.closed:
             return
         self._cancel()
         clear_box(self.items)
         self.buttons.clear()
-        count = 16 if self.mode == 'Tiles' else 24
+        count = self.page_size
         entries = self.entries
         pages = max(1, (len(entries) + count - 1) // count)
         self.page = min(self.page, pages - 1)
@@ -226,9 +231,13 @@ class NativeBrowser:
         visible = entries[self.page * count:(self.page + 1) * count]
         row = None
         for index, entry in enumerate(visible):
-            image = toga.ImageView(style=Pack(width=96 if self.mode == 'Tiles' else 36, height=96 if self.mode == 'Tiles' else 36))
             key = entry.identity, entry.revision
-            if key in self.icons:
+            # Generic folders use the platform's text glyph. Do not allocate
+            # an empty native image widget when no preview can be displayed.
+            image = (toga.ImageView(style=Pack(width=96 if self.mode == 'Tiles' else 36,
+                                             height=96 if self.mode == 'Tiles' else 36))
+                     if not entry.container and (self.thumbnail or key in self.icons) else None)
+            if image is not None and key in self.icons:
                 image.image = toga.Image(src=self.icons[key])
                 self.icons.move_to_end(key)
             button = toga.Button(('📁 ' if entry.container else '') + entry.label,
@@ -240,9 +249,9 @@ class NativeBrowser:
                 if index % 2 == 0:
                     row = toga.Box(style=Pack(direction=ROW))
                     self.items.add(row)
-                row.add(toga.Box(children=[image, button], style=Pack(direction=COLUMN, flex=1, margin=4)))
+                row.add(toga.Box(children=([image] if image is not None else []) + [button], style=Pack(direction=COLUMN, flex=1, margin=4)))
             else:
-                self.items.add(toga.Box(children=[image, button], style=Pack(direction=ROW, margin_bottom=3)))
+                self.items.add(toga.Box(children=([image] if image is not None else []) + [button], style=Pack(direction=ROW, margin_bottom=3)))
             if self.thumbnail and not entry.container and key not in self.icons:
                 self._spawn(self._load_thumbnail(entry, image, self.epoch, self.cancelled))
         if not visible:

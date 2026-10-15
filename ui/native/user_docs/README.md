@@ -8,6 +8,9 @@ For images, pinch to zoom and drag to pan. At fit size, horizontal swipes ask th
 application to change images. Tap asks the application to show or hide controls.
 Fit returns to the centered image. The application owns image order, reading
 direction and whether paging is available.
+Readers can reserve horizontal swipes, including screen-edge swipes, for paging.
+In those readers, use the application's Back button to leave the screen. Dragging
+a zoomed image continues to pan; fit the image before swiping to another page.
 
 Applications can also use system document pickers. Opening a document grants
 scoped access while it is being imported; the application chooses where to keep

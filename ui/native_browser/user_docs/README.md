@@ -4,6 +4,7 @@ Choose **List** for compact rows or **Tiles** for larger cover images. **Previou
 and **Next** show the next page of items. Select an entry to see file information
 below the list, including available format metadata. Hosts may omit this information
 for an Open/Save picker and supply their own folder and Open buttons.
+The host application determines how many items fit on one scrolling page.
 
 Covers load in the background. Missing or locked covers leave names selectable;
 view changes and closing stop obsolete work. Thumbnails stay in memory.

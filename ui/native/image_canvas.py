@@ -42,6 +42,8 @@ def apple_scroll_class():
                     return False
                 if gesture not in self.owner.swipes and gesture != self.owner.tap:
                     return True
+                if gesture in self.owner.swipes and self.owner.interface.page_swipes_at_edges:
+                    return True
                 x = touch.locationInView(self).x
                 return 24 < x < self.bounds.size.width - 24
 
@@ -157,8 +159,9 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
-    def __init__(self, *args, on_page=None, on_toggle=None, description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
         self.description = description
+        self.page_swipes_at_edges = page_swipes_at_edges
         self.on_page = on_page
         self.on_toggle = on_toggle
         super().__init__(*args, **kwargs)
