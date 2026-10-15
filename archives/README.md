@@ -120,3 +120,14 @@ Plain ZIP access through `zip_access` uses the standard library without importin
 pyzipper. Encrypted ZIP access loads pyzipper on demand and raises an explanatory
 RuntimeError if it is absent. This allows unencrypted EPUB/CBZ container I/O in
 portable code; rendering and mobile deployment are separate concerns.
+
+## Open-adapter rebuilding
+
+`rebuilding.content_manifest(archive)` hashes open archive adapters, using an
+explicit native `content_manifest` shortcut when available. `patched_manifest`
+accepts replacement-name/bytes mappings. `rewrite_members(original, output,
+replacements, first=(), stored=(), max_member_bytes=None, cancelled=...)` streams
+unchanged members, preserves comments/portable member attributes and returns
+expected content hashes. Hosts validate inputs, configure encryption, verify the
+finished output and publish it. Entry ordering and compression overrides are explicit
+names; this layer contains no EPUB/comic rules.
