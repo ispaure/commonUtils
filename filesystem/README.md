@@ -50,3 +50,13 @@ link policy. `tree_content_state(root, cancelled=..., max_entries=10000)` reject
 links/junctions, special files and hard-linked files and returns relative names
 with SHA-256 hex (None for directories). Each file is verified independently;
 the tree inventory is not a writer lock or atomic whole-tree snapshot.
+
+## Directory relocation
+
+`relocation.relocate_directory(source, destination)` never merges/replaces an
+existing destination. It attempts an exclusive rename, otherwise stages a verified
+copy and removes the unchanged source only after publication. Relative external
+links retain their targets; internal links rebase onto the relocated tree.
+Hard-linked/special files are rejected during copy verification. A linked root is
+relocated as a link. Cleanup after publication may fail with both copies retained;
+callers own recovery and migration decisions.

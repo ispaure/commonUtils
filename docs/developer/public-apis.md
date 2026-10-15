@@ -188,3 +188,6 @@ content inventories; persisted job formats and conflict policy belong to callers
 
 `archives.rebuilding` shares manifests and selected-member replacement across open
 ZIP adapters. Format-specific metadata and publication policy remain host-owned.
+
+`filesystem.relocation.relocate_directory` provides verified non-overwriting
+relocation with link rebasing; hosts choose storage locations and migration timing.
