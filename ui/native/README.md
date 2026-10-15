@@ -90,3 +90,15 @@ names. The host supplies MIME type, limits and content policy. Android output
 closes on failure; iOS stages in app data and removes staging after picker completion
 or cancellation. Local exports stage before replacement and retain the old file on
 copy failure. Native providers determine their own publication guarantees.
+
+## Menus and presentation
+
+`menus.NativeMenu(button, actions, invoke=..., context=..., fallback=...)` builds
+Apple primary-action menus or Android anchored popups. Actions are `(title, callback)`
+pairs; `invoke(callback)` performs host guards/scheduling. `context()` supplies the
+Android activity and `fallback()` supplies other-backend UI. `dispose()` detaches
+native callbacks and rejects stale actions. Hosts retain the menu with its view.
+
+`presentation` supplies `surface`, `list_button`, `template_icon` and
+`scroll_content`: optional native colour/tint/row behavior and fresh scroll parenting
+for the pinned Toga layout engine. They do not choose destinations or document policy.
