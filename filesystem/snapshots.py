@@ -23,10 +23,13 @@ def verified_file_snapshot(path, *, cancelled=lambda: False):
     path = Path(path)
     before = file_revision(path)
     with path.open('rb') as stream:
-        if _revision(os.fstat(stream.fileno())) != before:
+        opened = _revision(os.fstat(stream.fileno()))
+        # Windows stat() and fstat() can give ctime different meanings.
+        # Compare content/identity across APIs, and each full revision to itself.
+        if opened[:4] != before[:4]:
             raise ValueError('File changed during inspection.')
         _, digest = stream_signature(stream, cancelled=cancelled)
-        if _revision(os.fstat(stream.fileno())) != before or file_revision(path) != before:
+        if _revision(os.fstat(stream.fileno())) != opened or file_revision(path) != before:
             raise ValueError('File changed during inspection.')
     return before, bytes.fromhex(digest)
 
