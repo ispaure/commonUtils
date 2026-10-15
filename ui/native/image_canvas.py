@@ -4,6 +4,21 @@ import toga
 _scroll_class = None
 
 
+def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
+    """Viewport-local lens frame and sample point, in logical screen units."""
+    factor = max(1, min(2, min(view_width, view_height) / 400))
+    width, height = min(180 * factor, view_width), min(140 * factor, view_height)
+    offset = height / 2 + 36
+    x = max(0, min(thumb_x - width / 2, view_width - width))
+    y = max(0, min(thumb_y - height - 36, view_height - height))
+    # Keep the lens visible while the sample continues toward the edges.
+    # Near the bottom, progressively overcome the above-finger offset too.
+    push = max(0, min(1, (thumb_y - (view_height - offset)) / offset))
+    sample_x = max(0, min(thumb_x, view_width))
+    sample_y = max(0, min(thumb_y - offset + push * offset, view_height))
+    return x, y, width, height, sample_x, sample_y
+
+
 def apple_scroll_class():
     global _scroll_class
     if _scroll_class is None:
@@ -183,16 +198,11 @@ def apple_backend(interface):
             # and zoom are all included, and the lens itself never scrolls.
             thumb = gesture.locationInView(parent)
             rect = self.native.convertRect(self.native.bounds, toView=parent)
-            width, height = min(180, rect.size.width), min(140, rect.size.height)
-            x = max(rect.origin.x, min(thumb.x - width / 2, rect.origin.x + rect.size.width - width))
-            y = thumb.y - height - 36
-            if y < rect.origin.y:
-                y = thumb.y + 36
-            y = max(rect.origin.y, min(y, rect.origin.y + rect.size.height - height))
-            self.lens.frame = CGRect((x, y), (width, height))
-            # Sample the page beneath the positioned lens, including its edge
-            # clamping, rather than the separate thumb position.
-            source = self.picture.convertPoint(CGPoint(x + width / 2, y + height / 2), fromView=parent)
+            x, y, width, height, sample_x, sample_y = magnifier_geometry(
+                rect.size.width, rect.size.height, thumb.x - rect.origin.x, thumb.y - rect.origin.y)
+            self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
+            source = self.picture.convertPoint(
+                CGPoint(rect.origin.x + sample_x, rect.origin.y + sample_y), fromView=parent)
             scale = 2.5 * float(self.native.zoomScale)
             self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
                                               (size.width * scale, size.height * scale))

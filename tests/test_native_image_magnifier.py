@@ -71,9 +71,9 @@ class AppleLensTests(unittest.TestCase):
         lens = backend.lens
         backend.show_magnifier(self.gesture(thumb_x=399, thumb_y=10))
         self.assertIs(backend.lens, lens)
-        self.assertEqual((lens.frame.origin.x, lens.frame.origin.y), (220, 46))
+        self.assertEqual((lens.frame.origin.x, lens.frame.origin.y), (220, 0))
         frame = backend.lens_picture.frame
-        self.assertEqual((frame.origin.x, frame.origin.y), (-635, 30))
+        self.assertEqual((frame.origin.x, frame.origin.y), (-857.5, 320))
 
     def test_lens_over_letterbox_does_not_shift_sample_to_page_edge(self):
         backend = self.backend
@@ -104,6 +104,37 @@ class AppleLensTests(unittest.TestCase):
         backend.native.superview = None
         backend.show_magnifier(self.gesture())
         self.assertIsNone(backend.lens)
+
+
+class LensGeometryTests(unittest.TestCase):
+    def test_tablets_get_larger_lenses_and_rotation_preserves_size(self):
+        phone = canvas.magnifier_geometry(400, 800, 200, 400)
+        tablet = canvas.magnifier_geometry(800, 1200, 400, 600)
+        rotated = canvas.magnifier_geometry(1200, 800, 600, 400)
+        self.assertEqual(phone[2:4], (180, 140))
+        self.assertEqual(tablet[2:4], (360, 280))
+        self.assertEqual(tablet[2:4], rotated[2:4])
+
+    def test_horizontal_sample_continues_after_lens_stops_at_both_edges(self):
+        for start, end in ((80, 0), (320, 400)):
+            a = canvas.magnifier_geometry(400, 800, start, 400)
+            b = canvas.magnifier_geometry(400, 800, end, 400)
+            self.assertEqual(a[0], b[0])
+            self.assertEqual((a[4], b[4]), (start, end))
+
+    def test_sample_reaches_all_four_corners_with_lens_inside_viewport(self):
+        for width, height in ((400, 800), (800, 1200), (1200, 800), (160, 100)):
+            for tx, ty in ((0, 0), (width, 0), (0, height), (width, height)):
+                x, y, w, h, sx, sy = canvas.magnifier_geometry(width, height, tx, ty)
+                self.assertEqual((sx, sy), (tx, ty))
+                self.assertTrue(0 <= x <= width - w)
+                self.assertTrue(0 <= y <= height - h)
+
+    def test_vertical_sample_progresses_smoothly_to_bottom(self):
+        values = [canvas.magnifier_geometry(800, 1200, 400, y)[5] for y in range(1201)]
+        self.assertEqual(values[0], 0)
+        self.assertEqual(values[-1], 1200)
+        self.assertTrue(all(0 <= b-a <= 2 for a, b in zip(values, values[1:])))
 
 
 class AppleHoldLifecycleTests(unittest.TestCase):

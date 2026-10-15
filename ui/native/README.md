@@ -56,8 +56,12 @@ to prevent navigation pop gestures from competing; tap edge filtering is retaine
 Set `magnifier_enabled=True` to opt into the iOS/Android hold lens (off by
 default). Hold 400 ms, drag to move the 2.5× lens, release to dismiss. The lens
 magnifies the image beneath its own center, using decoded pixels in memory,
-and suppresses tap/paging while active. Viewport clamping changes the sampled
-center too; image margins remain blank rather than snapping to the image edge.
+and suppresses tap/paging while active. Its 180×140 logical-unit size scales
+with the viewport’s shorter side, up to 360×280 on tablets. The lens stays
+inside the viewport; continued dragging toward an edge moves the sample toward
+the viewport border independently of the lens frame, including the bottom edge.
+It stays above the finger when space allows and clamps at the top instead of
+flipping below. Image margins remain blank rather than snapping to the image edge.
 A second finger cancels it. Disabling the property, replacing the image, resizing,
 detaching or disposing clears the overlay and pending hold. Hosts own eligibility
 such as fullscreen-only use; the canvas has no comic or fullscreen policy.

@@ -54,11 +54,16 @@ public final class ImageCanvasView extends AppCompatImageView {
         super.onDraw(canvas);
         if (!lensActive || getDrawable() == null) return;
         float density = getResources().getDisplayMetrics().density;
-        float width = Math.min(180*density, getWidth()), height = Math.min(140*density, getHeight());
+        // Match magnifier_geometry in the Apple backend, using logical units.
+        float factor = Math.max(1, Math.min(2, Math.min(getWidth(), getHeight()) / (400*density)));
+        float width = Math.min(180*density*factor, getWidth()), height = Math.min(140*density*factor, getHeight());
+        float offset = height/2 + 36*density;
         float left = Math.max(0, Math.min(lastX-width/2, getWidth()-width));
         float top = lastY-height-36*density;
-        if (top < 0) top = lastY+36*density;
         top = Math.max(0, Math.min(top, getHeight()-height));
+        float push = Math.max(0, Math.min(1, (lastY-(getHeight()-offset))/offset));
+        float sampleX = Math.max(0, Math.min(lastX, getWidth()));
+        float sampleY = Math.max(0, Math.min(lastY-offset+push*offset, getHeight()));
         RectF rect = new RectF(left, top, left+width, top+height);
         lensClip.reset();
         lensClip.addRoundRect(rect, 24*density, 24*density, Path.Direction.CW);
@@ -67,8 +72,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         canvas.drawColor(Color.BLACK);
         canvas.translate(rect.centerX(), rect.centerY());
         canvas.scale(2.5f, 2.5f);
-        // Magnify the page beneath the lens center after viewport clamping.
-        canvas.translate(-rect.centerX()+getPaddingLeft(), -rect.centerY()+getPaddingTop());
+        // At the edges, dragging keeps moving the sample beyond the fixed lens.
+        canvas.translate(-sampleX+getPaddingLeft(), -sampleY+getPaddingTop());
         canvas.concat(matrix);
         // Reuse original decoded pixels, rather than enlarging a screenshot.
         getDrawable().draw(canvas);
