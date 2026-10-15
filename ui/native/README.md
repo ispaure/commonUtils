@@ -32,6 +32,9 @@ visibility. On Android, hidden mode also hides system status/navigation bars wit
 snapshots each bar's original visibility and system-bar behavior once per hidden
 context and restores them on exit. Insets are reapplied so host content can use
 the newly available viewport. `chrome.restore()` runs during host uninstallation.
+The Android adapter retains LinearLayout's weighted/MATCH_PARENT content sizing
+after each Toga refresh; measured child sizes must not freeze the viewport during
+rail, system-bar or window-size transitions.
 
 `host.chrome.set_page_swipes(active, navigation=None)` reserves horizontal reader
 gestures by disabling the Apple navigation controller's edge and, when available,

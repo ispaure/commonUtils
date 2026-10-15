@@ -326,6 +326,7 @@ class AndroidNavigation:
         self.impl.native_navigationview = self.bottom
         self.rail = None
         self.old_resize = self.impl.resize_tab_content
+        self.old_refreshed = self.impl.refreshed
         self.old_window_resize = window.on_resize
         self.native_window = self.impl._native_activity.getWindow()
         self.old_soft_input = self.native_window.getAttributes().softInputMode
@@ -364,6 +365,7 @@ class AndroidNavigation:
         self.impl.onItemSelectedListener = SelectionListener(self)
         self.bottom.setOnItemSelectedListener(self.impl.onItemSelectedListener)
         self.impl.resize_tab_content = self.resize_content
+        self.impl.refreshed = self.content_refreshed
         # GONE navigation bars do not receive a layout event themselves.
         # Watch the content viewport so hiding/restoring chrome still relayouts
         # the Python widgets after Android has reclaimed the actual space.
@@ -459,6 +461,20 @@ class AndroidNavigation:
         if width and height:
             self.impl.resize_content(width, height)
 
+    def content_refreshed(self):
+        # Container.refreshed replaces MATCH_PARENT/weight dimensions with the
+        # previous measured content size. In rail mode this freezes the height
+        # before system bars disappear; its weighted width also keeps the old
+        # rail allocation. Let LinearLayout own both dimensions after Pack has
+        # updated the children, so native resize events reach the whole reader.
+        from android.widget import LinearLayout
+        self.old_refreshed()
+        native = self.impl.native_content
+        params = native.getLayoutParams()
+        width, height = (0, -1) if self.mode == 'rail' else (-1, 0)
+        if params.width != width or params.height != height or params.weight != 1:
+            native.setLayoutParams(LinearLayout.LayoutParams(width, height, 1))
+
     def diagnostics(self):
         from android.os import Looper
         view = self.impl.native_navigationview
@@ -486,6 +502,7 @@ class AndroidNavigation:
         self.original_bottom.setOnItemSelectedListener(self.old_listener)
         self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
         self.impl.resize_tab_content = self.old_resize
+        self.impl.refreshed = self.old_refreshed
         self.window.on_resize = self.old_window_resize
         self.native_window.setSoftInputMode(self.old_soft_input)
         self.impl.native.setPadding(0, 0, 0, 0)
