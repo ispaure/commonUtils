@@ -176,3 +176,6 @@ notifications with host callbacks; see the native component lifecycle guide.
 
 System document references use `runtime.document_access` adapters and explicitly
 imported `ui.native.documents` pickers/stream export; see native components.
+
+`ui.native.menus.NativeMenu` and `ui.native.presentation` expose native presentation
+mechanics. Hosts supply guarded invocation, activity context and fallback commands.
