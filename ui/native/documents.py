@@ -9,6 +9,13 @@ _ios_delegate_class = None
 _ios_pickers = {}
 
 
+def cancel_document_picker(window):
+    """Cancel a pending Apple picker when its owning window disconnects."""
+    picker = _ios_pickers.get(window.id)
+    if picker is not None:
+        picker[0].cancel()
+
+
 async def pick_document(app, *, title='Open document'):
     current = get_os()
     if current is OS.ANDROID:
