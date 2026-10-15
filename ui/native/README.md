@@ -75,3 +75,18 @@ to iOS memory warnings and Android component callbacks. Delivery uses the app's
 asyncio loop; bound callbacks are weakly held. `dispose()` unregisters listeners
 and suppresses already queued notifications. The host owns active-window guards,
 resource release and theme updates. Unsupported backends install no native hooks.
+
+## System documents
+
+`documents.pick_document(app, title=...)` returns `(access, reference)` or None
+on cancellation. `runtime.document_access` supplies scoped iOS NSURL, Android
+ContentResolver and local-path stream adapters. Access closes with the context;
+no persistent grants or bookmarks are retained. Import into host-owned storage
+while that context is open.
+
+`documents.export_stream(app, name, open_source, mime_type=...)` selects a system
+destination and streams from a context-manager factory. Names must be single file
+names. The host supplies MIME type, limits and content policy. Android output
+closes on failure; iOS stages in app data and removes staging after picker completion
+or cancellation. Local exports stage before replacement and retain the old file on
+copy failure. Native providers determine their own publication guarantees.
