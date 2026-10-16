@@ -8,12 +8,13 @@ def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
     """Viewport-local lens frame and sample point, in logical screen units."""
     factor = max(1, min(2, min(view_width, view_height) / 400))
     width, height = min(180 * factor, view_width), min(140 * factor, view_height)
-    offset = height / 2 + 36
+    offset = height / 2 + 36 - .045 * view_height
     x = max(0, min(thumb_x - width / 2, view_width - width))
-    y = max(0, min(thumb_y - height - 36, view_height - height))
+    y = max(0, min(thumb_y - height - 36 + .045 * view_height, view_height - height))
     # Keep the lens visible while the sample continues toward the edges.
-    # Near the bottom, progressively overcome the above-finger offset too.
-    push = max(0, min(1, (thumb_y - (view_height - offset)) / offset))
+    # At either vertical edge, progressively remove the sampling offset.
+    push = (max(0, min(1, (thumb_y - (view_height - offset)) / offset)) if offset > 0
+            else max(0, min(1, 1 - thumb_y / -offset)) if offset < 0 else 0)
     sample_x = max(0, min(thumb_x, view_width))
     sample_y = max(0, min(thumb_y - offset + push * offset, view_height))
     return x, y, width, height, sample_x, sample_y
@@ -203,7 +204,7 @@ def apple_backend(interface):
             self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
             source = self.picture.convertPoint(
                 CGPoint(rect.origin.x + sample_x, rect.origin.y + sample_y), fromView=parent)
-            scale = 2.5 * float(self.native.zoomScale)
+            scale = 2.0 * float(self.native.zoomScale)
             self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
                                               (size.width * scale, size.height * scale))
 
