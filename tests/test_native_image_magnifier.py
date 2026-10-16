@@ -61,26 +61,26 @@ class AppleLensTests(unittest.TestCase):
         backend.show_magnifier(self.gesture())
         self.assertIs(backend.lens_picture.image, backend.picture.image)
         frame = backend.lens_picture.frame
-        self.assertEqual((frame.size.width, frame.size.height), (1000, 1500))
-        self.assertEqual((frame.origin.x, frame.origin.y), (-110, -415))
+        self.assertEqual((frame.size.width, frame.size.height), (800, 1200))
+        self.assertEqual((frame.origin.x, frame.origin.y), (-70, -390))
         point = backend.picture.convertPoint.call_args.args[0]
-        self.assertEqual((point.x, point.y), (100, 294))
+        self.assertEqual((point.x, point.y), (100, 330))
         self.assertIs(backend.picture.convertPoint.call_args.kwargs['fromView'], backend.native.superview)
-        self.assertEqual(backend.lens.frame.origin.y, 224)
+        self.assertEqual(backend.lens.frame.origin.y, 260)
         # Moving keeps the same image and overlay, and clamps to the viewport.
         lens = backend.lens
         backend.show_magnifier(self.gesture(thumb_x=399, thumb_y=10))
         self.assertIs(backend.lens, lens)
         self.assertEqual((lens.frame.origin.x, lens.frame.origin.y), (220, 0))
         frame = backend.lens_picture.frame
-        self.assertEqual((frame.origin.x, frame.origin.y), (-857.5, 320))
+        self.assertEqual((frame.origin.x, frame.origin.y), (-668, 270))
 
     def test_lens_over_letterbox_does_not_shift_sample_to_page_edge(self):
         backend = self.backend
-        backend.show_magnifier(self.gesture(thumb_y=180))
-        self.assertEqual(backend.lens.frame.origin.y, 4)
+        backend.show_magnifier(self.gesture(thumb_y=120))
+        self.assertEqual(backend.lens.frame.origin.y, 0)
         # The center is above the page; preserve that blank margin in the lens.
-        self.assertEqual(backend.lens_picture.frame.origin.y, 135)
+        self.assertEqual(backend.lens_picture.frame.origin.y, 170)
 
     def test_ignores_initial_letterbox_hold_and_clears_pixels_when_disabled(self):
         backend = self.backend

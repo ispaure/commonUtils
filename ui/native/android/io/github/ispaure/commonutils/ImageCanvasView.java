@@ -57,11 +57,12 @@ public final class ImageCanvasView extends AppCompatImageView {
         // Match magnifier_geometry in the Apple backend, using logical units.
         float factor = Math.max(1, Math.min(2, Math.min(getWidth(), getHeight()) / (400*density)));
         float width = Math.min(180*density*factor, getWidth()), height = Math.min(140*density*factor, getHeight());
-        float offset = height/2 + 36*density;
+        float offset = height/2 + 36*density - .045f*getHeight();
         float left = Math.max(0, Math.min(lastX-width/2, getWidth()-width));
-        float top = lastY-height-36*density;
+        float top = lastY-height-36*density + .045f*getHeight();
         top = Math.max(0, Math.min(top, getHeight()-height));
-        float push = Math.max(0, Math.min(1, (lastY-(getHeight()-offset))/offset));
+        float push = offset > 0 ? Math.max(0, Math.min(1, (lastY-(getHeight()-offset))/offset))
+            : offset < 0 ? Math.max(0, Math.min(1, 1-lastY/-offset)) : 0;
         float sampleX = Math.max(0, Math.min(lastX, getWidth()));
         float sampleY = Math.max(0, Math.min(lastY-offset+push*offset, getHeight()));
         RectF rect = new RectF(left, top, left+width, top+height);
@@ -71,7 +72,7 @@ public final class ImageCanvasView extends AppCompatImageView {
         canvas.clipPath(lensClip);
         canvas.drawColor(Color.BLACK);
         canvas.translate(rect.centerX(), rect.centerY());
-        canvas.scale(2.5f, 2.5f);
+        canvas.scale(2f, 2f);
         // At the edges, dragging keeps moving the sample beyond the fixed lens.
         canvas.translate(-sampleX+getPaddingLeft(), -sampleY+getPaddingTop());
         canvas.concat(matrix);
