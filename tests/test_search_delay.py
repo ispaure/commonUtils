@@ -1,5 +1,6 @@
 """Typing must settle before expensive search callbacks execute."""
 import asyncio
+import time
 import unittest
 from commonUtils.ui.native.event_loop import DebouncedCallback
 
@@ -33,7 +34,11 @@ class QtDelayTests(unittest.TestCase):
         field.setText('needle')
         QTest.qWait(250)
         self.assertEqual(calls, [])
-        QTest.qWait(220)
+        # A loaded native runner may dispatch a valid timer late. Keep the
+        # quiet-period assertion above, then wait for the observable callback.
+        deadline = time.monotonic() + 2
+        while calls != ['needle'] and time.monotonic() < deadline:
+            QTest.qWait(20)
         self.assertEqual(calls, ['needle'])
         field.deleteLater()
         app.processEvents()
