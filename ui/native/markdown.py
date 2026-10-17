@@ -1,0 +1,248 @@
+"""Offline Markdown wiki: inline browse/search, phone page switching and tablet split."""
+from pathlib import Path
+from uuid import uuid4
+from urllib.parse import quote, unquote, urlsplit, parse_qs
+from html import unescape
+import json
+import re
+
+import toga
+from toga.style import Pack
+from toga.style.pack import COLUMN, ROW
+
+from ...formats.markdown_wiki import MarkdownWiki, resolve_document_path, documentation_root
+from .markdown_preview import markdown_preview
+from .adaptive import AdaptiveSidebar, allocated_width
+from .presentation import list_button, navigation_button
+
+
+class MarkdownWikiView:
+    def __init__(self, directory, path=None, *, width=390, font_size=16, render=None, open_file=None):
+        self.open_file = open_file
+        self.font_size = font_size
+        self.render = render or markdown_preview
+        self.catalog = MarkdownWiki(directory)
+        self.history = []
+        self.history_index = -1
+        self.path = None
+        self.url_prefix = '/wiki/' + uuid4().hex + '/'
+        self.base = 'https://markdown.invalid' + self.url_prefix
+        self.expanded = set()
+        self.reading = False
+        self.pending_fragment = ''
+        self.wide = None
+        self.search = toga.TextInput(placeholder='Search documentation', on_change=self.filter,
+                                     style=Pack(height=48))
+        self.mode = toga.Selection(items=['File names & titles', 'Page text'],
+                                   on_change=self.filter, style=Pack(height=48))
+        self.rows = toga.Box(style=Pack(direction=COLUMN))
+        self.notice = toga.Label('')
+        self.browse = toga.Box(children=[self.search, self.mode, self.notice,
+            toga.ScrollContainer(content=self.rows, horizontal=False, style=Pack(flex=1))],
+            style=Pack(direction=COLUMN, flex=1))
+        self.web = toga.WebView(on_navigation_starting=self.follow_link,
+                                on_webview_load=self.page_loaded, style=Pack(flex=1))
+        self.title = toga.Label('Documentation', style=Pack(margin_bottom=8))
+        self.article = toga.Box(children=[self.title, self.web], style=Pack(direction=COLUMN, flex=1))
+        self.sidebar = AdaptiveSidebar(self.browse, self.article, width=max(0, width - 24),
+                                       label='Documentation folders and search')
+        self.browse_button = self.sidebar.menu_button
+        self.browse_button.on_press = self.toggle_browse
+        self.content = self.sidebar.view
+        self.back_button = navigation_button('back', 'Back', on_press=self.back, enabled=False)
+        self.forward_button = navigation_button('forward', 'Forward', on_press=self.forward, enabled=False)
+        self.up_button = navigation_button('up', 'Up to parent folder page', on_press=self.up, enabled=False)
+        self.navigation = navigation = toga.Box(children=[self.browse_button, self.back_button, self.forward_button, self.up_button],
+                              style=Pack(direction=ROW))
+        self.view = toga.Box(children=[navigation, self.content], style=Pack(direction=COLUMN, flex=1, margin=12))
+        self.reflow(width)
+        self.filter()
+        initial = Path(path).resolve() if path is not None else self.catalog.first_page
+        if initial:
+            self.open_page(initial)
+        else:
+            self.show_browse()
+
+    def reflow(self, width):
+        # The root owns twelve-point margins on each side. Its parent allocation
+        # already accounts for native safe areas, rails and any enclosing pane.
+        self.sidebar.reflow(max(0, allocated_width(self.view, width) - 24))
+        self.wide = self.sidebar.expanded
+        if self.wide and self.browse_button in self.navigation.children:
+            self.navigation.remove(self.browse_button)
+        elif not self.wide and self.browse_button not in self.navigation.children:
+            self.navigation.insert(0, self.browse_button)
+
+    def layout(self):
+        if self.reading:
+            self.sidebar.show_detail()
+        else:
+            self.sidebar.show_sidebar()
+
+    def toggle_browse(self, widget=None, **kwargs):
+        self.sidebar.toggle()
+        self.reading = not self.sidebar.sidebar_open
+
+    def show_browse(self, widget=None, **kwargs):
+        self.reading = False
+        self.sidebar.show_sidebar()
+
+    def filter(self, widget=None, **kwargs):
+        if not hasattr(self, 'rows'):
+            return
+        self.rows.clear()
+        query = self.search.value or ''
+        mode = 'content' if self.mode.value == 'Page text' else 'filename'
+        entries = self.catalog.search(query, mode)
+        self.notice.text = ('No matching pages.' if not entries else
+            (f'{len(self.catalog.errors)} pages or folders could not be read.' if self.catalog.errors else ''))
+        def add(entries, depth=0):
+            for entry in entries:
+                row = toga.Box(style=Pack(direction=ROW, margin_bottom=2))
+                # Reserve the disclosure column for pages too. Without it a
+                # child page starts left of its parent's title on native hosts.
+                row.add(toga.Box(style=Pack(width=depth * 20)))
+                if entry.children:
+                    def toggle(widget, entry=entry, **kwargs):
+                        if entry.location in self.expanded:
+                            self.expanded.remove(entry.location)
+                        else:
+                            self.expanded.add(entry.location)
+                        self.filter()
+                    row.add(toga.Button('−' if query or entry.location in self.expanded else '+',
+                                        on_press=toggle, style=Pack(width=48, height=48)))
+                else:
+                    row.add(toga.Box(style=Pack(width=48, height=48)))
+                def choose(widget, entry=entry, **kwargs):
+                    if entry.page:
+                        self.open_page(entry.page)
+                    elif entry.location in self.expanded:
+                        self.expanded.remove(entry.location)
+                        self.filter()
+                    else:
+                        self.expanded.add(entry.location)
+                        self.filter()
+                row.add(list_button(toga.Button(('✓ ' if entry.page == self.path else '') + entry.title,
+                                    on_press=choose, style=Pack(flex=1, height=48))))
+                self.rows.add(row)
+                if query or entry.location in self.expanded:
+                    add(entry.children, depth + 1)
+        add(entries)
+
+    def open_page(self, path, *, remember=True, linked=False, fragment=''):
+        path = Path(path).resolve()
+        if path not in self.catalog.pages and not (linked and path.suffix.lower() in ('.md', '.markdown')):
+            self.notice.text = 'That page is outside this documentation folder or unavailable.'
+            self.reading = False
+            self.layout()
+            return False
+        try:
+            from ...filesystem.local_access import check_local_path
+            check_local_path(path)
+            text = path.read_text(encoding='utf-8-sig')
+            html = self.render(text, self.font_size, local_links=True)
+        except (OSError, UnicodeError, ValueError) as error:
+            self.notice.text = str(error)
+            self.reading = False
+            self.layout()
+            return False
+        root = documentation_root(path, self.catalog.root)
+        if root != self.catalog.root:
+            self.catalog = MarkdownWiki(root)
+            self.expanded.clear()
+            self.search.value = ''
+        if remember and path != self.path:
+            del self.history[self.history_index + 1:]
+            self.history.append(path)
+            self.history_index = len(self.history) - 1
+        self.path = path
+        self.update_navigation()
+        self.url_prefix = '/wiki/' + uuid4().hex + '/'
+        self.base = 'https://markdown.invalid' + self.url_prefix + quote(path.name)
+        # Encode destinations rather than letting WebView normalize ../ past
+        # the synthetic render URL. The source page remains the resolution base.
+        html = re.sub(r'href="([^"]*)"', lambda match:
+                      'href="' + self.base + '?target=' + quote(unescape(match[1]), safe='') + '"', html)
+        self.pending_fragment = fragment
+        self.web.set_content(self.base, html)
+        self.title.text = self.catalog.title(text, path.stem)
+        self.reading = True
+        self.filter()
+        self.layout()
+        return True
+
+    def scroll_fragment(self, fragment):
+        # Host-evaluated code only; fragment text is serialized as data. Android
+        # ignores set_content's base URL, so native # navigation is not portable.
+        self.web.evaluate_javascript('(function(){const heading=document.getElementById('
+            + json.dumps(unquote(fragment)) + ');if(heading)heading.scrollIntoView();})()')
+
+    def page_loaded(self, widget=None, **kwargs):
+        if self.pending_fragment:
+            fragment, self.pending_fragment = self.pending_fragment, ''
+            self.scroll_fragment(fragment)
+
+    def update_navigation(self):
+        self.back_button.enabled = self.history_index > 0
+        self.forward_button.enabled = 0 <= self.history_index < len(self.history) - 1
+        self.up_button.enabled = self.catalog.parent_page(self.path) is not None
+
+    def navigate_history(self, offset):
+        index = self.history_index + offset
+        if not 0 <= index < len(self.history):
+            return False
+        if not self.open_page(self.history[index], remember=False, linked=True):
+            return False
+        self.history_index = index
+        self.update_navigation()
+        return True
+
+    def back(self, widget=None, **kwargs):
+        return self.navigate_history(-1)
+
+    def forward(self, widget=None, **kwargs):
+        return self.navigate_history(1)
+
+    def up(self, widget=None, **kwargs):
+        target = self.catalog.parent_page(self.path)
+        return self.open_page(target) if target is not None else False
+
+    def follow_link(self, widget, url, **kwargs):
+        parsed = urlsplit(url)
+        if not parsed.scheme and not parsed.netloc:
+            target = url
+        elif (parsed.scheme == 'https' and parsed.netloc == 'markdown.invalid'
+              and parsed.path.startswith(self.url_prefix)):
+            target = parse_qs(parsed.query).get('target', [None])[0]
+            if target is None:
+                if parsed.fragment and url.split('#')[0] == self.base:
+                    self.scroll_fragment(parsed.fragment)
+                return False
+        else:
+            return False
+        relative = urlsplit(target)
+        if relative.scheme or relative.netloc or relative.path.startswith('/') or self.path is None:
+            return False
+        if not relative.path:
+            if relative.fragment:
+                self.scroll_fragment(relative.fragment)
+            return False
+        try:
+            from ...filesystem.local_access import check_local_path
+            candidate = (self.path.parent / unquote(relative.path)).resolve()
+            check_local_path(candidate)
+            path = resolve_document_path(candidate)
+            check_local_path(path)
+            if path.suffix.lower() in ('.md', '.markdown'):
+                self.open_page(path, linked=True, fragment=relative.fragment)
+            elif self.open_file is not None:
+                from ...persistence.text import is_text_path
+                if not is_text_path(path):
+                    raise ValueError('The linked file is not a text file.')
+                self.open_file(path)
+            else:
+                raise ValueError('This host has no text editor for linked files.')
+        except (OSError, ValueError) as error:
+            self.notice.text = str(error)
+            self.show_browse()
+        return False

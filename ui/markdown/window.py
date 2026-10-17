@@ -6,11 +6,11 @@ from .viewer import MarkdownViewer
 class MarkdownWindow(qt.QMainWindow):
     document_editor_name = 'Markdown Editor'
     document_editor_id = 'markdown'
-    def __init__(self, path, parent=None, *, allow_edit=False, storage=None):
+    def __init__(self, path=None, parent=None, *, allow_edit=False, storage=None, directory=None):
         super().__init__(parent)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
         allow_edit = bool(allow_edit or qt.QApplication.keyboardModifiers() & qt.Qt.KeyboardModifier.AltModifier)
-        self.viewer = MarkdownViewer(parent=self, allow_edit=allow_edit, storage=storage)
+        self.viewer = MarkdownViewer(parent=self, allow_edit=allow_edit, storage=storage, directory=directory)
         self.viewer.document_window = self
         self.workspace_controls = self.viewer.workspace_controls
         self.setCentralWidget(self.viewer)
@@ -41,10 +41,11 @@ class MarkdownWindow(qt.QMainWindow):
             view_menu.addAction(action)
         self.setWindowTitle('Documentation')
         self.resize(900, 700)
-        if path is None:
+        if path is None and self.viewer.current_path is None:
             self.viewer.new_document()
-        else:
+        elif path is not None:
             self.viewer.open_document(path)
+        self._update_title()
 
     def _update_title(self):
         path = self.viewer.current_path
@@ -68,9 +69,9 @@ class MarkdownWindow(qt.QMainWindow):
 _windows = set()
 
 
-def open_markdown(path, *, parent=None, allow_edit=False, detached=False, allow_new_tabs=True):
+def open_markdown(path=None, *, parent=None, allow_edit=False, detached=False, allow_new_tabs=True, directory=None):
     """Open a preview window; allow_edit=True or holding Alt starts editing. Requires Qt app."""
-    window = MarkdownWindow(path, parent, allow_edit=allow_edit)
+    window = MarkdownWindow(path, parent, allow_edit=allow_edit, directory=directory)
     _windows.add(window)
     window.destroyed.connect(lambda: _windows.discard(window))
     from ..document_host import show_document

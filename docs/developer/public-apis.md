@@ -130,9 +130,12 @@ See [runtime](../../runtime/README.md).
 - [Feature declarations](../../ui/features/README.md): data-only definitions and
   lazy per-browser installation; detailed contracts in [extensions](extension-points.md).
 - [MarkdownViewer / MarkdownWindow / open_markdown](../../ui/markdown/README.md):
-  preview by default, explicit editing, boolean save/navigation outcomes.
+  preview by default, explicit editing, boolean save/navigation outcomes, and
+  optional `directory` wiki navigation.
 - [CodeEdit and companions](../../ui/code_editor/README.md): editing mechanics,
   search, diff/merge and optional syntax; host owns documents and save policy.
+- `ui.text_editor.open_text_file` opens the host text editor (or a shared standalone
+  `TextFileWindow`) without Markdown history.
 - `ui.text_editor.TextFileEditor` and `ui.settings.ini_editor.INISettingsEditor`: embedding
   editors with `save`, `reload`, `is_modified`, `can_close` and `saved(path)`.
 - [ArchiveContents](../../ui/archive_view/README.md): passive navigation and request
@@ -171,7 +174,17 @@ visible thumbnail loading and generic/rich file details. Source work, credential
 and activation remain host-owned. See the [resource provider contract](../../ui/resource-providers.md#native-list-and-tile-presentation)
 for callback, revision, bounded-cache and shutdown requirements.
 
+`formats.markdown_wiki.MarkdownWiki` supplies a GUI-free local documentation
+catalog with folder landing pages, body-heading titles (after optional YAML frontmatter) and recursive text/name search.
+
 ## Optional native Toga components
+
+`ui.native.adaptive.AdaptiveSidebar` supplies reusable allocated-width sidebar/detail
+presentation; `SidebarPolicy` and `allocated_width` load no toolkit.
+
+`ui.native.markdown.MarkdownWikiView` supplies adaptive, read-only documentation
+browsing and inline search; `ui.native.markdown_preview` renders bounded inert
+HTML. Both are reusable without Logistics or Qt.
 
 `ui.native.navigation_state` supplies toolkit-independent destination state.
 `ui.native.navigation.NativeNavigationHost`, `ui.native.routes.Routes`, and

@@ -119,3 +119,74 @@ See [resource provider contracts](../resource-providers.md#markdown-storage) for
 byte I/O, conflict checks, asynchronous completion, resource loading and private
 presentation. Hosts own providers and worker lifetimes; the shared viewer has no
 backend-specific credential or encryption dependency.
+
+## Directory wiki mode
+
+Pass `directory=Directory(Path(...))` (or a path) to `MarkdownViewer`,
+`MarkdownWindow` or `open_markdown`. This adds an inline left tree and search;
+without it the existing single-document layout is unchanged. With no initial
+path, the directory's same-named `.md`, `README.md`, `index.md`, or first available
+page opens. An empty directory leaves the viewer empty.
+
+`formats.markdown_wiki.MarkdownWiki` owns the GUI-free catalog used by native
+mobile consumers too. It traverses visible directories, skips symlinks and reads
+UTF-8 Markdown files up to 1 MiB. Read failures are retained in `errors` for inline
+reporting. Searches use a case-insensitive substring over names/titles or source
+text and retain matching ancestors. Folder landing files match the folder stem
+and are not duplicated among children. The first nonblank body line can supply an ATX or Setext heading title, including
+after a complete YAML frontmatter block. Introductory body text prevents title
+adoption; unclosed frontmatter falls back to the file/folder name.
+
+Tree clicks call the existing `open_document`, preserving save/discard/cancel and
+history. Links and Back/Forward synchronize the tree selection. The catalog is a
+snapshot taken when the view opens; reopen it to include files added externally.
+`storage` adapters with a directory must provide locally catalogable paths;
+directory mode does not enumerate private or remote storage adapters.
+
+Wiki mode uses arrow icons for Back/Forward and adds an Up arrow with a tooltip. Up uses
+`MarkdownWiki.parent_page` and calls `open_document`, including its unsaved-edit
+veto. Articles go to their containing folder's same-named page; folder landing
+pages go to their parent's landing. The root also accepts README/index. Missing
+landing pages disable Up, and navigation stays inside the catalog root.
+
+Relative page links resolve from the current source file, including `../`.
+An extensionless destination tries `.md` and `.markdown`; a directory tries its
+same-named page, README, then index. Linked Markdown may be outside the tree and
+still participates in page history. Explicit local text/code links open the host
+text editor separately and never enter wiki history; missing and binary files
+report an inline error. Files are never executed.
+
+For ordinary local documents the Qt reader calls `ui.text_editor.open_text_file`.
+A host can install `QApplication._commonutils_open_text_file(path, parent)` to use
+its own editor; otherwise a retained `TextFileWindow` opens the shared editor and
+honors unsaved-change cancellation. Storage-backed readers retain their adapter's
+`open_link` routing and do not use raw local-file handoff.
+
+## Reading-mode link previews
+
+`LinkPreview` in `hover.py` observes the reading browser's viewport. Pointer moves
+on local file links resolve through the same extensionless/folder resolver as
+navigation and show a nonactivating, pointer-transparent tooltip window. Previews
+read at most 16 KiB and display at most 18 source lines/2,400 characters. They do
+not navigate, execute code, load resources or create editor sessions. Nonlocal,
+missing, binary and storage-adapter links show no preview. Protected local roots
+use the existing access check.
+
+Leaving the anchor/viewport, scrolling, pressing a mouse button, replacing the
+document, hiding/deactivating the view or entering edit mode immediately hides
+and clears the snippet. Editing widgets have no hover-preview filters.
+
+## Wiki scopes and landing pages
+
+A conventional wiki has a `docs/docs.md` scope landing, audience subfolders and
+same-named nested pages such as `banana/banana.md`. Start pages with an H1 after
+optional YAML properties; the heading supplies the visible title. Parent pages
+should link to their children so the hierarchy also works outside the viewer.
+
+Explicit Markdown links into another wiki replace the sidebar catalog with that
+wiki's scope. Back and Forward restore the destination's scope as well. Search
+clears when changing scopes so a previous query cannot hide the new guide.
+`formats.markdown_wiki.documentation_root(path, fallback)` resolves conventional
+scopes without application-specific ownership rules. Custom directories retain
+the supplied root while browsing contained pages. This is navigation scoping,
+not an access boundary; normal local-file access checks still apply.

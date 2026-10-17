@@ -116,3 +116,43 @@ class TextFileEditor(qt.QWidget):
         if choice == qt.QMessageBox.StandardButton.Discard:
             return self.reload(initial=True)
         return False
+
+
+class TextFileWindow(qt.QMainWindow):
+    document_editor_id = 'text_editor'
+    document_editor_name = 'Text Editor'
+
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.editor = TextFileEditor(path, self)
+        self.setCentralWidget(self.editor)
+        self.setWindowTitle(Path(path).name + ' — Text Editor')
+        self.resize(900, 650)
+
+    def closeEvent(self, event):
+        if self.editor.can_close():
+            super().closeEvent(event)
+        else:
+            event.ignore()
+
+
+_text_windows = set()
+
+
+def open_text_file(path, parent=None):
+    """Let the host open its editor, with a standalone shared-editor fallback."""
+    from ..filesystem.local_access import check_local_path
+    from ..persistence.text import is_text_path
+    path = Path(path).resolve()
+    check_local_path(path)
+    if not path.is_file() or not is_text_path(path):
+        raise ValueError('The linked file is missing or is not a text file.')
+    handler = getattr(qt.QApplication.instance(), '_commonutils_open_text_file', None)
+    if handler is not None:
+        return handler(path, parent)
+    window = TextFileWindow(path, parent)
+    _text_windows.add(window)
+    window.destroyed.connect(lambda: _text_windows.discard(window))
+    from .document_host import show_document
+    return show_document(window)

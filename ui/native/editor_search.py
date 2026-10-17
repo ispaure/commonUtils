@@ -74,7 +74,7 @@ class EditorSearch:
     def select_match(self):
         editor, text = self.editor, self.editor.value
         start, end = (len(text[:offset].encode('utf-16-le')) // 2 for offset in self.span)
-        backend = type(editor._impl).__module__
+        backend = getattr(editor, 'backend_name', type(editor._impl).__module__)
         editor.focus()
         if backend.startswith('toga_android.'):
             editor._impl.native.setSelection(start, end)

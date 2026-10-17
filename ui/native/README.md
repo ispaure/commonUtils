@@ -139,3 +139,98 @@ Find/Replace, case matching, wrapping and native UTF-16 selection for a Toga tex
 input. `toggle()` inserts/removes its panel. Call `changed()` when editor text
 changes to invalidate the retained match. The host owns drafts, session guards,
 read-only policy and saving. No Qt search widget is imported.
+
+## Markdown documentation wiki
+
+Explicitly import `ui.native.markdown.MarkdownWikiView` in a Toga host. It takes
+`directory` (Directory or path), optional initial `path`, `width=390`,
+`font_size=16` and optional `render(text, font_size, local_links=True) -> HTML`.
+Place its `view` widget in your host and call `reflow(width)` on resize.
+The default inert renderer, `ui.native.markdown_preview`, requires the pure-Python
+`markdown-it-py` package (Logistics pins 4.2.0 in its mobile manifest). It renders
+CommonMark plus tables and strikethrough, including nested lists, quotes, emphasis,
+reference links and heading IDs. HTML is escaped, image alt text is displayed,
+and external links remain inert. Tables/code scroll horizontally without widening
+the page. Input/output limits remain 1/2 MiB, without scripts or remote resources. A host renderer may inject its
+own CSS palette. Neither module imports Qt or a consumer application.
+
+The read-only view owns its nested folder controls, inline file/title or source
+text search, page selection and relative Markdown links. A hamburger toggles the tree in narrow allocations; when the tree and article
+fit together it pins the tree beside the article. Browse state
+survives page changes and resizing. Links open only cataloged local pages. Hosts own routing,
+close behavior and document editing. Directory/title/search rules come from
+`formats.markdown_wiki.MarkdownWiki`, shared with the Qt Markdown viewer. Import
+the Qt or native entry point explicitly for the host toolkit; importing one does
+not require installing the other toolkit.
+
+The wiki top bar exposes Back/Forward history and Up via `back()`, `forward()` and
+`up()` (success booleans). Only successful page opens enter history; opening a new
+page after Back drops forward history. Failed history loads retain the current
+position. `MarkdownWiki.parent_page(path)` supplies shared Up semantics: an article
+opens its containing folder's landing page, a landing page opens its parent's,
+and the root accepts README/index fallbacks. Missing parents disable Up.
+
+## Adaptive sidebar and detail
+
+`ui.native.adaptive.AdaptiveSidebar(sidebar, detail, width=..., policy=...)` mounts
+retained widgets in its `view`. Put its accessible `menu_button` in a toolbar;
+`toggle()`, `show_sidebar()` and `show_detail()` switch compact views. Hosts call
+`reflow(usable_width)` after native layout/resize. `expanded` reports whether both
+panes fit. Widgets, queries and application state are never recreated by reflow.
+
+`SidebarPolicy` uses a sidebar width, minimum detail width and gap (260 + 448 + 12
+by default). These are logical units: iOS points or Android dp, after safe areas,
+rails and app-specific margins. `allocated_width(widget, fallback)` measures the
+parent's native allocation, converts Android pixels by display density, and caps
+it at the host's current window/pane width. Use this instead of physical screen
+resolution, device names or a tablet flag. `SidebarPolicy` and measurement can be
+imported without Toga or Qt; constructing a pair explicitly loads Toga.
+
+The Markdown wiki subtracts its own 24-point horizontal margins and hides the
+hamburger while its tree is pinned. Its host supplies the current destination's
+content allocation, so split-screen, resizable iPad windows and foldables follow
+the same fit rule. No iPhone Duo, iPad or Android model exception is needed.
+
+`presentation.navigation_button(direction, label, on_press=..., enabled=...)`
+supplies shared Back/Forward/Up controls with UIKit symbols, Android vectors,
+accessible action labels and 48-point/dp touch targets. The wiki uses these arrows
+alongside the hamburger; disabled history and parent actions remain disabled.
+
+Relative page links resolve from the current source file, including `../`.
+An extensionless destination tries `.md` and `.markdown`; a directory tries its
+same-named page, README, then index. Linked Markdown may be outside the tree and
+still participates in page history. Explicit local text/code links open the host
+text editor separately and never enter wiki history; missing and binary files
+report an inline error. Files are never executed.
+
+Native hosts provide `MarkdownWikiView(..., open_file=callback)` for non-Markdown
+text links. The callback receives the resolved Path and owns editor/session
+presentation. Rendered hrefs encode the source-relative destination under the
+current render URL so WebView URL normalization cannot discard parent segments.
+Stale render URLs remain ignored. The view does not open arbitrary URL schemes.
+
+Both `[test.md|Test]` (alias form) and `[Test](test.md)` (standard Markdown) show
+Test and open test.md. The double-bracket `[[test.md|Test]]` form also works.
+Alias-like text inside inline code or fenced code stays literal.
+
+Tree rows reserve a 48-unit disclosure column for both pages and folders and
+indent every child level by 20 logical units. Heading links scroll through a
+host-evaluated, data-serialized DOM lookup, including fragments on linked pages;
+this avoids Android WebView ignoring the HTML base URL. Document scripts remain
+blocked by the content policy. `open_page(..., fragment="heading-id")` requests a
+scroll after the page loads.
+
+## Wiki scopes and landing pages
+
+A conventional wiki has a `docs/docs.md` scope landing, audience subfolders and
+same-named nested pages such as `banana/banana.md`. Start pages with an H1 after
+optional YAML properties; the heading supplies the visible title. Parent pages
+should link to their children so the hierarchy also works outside the viewer.
+
+Explicit Markdown links into another wiki replace the sidebar catalog with that
+wiki's scope. Back and Forward restore the destination's scope as well. Search
+clears when changing scopes so a previous query cannot hide the new guide.
+`formats.markdown_wiki.documentation_root(path, fallback)` resolves conventional
+scopes without application-specific ownership rules. Custom directories retain
+the supplied root while browsing contained pages. This is navigation scoping,
+not an access boundary; normal local-file access checks still apply.
