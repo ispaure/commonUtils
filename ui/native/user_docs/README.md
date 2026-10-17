@@ -7,7 +7,7 @@ On Android phones, opening the keyboard keeps the destination bar at its normal
 height above the keyboard so the active screen can use the remaining space.
 
 For images, pinch to zoom and drag to pan. At fit size, horizontal swipes ask the
-application to change images. Tap asks the application to show or hide controls.
+application to change images; some readers use up/down swipes instead. Tap asks the application to show or hide controls.
 Fit returns to the centered image. The application owns image order, reading
 direction and whether paging is available.
 Readers can reserve horizontal swipes, including screen-edge swipes, for paging.
@@ -69,3 +69,11 @@ editable with colours paused; the app controls files, saving and any live previe
 Password and token controls start hidden. Use the eye button to show or hide the
 current value. Clearing the field hides it again. The application decides when
 credentials are submitted, retained or cleared.
+
+## Images supplied by an app
+
+Apps can enable inline PNG, JPEG and WebP images in native Markdown views.
+The app decides which image files are accessible and supplies their bytes;
+the renderer embeds them without fetching network resources. Missing or
+unsupported images show alternative text. Views without this opt-in, including
+the documentation wiki, continue to show image alternative text.

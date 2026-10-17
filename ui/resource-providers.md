@@ -366,7 +366,11 @@ sorts natural names, numeric sizes or modified values in either direction while
 retaining containers first. `runtime.resource_search.search_resources` walks
 provider listings breadth-first, validates child scope and produces relative labels
 for nested matches. Desktop ResourceBrowser and NativeBrowser debounce searches
-and run this scan on cancellable workers, bounded to 10,000 examined entries.
+for 400 ms after the last edit and run this scan on cancellable workers.
+The default scan visits the full subtree; callers can explicitly set max_entries.
+An optional provider search_entries(directory, cancelled=...) iterator supplies a
+recursive listing directly; its rows must stay strictly beneath the requested
+directory. Partial or failed listings must not be presented as complete.
 Partial results report limits or unreadable folders; credentials failures abort.
 Search retains no durable index or file content. Sorting reprojects the current
 snapshot without rescanning; closing search restores the original folder tree. Selection is cleared when filtered out

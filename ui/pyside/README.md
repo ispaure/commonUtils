@@ -62,3 +62,10 @@ This is the desktop Qt facade, including its existing file-dialog exports.
 Explicit import on iOS/Android raises `UnsupportedCapabilityError` before loading
 Qt binaries. Portable document/file modules do not import this facade; a mobile
 UI and document picker remain future host integrations.
+
+### Search input delay
+
+`connect_search(field, callback, pass_text=False)` connects a QLineEdit through
+a parent-owned, single-shot 400 ms timer. The callback receives no arguments by
+default; pass_text=True supplies the latest field text. Each edit restarts the
+timer. Explicit Find/Next/Previous commands can still execute immediately.

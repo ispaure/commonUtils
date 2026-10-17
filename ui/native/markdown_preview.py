@@ -1,9 +1,11 @@
 """Bounded offline Markdown, with escaped HTML and no external resources."""
+import base64
 from html import escape
 import re
 from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
 
 _ALIAS = re.compile(r'\[\[([^]\n|]+)\|([^]\n]+)\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
 
@@ -25,16 +27,57 @@ def _alias(state, silent):
     return True
 
 
-def markdown_body(text, *, local_links=False):
+def embedded_image(target, alt, image_source=None):
+    """Render host-supplied raster bytes; never fetch a URL or open a path here."""
+    if image_source is not None:
+        try:
+            image = image_source(target)
+            if image is not None:
+                mime, data = image
+                if mime not in {'image/png', 'image/jpeg', 'image/webp'} or not isinstance(data, bytes) or len(data) > 8 * 1024 * 1024:
+                    raise ValueError('Invalid embedded image.')
+                encoded = base64.b64encode(data).decode('ascii')
+                return f'<img src="data:{mime};base64,{encoded}" alt="{escape(alt, quote=True)}" style="max-width:100%;height:auto">'
+        except (OSError, ValueError):
+            pass
+    return '<span class="image-alt">' + escape(alt) + '</span>'
+
+
+def wiki_image(state, silent):
+    """Opt-in image embeds; code spans and escaped syntax stay literal."""
+    if not state.src.startswith('![[', state.pos):
+        return False
+    end = state.src.find(']]', state.pos + 3, state.posMax)
+    if end < 0 or '\n' in state.src[state.pos:end]:
+        return False
+    content = state.src[state.pos + 3:end]
+    target, _, alt = content.partition('|')
+    if not target.strip():
+        return False
+    if not silent:
+        token = state.push('image', 'img', 0)
+        token.attrSet('src', target.strip())
+        token.content = alt or target.strip()
+        child = Token('text', '', 0)
+        child.content = token.content
+        token.children = [child]
+    state.pos = end + 2
+    return True
+
+
+def markdown_body(text, *, local_links=False, image_source=None):
     """Render CommonMark with tables/strikethrough and opt-in local wiki links.
 
-    HTML is escaped, images show their alt text and external links remain inert.
+    HTML is escaped and external links remain inert. Images show alt text unless
+    the host supplies an image_source callback returning (MIME type, bytes).
     The pure-Python parser is shared by all native hosts, including chat.
     """
     if len(text.encode('utf-8')) > 1024 * 1024:
         raise ValueError('Preview is limited to 1 MiB.')
     parser = MarkdownIt('commonmark', {'html': False, 'maxNesting': 32}).enable(['table', 'strikethrough'])
     parser.inline.ruler.before('link', 'wiki_alias', _alias)
+    if image_source is not None:
+        parser.inline.ruler.before('image', 'wiki_image', wiki_image)
     tokens = parser.parse(text)
     headings = set()
     heading_counts = {}
@@ -76,8 +119,15 @@ def markdown_body(text, *, local_links=False):
                 prepare(token.children)
     prepare(tokens)
 
+    image_bytes = 0
     def image(renderer, items, index, options, env):
-        return '<span class="image-alt">' + escape(renderer.renderInlineAsText(items[index].children or [], options, env)) + '</span>'
+        nonlocal image_bytes
+        token = items[index]
+        rendered = embedded_image(token.attrGet('src') or '', renderer.renderInlineAsText(token.children or [], options, env), image_source)
+        image_bytes += len(rendered)
+        if image_bytes > 22 * 1024 * 1024:
+            return embedded_image('', token.content)
+        return rendered
 
     def table_open(renderer, items, index, options, env):
         return '<div class="table-scroll" role="region" aria-label="Table" tabindex="0"><table>\n'
@@ -91,12 +141,14 @@ def markdown_body(text, *, local_links=False):
     return parser.renderer.render(tokens, parser.options, {})
 
 
-def markdown_preview(text, font_size=16, *, local_links=False, stylesheet=""):
+def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", image_source=None):
     size = int(font_size)
     if not 12 <= size <= 32:
         raise ValueError('Invalid preview font size.')
-    body = markdown_body(text, local_links=local_links)
+    body = markdown_body(text, local_links=local_links, image_source=image_source)
     policy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    if image_source is not None:
+        policy += "; img-src data:"
     result = ('<!doctype html><html><head><meta charset="utf-8">'
             f'<meta http-equiv="Content-Security-Policy" content="{policy}">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -109,6 +161,7 @@ def markdown_preview(text, font_size=16, *, local_links=False, stylesheet=""):
             '.table-scroll{max-width:100%;overflow-x:auto;margin:1em 0}table{border-collapse:collapse;width:100%;font-size:.95em}'
             'th,td{border:1px solid GrayText;padding:.55em .7em;min-width:6em;vertical-align:top}th{font-weight:600;background:color-mix(in srgb,currentColor 8%,transparent)}'
             '</style></head><body>' + body + '</body></html>')
-    if len(result.encode('utf-8')) > 2 * 1024 * 1024:
-        raise ValueError('The rendered preview exceeds 2 MiB; preview a smaller document.')
+    limit = (24 if image_source is not None else 2) * 1024 * 1024
+    if len(result.encode('utf-8')) > limit:
+        raise ValueError('The rendered preview exceeds its size limit; preview a smaller document.')
     return result

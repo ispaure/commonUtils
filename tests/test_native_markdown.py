@@ -10,6 +10,22 @@ from commonUtils.ui.native.markdown_preview import markdown_preview
 
 
 class NativeMarkdownTests(unittest.TestCase):
+    def test_host_supplied_images_are_opt_in_and_cannot_inject_markup(self):
+        calls = []
+        def image(target):
+            calls.append(target)
+            return 'image/webp', b'fixture'
+        html = markdown_preview('![A & B](photo.webp) ![[other.webp]]', image_source=image)
+        self.assertEqual(calls, ['photo.webp', 'other.webp'])
+        self.assertEqual(html.count('<img src="data:image/webp;base64,'), 2)
+        self.assertIn('alt="A &amp; B"', html)
+        self.assertIn('img-src data:', html)
+        self.assertNotIn('<img', markdown_preview('![A](photo.webp)'))
+        self.assertNotIn('<img', markdown_preview('![A](photo.webp)',
+            image_source=lambda target: ('image/svg+xml', b'<svg/>')))
+        self.assertNotIn('<img', markdown_preview('![A](photo.webp)',
+            image_source=lambda target: (_ for _ in ()).throw(OSError('Missing'))))
+
     def test_common_markdown_and_tables(self):
         html = markdown_preview('''# Main *title*
 ## Repeated
