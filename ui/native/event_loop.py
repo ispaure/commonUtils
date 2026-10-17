@@ -26,3 +26,22 @@ def bind_cooperative_loop(loop):
             events._set_running_loop(previous)
     loop.run_delayed_tasks = dispatch
     loop._commonutils_bound = True
+
+
+class DebouncedCallback:
+    """Coalesce native text edits on the application's loop (400 ms)."""
+    def __init__(self, callback):
+        self.callback, self.pending = callback, None
+
+    def __call__(self, *args, **kwargs):
+        self.cancel()
+        self.pending = asyncio.get_event_loop().call_later(.4, self.run, args, kwargs)
+
+    def run(self, args, kwargs):
+        self.pending = None
+        self.callback(*args, **kwargs)
+
+    def cancel(self):
+        if self.pending is not None:
+            self.pending.cancel()
+            self.pending = None

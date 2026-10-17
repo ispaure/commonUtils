@@ -169,3 +169,9 @@ spans partition the block, so hosts can review or restore each part independentl
 monospace columns. Zero (the shared default) disables it; valid values are 0–1000.
 The ruler follows font metrics and horizontal scrolling, is copied when sharing
 an editor document, and does not change text, wrapping or scroll extents.
+
+Language choices and filename detection now come from `formats.code_syntax`,
+shared with the native source input without importing Qt. The common Pygments
+Blade grammar lives in `formats.code_blade`; the existing nested desktop import
+continues to expose that same grammar. Qt's incremental block formatter remains
+in this package; native text views apply UTF-16 spans from `formats.code_spans`.

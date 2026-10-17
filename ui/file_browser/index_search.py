@@ -56,7 +56,7 @@ class IndexSearch(qt.QWidget):
         controls.addStretch()
         layout.addLayout(controls)
         self.debounce = qt.QTimer(self)
-        self.debounce.setSingleShot(True); self.debounce.setInterval(180)
+        self.debounce.setSingleShot(True); self.debounce.setInterval(400)
         self.debounce.timeout.connect(self.refresh)
         self.progress_poll = qt.QTimer(self)
         self.progress_poll.setInterval(1200)
@@ -96,7 +96,7 @@ class IndexSearch(qt.QWidget):
             self.browser._selection_changed()
 
     def _poll(self):
-        if self.active and self.browser.folder_busy and not self.busy and not self.closing:
+        if self.active and self.browser.folder_busy and not self.busy and not self.closing and not self.debounce.isActive():
             self.refresh()
 
     def refresh(self):

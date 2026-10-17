@@ -8,6 +8,9 @@ or vault-wide property registry.
 
 ## Read and navigate
 
+Ordinary file-browser activation opens preview. Hold Alt/Option while opening to
+start editing, or use a host action explicitly labeled as an editor.
+
 Use Contents to jump to headings and Back/Forward to return to earlier documents
 and scroll positions. Relative links resolve beside the current document. Wiki links
 such as `[[Notes|My notes]]` target local documents; extensionless targets gain `.md`.
@@ -41,7 +44,8 @@ Supported Markdown markers become visible when the caret touches or is inside an
 element, or a selection overlaps it. Hovering leaves the markers hidden. Click a
 link label to navigate, including while editing; click its revealed syntax to edit
 the destination, or Shift-click/drag to select text. Ctrl/Command-click also follows
-links from their syntax. The compact **Format** menu beside Back/Forward contains
+links from their syntax. The Bold, Italic, Undo and Redo icon buttons match the mobile editor. Hover or
+focus a button for its label and shortcut. The **Format** icon menu beside them contains
 undo/redo, inline styles, headings, lists and quotes. **Format → Table** commands insert a table or add/remove rows and columns;
 the first row is the header. Structural table changes are undoable.
 

@@ -156,7 +156,7 @@ See [runtime](../../runtime/README.md).
 - [UI tasks](../../ui/tasks/README.md): canonical modules under `ui.tasks`.
 - [UI readers](../../ui/readers/README.md): canonical modules under `ui.readers`.
 - [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`.
-- [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`.
+- [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`, including shared desktop/native-WebView formatting vectors.
 
 Provider-backed file work uses `runtime.local_files.LocalFiles`, contracts and
 capabilities in `runtime.resource_provider`, and complete operations in
@@ -202,7 +202,22 @@ gestures for a visible reader; see the [native component contract](../../ui/nati
 | Native action menus | `menus.NativeMenu`; host supplies guarded invocation/context/fallback |
 | Optional native row/tint/layout mechanics | `presentation` |
 | Literal Find/Replace | `editor_search.EditorSearch(editor, container)`; host notifies text changes |
+| Native source input, line numbers and syntax colours | `code_input.CodeInput(loop=..., filename=...)`; call `dispose()` on retirement |
+
+`formats.code_syntax` shares language choices and detection with desktop;
+`formats.code_spans` provides bounded UTF-16 colour spans and logical line starts
+without Qt. The native input uses the host's Pygments installation.
 
 See [native components](../../ui/native/README.md) for lifecycle, callbacks and
 Android bridge packaging. `tools.mobile_ci.stage` includes their Python/Java
 sources and records untracked local native sources as dirty.
+
+## Password entry and visibility
+
+Desktop consumers import `password_field` from `commonUtils.ui.pyside.passwords`
+to add an idempotent trailing reveal action to a `QLineEdit`; shared
+`LineEdit(..., pw_field=True)` uses it too. See the [Qt backend reference](../../ui/pyside/README.md#password-fields).
+Mobile consumers import `PasswordInput` from `commonUtils.ui.native.password_input`.
+It exposes the input value, enabled state, focus and confirmation handler plus an
+accessible native eye button. See [native password entry](../../ui/native/README.md#password-entry).
+Both start masked and hide again on clear. Hosts own credentials and workflows.

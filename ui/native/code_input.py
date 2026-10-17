@@ -4,7 +4,6 @@ Keeps Toga's text control, keyboard, IME, selection and undo. Hosts retain files
 recovery and save policy. No document bytes enter a WebView or a disk cache.
 """
 import asyncio
-from bisect import bisect_right
 import toga
 from ...formats.code_syntax import detect_language
 from ...formats.code_spans import line_offsets, syntax_spans
@@ -13,13 +12,24 @@ _apple_class = None
 _gutter_class = None
 
 
+def apple_value(owner, name):
+    value = getattr(owner, name)
+    return value() if callable(value) else value
+
+
 def apple_view_class():
     global _apple_class
     if _apple_class is None:
         from toga_iOS.widgets.multilinetextinput import TogaMultilineTextView
-        from rubicon.objc import objc_method, send_super, CGRect, CGPoint, NSRange, ObjCClass
+        from rubicon.objc import objc_method, send_super, objc_id, CGRect
 
         class CommonUtilsCodeTextView(TogaMultilineTextView):
+            @objc_method
+            def traitCollectionDidChange_(self, previous: objc_id) -> None:
+                send_super(__class__, self, 'traitCollectionDidChange:', previous, argtypes=[objc_id])
+                if self.interface is not None:
+                    self.interface.changed(notify=False)
+
             @objc_method
             def layoutSubviews(self) -> None:
                 send_super(__class__, self, 'layoutSubviews')
@@ -32,6 +42,7 @@ def apple_view_class():
                     if geometry != getattr(impl, 'gutter_geometry', None):
                         impl.gutter_geometry = geometry
                         gutter.frame = CGRect(geometry[:2], geometry[2:])
+                    self.bringSubviewToFront(gutter)
                     gutter.setNeedsDisplay()
 
         _apple_class = CommonUtilsCodeTextView
@@ -47,39 +58,54 @@ def apple_gutter_class():
             owner = objc_property(object, weak=True)
             @objc_method
             def drawRect_(self, rect: CGRect) -> None:
-                interface = self.owner
-                if interface is None or not hasattr(interface, 'line_starts'):
-                    return
-                native = interface._impl.native
-                font = ObjCClass('UIFont').monospacedSystemFontOfSize(float(native.font.pointSize) * .85, weight=0)
-                colour = ObjCClass('UIColor').secondaryLabelColor()
-                attributes = {'NSFont': font, 'NSColor': colour}
-                inset, bounds, manager = native.textContainerInset, native.bounds, native.layoutManager
-                top, bottom = float(bounds.origin.y), float(bounds.origin.y + bounds.size.height)
-                manager.ensureLayoutForTextContainer(native.textContainer)
-                visible = manager.glyphRangeForBoundingRect(
-                    CGRect((0, max(0, top - inset.top)), (bounds.size.width, bounds.size.height)),
-                    inTextContainer=native.textContainer)
-                characters = manager.characterRangeForGlyphRange(visible, actualGlyphRange=None)
-                start = max(0, bisect_right(interface.line_starts, int(characters.location)) - 1)
-                length = int(native.textStorage.length)
-                for number in range(start, len(interface.line_starts)):
-                    offset = interface.line_starts[number]
-                    if offset < length:
-                        glyph = manager.glyphIndexForCharacterAtIndex(offset)
-                        line = manager.lineFragmentRectForGlyphAtIndex(glyph, effectiveRange=None)
-                        y = float(line.origin.y + inset.top)
-                    else:
-                        line = manager.extraLineFragmentRect
-                        y = float(line.origin.y + inset.top) if line.size.height else float(inset.top)
-                    if y > bottom:
-                        break
-                    if y + float(native.font.lineHeight) >= top:
-                        label = ObjCClass('NSString').stringWithString(str(number + 1))
-                        size = label.sizeWithAttributes(attributes)
-                        label.drawAtPoint(CGPoint(inset.left - size.width - 10, y - top), withAttributes=attributes)
+                try:
+                    draw_apple_numbers(self)
+                except Exception as error:
+                    if self.owner is not None:
+                        self.owner.gutter_error = str(error)
+
         _gutter_class = CommonUtilsCodeGutter
     return _gutter_class
+
+
+def draw_apple_numbers(self):
+    from rubicon.objc import ObjCClass, CGRect, CGPoint
+    interface = self.owner
+    if interface is None or not hasattr(interface, 'line_starts'):
+        return
+    native = interface._impl.native
+    font = ObjCClass('UIFont').monospacedSystemFontOfSize(float(native.font.pointSize) * .85, weight=0)
+    colour = apple_value(ObjCClass('UIColor'), 'secondaryLabelColor')
+    attributes = {'NSFont': font, 'NSColor': colour}
+    inset, bounds, manager = native.textContainerInset, native.bounds, native.layoutManager
+    top, bottom = float(bounds.origin.y), float(bounds.origin.y + bounds.size.height)
+    manager.ensureLayoutForTextContainer(native.textContainer)
+    length = int(native.textStorage.length())
+    def line_y(number):
+        offset = interface.line_starts[number]
+        if offset < length:
+            glyph = manager.glyphIndexForCharacterAtIndex(offset)
+            line = manager.lineFragmentRectForGlyphAtIndex(glyph, effectiveRange=None)
+            return float(line.origin.y + inset.top)
+        line = manager.extraLineFragmentRect
+        return float(line.origin.y + inset.top) if line.size.height else float(inset.top)
+    # Find the first visible logical row using actual fragment geometry.
+    # glyphRangeForBoundingRect can omit rows after UITextView's caret scroll.
+    low, high = 0, len(interface.line_starts)
+    while low < high:
+        middle = (low + high) // 2
+        if line_y(middle) + float(native.font.lineHeight) < top:
+            low = middle + 1
+        else:
+            high = middle
+    for number in range(low, len(interface.line_starts)):
+        y = line_y(number)
+        if y > bottom:
+            break
+        if y + float(native.font.lineHeight) >= top:
+            label = ObjCClass('NSString').stringWithString(str(number + 1))
+            size = label.sizeWithAttributes(attributes)
+            label.drawAtPoint(CGPoint(inset.left - size.width - 10, y - top), withAttributes=attributes)
 
 def apple_backend(interface):
     from toga_iOS.widgets.multilinetextinput import MultilineTextInput
@@ -108,13 +134,14 @@ def apple_backend(interface):
             self.gutter.owner = self.interface
             self.gutter.userInteractionEnabled = False
             self.gutter.opaque = False
-            self.gutter.backgroundColor = ObjCClass('UIColor').clearColor()
+            self.gutter.backgroundColor = apple_value(ObjCClass('UIColor'), 'clearColor')
             self.native.addSubview(self.gutter)
 
         def set_font(self, font):
             super().set_font(font)
             self.native.font = ObjCClass('UIFont').monospacedSystemFontOfSize(float(self.native.font.pointSize), weight=0)
             self.native.setNeedsDisplay()
+
     return Backend(interface=interface)
 
 
@@ -135,7 +162,9 @@ class CodeInput(toga.MultilineTextInput):
         backend = type(self._impl).__module__
         if backend.startswith('toga_android.'):
             from java import jclass
+            readonly = self.readonly
             self.android_support = jclass('io.github.ispaure.commonutils.CodeEditorSupport')(self._impl.native)
+            self.readonly = readonly
         self.changed()
 
     def _create(self):
@@ -153,11 +182,18 @@ class CodeInput(toga.MultilineTextInput):
         self.changed(notify=False)
 
     def changed(self, widget=None, *, notify=True, **kwargs):
-        if self.closed or self.applying:
+        if self.closed or self.applying or getattr(self, '_impl', None) is None:
             return
         self.line_starts = line_offsets(self.value)
         self.language = self.language_override or detect_language(self.filename, self.value)
         if hasattr(self._impl, 'native') and type(self._impl).__module__ == __name__:
+            native = self._impl.native
+            from rubicon.objc import UIEdgeInsets
+            inset = native.textContainerInset
+            font_size = float(native.font.pointSize) if native.font is not None else 16
+            width = max(48, len(str(len(self.line_starts))) * font_size * .6 + 20)
+            if abs(inset.left - width) > .5:
+                native.textContainerInset = UIEdgeInsets(inset.top, width, inset.bottom, inset.right)
             self._impl.native.setNeedsLayout()
         if self.pending is not None:
             self.pending.cancel()
@@ -204,7 +240,8 @@ class CodeInput(toga.MultilineTextInput):
                 selection, offset = native.selectedRange, native.contentOffset
                 storage.beginEditing()
                 try:
-                    storage.removeAttribute('NSColor', range=NSRange(0, storage.length))
+                    storage.addAttribute('NSColor', value=apple_value(ObjCClass('UIColor'), 'labelColor'),
+                                         range=NSRange(0, storage.length()))
                     for start, end, rgb in spans:
                         colour = ObjCClass('UIColor').colorWithRed((rgb >> 16 & 255) / 255,
                             green=(rgb >> 8 & 255) / 255, blue=(rgb & 255) / 255, alpha=1)

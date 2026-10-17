@@ -3,6 +3,8 @@
 An application using these optional components can provide native destination
 tabs or a wider-screen rail/sidebar, with separate Back history in each destination.
 The application decides destination names, available screens and close prompts.
+On Android phones, opening the keyboard keeps the destination bar at its normal
+height above the keyboard so the active screen can use the remaining space.
 
 For images, pinch to zoom and drag to pan. At fit size, horizontal swipes ask the
 application to change images. Tap asks the application to show or hide controls.
@@ -53,3 +55,17 @@ A folder opens its same-named page (for example, `banana/banana.md`). Guides
 begin with a title heading, which also names them in the tree. A link to another
 documentation wiki changes the sidebar to that guide's files. Back and Forward
 return to the corresponding guide and tree. Search clears on a scope change.
+
+## Source editing
+
+An app can use the native source editor for text, Markdown and configuration/code
+files. It shows logical line numbers beside monospace text and syntax colours for
+the chosen language. Wrapped continuations keep their original line number.
+The native keyboard, selection and undo stay available. Large files can remain
+editable with colours paused; the app controls files, saving and any live preview.
+
+## Password visibility
+
+Password and token controls start hidden. Use the eye button to show or hide the
+current value. Clearing the field hides it again. The application decides when
+credentials are submitted, retained or cleared.

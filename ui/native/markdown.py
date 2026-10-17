@@ -7,6 +7,7 @@ import json
 import re
 
 import toga
+from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
@@ -31,7 +32,7 @@ class MarkdownWikiView:
         self.reading = False
         self.pending_fragment = ''
         self.wide = None
-        self.search = toga.TextInput(placeholder='Search documentation', on_change=self.filter,
+        self.search = toga.TextInput(placeholder='Search documentation', on_change=DebouncedCallback(self.filter),
                                      style=Pack(height=48))
         self.mode = toga.Selection(items=['File names & titles', 'Page text'],
                                    on_change=self.filter, style=Pack(height=48))
@@ -66,8 +67,12 @@ class MarkdownWikiView:
     def reflow(self, width):
         # The root owns twelve-point margins on each side. Its parent allocation
         # already accounts for native safe areas, rails and any enclosing pane.
-        self.sidebar.reflow(max(0, allocated_width(self.view, width) - 24))
+        available = max(0, allocated_width(self.view, width) - 24)
+        self.sidebar.reflow(available)
         self.wide = self.sidebar.expanded
+        # A hidden scroll subtree can retain its intrinsic minimum on iOS when
+        # reparented into the phone browse view. Bind content to the viewport.
+        self.rows.style.width = self.sidebar.policy.sidebar_width if self.wide else available
         if self.wide and self.browse_button in self.navigation.children:
             self.navigation.remove(self.browse_button)
         elif not self.wide and self.browse_button not in self.navigation.children:
@@ -156,6 +161,7 @@ class MarkdownWikiView:
             self.history.append(path)
             self.history_index = len(self.history) - 1
         self.path = path
+        self.expanded.update(folder for folder in path.parents if self.catalog.root in folder.parents)
         self.update_navigation()
         self.url_prefix = '/wiki/' + uuid4().hex + '/'
         self.base = 'https://markdown.invalid' + self.url_prefix + quote(path.name)

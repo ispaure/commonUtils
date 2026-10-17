@@ -122,3 +122,9 @@ header is collapsed. Hidden or retired headers do not display extra + buttons.
 The Menus settings include **Launch with sidebar**, enabled by default, for hosts
 that support sidebar navigation on their launch screen. Hosts apply the choice
 when opening a workspace.
+
+## Password visibility
+
+Password and token controls start hidden. Use the eye button to show or hide the
+current value. Clearing the field hides it again. The application decides when
+credentials are submitted, retained or cleared.

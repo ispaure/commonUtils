@@ -40,7 +40,8 @@ class LineEdit:
         _api.set_font(self.line_edit)
 
         if pw_field:
-            self.line_edit.setEchoMode(_api.QLineEdit.EchoMode.Password)
+            from .passwords import password_field
+            password_field(self.line_edit)
 
     def txt(self):
         return self.line_edit.text()
@@ -185,3 +186,13 @@ def create_checkbox(target: _api.QWidget, rect: _api.QRect, default_state: bool 
 
     return checkbox
 
+
+
+def connect_search(field, callback, *, pass_text=False):
+    """Run a text-driven filter after 400 ms without another edit."""
+    timer = _api.QTimer(field)
+    timer.setSingleShot(True)
+    timer.setInterval(400)
+    timer.timeout.connect(lambda: callback(field.text()) if pass_text else callback())
+    field.textChanged.connect(lambda *_: timer.start())
+    return timer

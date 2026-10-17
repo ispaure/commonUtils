@@ -36,7 +36,7 @@ class CommandPalette(qt.QDialog):
         layout.addWidget(self.query)
         layout.addWidget(self.results)
         self.query.installEventFilter(self)
-        self.query.textChanged.connect(self.refresh)
+        qt.connect_search(self.query, self.refresh)
         self.query.returnPressed.connect(self.run_current)
         self.results.itemActivated.connect(lambda item: self.run_current())
         self.refresh()

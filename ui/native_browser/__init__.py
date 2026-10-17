@@ -77,8 +77,9 @@ class NativeBrowser:
 
 
     def set_entries(self, provider, directory, rows, *, location=None):
+        rows = tuple(rows)
         root = provider.root / provider.relative(directory)
-        tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=10001)
+        tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(rows) + 1)
         tree.set_children(root, provider_entries(provider, rows))
         if location is not None and location != self.location:
             self.search.value = ''
@@ -131,6 +132,12 @@ class NativeBrowser:
         self.search_cancelled.set()
         self.search_cancelled = Event()
         self.search_epoch += 1
+        self._spawn(self._apply_query(self.search_epoch, self.search_cancelled))
+
+    async def _apply_query(self, epoch, cancelled):
+        await asyncio.sleep(.4)
+        if self.closed or epoch != self.search_epoch or cancelled.is_set():
+            return
         if self.folder_tree is not None:
             self.tree = self.folder_tree
         self.page = 0
@@ -148,7 +155,6 @@ class NativeBrowser:
     async def _search_subfolders(self, epoch, cancelled):
         from ...runtime.resource_search import search_resources
         provider, directory, query = self.search_provider, self.search_directory, self.search.value
-        await asyncio.sleep(.25)
         if self.closed or epoch != self.search_epoch or cancelled.is_set():
             return
         self.page_label.text = 'Searching subfolders…'
@@ -157,7 +163,7 @@ class NativeBrowser:
             if self.closed or epoch != self.search_epoch or cancelled.is_set():
                 return
             root = provider.root / provider.relative(directory)
-            tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=10001)
+            tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
             tree.set_children(root, provider_entries(provider, result.rows))
             self.set_tree(tree)
             if not result.complete:

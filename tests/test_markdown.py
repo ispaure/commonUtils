@@ -587,4 +587,4 @@ class MarkdownTests(QtTestCase):
         self.assertTrue(index.isValid())
         with patch('commonUtils.ui.markdown.open_markdown') as opened:
             browser._activate(index)
-        opened.assert_called_once_with(self.second, parent=browser.window(), allow_edit=True)
+        opened.assert_called_once_with(self.second, parent=browser.window())

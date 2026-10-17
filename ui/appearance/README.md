@@ -12,6 +12,8 @@ modules have been removed; update imports and mock patch targets to this package
 - `theme`
 - `styling`
 - `icons`
+- `formatting_glyphs`: shared vector geometry and inline SVG, without GUI imports
+- `formatting_icons`: palette-aware Qt adapter for the same geometry
 - `status_line`: compact, muted, UI-font footers and native status-bar styling
 
 `StatusLine(text='', parent=None)` matches File Browser's italic, muted footer.
@@ -34,3 +36,12 @@ italic footers with application-wide styling enabled.
 
 Theme changes retain the existing Fusion engine and coalesce system notifications.
 Resolved font roles are cached; repeated control polish does not rebind unchanged roles.
+
+## Formatting icons
+
+`formatting_glyphs.py` owns the 24-point vector paths shared by Qt Markdown
+controls and native WebView editors. `formatting_svg()` emits inline vectors
+using the control's current color; the containing button supplies its accessible
+name and tooltip. `formatting_icons.FormattingIcon` paints those same paths
+through the palette-aware `set_painted_icon()` adapter. Keep geometry in the
+shared module so desktop and mobile cannot drift into different icon sets.
