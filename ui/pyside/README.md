@@ -31,6 +31,16 @@ does not change point sizes or address default-font differences between platform
 Tests exercise real widgets with synthetic native Windows message sequences;
 physical mixed-DPI monitor transitions still require Windows hardware validation.
 
+## Password fields
+
+Import `password_field` from `commonUtils.ui.pyside.passwords` and pass an existing
+`QLineEdit`. The helper returns the same field, starts masked, and adds one trailing
+eye action. Repeated installation is idempotent. `field.visibility_action` is the
+checkable action; its text and tooltip switch between Show password and Hide
+password. Toggling preserves the value and selection; clearing masks it again.
+`LineEdit(..., pw_field=True)` also installs this helper. The host owns secret
+storage, validation, submission and lifetime.
+
 ## Files
 
 | File | Responsibility / public entry points |
@@ -42,6 +52,7 @@ physical mixed-DPI monitor transitions still require Windows hardware validation
 | [window_dpi.py](window_dpi.py) | Windows-only preservation of logical window sizes across DPI changes. |
 | [messages.py](messages.py) | Messages utilities; public API is commonUtils.ui.pyside. |
 | [progress.py](progress.py) | Progress utilities; public API is commonUtils.ui.pyside. |
+| [passwords.py](passwords.py) | Password masking and accessible reveal action. |
 | [widgets.py](widgets.py) | Widgets utilities; public API is commonUtils.ui.pyside. |
 | [windows.py](windows.py) | Windows utilities; public API is commonUtils.ui.pyside. |
 

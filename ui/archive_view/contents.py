@@ -51,7 +51,7 @@ class ArchiveContents(qt.QWidget):
         self.search.setClearButtonEnabled(True)
         self.search.setMinimumWidth(180)
         self.search.setAccessibleName('Search archive entries')
-        self.search.textChanged.connect(self._render)
+        qt.connect_search(self.search, self._render)
         row.addWidget(self.search)
         content_layout.addLayout(row)
         self.files = qt.QTreeWidget()

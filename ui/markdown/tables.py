@@ -1,5 +1,7 @@
 """Markdown table actions using Qt's existing document and undo stack."""
 from .. import pyside as qt
+from ..appearance.icons import set_painted_icon
+from ..appearance.formatting_icons import FormattingIcon
 from .presentation import style_table
 
 
@@ -11,6 +13,7 @@ class MarkdownTablesMixin:
         self._table_menu = qt.QMenu(self.table_button)
         self.table_button.setMenu(self._table_menu)
         self.table_insert_action = self._action('Insert table…', self._insert_table_dialog)
+        set_painted_icon(self.table_insert_action, FormattingIcon, 'table')
         self._table_menu.addAction(self.table_insert_action)
         self._table_menu.addSeparator()
         self._table_actions = {}
@@ -19,11 +22,15 @@ class MarkdownTablesMixin:
                            ('delete_row', 'Delete row'), ('delete_column', 'Delete column'),
                            ('delete_table', 'Delete table')):
             action = self._action(title, lambda key=key: self._edit_table(key))
+            glyph = ('row_add' if key.startswith('row_') else 'column_add' if key.startswith('column_')
+                     else {'delete_row': 'row_delete', 'delete_column': 'column_delete', 'delete_table': 'table_delete'}[key])
+            set_painted_icon(action, FormattingIcon, glyph)
             self._table_actions[key] = action
             self._table_menu.addAction(action)
         self.table_button.setParent(self)
         self.table_button.hide()
         self._table_menu.setTitle('Table')
+        set_painted_icon(self._table_menu.menuAction(), FormattingIcon, 'table')
         self.format_menu.addMenu(self._table_menu)
         self.formatted_editor.table_actions = (self.table_insert_action, *self._table_actions.values())
         self.formatted_editor.cursorPositionChanged.connect(self._update_table_actions)

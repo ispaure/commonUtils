@@ -35,6 +35,11 @@ the newly available viewport. `chrome.restore()` runs during host uninstallation
 The Android adapter retains LinearLayout's weighted/MATCH_PARENT content sizing
 after each Toga refresh; measured child sizes must not freeze the viewport during
 rail, system-bar or window-size transitions.
+The Android adapter disables Material 1.12's automatic bottom-navigation inset
+listener: the window/host already reserves system and keyboard space. Otherwise
+Material adds the IME height as bar padding during `adjustResize`, expanding the
+bar until the weighted content has no height. Destination buttons retain their
+normal height above the keyboard.
 
 `host.chrome.set_page_swipes(active, navigation=None)` reserves horizontal reader
 gestures by disabling the Apple navigation controller's edge and, when available,
@@ -234,3 +239,52 @@ clears when changing scopes so a previous query cannot hide the new guide.
 scopes without application-specific ownership rules. Custom directories retain
 the supplied root while browsing contained pages. This is navigation scoping,
 not an access boundary; normal local-file access checks still apply.
+
+## Native source editor
+
+`code_input.CodeInput(loop=..., filename='', on_change=..., highlighting=True, **kwargs)`
+extends Toga's MultilineTextInput. It retains the native keyboard, IME, undo and
+selection. iOS draws a gutter over UITextView's text canvas; Android attaches
+`CodeEditorSupport` to the existing EditText. Logical line numbers follow native
+wrapped-line geometry and scrolling rather than estimating character widths.
+Call `set_filename` on rename, `set_language(alias)` for an override (None restores
+detection), and `dispose()` when retiring a view. Existing `.value`, `.readonly`
+and EditorSearch contracts remain available; `backend_name` identifies the host
+backend for native UTF-16 selection adapters.
+
+Hosts supply Pygments (Logistics pins 2.19.2). Language choices, filename detection
+and the Blade grammar are shared with desktop under `formats.code_syntax` and
+`formats.code_blade`. `formats.code_spans` produces colour spans and logical-line
+starts in UTF-16 coordinates without importing Qt. Colouring runs after a typing
+pause on a worker; changed text, language, filename or closed controls reject stale
+results. Active IME composition defers recolouring. Native attributes/spans are
+changed in place without replacing source text or its selection. Highlighting
+falls back to plain text above 128 Ki characters or 20,000 coloured spans; line
+numbers and editing remain available. The consumer owns save, private-memory,
+restoration and Markdown preview policy. Compile CodeEditorSupport.java with the
+other native bridge files on Android.
+
+The Markdown tree scroll content uses the allocated sidebar width (260 logical
+units when pinned, the available browse width on phones). This prevents iOS from
+retaining the hidden tree's minimum intrinsic width when switching from article
+to browse mode. Native documentation probes check the actual title-button frame.
+
+Opening a page expands its ancestor folders, including after scope changes and
+history navigation, so the current article is visible in the tree.
+
+## Password entry
+
+Import `PasswordInput` explicitly from `commonUtils.ui.native.password_input` in
+an iOS or Android Toga host. Construct it with `placeholder`, `on_confirm` and
+optional `style`. It supplies a native password field plus a 48-point eye button,
+with accessible Show password / Hide password names and system-colour icons.
+The row is at least 48 points tall. `value`, `enabled`, `focus()` and assignable
+`on_confirm` delegate to the input; disabling also disables the eye button.
+`field` exposes the underlying Toga input and `eye` exposes the reveal button.
+
+`revealed` reports visibility; `set_revealed(bool)` changes it and
+`toggle_visibility()` toggles it. Input starts hidden, toggling preserves its value
+and selection, and clearing through `value` or the input masks it again.
+Only the iOS/Android adapters change native masking; the dummy backend exercises
+state and callbacks. No Qt or consuming application modules are imported. Hosts
+own persistence, credential validation, background privacy and disposal policy.

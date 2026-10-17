@@ -1,6 +1,7 @@
 """Per-editor literal Find/Replace with native selection and retained drafts."""
 import re
 import toga
+from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
@@ -10,7 +11,7 @@ class EditorSearch:
         self.editor, self.container = editor, container
         self.insertion_index = insertion_index
         self.span = None
-        self.query = toga.TextInput(placeholder='Find text', on_change=self.changed, style=Pack(flex=1, height=44))
+        self.query = toga.TextInput(placeholder='Find text', on_change=DebouncedCallback(self.changed), style=Pack(flex=1, height=44))
         self.replacement = toga.TextInput(placeholder='Replace with', style=Pack(flex=1, height=44))
         self.case = toga.Switch('Match case', on_change=self.changed, style=Pack(height=44))
         self.notice = toga.Label('', style=Pack(font_size=12, flex=1))

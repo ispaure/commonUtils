@@ -68,6 +68,13 @@ import toga
 from commonUtils.ui.native.navigation import NativeNavigationHost
 from commonUtils.ui.native.routes import Routes
 from commonUtils.ui.native.image_canvas import ImageCanvas
+from commonUtils.ui.native.password_input import PasswordInput
+password = PasswordInput()
+password.value = 'independent secret'
+password.eye.on_press()
+assert password.revealed and password.value == 'independent secret'
+password.value = ''
+assert not password.revealed
 app = toga.App('Independent consumer', 'org.example.native-components')
 host = NativeNavigationHost((('gallery', 'Gallery', 'photo', 'ic_menu_gallery'),
                              ('notes', 'Notes', 'doc', 'ic_menu_edit')))

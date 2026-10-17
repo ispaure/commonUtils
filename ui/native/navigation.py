@@ -320,6 +320,12 @@ class AndroidNavigation:
         context = ContextThemeWrapper(self.impl._native_activity,
             MaterialR.style.Theme_MaterialComponents_DayNight)
         self.bottom = BottomNavigationView(context)
+        # Material 1.12's default inset listener treats the IME bottom inset as
+        # navigation padding. Under adjustResize that grows this WRAP_CONTENT
+        # bar to the whole remaining viewport and gives the content zero height.
+        # The window/navigation host already reserves system and keyboard space.
+        from java import jclass
+        jclass('androidx.core.view.ViewCompat').setOnApplyWindowInsetsListener(self.bottom, None)
         self.bottom.setLabelVisibilityMode(1)
         self.bottom.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
         self.impl.native.addView(self.bottom, LinearLayout.LayoutParams(-1, -2))

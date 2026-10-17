@@ -148,7 +148,7 @@ class ResourceBrowser(qt.QWidget):
         layout.addWidget(self.search_operation)
         self.search_timer = qt.QTimer(self)
         self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(250)
+        self.search_timer.setInterval(400)
         self.search_timer.timeout.connect(self._start_search)
         self.search_pending = False
         self._normal_tree = None
@@ -329,8 +329,6 @@ class ResourceBrowser(qt.QWidget):
             return
         if self._normal_tree is None:
             self._normal_tree = self.model.tree
-        self.model.set_filter(query, self.navigation.directory)
-        self.views.set_root(self.navigation.directory)
         self.search_timer.start()
 
     def _start_search(self):
@@ -366,7 +364,7 @@ class ResourceBrowser(qt.QWidget):
                 self.search_operation.bar.hide()
                 self.search_operation.cancel_button.hide()
         if self.search_pending:
-            self.search_timer.start(1)
+            self.search_timer.start()
         self._maybe_idle()
 
     def selected_rows(self):

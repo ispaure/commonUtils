@@ -1,6 +1,7 @@
 """Internal source-editing actions and safe file operations for MarkdownViewer."""
 from ..appearance.icons import set_painted_icon
-from ..readers.reader_chrome import ReaderIcon
+from ..readers.reader_chrome import ReaderIcon, reader_button
+from ..appearance.formatting_icons import FormattingIcon
 from pathlib import Path
 
 from .. import pyside as qt
@@ -54,6 +55,11 @@ class MarkdownEditingMixin:
         self.link_action = self._action('Insert link', self.insert_link, extra=('Ctrl+K',))
         self.editor_toolbar = qt.QToolButton(self)
         self.editor_toolbar.setText('Format')
+        set_painted_icon(self.editor_toolbar, FormattingIcon, 'format')
+        self.editor_toolbar.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.editor_toolbar.setToolTip('Markdown formatting')
+        self.editor_toolbar.setIconSize(qt.QSize(20, 20))
+        self.editor_toolbar.setMinimumSize(32, 32)
         self.editor_toolbar.setAccessibleName('Markdown formatting')
         self.editor_toolbar.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
         self.format_menu = qt.QMenu(self.editor_toolbar)
@@ -61,14 +67,31 @@ class MarkdownEditingMixin:
         for action in (self.undo_action, self.redo_action, self.bold_action, self.italic_action,
                        self.code_action, self.link_action):
             self.format_menu.addAction(action)
+        for action, glyph in ((self.bold_action, 'bold'), (self.italic_action, 'italic'),
+                              (self.undo_action, 'undo'), (self.redo_action, 'redo'),
+                              (self.code_action, 'code'), (self.link_action, 'link')):
+            set_painted_icon(action, FormattingIcon, glyph)
         menu = self.format_menu.addMenu('Heading')
-        menu.addAction('Paragraph', lambda: self.prefix_lines(''))
+        set_painted_icon(menu.menuAction(), FormattingIcon, 'heading')
+        action = menu.addAction('Paragraph', lambda: self.prefix_lines(''))
+        set_painted_icon(action, FormattingIcon, 'paragraph')
         for level in range(1, 7):
-            menu.addAction(f'Heading {level}', lambda level=level: self.prefix_lines('#' * level + ' '))
-        self.format_menu.addAction('Bullet list', lambda: self.prefix_lines('- '))
-        self.format_menu.addAction('Quote', lambda: self.prefix_lines('> '))
+            action = menu.addAction(f'Heading {level}', lambda level=level: self.prefix_lines('#' * level + ' '))
+            set_painted_icon(action, FormattingIcon, 'heading')
+        action = self.format_menu.addAction('Bullet list', lambda: self.prefix_lines('- '))
+        set_painted_icon(action, FormattingIcon, 'bullets')
+        action = self.format_menu.addAction('Quote', lambda: self.prefix_lines('> '))
+        set_painted_icon(action, FormattingIcon, 'quote')
         self._build_table_actions()
+        self.format_buttons = {}
         self.navigation_toolbar.insertWidget(2, self.editor_toolbar)
+        for index, (glyph, action) in enumerate((('bold', self.bold_action), ('italic', self.italic_action),
+                                                ('undo', self.undo_action), ('redo', self.redo_action))):
+            button = reader_button(self, action.text(), action=action)
+            button.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+            self.navigation_toolbar.insertWidget(2 + index, button)
+            self.format_buttons[glyph] = button
+            button.hide()
         self.editor_toolbar.hide()
         self.find_bar = qt.QWidget()
         row = qt.QHBoxLayout(self.find_bar)
@@ -114,6 +137,8 @@ class MarkdownEditingMixin:
         self.pages.setCurrentWidget(self.active_editor() if enabled else self.browser)
         self.diagrams_button.setVisible(not enabled and bool(mermaid_blocks(self.editor.toPlainText())))
         self.editor_toolbar.setVisible(enabled)
+        for button in self.format_buttons.values():
+            button.setVisible(enabled)
         self.properties_button.setVisible(enabled and self.allow_edit)
         self.appearance_button.setVisible(not enabled)
         self.speech.action.setVisible(not enabled)

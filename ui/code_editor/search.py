@@ -156,7 +156,7 @@ class SearchPanel(qt.QWidget):
         layout.addWidget(self.task)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(150)
+        self.timer.setInterval(400)
         self.timer.timeout.connect(self._search)
         for field in (self.query, self.replacement):
             field.textChanged.connect(self.schedule)
@@ -290,7 +290,7 @@ class SearchPanel(qt.QWidget):
                     self.find(direction)
         if self._pending:
             self._pending = False
-            self.timer.start(0)
+            self.timer.start()
         self.idle.emit()
 
     def _highlight(self):

@@ -35,7 +35,7 @@ class WikiPanel(qt.QWidget):
         layout.setStretch(2, 1)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(150)
+        self.timer.setInterval(400)
         self.timer.timeout.connect(self.populate)
         self.search.textChanged.connect(lambda: self.timer.start())
         self.mode.currentIndexChanged.connect(self.populate)

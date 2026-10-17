@@ -84,3 +84,19 @@ class ResourceSearchTests(unittest.TestCase):
         self.assertFalse(result.complete)
         with self.assertRaises(OperationCancelled):
             search_resources(provider, 'books', 'note', cancelled=lambda: True)
+
+
+class LargeResourceSearchTests(unittest.TestCase):
+    def test_default_search_reaches_matches_beyond_ten_thousand_entries(self):
+        from types import SimpleNamespace
+        from commonUtils.runtime.resource_search import search_resources
+        def listing(path, *, cancelled):
+            if not path:
+                return [dict(path=f'file-{i}', name=f'file-{i}', directory=False) for i in range(10001)] + [
+                    dict(path='nested', name='nested', directory=True)]
+            return [dict(path='nested/needle.pdf', name='needle.pdf', directory=False)]
+        provider = SimpleNamespace(relative=lambda value: value, list=listing)
+        result = search_resources(provider, '', 'needle')
+        self.assertTrue(result.complete)
+        self.assertEqual(result.scanned, 10003)
+        self.assertEqual(result.rows[0]['path'], 'nested/needle.pdf')
