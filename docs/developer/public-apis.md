@@ -184,7 +184,9 @@ presentation; `SidebarPolicy` and `allocated_width` load no toolkit.
 
 `ui.native.markdown.MarkdownWikiView` supplies adaptive, read-only documentation
 browsing and inline search; `ui.native.markdown_preview` renders bounded inert
-HTML. Both are reusable without Logistics or Qt.
+HTML, with optional host-supplied raster image bytes through `image_source`.
+See the [native API guide](../../ui/native/README.md#host-supplied-markdown-images)
+for callback and size contracts. Both are reusable without Logistics or Qt.
 
 `ui.native.navigation_state` supplies toolkit-independent destination state.
 `ui.native.navigation.NativeNavigationHost`, `ui.native.routes.Routes`, and

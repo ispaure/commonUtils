@@ -49,11 +49,14 @@ the recognizers' original enabled states; explicit Back buttons remain available
 
 ## Native image canvas
 
-`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, description=..., **kwargs)`
+`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, page_axis='horizontal', description=..., **kwargs)`
 extends Toga ImageView. It fits and centers an image, bounds zoom to 1–6, allows
 pan while zoomed, and emits left/right paging callbacks at fit scale. It does not
 load files, determine page order, decrypt content or save positions. Supply a
-description appropriate to the consumer's content.
+description appropriate to the consumer's content. Set `page_axis='vertical'`
+at construction for up/down paging (up emits +1, down emits -1); the default
+horizontal axis retains left/right paging. Both axes retain tap, pinch/pan and
+hold-lens arbitration, and page swipes require fit scale.
 Set `page_swipes_at_edges=True` to accept Apple paging swipes within the outer
 24 points too. The host must also reserve paging through `chrome.set_page_swipes`
 to prevent navigation pop gestures from competing; tap edge filtering is retained.
@@ -288,3 +291,26 @@ and selection, and clearing through `value` or the input masks it again.
 Only the iOS/Android adapters change native masking; the dummy backend exercises
 state and callbacks. No Qt or consuming application modules are imported. Hosts
 own persistence, credential validation, background privacy and disposal policy.
+
+## Host-supplied Markdown images
+
+`markdown_body` and `markdown_preview` accept optional `image_source(target)`.
+The callback returns `(mime_type, bytes)` or `None`; it owns path resolution,
+permissions, revision checks and I/O. The renderer never fetches images itself.
+PNG, JPEG and WebP up to 8 MiB are embedded as data URIs; `OSError`/`ValueError`
+and unsupported data fall back to escaped alt text. Hosts must validate raster
+content and bound their total I/O. An opted-in preview allows only `data:` image
+sources and has a 24 MiB output limit; the default inert preview keeps its 2 MiB
+limit and alt-text-only images. Image markup is bounded to 22 MiB per body.
+
+With an image source, `![[relative/image.webp]]` is parsed as an image embed.
+The reusable `embedded_image` and `wiki_image` helpers allow formatted editors to
+apply the same image policy without loading an application module. Wiki parsing
+is opt-in; code spans, fenced code and escaped embeds remain literal.
+
+### Search input delay
+
+`event_loop.DebouncedCallback(callback)` coalesces native text edits on the app
+event loop and invokes the callback after 400 ms without another edit. `cancel()`
+retires a pending callback. Native browser filename search delays both filtering
+and recursive scanning; editing cancels the previous scan immediately.

@@ -87,6 +87,16 @@ assert routes.body().children[0] is draft
 assert draft.value == 'independent draft'
 host.activate('gallery')
 canvas = ImageCanvas()
+assert canvas.page_axis == 'horizontal'
+vertical = ImageCanvas(page_axis='vertical')
+assert vertical.page_axis == 'vertical'
+vertical.dispose()
+try:
+    ImageCanvas(page_axis='diagonal')
+except ValueError:
+    pass
+else:
+    raise AssertionError('Unsupported paging axis accepted')
 canvas.fit_page()
 assert canvas.zoom_scale == 1
 canvas.dispose()

@@ -108,7 +108,7 @@ def apple_scroll_class():
             @objc_method
             def pageSwipe_(self, gesture) -> None:
                 if self.owner is not None and self.zoomScale <= 1.05:
-                    self.owner.interface.page(-1 if gesture.direction == 1 else 1)
+                    self.owner.interface.page(-1 if gesture.direction in (1, 8) else 1)
         _scroll_class = CommonUtilsImageScroll
     return _scroll_class
 
@@ -137,7 +137,7 @@ def apple_backend(interface):
             self.native.setTranslatesAutoresizingMaskIntoConstraints(False)
             self.native.setAutoresizesSubviews(False)
             self.swipes = []
-            for direction in (1, 2):
+            for direction in ((4, 8) if self.interface.page_axis == 'vertical' else (1, 2)):
                 gesture = ObjCClass('UISwipeGestureRecognizer').alloc().initWithTarget(self.native, action=SEL('pageSwipe:'))
                 gesture.direction, gesture.delegate = direction, self.native
                 self.native.addGestureRecognizer(gesture)
@@ -257,6 +257,7 @@ def android_backend(interface):
         def create(self):
             self.native = View(self._native_activity)
             self.native.setContentDescription(self.interface.description)
+            self.native.setVerticalPaging(self.interface.page_axis == 'vertical')
             owner = self
             class Listener(dynamic_proxy(View.PageListener)):
                 def page(self, direction):
@@ -277,7 +278,10 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
-    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+        if page_axis not in ('horizontal', 'vertical'):
+            raise ValueError('page_axis must be horizontal or vertical')
+        self.page_axis = page_axis
         self._magnifier_enabled = bool(magnifier_enabled)
         self.description = description
         self.page_swipes_at_edges = page_swipes_at_edges

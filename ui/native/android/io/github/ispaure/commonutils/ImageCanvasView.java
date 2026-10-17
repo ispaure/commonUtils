@@ -20,7 +20,8 @@ public final class ImageCanvasView extends AppCompatImageView {
     private final Matrix matrix = new Matrix();
     private final ScaleGestureDetector detector;
     private float zoom = 1, base = 1, lastX, lastY, startX, startY;
-    private boolean multiplePointers;
+    private boolean multiplePointers, verticalPaging;
+    public void setVerticalPaging(boolean value) { verticalPaging = value; }
     private boolean magnifierEnabled, lensActive, lensConsumed, touchActive;
     private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path lensClip = new Path();
@@ -172,7 +173,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         if (event.getActionMasked() == MotionEvent.ACTION_UP) {
             float dx = event.getX()-startX, dy = event.getY()-startY;
             float threshold = Math.max(32*density, Math.min(80*density, getWidth()*.12f));
-            if (!lensConsumed && !multiplePointers && zoom <= 1.05f && Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy)*1.5f && listener != null) listener.page(dx < 0 ? 1 : -1);
+            float along = verticalPaging ? dy : dx, across = verticalPaging ? dx : dy;
+            if (!lensConsumed && !multiplePointers && zoom <= 1.05f && Math.abs(along) > threshold && Math.abs(along) > Math.abs(across)*1.5f && listener != null) listener.page(along < 0 ? 1 : -1);
             else if (!lensConsumed && !multiplePointers && Math.abs(dx) < 12*density && Math.abs(dy) < 12*density) performClick();
             touchActive = false;
             dismissMagnifier();
