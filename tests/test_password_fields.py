@@ -1,11 +1,11 @@
 """Qt reveal controls preserve values and reset visibility on clear."""
-from ..ui import pyside as qt
-from .qt_test_case import QtTestCase
+from commonUtils.ui import pyside as qt
+from commonUtils.tests.qt_test_case import QtTestCase
 
 
 class PasswordFieldTests(QtTestCase):
     def test_password_eye_preserves_value_selection_and_masks_after_clear(self):
-        from ..ui.pyside.passwords import password_field
+        from commonUtils.ui.pyside.passwords import password_field
         field = password_field(qt.QLineEdit())
         self.addCleanup(field.deleteLater)
         field.setText('synthetic secret')
@@ -26,7 +26,7 @@ class PasswordFieldTests(QtTestCase):
         self.assertEqual(len(field.actions()), 1)
 
     def test_existing_password_wrapper_uses_reveal_control(self):
-        from ..ui.pyside.widgets import LineEdit
+        from commonUtils.ui.pyside.widgets import LineEdit
         owner = qt.QWidget()
         self.addCleanup(owner.deleteLater)
         wrapper = LineEdit('synthetic secret', owner, qt.QRect(0, 0, 240, 48), pw_field=True)
