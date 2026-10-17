@@ -22,7 +22,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
     path_changed = qt.Signal(object)
     modified_changed = qt.Signal(bool)
 
-    def __init__(self, path=None, parent=None, *, allow_edit=False, storage=None):
+    def __init__(self, path=None, parent=None, *, allow_edit=False, storage=None, directory=None):
         super().__init__(parent)
         self.allow_edit = bool(allow_edit)
         self.storage = storage
@@ -104,7 +104,20 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self.pages.addWidget(self.browser)
         self.pages.addWidget(self.editor)
         self.pages.addWidget(self.formatted_editor)
-        layout.addWidget(self.pages, 1)
+        if directory is not None:
+            from .wiki import WikiPanel
+            self.wiki = WikiPanel(self, directory)
+            self.wiki_splitter = qt.QSplitter()
+            self.wiki_splitter.addWidget(self.wiki)
+            self.wiki_splitter.addWidget(self.pages)
+            self.wiki_splitter.setStretchFactor(1, 1)
+            self.wiki_splitter.setSizes([260, 740])
+            layout.addWidget(self.wiki_splitter, 1)
+            if path is None:
+                path = self.wiki.catalog.first_page
+        else:
+            self.wiki = None
+            layout.addWidget(self.pages, 1)
         self.properties = MarkdownProperties(self)
         self.properties.changed.connect(self._apply_properties)
         layout.insertWidget(1, self.properties)
@@ -164,6 +177,8 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self._reading_palette_timer.setInterval(0)
         self._reading_palette_timer.timeout.connect(lambda: self._render_source(self.editor.toPlainText()))
         self.browser.installEventFilter(self)
+        from .hover import LinkPreview
+        self.link_preview = LinkPreview(self)
         if storage is not None:
             for action in (self.new_action, self.open_action, self.save_as_action):
                 action.setEnabled(False)
@@ -322,6 +337,24 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         if not url.isLocalFile():
             self.status.setText(f'Unsupported link: {url.toString()}')
             return
+        if self.storage is None:
+            try:
+                from ...filesystem.local_access import check_local_path
+                from ...formats.markdown_wiki import resolve_document_path
+                candidate = Path(url.toLocalFile())
+                check_local_path(candidate)
+                candidate = resolve_document_path(candidate)
+                check_local_path(candidate)
+                if candidate.suffix.lower() not in ('.md', '.markdown'):
+                    from ..text_editor import open_text_file
+                    open_text_file(candidate, self.window())
+                    return
+                fragment = url.fragment()
+                url = qt.QUrl.fromLocalFile(str(candidate))
+                url.setFragment(fragment)
+            except (OSError, ValueError) as error:
+                self.status.setText(f'Cannot open link: {error}')
+                return
         if Path(url.toLocalFile()) == self.current_path:
             self._remember_scroll()
             self._render_source(self.markdown_text())

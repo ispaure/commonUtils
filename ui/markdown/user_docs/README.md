@@ -130,3 +130,29 @@ can keep text and embedded images in memory, with Save/Discard/Cancel on close
 and no persistent private drafts. The host decides which locations are available
 and whether opening another document uses a new window. Save failures retain your
 current buffer; inspect a reported saved destination before retrying Save As.
+
+## Browse documentation folders
+
+A host can open a Markdown directory as a wiki. Use the left tree to browse nested
+folders and pages, and the inline search to filter file names/titles or page text.
+Folders with a same-named Markdown file open that page. Its first body heading (after optional YAML properties and blank lines)
+becomes the label; otherwise the folder name is used. Expanding the folder still
+shows its other pages. Clear search to see the full hierarchy again. Page changes
+use the usual unsaved-edit confirmation. Reopen the wiki to discover files added
+outside the viewer.
+
+The top bar provides Back, Forward and Up. Back/Forward revisit pages you have
+opened. Up opens the containing folder's same-named Markdown page; from that
+folder page it opens the parent folder's page. At the documentation root,
+README.md or index.md can serve as the folder page. Up is disabled when that
+folder has no page or you are already at the root page.
+
+In desktop reading mode, hover a local Markdown/text/code link to see a short
+source snippet in a preview window. Moving off the link closes it immediately.
+This does not open the file or change your reading history. Editing mode does
+not show hover previews. Missing, binary and external web links have no preview.
+
+A folder opens its same-named page (for example, `banana/banana.md`). Guides
+begin with a title heading, which also names them in the tree. A link to another
+documentation wiki changes the sidebar to that guide's files. Back and Forward
+return to the corresponding guide and tree. Search clears on a scope change.
