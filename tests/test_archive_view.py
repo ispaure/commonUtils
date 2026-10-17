@@ -27,6 +27,7 @@ class ArchiveViewTests(QtTestCase):
         names = [self.view.files.topLevelItem(i).text(0) for i in range(self.view.files.topLevelItemCount())]
         self.assertEqual(names, ['folder', 'small.txt', 'notes.txt'])
         self.view.search.setText('nested')
+        self.wait_until(lambda: self.view.files.topLevelItemCount() == 1)
         self.assertEqual(self.view.files.topLevelItemCount(), 1)
         self.assertEqual(self.view.files.topLevelItem(0).text(0), 'folder/nested.txt')
 
@@ -34,6 +35,7 @@ class ArchiveViewTests(QtTestCase):
         names = []
         self.view.preview_requested.connect(names.append)
         self.view.search.setText('notes')
+        self.wait_until(lambda: self.view.files.topLevelItemCount() == 1)
         item = self.view.files.topLevelItem(0)
         item.setSelected(True)
         self.view.preview_button.click()
@@ -45,6 +47,7 @@ class ArchiveViewTests(QtTestCase):
         requested = []
         self.view.remove_requested.connect(requested.append)
         self.view.search.setText('notes')
+        self.wait_until(lambda: self.view.files.topLevelItemCount() == 1)
         self.view.files.topLevelItem(0).setSelected(True)
         menu = self.view.context_menu()
         self.addCleanup(menu.deleteLater)
