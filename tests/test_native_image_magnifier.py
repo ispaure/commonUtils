@@ -33,7 +33,8 @@ class AppleLensTests(unittest.TestCase):
                 native.init.return_value = native
                 self.objects.append(native)
                 return native
-            return NS(alloc=allocate, whiteColor=NS(CGColor=object()), blackColor=object())
+            return NS(alloc=allocate, buttonWithType=lambda kind: allocate(), systemFontOfSize=Mock(),
+                      whiteColor=Mock(CGColor=object()), grayColor=Mock(), blackColor=Mock())
         self.modules = patch.dict(sys.modules, {
             'toga_iOS.widgets.imageview': NS(ImageView=ImageView),
             'rubicon.objc': NS(ObjCClass=objc_class, CGRect=rect, CGSize=Mock(),
@@ -41,7 +42,9 @@ class AppleLensTests(unittest.TestCase):
         })
         self.modules.start()
         self.addCleanup(self.modules.stop)
-        self.backend = apple_backend(NS(magnifier_enabled=True))
+        lens = patch.object(canvas, 'apple_lens_class', return_value=objc_class('UIView'))
+        lens.start(); self.addCleanup(lens.stop)
+        self.backend = apple_backend(NS(magnifier_enabled=True, magnifier_zoom=200))
         self.backend.lens = self.backend.lens_picture = None
         # Model a panned/zoomed page with its origin at (20, 100) in the parent.
         self.backend.picture = NS(image=object(), bounds=rect((0, 0), (200, 300)),
@@ -95,6 +98,24 @@ class AppleLensTests(unittest.TestCase):
         self.assertIsNone(backend.lens)
         backend.hide_magnifier()  # cancellation/disposal can be repeated
 
+    def test_percentage_updates_original_pixel_transform_and_endpoint_buttons(self):
+        backend = self.backend
+        backend.interface.magnifier_zoom = 250
+        backend.show_magnifier(self.gesture())
+        self.assertEqual(backend.lens_picture.frame.size.width, 1000)
+        backend.lens_more.setEnabled.assert_called_with(False)
+        backend.lens_less.setEnabled.assert_called_with(True)
+        self.assertEqual(backend.lens_label.text, '250%')
+        backend.interface.magnifier_zoom = 150
+        backend.hold = self.gesture()
+        backend.set_magnifier_zoom(150)
+        self.assertEqual(backend.lens_picture.frame.size.width, 600)
+        backend.lens_less.setEnabled.assert_called_with(False)
+        backend.lens_more.setEnabled.assert_called_with(True)
+        self.assertEqual(backend.lens_label.text, '150%')
+        backend.hide_magnifier()
+        self.assertIsNone(backend.lens_more)
+
     def test_detached_or_disabled_canvas_cannot_show_a_lens(self):
         backend = self.backend
         backend.interface.magnifier_enabled = False
@@ -104,6 +125,42 @@ class AppleLensTests(unittest.TestCase):
         backend.native.superview = None
         backend.show_magnifier(self.gesture())
         self.assertIsNone(backend.lens)
+
+
+class MagnifierSettingTests(unittest.TestCase):
+    def setUp(self):
+        self.view = object.__new__(canvas.ImageCanvas)
+        self.view._impl = NS(set_magnifier_zoom=Mock())
+        self.view._magnifier_zoom = 190
+        self.view.on_magnifier_zoom = Mock()
+
+    def test_steps_are_bounded_and_notify_once_per_actual_change(self):
+        view = self.view
+        for _ in range(10):view.change_magnifier_zoom(1)
+        self.assertEqual(view.magnifier_zoom, 250)
+        self.assertEqual([call.args[1] for call in view.on_magnifier_zoom.call_args_list], [210,230,250])
+        for _ in range(10):view.change_magnifier_zoom(-1)
+        self.assertEqual(view.magnifier_zoom, 150)
+        for value in (149, 151, 200, 251, '190', 190.0):
+            with self.assertRaises(ValueError):view.request_magnifier_zoom(value)
+
+    def test_host_can_reject_a_failed_save_without_changing_native_zoom(self):
+        view = self.view
+        view.on_magnifier_zoom.return_value = False
+        self.assertFalse(view.change_magnifier_zoom(1))
+        self.assertEqual(view.magnifier_zoom, 190)
+        view._impl.set_magnifier_zoom.assert_not_called()
+
+    def test_lens_only_receives_control_touches(self):
+        class View:pass
+        objc = NS(ObjCClass=lambda name: View, objc_method=lambda method: method, objc_id=object)
+        with patch.object(canvas, '_lens_class', None), patch.dict(sys.modules, {
+            'rubicon.objc': objc, 'rubicon.objc.types': NS(CGPoint=object),
+        }):
+            lens = canvas.apple_lens_class()()
+        lens.bounds = rect((0,0),(180,140))
+        for x,y,expected in ((20,20,True),(160,20,True),(90,20,False),(20,60,False)):
+            self.assertEqual(lens.pointInside_withEvent_(NS(x=x,y=y),None),expected)
 
 
 class LensGeometryTests(unittest.TestCase):

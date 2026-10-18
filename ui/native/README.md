@@ -49,7 +49,7 @@ the recognizers' original enabled states; explicit Back buttons remain available
 
 ## Native image canvas
 
-`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, page_axis='horizontal', description=..., **kwargs)`
+`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description=..., **kwargs)`
 extends Toga ImageView. It fits and centers an image, bounds zoom to 1–6, allows
 pan while zoomed, and emits left/right paging callbacks at fit scale. It does not
 load files, determine page order, decrypt content or save positions. Supply a
@@ -62,7 +62,7 @@ Set `page_swipes_at_edges=True` to accept Apple paging swipes within the outer
 to prevent navigation pop gestures from competing; tap edge filtering is retained.
 
 Set `magnifier_enabled=True` to opt into the iOS/Android hold lens (off by
-default). Hold 400 ms, drag to move the 2× lens, release to dismiss. The lens
+default). Hold 400 ms, drag to move the lens, release to dismiss. The lens
 magnifies the image beneath its own center, using decoded pixels in memory,
 and suppresses tap/paging while active. Its 180×140 logical-unit size scales
 with the viewport’s shorter side, up to 360×280 on tablets. The lens stays
@@ -70,7 +70,15 @@ inside the viewport; continued dragging toward an edge moves the sample toward
 the viewport border independently of the lens frame, including the bottom edge.
 Its frame is lowered by 4.5% of the viewport height from the original
 36-unit above-finger gap, allowing overlap with the finger. It clamps at the edges. Image margins remain blank rather than snapping to the image edge.
-A second finger cancels it. Disabling the property, replacing the image, resizing,
+Tap −/+ at the top corners with another finger to change `magnifier_zoom` through
+150, 170, 190, 210, 230 and 250 percent (default 190). The center label shows the
+current value and endpoint buttons disable at the bounds.
+`on_magnifier_zoom(canvas, percent)` receives a requested change before applying it;
+return `False` to reject a failed host save. Assigning `magnifier_zoom` updates a
+visible lens without firing the callback. `change_magnifier_zoom(direction)` steps
+once and `request_magnifier_zoom(percent)` requests an explicit supported level.
+The host owns persistence and synchronization across canvases. A second finger
+outside the control bar still cancels the lens for pinch zoom. Disabling the property, replacing the image, resizing,
 detaching or disposing clears the overlay and pending hold. Hosts own eligibility
 such as fullscreen-only use; the canvas has no comic or fullscreen policy.
 

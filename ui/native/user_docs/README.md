@@ -18,7 +18,10 @@ When the application enables the magnifying bubble, hold the image briefly,
 then drag to move the bubble. It enlarges the image beneath the bubble’s center,
 above your finger, and is larger on tablets. Near an edge, keep dragging toward
 the border to inspect the outermost pixels after the bubble stops moving. Release
-to dismiss it; a second finger cancels it for pinch zoom.
+to dismiss it. While holding, tap −/+ in the top corners with another finger
+to adjust the bubble from 150% to 250% in 20% steps. The number between the
+buttons shows its zoom. The application decides whether to remember this value.
+A second finger outside these controls still cancels the bubble for pinch zoom.
 
 Applications can also use system document pickers. Opening a document grants
 scoped access while it is being imported; the application chooses where to keep

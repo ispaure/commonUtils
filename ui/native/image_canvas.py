@@ -2,6 +2,8 @@
 import toga
 
 _scroll_class = None
+_lens_class = None
+MAGNIFIER_ZOOMS = tuple(range(150, 251, 20))
 
 
 def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
@@ -18,6 +20,22 @@ def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
     sample_x = max(0, min(thumb_x, view_width))
     sample_y = max(0, min(thumb_y - offset + push * offset, view_height))
     return x, y, width, height, sample_x, sample_y
+
+
+def apple_lens_class():
+    global _lens_class
+    if _lens_class is None:
+        from rubicon.objc import ObjCClass, objc_method, objc_id
+        from rubicon.objc.types import CGPoint
+        class CommonUtilsImageLens(ObjCClass('UIView')):
+            @objc_method
+            def pointInside_withEvent_(self, point: CGPoint, event: objc_id) -> bool:
+                # Only controls receive a second touch. The rest passes through
+                # so an ordinary second finger can still start pinch zoom.
+                return (0 <= point.y < 44 and (0 <= point.x < 44
+                    or self.bounds.size.width - 44 <= point.x < self.bounds.size.width))
+        _lens_class = CommonUtilsImageLens
+    return _lens_class
 
 
 def apple_scroll_class():
@@ -84,6 +102,16 @@ def apple_scroll_class():
                 return 24 < x < self.bounds.size.width - 24
 
             @objc_method
+            def magnifierLess_(self, sender) -> None:
+                if self.owner is not None:
+                    self.owner.interface.change_magnifier_zoom(-1)
+
+            @objc_method
+            def magnifierMore_(self, sender) -> None:
+                if self.owner is not None:
+                    self.owner.interface.change_magnifier_zoom(1)
+
+            @objc_method
             def magnify_(self, gesture) -> None:
                 if self.owner is not None:
                     if gesture.state in (1, 2):  # began / changed
@@ -122,6 +150,7 @@ def apple_backend(interface):
             self.picture.contentMode = 1
             self.last_size = None
             self.lens = self.lens_picture = None
+            self.lens_less = self.lens_more = self.lens_label = None
             self.native = apple_scroll_class().alloc().init()
             self.native.owner = self
             self.native.delegate = self.native
@@ -169,6 +198,11 @@ def apple_backend(interface):
                 self.lens_picture.image = None
                 self.lens.removeFromSuperview()
                 self.lens = self.lens_picture = None
+            self.lens_less = self.lens_more = self.lens_label = None
+
+        def set_magnifier_zoom(self, value):
+            if self.lens is not None:
+                self.show_magnifier(self.hold)
 
         def show_magnifier(self, gesture):
             parent = self.native.superview
@@ -184,8 +218,8 @@ def apple_backend(interface):
                 # follow the thumb across page edges without changing gestures.
                 if not (0 <= source.x <= size.width and 0 <= source.y <= size.height):
                     return
-                self.lens = ObjCClass('UIView').alloc().init()
-                self.lens.userInteractionEnabled = False
+                self.lens = apple_lens_class().alloc().init()
+                self.lens.userInteractionEnabled = True
                 self.lens.clipsToBounds = True
                 self.lens.layer.cornerRadius = 24
                 self.lens.layer.borderWidth = 2
@@ -194,6 +228,25 @@ def apple_backend(interface):
                 self.lens_picture = ObjCClass('UIImageView').alloc().init()
                 self.lens_picture.image = self.picture.image
                 self.lens.addSubview(self.lens_picture)
+                self.lens_label = ObjCClass('UILabel').alloc().init()
+                self.lens_label.textAlignment = 1
+                self.lens_label.textColor = ObjCClass('UIColor').whiteColor
+                self.lens_label.backgroundColor = ObjCClass('UIColor').blackColor.colorWithAlphaComponent(.85)
+                self.lens_label.font = ObjCClass('UIFont').systemFontOfSize(16)
+                self.lens.addSubview(self.lens_label)
+                for field, title, action, label in (
+                    ('lens_less', '−', 'magnifierLess:', 'Decrease magnifier zoom'),
+                    ('lens_more', '+', 'magnifierMore:', 'Increase magnifier zoom')):
+                    button = ObjCClass('UIButton').buttonWithType(0)
+                    button.setTitle(title, forState=0)
+                    button.setTitleColor(ObjCClass('UIColor').whiteColor, forState=0)
+                    button.setTitleColor(ObjCClass('UIColor').grayColor, forState=2)
+                    button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
+                    button.backgroundColor = ObjCClass('UIColor').blackColor.colorWithAlphaComponent(.85)
+                    button.accessibilityLabel = label
+                    button.addTarget(self.native, action=SEL(action), forControlEvents=64)
+                    setattr(self, field, button)
+                    self.lens.addSubview(button)
                 parent.addSubview(self.lens)
             # Convert through the native hierarchy: scroll offsets, fit margins
             # and zoom are all included, and the lens itself never scrolls.
@@ -204,7 +257,14 @@ def apple_backend(interface):
             self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
             source = self.picture.convertPoint(
                 CGPoint(rect.origin.x + sample_x, rect.origin.y + sample_y), fromView=parent)
-            scale = 2.0 * float(self.native.zoomScale)
+            percent = getattr(self.interface, 'magnifier_zoom', 200)
+            self.lens_less.frame = CGRect((0, 0), (44, 44))
+            self.lens_more.frame = CGRect((width - 44, 0), (44, 44))
+            self.lens_label.frame = CGRect((44, 0), (max(0, width - 88), 44))
+            self.lens_less.setEnabled(percent > 150)
+            self.lens_more.setEnabled(percent < 250)
+            self.lens_label.text = str(percent) + '%'
+            scale = percent / 100 * float(self.native.zoomScale)
             self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
                                               (size.width * scale, size.height * scale))
 
@@ -264,12 +324,18 @@ def android_backend(interface):
                     owner.interface.page(direction)
                 def toggleControls(self):
                     owner.interface.toggle_controls()
+                def magnifierZoom(self, value):
+                    owner.interface.request_magnifier_zoom(value)
             self.listener = Listener()
             self.native.setPageListener(self.listener)
             self.native.setMagnifierEnabled(self.interface.magnifier_enabled)
+            self.native.setMagnifierZoom(self.interface.magnifier_zoom)
 
         def set_magnifier_enabled(self, enabled):
             self.native.setMagnifierEnabled(enabled)
+
+        def set_magnifier_zoom(self, value):
+            self.native.setMagnifierZoom(value)
 
         def rehint(self):
             super().rehint()
@@ -278,11 +344,15 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
-    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
         if page_axis not in ('horizontal', 'vertical'):
             raise ValueError('page_axis must be horizontal or vertical')
         self.page_axis = page_axis
         self._magnifier_enabled = bool(magnifier_enabled)
+        if type(magnifier_zoom) is not int or magnifier_zoom not in MAGNIFIER_ZOOMS:
+            raise ValueError('Magnifier zoom must be 150–250%, in 20% steps.')
+        self._magnifier_zoom = magnifier_zoom
+        self.on_magnifier_zoom = on_magnifier_zoom
         self.description = description
         self.page_swipes_at_edges = page_swipes_at_edges
         self.on_page = on_page
@@ -307,6 +377,34 @@ class ImageCanvas(toga.ImageView):
         setter = getattr(self._impl, 'set_magnifier_enabled', None)
         if setter is not None:
             setter(self._magnifier_enabled)
+
+    @property
+    def magnifier_zoom(self):
+        return self._magnifier_zoom
+
+    @magnifier_zoom.setter
+    def magnifier_zoom(self, value):
+        if type(value) is not int or value not in MAGNIFIER_ZOOMS:
+            raise ValueError('Magnifier zoom must be 150–250%, in 20% steps.')
+        self._magnifier_zoom = value
+        setter = getattr(self._impl, 'set_magnifier_zoom', None)
+        if setter is not None:
+            setter(value)
+
+    def request_magnifier_zoom(self, value):
+        if type(value) is not int or value not in MAGNIFIER_ZOOMS:
+            raise ValueError('Magnifier zoom must be 150–250%, in 20% steps.')
+        if value == self.magnifier_zoom:
+            return False
+        if self.on_magnifier_zoom is not None and self.on_magnifier_zoom(self, value) is False:
+            return False
+        self.magnifier_zoom = value
+        return True
+
+    def change_magnifier_zoom(self, direction):
+        index = MAGNIFIER_ZOOMS.index(self.magnifier_zoom)
+        return self.request_magnifier_zoom(MAGNIFIER_ZOOMS[max(0, min(len(MAGNIFIER_ZOOMS)-1,
+            index + (1 if direction > 0 else -1)))])
 
     def page(self, direction):
         if self.on_page is not None and self.image is not None and self.zoom_scale <= 1.05:
@@ -342,7 +440,7 @@ class ImageCanvas(toga.ImageView):
     def dispose(self):
         """Retire callbacks and native gesture ownership before dropping a page."""
         self.magnifier_enabled = False
-        self.on_page = self.on_toggle = None
+        self.on_page = self.on_toggle = self.on_magnifier_zoom = None
         self.image = None
         if hasattr(self._impl, 'picture'):
             self._impl.native.delegate = None

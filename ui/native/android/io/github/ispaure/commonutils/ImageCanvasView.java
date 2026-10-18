@@ -8,14 +8,24 @@ import android.graphics.Path;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.view.MotionEvent;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.PopupWindow;
+import android.widget.TextView;
 import android.view.ViewConfiguration;
 import android.view.ScaleGestureDetector;
 import androidx.appcompat.widget.AppCompatImageView;
 
 /** Bounded per-page zoom; horizontal paging is admitted only at fit scale. */
 public final class ImageCanvasView extends AppCompatImageView {
-    public interface PageListener { void page(int direction); void toggleControls(); }
+    public interface PageListener {
+        void page(int direction);
+        void toggleControls();
+        default void magnifierZoom(int percent) {}
+    }
     private PageListener listener;
     private final Matrix matrix = new Matrix();
     private final ScaleGestureDetector detector;
@@ -23,11 +33,16 @@ public final class ImageCanvasView extends AppCompatImageView {
     private boolean multiplePointers, verticalPaging;
     public void setVerticalPaging(boolean value) { verticalPaging = value; }
     private boolean magnifierEnabled, lensActive, lensConsumed, touchActive;
+    private int magnifierZoom = 190;
+    private PopupWindow lensControls;
+    private Button lensLess, lensMore;
+    private TextView lensLabel;
     private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path lensClip = new Path();
     private final Runnable hold = () -> {
         if (magnifierEnabled && touchActive && !multiplePointers && containsImage(lastX, lastY)) {
             lensActive = lensConsumed = true;
+            showLensControls();
             invalidate();
         }
     };
@@ -39,6 +54,10 @@ public final class ImageCanvasView extends AppCompatImageView {
     private void dismissMagnifier() {
         if (hold != null) removeCallbacks(hold);
         lensActive = false;
+        if (lensControls != null) lensControls.dismiss();
+        lensControls = null;
+        lensLess = lensMore = null;
+        lensLabel = null;
         invalidate();
     }
     private boolean containsImage(float x, float y) {
@@ -51,29 +70,107 @@ public final class ImageCanvasView extends AppCompatImageView {
         return point[0] >= 0 && point[1] >= 0 && point[0] <= image.getIntrinsicWidth()
             && point[1] <= image.getIntrinsicHeight();
     }
+    private RectF lensBounds() {
+        float density = getResources().getDisplayMetrics().density;
+        float factor = Math.max(1, Math.min(2, Math.min(getWidth(), getHeight()) / (400*density)));
+        float width = Math.min(180*density*factor, getWidth()), height = Math.min(140*density*factor, getHeight());
+        float left = Math.max(0, Math.min(lastX-width/2, getWidth()-width));
+        float top = Math.max(0, Math.min(lastY-height-36*density + .045f*getHeight(), getHeight()-height));
+        return new RectF(left, top, left+width, top+height);
+    }
+    public int getMagnifierZoom() { return magnifierZoom; }
+    public void setMagnifierZoom(int value) {
+        if (value < 150 || value > 250 || (value-150)%20 != 0)
+            throw new IllegalArgumentException("Magnifier zoom must be 150–250%, in 20% steps.");
+        magnifierZoom = value;
+        updateLensControls();
+        invalidate();
+    }
+    private void changeMagnifierZoom(int direction) {
+        int value = Math.max(150, Math.min(250, magnifierZoom + 20*direction));
+        if (value == magnifierZoom) return;
+        if (listener != null) listener.magnifierZoom(value);
+        else setMagnifierZoom(value);
+    }
+    private void showLensControls() {
+        if (getWindowToken() == null) return;
+        Context context = getContext();
+        float density = getResources().getDisplayMetrics().density;
+        int side = Math.round(44*density);
+        FrameLayout bar = new FrameLayout(context);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xDD000000);
+        background.setCornerRadius(22*density);
+        bar.setBackground(background);
+        bar.setClipToOutline(true);
+        lensLabel = new TextView(context);
+        lensLabel.setTextColor(Color.WHITE);
+        lensLabel.setTextSize(16);
+        lensLabel.setGravity(Gravity.CENTER);
+        lensLabel.setBackgroundColor(0xDD000000);
+        bar.addView(lensLabel, new FrameLayout.LayoutParams(-1, -1));
+        lensLess = new Button(context);
+        lensMore = new Button(context);
+        for (Button button : new Button[]{lensLess, lensMore}) {
+            button.setPadding(0, 0, 0, 0);
+            button.setMinWidth(0); button.setMinimumWidth(0);
+            button.setMinHeight(0); button.setMinimumHeight(0);
+            button.setTextSize(24); button.setTextColor(Color.WHITE);
+            button.setBackgroundColor(0xDD000000);
+        }
+        lensLess.setText("−"); lensMore.setText("+");
+        lensLess.setContentDescription("Decrease magnifier zoom");
+        lensMore.setContentDescription("Increase magnifier zoom");
+        lensLess.setOnClickListener(view -> changeMagnifierZoom(-1));
+        lensMore.setOnClickListener(view -> changeMagnifierZoom(1));
+        bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.TOP));
+        bar.addView(lensMore, new FrameLayout.LayoutParams(side, side, Gravity.RIGHT | Gravity.TOP));
+        RectF rect = lensBounds();
+        int inset = Math.round(2*density);
+        lensControls = new PopupWindow(bar, Math.round(rect.width())-2*inset, side, false);
+        lensControls.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
+        // Route a second finger to the buttons without cancelling the held
+        // image gesture or treating that finger as a pinch.
+        lensControls.setSplitTouchEnabled(true);
+        lensControls.setOutsideTouchable(false);
+        lensControls.setClippingEnabled(true);
+        int[] origin = new int[2];
+        getLocationOnScreen(origin);
+        lensControls.showAtLocation(this, Gravity.TOP | Gravity.LEFT,
+            origin[0]+Math.round(rect.left)+inset, origin[1]+Math.round(rect.top)+inset);
+        updateLensControls();
+    }
+    private void updateLensControls() {
+        if (lensControls == null) return;
+        lensLabel.setText(magnifierZoom + "%");
+        lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
+        lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
+        lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
+        RectF rect = lensBounds();
+        int[] origin = new int[2]; getLocationOnScreen(origin);
+        float density = getResources().getDisplayMetrics().density;
+        int inset = Math.round(2*density);
+        lensControls.update(origin[0]+Math.round(rect.left)+inset, origin[1]+Math.round(rect.top)+inset,
+            Math.round(rect.width())-2*inset, Math.round(44*density));
+    }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (!lensActive || getDrawable() == null) return;
         float density = getResources().getDisplayMetrics().density;
-        // Match magnifier_geometry in the Apple backend, using logical units.
-        float factor = Math.max(1, Math.min(2, Math.min(getWidth(), getHeight()) / (400*density)));
-        float width = Math.min(180*density*factor, getWidth()), height = Math.min(140*density*factor, getHeight());
+        RectF rect = lensBounds();
+        float height = rect.height();
         float offset = height/2 + 36*density - .045f*getHeight();
-        float left = Math.max(0, Math.min(lastX-width/2, getWidth()-width));
-        float top = lastY-height-36*density + .045f*getHeight();
-        top = Math.max(0, Math.min(top, getHeight()-height));
         float push = offset > 0 ? Math.max(0, Math.min(1, (lastY-(getHeight()-offset))/offset))
             : offset < 0 ? Math.max(0, Math.min(1, 1-lastY/-offset)) : 0;
         float sampleX = Math.max(0, Math.min(lastX, getWidth()));
         float sampleY = Math.max(0, Math.min(lastY-offset+push*offset, getHeight()));
-        RectF rect = new RectF(left, top, left+width, top+height);
         lensClip.reset();
         lensClip.addRoundRect(rect, 24*density, 24*density, Path.Direction.CW);
         int saved = canvas.save();
         canvas.clipPath(lensClip);
         canvas.drawColor(Color.BLACK);
         canvas.translate(rect.centerX(), rect.centerY());
-        canvas.scale(2f, 2f);
+        canvas.scale(magnifierZoom/100f, magnifierZoom/100f);
         // At the edges, dragging keeps moving the sample beyond the fixed lens.
         canvas.translate(-sampleX+getPaddingLeft(), -sampleY+getPaddingTop());
         canvas.concat(matrix);
@@ -187,7 +284,7 @@ public final class ImageCanvasView extends AppCompatImageView {
             getParent().requestDisallowInterceptTouchEvent(true);
         }
         lastX = event.getX(); lastY = event.getY();
-        if (lensActive) invalidate();
+        if (lensActive) { updateLensControls(); invalidate(); }
         return true;
     }
     @Override public boolean performClick() {
