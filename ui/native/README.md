@@ -23,6 +23,8 @@ callbacks. `activate(identity)` selects a destination without rebuilding views.
 `Routes(host, guard, changed, intent=None)` retains a separate stack per destination.
 The guard controls navigation, and the consumer decides document-close behavior.
 Install/uninstall routes with their host to register/remove native Back delegates.
+Android bottom-bar/rail transitions suppress Toga's programmatic selection event;
+rotation changes presentation without invoking host navigation or retiring routes.
 
 `host.chrome.set_hidden(hidden, navigation=None)` hides native bars and restores
 their previous visibility. A consumer with a custom split/detail controller can
@@ -70,15 +72,19 @@ inside the viewport; continued dragging toward an edge moves the sample toward
 the viewport border independently of the lens frame, including the bottom edge.
 Its frame is lowered by 4.5% of the viewport height from the original
 36-unit above-finger gap, allowing overlap with the finger. It clamps at the edges. Image margins remain blank rather than snapping to the image edge.
-Tap −/+ at the top corners with another finger to change `magnifier_zoom` through
-150, 170, 190, 210, 230 and 250 percent (default 190). The center label shows the
-current value and endpoint buttons disable at the bounds.
+Keep the original finger holding the image and tap the 44-unit −/+ buttons
+with another finger to change `magnifier_zoom` through 150, 170, 190, 210, 230 and
+250 percent (default 190). The controls sit at the upper left/right corners,
+8 units outward and 12 upward, clamped to the viewport. A label shows the value.
+UIKit adds the buttons as siblings of the clipped lens; Android uses a split-touch
+popup above the lens. The original hold stays on the image; button taps do not
+page or toggle controls. Releasing the original hold dismisses the lens and buttons.
 `on_magnifier_zoom(canvas, percent)` receives a requested change before applying it;
 return `False` to reject a failed host save. Assigning `magnifier_zoom` updates a
 visible lens without firing the callback. `change_magnifier_zoom(direction)` steps
 once and `request_magnifier_zoom(percent)` requests an explicit supported level.
 The host owns persistence and synchronization across canvases. A second finger
-outside the control bar still cancels the lens for pinch zoom. Disabling the property, replacing the image, resizing,
+away from the buttons still cancels the lens for ordinary image pinch zoom. Disabling the property, replacing the image, resizing,
 detaching or disposing clears the overlay and pending hold. Hosts own eligibility
 such as fullscreen-only use; the canvas has no comic or fullscreen policy.
 

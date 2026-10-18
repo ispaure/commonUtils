@@ -22,6 +22,12 @@ def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
     return x, y, width, height, sample_x, sample_y
 
 
+def magnifier_controls_geometry(view_width, view_height, x, y, width):
+    """44-point corner targets, offset 8 points outward and 12 upward."""
+    clamp_x = lambda value: max(0, min(value, view_width - 44))
+    return clamp_x(x - 8), clamp_x(x + width - 36), max(0, min(y - 12, view_height - 44))
+
+
 def apple_lens_class():
     global _lens_class
     if _lens_class is None:
@@ -30,10 +36,8 @@ def apple_lens_class():
         class CommonUtilsImageLens(ObjCClass('UIView')):
             @objc_method
             def pointInside_withEvent_(self, point: CGPoint, event: objc_id) -> bool:
-                # Only controls receive a second touch. The rest passes through
-                # so an ordinary second finger can still start pinch zoom.
-                return (0 <= point.y < 44 and (0 <= point.x < 44
-                    or self.bounds.size.width - 44 <= point.x < self.bounds.size.width))
+                # The lens passes touches through; sibling buttons receive control taps.
+                return False  # Corner buttons are sibling views outside the clipped lens.
         _lens_class = CommonUtilsImageLens
     return _lens_class
 
@@ -198,6 +202,9 @@ def apple_backend(interface):
                 self.lens_picture.image = None
                 self.lens.removeFromSuperview()
                 self.lens = self.lens_picture = None
+            for button in (self.lens_less, self.lens_more):
+                if button is not None:
+                    button.removeFromSuperview()
             self.lens_less = self.lens_more = self.lens_label = None
 
         def set_magnifier_zoom(self, value):
@@ -234,6 +241,7 @@ def apple_backend(interface):
                 self.lens_label.backgroundColor = ObjCClass('UIColor').blackColor.colorWithAlphaComponent(.85)
                 self.lens_label.font = ObjCClass('UIFont').systemFontOfSize(16)
                 self.lens.addSubview(self.lens_label)
+                parent.addSubview(self.lens)
                 for field, title, action, label in (
                     ('lens_less', '−', 'magnifierLess:', 'Decrease magnifier zoom'),
                     ('lens_more', '+', 'magnifierMore:', 'Increase magnifier zoom')):
@@ -246,8 +254,8 @@ def apple_backend(interface):
                     button.accessibilityLabel = label
                     button.addTarget(self.native, action=SEL(action), forControlEvents=64)
                     setattr(self, field, button)
-                    self.lens.addSubview(button)
-                parent.addSubview(self.lens)
+                    button.layer.cornerRadius = 22
+                    parent.addSubview(button)
             # Convert through the native hierarchy: scroll offsets, fit margins
             # and zoom are all included, and the lens itself never scrolls.
             thumb = gesture.locationInView(parent)
@@ -258,9 +266,13 @@ def apple_backend(interface):
             source = self.picture.convertPoint(
                 CGPoint(rect.origin.x + sample_x, rect.origin.y + sample_y), fromView=parent)
             percent = getattr(self.interface, 'magnifier_zoom', 200)
-            self.lens_less.frame = CGRect((0, 0), (44, 44))
-            self.lens_more.frame = CGRect((width - 44, 0), (44, 44))
-            self.lens_label.frame = CGRect((44, 0), (max(0, width - 88), 44))
+            # Separate sibling controls can extend beyond the rounded lens;
+            # clamp to the reader viewport so edge holds keep both reachable.
+            left, right, top = magnifier_controls_geometry(
+                rect.size.width, rect.size.height, x, y, width)
+            self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (44, 44))
+            self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (44, 44))
+            self.lens_label.frame = CGRect(((width - 64) / 2, 0), (64, 32))
             self.lens_less.setEnabled(percent > 150)
             self.lens_more.setEnabled(percent < 250)
             self.lens_label.text = str(percent) + '%'

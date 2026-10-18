@@ -8,7 +8,6 @@ import android.graphics.Path;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.view.MotionEvent;
 import android.view.Gravity;
 import android.widget.Button;
@@ -78,6 +77,14 @@ public final class ImageCanvasView extends AppCompatImageView {
         float top = Math.max(0, Math.min(lastY-height-36*density + .045f*getHeight(), getHeight()-height));
         return new RectF(left, top, left+width, top+height);
     }
+    private RectF lensControlsBounds() {
+        float density = getResources().getDisplayMetrics().density;
+        RectF lens = lensBounds();
+        float left = Math.max(0, lens.left - 8*density);
+        float right = Math.min(getWidth(), lens.right + 8*density);
+        float top = Math.max(0, Math.min(lens.top - 12*density, getHeight() - 44*density));
+        return new RectF(left, top, right, top + 44*density);
+    }
     public int getMagnifierZoom() { return magnifierZoom; }
     public void setMagnifierZoom(int value) {
         if (value < 150 || value > 250 || (value-150)%20 != 0)
@@ -98,11 +105,6 @@ public final class ImageCanvasView extends AppCompatImageView {
         float density = getResources().getDisplayMetrics().density;
         int side = Math.round(44*density);
         FrameLayout bar = new FrameLayout(context);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(0xDD000000);
-        background.setCornerRadius(22*density);
-        bar.setBackground(background);
-        bar.setClipToOutline(true);
         lensLabel = new TextView(context);
         lensLabel.setTextColor(Color.WHITE);
         lensLabel.setTextSize(16);
@@ -125,9 +127,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         lensMore.setOnClickListener(view -> changeMagnifierZoom(1));
         bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.TOP));
         bar.addView(lensMore, new FrameLayout.LayoutParams(side, side, Gravity.RIGHT | Gravity.TOP));
-        RectF rect = lensBounds();
-        int inset = Math.round(2*density);
-        lensControls = new PopupWindow(bar, Math.round(rect.width())-2*inset, side, false);
+        RectF rect = lensControlsBounds();
+        lensControls = new PopupWindow(bar, Math.round(rect.width()), side, false);
         lensControls.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
         // Route a second finger to the buttons without cancelling the held
         // image gesture or treating that finger as a pinch.
@@ -137,7 +138,7 @@ public final class ImageCanvasView extends AppCompatImageView {
         int[] origin = new int[2];
         getLocationOnScreen(origin);
         lensControls.showAtLocation(this, Gravity.TOP | Gravity.LEFT,
-            origin[0]+Math.round(rect.left)+inset, origin[1]+Math.round(rect.top)+inset);
+            origin[0]+Math.round(rect.left), origin[1]+Math.round(rect.top));
         updateLensControls();
     }
     private void updateLensControls() {
@@ -146,12 +147,11 @@ public final class ImageCanvasView extends AppCompatImageView {
         lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
         lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
         lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
-        RectF rect = lensBounds();
+        RectF rect = lensControlsBounds();
         int[] origin = new int[2]; getLocationOnScreen(origin);
         float density = getResources().getDisplayMetrics().density;
-        int inset = Math.round(2*density);
-        lensControls.update(origin[0]+Math.round(rect.left)+inset, origin[1]+Math.round(rect.top)+inset,
-            Math.round(rect.width())-2*inset, Math.round(44*density));
+        lensControls.update(origin[0]+Math.round(rect.left), origin[1]+Math.round(rect.top),
+            Math.round(rect.width()), Math.round(44*density));
     }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);

@@ -457,7 +457,13 @@ class AndroidNavigation:
         self.impl.native_navigationview = view
         for index, option in enumerate(self.impl.options):
             option.menu_item = view.getMenu().getItem(index)
-        self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
+        # Toga emits on_select even for this programmatic layout update. A
+        # rotation must retain the current route rather than reselect its tab.
+        changing, self.host.changing = self.host.changing, True
+        try:
+            self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
+        finally:
+            self.host.changing = changing
         view.setOnItemSelectedListener(self.impl.onItemSelectedListener)
         self.impl.native.requestLayout()
 

@@ -46,6 +46,7 @@ class AppleLensTests(unittest.TestCase):
         lens.start(); self.addCleanup(lens.stop)
         self.backend = apple_backend(NS(magnifier_enabled=True, magnifier_zoom=200))
         self.backend.lens = self.backend.lens_picture = None
+        self.backend.lens_less = self.backend.lens_more = None
         # Model a panned/zoomed page with its origin at (20, 100) in the parent.
         self.backend.picture = NS(image=object(), bounds=rect((0, 0), (200, 300)),
             convertPoint=Mock(side_effect=lambda point, **kw: NS(
@@ -91,10 +92,13 @@ class AppleLensTests(unittest.TestCase):
         self.assertIsNone(backend.lens)
         backend.show_magnifier(self.gesture())
         lens, picture = backend.lens, backend.lens_picture
+        buttons = (backend.lens_less, backend.lens_more)
         backend.set_magnifier_enabled(False)
         self.assertFalse(backend.hold.enabled)
         self.assertIsNone(picture.image)
         lens.removeFromSuperview.assert_called_once()
+        for button in buttons:
+            button.removeFromSuperview.assert_called_once()
         self.assertIsNone(backend.lens)
         backend.hide_magnifier()  # cancellation/disposal can be repeated
 
@@ -151,7 +155,7 @@ class MagnifierSettingTests(unittest.TestCase):
         self.assertEqual(view.magnifier_zoom, 190)
         view._impl.set_magnifier_zoom.assert_not_called()
 
-    def test_lens_only_receives_control_touches(self):
+    def test_lens_passes_touches_through_to_image(self):
         class View:pass
         objc = NS(ObjCClass=lambda name: View, objc_method=lambda method: method, objc_id=object)
         with patch.object(canvas, '_lens_class', None), patch.dict(sys.modules, {
@@ -159,11 +163,17 @@ class MagnifierSettingTests(unittest.TestCase):
         }):
             lens = canvas.apple_lens_class()()
         lens.bounds = rect((0,0),(180,140))
-        for x,y,expected in ((20,20,True),(160,20,True),(90,20,False),(20,60,False)):
+        for x,y,expected in ((20,20,False),(160,20,False),(90,20,False),(20,60,False)):
             self.assertEqual(lens.pointInside_withEvent_(NS(x=x,y=y),None),expected)
 
 
 class LensGeometryTests(unittest.TestCase):
+    def test_controls_extend_outside_corners_and_remain_reachable_at_edges(self):
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 100, 260, 180), (92, 244, 248))
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 0, 0, 180), (0, 144, 0))
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 220, 660, 180), (212, 356, 648))
+
+
     def test_tablets_get_larger_lenses_and_rotation_preserves_size(self):
         phone = canvas.magnifier_geometry(400, 800, 200, 400)
         tablet = canvas.magnifier_geometry(800, 1200, 400, 600)
