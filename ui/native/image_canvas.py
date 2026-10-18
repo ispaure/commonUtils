@@ -22,10 +22,10 @@ def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
     return x, y, width, height, sample_x, sample_y
 
 
-def magnifier_controls_geometry(view_width, view_height, x, y, width):
-    """44-point corner targets, offset 8 points outward and 12 upward."""
-    clamp_x = lambda value: max(0, min(value, view_width - 44))
-    return clamp_x(x - 8), clamp_x(x + width - 36), max(0, min(y - 12, view_height - 44))
+def magnifier_controls_geometry(view_width, view_height, x, y, width, height=140):
+    """33-point bottom-corner controls, clamped to the reader viewport."""
+    clamp_x = lambda value: max(0, min(value, view_width - 33))
+    return clamp_x(x - 6), clamp_x(x + width - 27), max(0, min(y + height - 24, view_height - 33))
 
 
 def apple_lens_class():
@@ -154,7 +154,7 @@ def apple_backend(interface):
             self.picture.contentMode = 1
             self.last_size = None
             self.lens = self.lens_picture = None
-            self.lens_less = self.lens_more = self.lens_label = None
+            self.lens_less = self.lens_more = None
             self.native = apple_scroll_class().alloc().init()
             self.native.owner = self
             self.native.delegate = self.native
@@ -205,7 +205,7 @@ def apple_backend(interface):
             for button in (self.lens_less, self.lens_more):
                 if button is not None:
                     button.removeFromSuperview()
-            self.lens_less = self.lens_more = self.lens_label = None
+            self.lens_less = self.lens_more = None
 
         def set_magnifier_zoom(self, value):
             if self.lens is not None:
@@ -235,12 +235,6 @@ def apple_backend(interface):
                 self.lens_picture = ObjCClass('UIImageView').alloc().init()
                 self.lens_picture.image = self.picture.image
                 self.lens.addSubview(self.lens_picture)
-                self.lens_label = ObjCClass('UILabel').alloc().init()
-                self.lens_label.textAlignment = 1
-                self.lens_label.textColor = ObjCClass('UIColor').whiteColor
-                self.lens_label.backgroundColor = ObjCClass('UIColor').blackColor.colorWithAlphaComponent(.85)
-                self.lens_label.font = ObjCClass('UIFont').systemFontOfSize(16)
-                self.lens.addSubview(self.lens_label)
                 parent.addSubview(self.lens)
                 for field, title, action, label in (
                     ('lens_less', '−', 'magnifierLess:', 'Decrease magnifier zoom'),
@@ -249,12 +243,12 @@ def apple_backend(interface):
                     button.setTitle(title, forState=0)
                     button.setTitleColor(ObjCClass('UIColor').whiteColor, forState=0)
                     button.setTitleColor(ObjCClass('UIColor').grayColor, forState=2)
-                    button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
+                    button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(18)
                     button.backgroundColor = ObjCClass('UIColor').blackColor.colorWithAlphaComponent(.85)
                     button.accessibilityLabel = label
                     button.addTarget(self.native, action=SEL(action), forControlEvents=64)
                     setattr(self, field, button)
-                    button.layer.cornerRadius = 22
+                    button.layer.cornerRadius = 16.5
                     parent.addSubview(button)
             # Convert through the native hierarchy: scroll offsets, fit margins
             # and zoom are all included, and the lens itself never scrolls.
@@ -269,13 +263,11 @@ def apple_backend(interface):
             # Separate sibling controls can extend beyond the rounded lens;
             # clamp to the reader viewport so edge holds keep both reachable.
             left, right, top = magnifier_controls_geometry(
-                rect.size.width, rect.size.height, x, y, width)
-            self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (44, 44))
-            self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (44, 44))
-            self.lens_label.frame = CGRect(((width - 64) / 2, 0), (64, 32))
+                rect.size.width, rect.size.height, x, y, width, height)
+            self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
+            self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
             self.lens_less.setEnabled(percent > 150)
             self.lens_more.setEnabled(percent < 250)
-            self.lens_label.text = str(percent) + '%'
             scale = percent / 100 * float(self.native.zoomScale)
             self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
                                               (size.width * scale, size.height * scale))

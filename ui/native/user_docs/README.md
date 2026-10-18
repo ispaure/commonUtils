@@ -18,9 +18,9 @@ When the application enables the magnifying bubble, hold the image briefly,
 then drag to move the bubble. It enlarges the image beneath the bubble’s center,
 above your finger, and is larger on tablets. Near an edge, keep dragging toward
 the border to inspect the outermost pixels after the bubble stops moving. Release
-to dismiss it. Keep holding the image and tap −/+ just outside the bubble’s upper
-left/right corners with another finger to adjust it from 150% to 250% in 20% steps. A small
-label shows its zoom. The application decides whether to remember this value.
+to dismiss it. Keep holding the image and tap −/+ just outside the bubble’s bottom
+left/right corners with another finger to adjust it from 150% to 250% in 20% steps.
+The compact buttons do not display a zoom percentage. The application decides whether to remember this value.
 A second finger away from the buttons still cancels the bubble for ordinary image pinch zoom.
 
 Applications can also use system document pickers. Opening a document grants

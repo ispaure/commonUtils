@@ -72,12 +72,13 @@ inside the viewport; continued dragging toward an edge moves the sample toward
 the viewport border independently of the lens frame, including the bottom edge.
 Its frame is lowered by 4.5% of the viewport height from the original
 36-unit above-finger gap, allowing overlap with the finger. It clamps at the edges. Image margins remain blank rather than snapping to the image edge.
-Keep the original finger holding the image and tap the 44-unit −/+ buttons
+Keep the original finger holding the image and tap the 33-unit −/+ buttons
 with another finger to change `magnifier_zoom` through 150, 170, 190, 210, 230 and
-250 percent (default 190). The controls sit at the upper left/right corners,
-8 units outward and 12 upward, clamped to the viewport. A label shows the value.
+250 percent (default 190). The controls sit at the bottom left/right corners,
+6 units outward and 9 below the lens, clamped to the viewport. No percentage
+label overlays the image.
 UIKit adds the buttons as siblings of the clipped lens; Android uses a split-touch
-popup above the lens. The original hold stays on the image; button taps do not
+popup at the lens's bottom edge. The original hold stays on the image; button taps do not
 page or toggle controls. Releasing the original hold dismisses the lens and buttons.
 `on_magnifier_zoom(canvas, percent)` receives a requested change before applying it;
 return `False` to reject a failed host save. Assigning `magnifier_zoom` updates a

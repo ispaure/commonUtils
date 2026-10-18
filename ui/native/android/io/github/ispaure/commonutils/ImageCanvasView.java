@@ -13,7 +13,6 @@ import android.view.Gravity;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.PopupWindow;
-import android.widget.TextView;
 import android.view.ViewConfiguration;
 import android.view.ScaleGestureDetector;
 import androidx.appcompat.widget.AppCompatImageView;
@@ -35,7 +34,6 @@ public final class ImageCanvasView extends AppCompatImageView {
     private int magnifierZoom = 190;
     private PopupWindow lensControls;
     private Button lensLess, lensMore;
-    private TextView lensLabel;
     private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path lensClip = new Path();
     private final Runnable hold = () -> {
@@ -56,7 +54,6 @@ public final class ImageCanvasView extends AppCompatImageView {
         if (lensControls != null) lensControls.dismiss();
         lensControls = null;
         lensLess = lensMore = null;
-        lensLabel = null;
         invalidate();
     }
     private boolean containsImage(float x, float y) {
@@ -80,10 +77,10 @@ public final class ImageCanvasView extends AppCompatImageView {
     private RectF lensControlsBounds() {
         float density = getResources().getDisplayMetrics().density;
         RectF lens = lensBounds();
-        float left = Math.max(0, lens.left - 8*density);
-        float right = Math.min(getWidth(), lens.right + 8*density);
-        float top = Math.max(0, Math.min(lens.top - 12*density, getHeight() - 44*density));
-        return new RectF(left, top, right, top + 44*density);
+        float left = Math.max(0, lens.left - 6*density);
+        float right = Math.min(getWidth(), lens.right + 6*density);
+        float top = Math.max(0, Math.min(lens.bottom - 24*density, getHeight() - 33*density));
+        return new RectF(left, top, right, top + 33*density);
     }
     public int getMagnifierZoom() { return magnifierZoom; }
     public void setMagnifierZoom(int value) {
@@ -103,21 +100,15 @@ public final class ImageCanvasView extends AppCompatImageView {
         if (getWindowToken() == null) return;
         Context context = getContext();
         float density = getResources().getDisplayMetrics().density;
-        int side = Math.round(44*density);
+        int side = Math.round(33*density);
         FrameLayout bar = new FrameLayout(context);
-        lensLabel = new TextView(context);
-        lensLabel.setTextColor(Color.WHITE);
-        lensLabel.setTextSize(16);
-        lensLabel.setGravity(Gravity.CENTER);
-        lensLabel.setBackgroundColor(0xDD000000);
-        bar.addView(lensLabel, new FrameLayout.LayoutParams(-1, -1));
         lensLess = new Button(context);
         lensMore = new Button(context);
         for (Button button : new Button[]{lensLess, lensMore}) {
             button.setPadding(0, 0, 0, 0);
             button.setMinWidth(0); button.setMinimumWidth(0);
             button.setMinHeight(0); button.setMinimumHeight(0);
-            button.setTextSize(24); button.setTextColor(Color.WHITE);
+            button.setTextSize(18); button.setTextColor(Color.WHITE);
             button.setBackgroundColor(0xDD000000);
         }
         lensLess.setText("−"); lensMore.setText("+");
@@ -143,7 +134,6 @@ public final class ImageCanvasView extends AppCompatImageView {
     }
     private void updateLensControls() {
         if (lensControls == null) return;
-        lensLabel.setText(magnifierZoom + "%");
         lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
         lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
         lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
@@ -151,7 +141,7 @@ public final class ImageCanvasView extends AppCompatImageView {
         int[] origin = new int[2]; getLocationOnScreen(origin);
         float density = getResources().getDisplayMetrics().density;
         lensControls.update(origin[0]+Math.round(rect.left), origin[1]+Math.round(rect.top),
-            Math.round(rect.width()), Math.round(44*density));
+            Math.round(rect.width()), Math.round(33*density));
     }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);

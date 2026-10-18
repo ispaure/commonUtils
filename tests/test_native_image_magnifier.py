@@ -109,14 +109,16 @@ class AppleLensTests(unittest.TestCase):
         self.assertEqual(backend.lens_picture.frame.size.width, 1000)
         backend.lens_more.setEnabled.assert_called_with(False)
         backend.lens_less.setEnabled.assert_called_with(True)
-        self.assertEqual(backend.lens_label.text, '250%')
+        self.assertFalse(hasattr(backend, 'lens_label'))
+        self.assertEqual((backend.lens_more.frame.size.width, backend.lens_more.frame.size.height), (33, 33))
+        self.assertEqual(backend.lens_more.frame.origin.y, backend.lens.frame.origin.y + backend.lens.frame.size.height - 24)
         backend.interface.magnifier_zoom = 150
         backend.hold = self.gesture()
         backend.set_magnifier_zoom(150)
         self.assertEqual(backend.lens_picture.frame.size.width, 600)
         backend.lens_less.setEnabled.assert_called_with(False)
         backend.lens_more.setEnabled.assert_called_with(True)
-        self.assertEqual(backend.lens_label.text, '150%')
+        self.assertFalse(hasattr(backend, 'lens_label'))
         backend.hide_magnifier()
         self.assertIsNone(backend.lens_more)
 
@@ -169,9 +171,10 @@ class MagnifierSettingTests(unittest.TestCase):
 
 class LensGeometryTests(unittest.TestCase):
     def test_controls_extend_outside_corners_and_remain_reachable_at_edges(self):
-        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 100, 260, 180), (92, 244, 248))
-        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 0, 0, 180), (0, 144, 0))
-        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 220, 660, 180), (212, 356, 648))
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 100, 260, 180), (94, 253, 376))
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 0, 0, 180), (0, 153, 116))
+        self.assertEqual(canvas.magnifier_controls_geometry(400, 800, 220, 660, 180), (214, 367, 767))
+        self.assertEqual(canvas.magnifier_controls_geometry(800, 1200, 200, 400, 360, 280), (194, 533, 656))
 
 
     def test_tablets_get_larger_lenses_and_rotation_preserves_size(self):
