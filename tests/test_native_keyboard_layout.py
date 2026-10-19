@@ -95,3 +95,98 @@ class KeyboardLayoutTests(unittest.TestCase):
         self.assertEqual(rail.visibility, 0)
         self.assertEqual(state.visibility, 0)
         self.assertTrue(state.showing)
+
+
+@unittest.skipUnless(AndroidNavigation is not None, 'Optional Toga backend is not installed')
+class AppleKeyboardLayoutTests(unittest.TestCase):
+    def adapter(self, *, modern=True, hidden=False):
+        from commonUtils.ui.native.navigation import AppleNavigation
+        state = NS(hidden=hidden, key=True, insets=NS(bottom=0))
+        class View:
+            bounds = NS(size=NS(width=400, height=800))
+            def setNeedsLayout(self): pass
+            def convertRect(self, rect, **kwargs): return rect
+            @property
+            def safeAreaInsets(self): return NS(bottom=34 + state.insets.bottom)
+        view = View()
+        class Parent:
+            view = None
+            @property
+            def additionalSafeAreaInsets(self): return state.insets
+            @additionalSafeAreaInsets.setter
+            def additionalSafeAreaInsets(self, value): state.insets = value
+        parent = Parent(); parent.view = view
+        tab = NS(isHidden=lambda: state.hidden, setHidden=lambda value: setattr(state, 'hidden', value))
+        controller = NS(tabBar=tab, view=view, respondsToSelector=lambda name: modern,
+                        isTabBarHidden=lambda: state.hidden,
+                        setTabBarHidden=lambda value, **kwargs: setattr(state, 'hidden', value))
+        adapter = AppleNavigation.__new__(AppleNavigation)
+        adapter.controller, adapter.parent = controller, parent
+        adapter.window = NS(_impl=NS(native=NS(isKeyWindow=lambda: state.key,
+            screen=NS(coordinateSpace=object()), convertRect=lambda rect, **kwargs: rect)))
+        adapter.host = NS(chrome=NS(context=None))
+        adapter.old_additional_insets = NS(bottom=0)
+        adapter.keyboard_inset = 0
+        adapter.keyboard_visible = False
+        adapter.keyboard_tab_visibility = None
+        adapter.keyboard_live = True
+        return adapter, state
+
+    def frame(self, adapter, *, top=500, height=300, width=400):
+        frame = NS(origin=NS(x=0, y=top), size=NS(width=width, height=height))
+        notice = NS(userInfo=NS(objectForKey=lambda name: NS(CGRectValue=frame)))
+        with patch.dict(sys.modules, {'rubicon.objc': NS(ObjCInstance=lambda value: value, SEL=lambda value: value)}):
+            adapter.refresh_keyboard(notice)
+
+    def test_keyboard_reclaims_tabs_and_dismissal_restores_original_visibility(self):
+        for modern in (True, False):
+            for hidden in (True, False):
+                with self.subTest(modern=modern, hidden=hidden):
+                    adapter, state = self.adapter(modern=modern, hidden=hidden)
+                    self.frame(adapter)
+                    self.assertTrue(state.hidden)
+                    self.assertEqual(adapter.keyboard_inset, 266)
+                    saved = adapter.keyboard_tab_visibility
+                    self.frame(adapter)
+                    self.assertEqual(adapter.keyboard_tab_visibility, saved)
+                    self.assertEqual(adapter.keyboard_inset, 266)
+                    self.frame(adapter, top=800)
+                    self.assertEqual(state.hidden, hidden)
+                    self.assertEqual(adapter.keyboard_inset, 0)
+                    self.assertIsNone(adapter.keyboard_tab_visibility)
+
+    def test_floating_keyboard_hides_tabs_without_full_width_inset(self):
+        adapter, state = self.adapter()
+        self.frame(adapter, top=300, height=200, width=200)
+        self.assertTrue(state.hidden)
+        self.assertEqual(adapter.keyboard_inset, 0)
+
+    def test_other_window_and_disposed_observer_do_not_hide_tabs(self):
+        adapter, state = self.adapter()
+        state.key = False
+        self.frame(adapter)
+        self.assertFalse(state.hidden)
+        self.assertEqual(adapter.keyboard_inset, 0)
+        state.key, adapter.keyboard_live = True, False
+        self.frame(adapter)
+        self.assertFalse(state.hidden)
+
+    def test_reader_snapshot_is_independent_and_keyboard_suppression_resumes(self):
+        from commonUtils.ui.native.chrome import NavigationChrome
+        adapter, state = self.adapter()
+        host = NS(adapter=adapter)
+        host.chrome = adapter.host.chrome = NavigationChrome(host)
+        self.frame(adapter)
+        adapter.restore_keyboard_chrome()
+        self.assertFalse(state.hidden)
+        host.chrome.context = ('reader', None)
+        host.chrome.restore_callbacks.append(lambda: setattr(state, 'hidden', False))
+        state.hidden = True
+        self.frame(adapter)
+        self.assertTrue(state.hidden)
+        self.assertIsNone(adapter.keyboard_tab_visibility)
+        with patch.dict(sys.modules, {'rubicon.objc': NS(SEL=lambda value: value)}):
+            host.chrome.restore()
+        self.assertTrue(state.hidden)
+        self.frame(adapter, top=800)
+        self.assertFalse(state.hidden)

@@ -42,6 +42,9 @@ class NavigationChrome:
             callback()
         self.restore_callbacks.clear()
         self.context = None
+        adapter = self.host.adapter
+        if adapter is not None and hasattr(adapter, 'refresh_keyboard_chrome'):
+            adapter.refresh_keyboard_chrome()
 
     def set_hidden(self, hidden, *, navigation=None):
         adapter = self.host.adapter

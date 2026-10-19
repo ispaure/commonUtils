@@ -23,6 +23,13 @@ callbacks. `activate(identity)` selects a destination without rebuilding views.
 `Routes(host, guard, changed, intent=None)` retains a separate stack per destination.
 The guard controls navigation, and the consumer decides document-close behavior.
 Install/uninstall routes with their host to register/remove native Back delegates.
+On iOS, a software keyboard in the owning key window temporarily hides destination
+tabs and restores their previous visibility on dismissal or host uninstallation.
+UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on
+iOS 18 and later; older systems use native view visibility. Floating keyboards
+hide the tabs without claiming a full-width keyboard inset. Immersive reader
+chrome keeps independent restoration ownership; leaving a reader while typing
+reapplies temporary keyboard suppression.
 Android bottom-bar/rail transitions suppress Toga's programmatic selection event;
 rotation changes presentation without invoking host navigation or retiring routes.
 

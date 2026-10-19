@@ -94,6 +94,8 @@ class AppleNavigation:
         self.old_get_size = window._impl.get_size
         self.old_additional_insets = self.parent.additionalSafeAreaInsets
         self.keyboard_inset = 0
+        self.keyboard_visible = False
+        self.keyboard_tab_visibility = None
         self.keyboard_live = True
         self.keyboard_block = Block(self.refresh_keyboard, None, objc_id)
         self.notification_center = ObjCClass('NSNotificationCenter').defaultCenter
@@ -196,8 +198,12 @@ class AppleNavigation:
         frame = native.convertRect(frame, fromCoordinateSpace=native.screen.coordinateSpace)
         frame = self.parent.view.convertRect(frame, fromView=native)
         bounds = self.parent.view.bounds.size
-        docked = (frame.origin.y + frame.size.height >= bounds.height - 1
-                  and frame.origin.x < bounds.width and frame.origin.x + frame.size.width > 0)
+        intersects = (bool(native.isKeyWindow()) and frame.size.height > 0
+                      and frame.origin.y < bounds.height and frame.origin.y + frame.size.height > 0
+                      and frame.origin.x < bounds.width and frame.origin.x + frame.size.width > 0)
+        self.keyboard_visible = intersects
+        self.refresh_keyboard_chrome()
+        docked = intersects and frame.origin.y + frame.size.height >= bounds.height - 1
         cover = max(0, bounds.height - max(0, frame.origin.y)) if docked else 0
         baseline = max(0, self.parent.view.safeAreaInsets.bottom - self.keyboard_inset)
         overlap = max(0, float(cover) - float(baseline))
@@ -207,6 +213,31 @@ class AppleNavigation:
             self.keyboard_inset = overlap
             self.parent.additionalSafeAreaInsets = insets
             self.parent.view.setNeedsLayout()
+
+    def refresh_keyboard_chrome(self):
+        if not self.keyboard_live or not self.keyboard_visible or self.host.chrome.context is not None:
+            self.restore_keyboard_chrome()
+            return
+        if self.keyboard_tab_visibility is None:
+            from rubicon.objc import SEL
+            modern = bool(self.controller.respondsToSelector(SEL('setTabBarHidden:animated:')))
+            hidden = bool(self.controller.isTabBarHidden() if modern else self.controller.tabBar.isHidden())
+            self.keyboard_tab_visibility = (modern, hidden)
+            self.set_keyboard_tabs_hidden(modern, True)
+
+    def set_keyboard_tabs_hidden(self, modern, hidden):
+        if modern:
+            # UIKit also releases the tab bar's safe-area reservation.
+            self.controller.setTabBarHidden(hidden, animated=False)
+        else:
+            self.controller.tabBar.setHidden(hidden)
+        self.controller.view.setNeedsLayout()
+
+    def restore_keyboard_chrome(self):
+        if self.keyboard_tab_visibility is not None:
+            modern, hidden = self.keyboard_tab_visibility
+            self.keyboard_tab_visibility = None
+            self.set_keyboard_tabs_hidden(modern, hidden)
 
     def push(self, destination, widget, title):
         from toga_iOS.container import ControlledContainer
@@ -274,7 +305,9 @@ class AppleNavigation:
 
     def dispose(self):
         self.keyboard_live = False
+        self.keyboard_visible = False
         self.notification_center.removeObserver(self.keyboard_observer)
+        self.restore_keyboard_chrome()
         self.parent.additionalSafeAreaInsets = self.old_additional_insets
         if getattr(self, 'split', None):
             self.split.dismissViewControllerAnimated(False, completion=None)
