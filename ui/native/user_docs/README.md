@@ -38,8 +38,8 @@ The application controls whether editing and saving are available.
 ## Documentation
 
 A native app can show an offline Markdown wiki. The hamburger button shows folders, pages and search in narrow windows; tap it
-again to return to the article. Wider windows keep the list beside the article. Use + or − to
-expand folders, and tap the title to open its page. File names & titles searches
+again to return to the article. Wider windows keep the list beside the article. Use the chevron to
+expand or collapse folders, and tap the title separately to open its page. File names & titles searches
 navigation labels and names; Page text searches Markdown source. Clear the query
 to show the full tree. The viewer is read-only; the host app owns editing.
 

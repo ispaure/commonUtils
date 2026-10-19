@@ -48,6 +48,44 @@ def list_button(button):
     return button
 
 
+def hierarchy_row(label, *, depth=0, expanded=None, on_toggle=None, on_activate=None,
+                  selected=False):
+    """A navigation row with independent 48-unit disclosure and title targets.
+
+    Hosts may style the returned row, ``disclosure`` and ``title_button``.
+    ``expanded=None`` reserves a matching column for a leaf. Targets and tree
+    state remain owned by the caller, so expanding never activates a page.
+    """
+    import toga
+    from toga.style import Pack
+    from toga.style.pack import ROW, CENTER
+    row = toga.Box(style=Pack(direction=ROW, align_items=CENTER, margin_bottom=4))
+    row.add(toga.Box(style=Pack(width=min(max(0, depth), 8) * 20)))
+    row.disclosure = None
+    if expanded is None:
+        row.add(toga.Box(style=Pack(width=48, height=48)))
+    else:
+        disclosure = row.disclosure = navigation_button('forward',
+            ('Collapse ' if expanded else 'Expand ') + label, on_press=on_toggle)
+        backend = type(disclosure._impl).__module__
+        if backend.startswith('toga_iOS.'):
+            from rubicon.objc import ObjCClass
+            disclosure.text = ''
+            disclosure._impl.native.setImage(ObjCClass('UIImage').systemImageNamed(
+                'chevron.down' if expanded else 'chevron.right'), forState=0)
+        elif backend.startswith('toga_android.'):
+            # Rotate the drawn chevron, keeping the full native touch target.
+            disclosure._impl.native.setRotation(90 if expanded else 0)
+        else:
+            disclosure.text = '⌄' if expanded else '›'
+        row.add(disclosure)
+    button = row.title_button = list_button(toga.Button(label, on_press=on_activate,
+        style=Pack(flex=1, height=48, font_size=15)))
+    button.hierarchy_selected = selected
+    row.add(button)
+    return row
+
+
 def template_icon(image):
     if type(image._impl).__module__.startswith('toga_iOS.'):
         from rubicon.objc import ObjCClass
@@ -137,3 +175,45 @@ def navigation_button(direction, label, *, on_press=None, enabled=True):
         native.setContentDescription(label)
         button._impl._control_drawable = drawable
     return button
+
+
+class HierarchyList:
+    """A flat preorder hierarchy with independent expand and activate targets."""
+    def __init__(self, entries, choose, *, row_style=None, selected=None):
+        import toga
+        from toga.style import Pack
+        from toga.style.pack import COLUMN
+        self.entries, self.choose = list(entries), choose
+        self.row_style, self.selected = row_style, selected
+        self.collapsed = set()
+        self.rows = toga.Box(style=Pack(direction=COLUMN))
+        self.render()
+
+    def render(self):
+        self.rows.clear()
+        hidden_depth = None
+        for number, entry in enumerate(self.entries):
+            if hidden_depth is not None and entry.depth > hidden_depth:
+                continue
+            hidden_depth = None
+            nested = number + 1 < len(self.entries) and self.entries[number + 1].depth > entry.depth
+            toggle = None
+            if nested:
+                def toggle(widget=None, number=number, **kwargs):
+                    if number in self.collapsed:
+                        self.collapsed.remove(number)
+                    else:
+                        self.collapsed.add(number)
+                    self.render()
+            def activate(widget=None, entry=entry, **kwargs):
+                return self.choose(entry)
+            selected = bool(self.selected and self.selected(entry))
+            row = hierarchy_row(entry.label, depth=entry.depth,
+                expanded=number not in self.collapsed if nested else None,
+                on_toggle=toggle, on_activate=activate, selected=selected)
+            row.title_button.hierarchy_entry = entry
+            if self.row_style is not None:
+                self.row_style(row, selected)
+            self.rows.add(row)
+            if nested and number in self.collapsed:
+                hidden_depth = entry.depth

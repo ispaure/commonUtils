@@ -14,7 +14,7 @@ from toga.style.pack import COLUMN, ROW
 from ...formats.markdown_wiki import MarkdownWiki, resolve_document_path, documentation_root
 from .markdown_preview import markdown_preview
 from .adaptive import AdaptiveSidebar, allocated_width
-from .presentation import list_button, navigation_button
+from .presentation import hierarchy_row, navigation_button
 
 
 class MarkdownWikiView:
@@ -103,10 +103,7 @@ class MarkdownWikiView:
             (f'{len(self.catalog.errors)} pages or folders could not be read.' if self.catalog.errors else ''))
         def add(entries, depth=0):
             for entry in entries:
-                row = toga.Box(style=Pack(direction=ROW, margin_bottom=2))
-                # Reserve the disclosure column for pages too. Without it a
-                # child page starts left of its parent's title on native hosts.
-                row.add(toga.Box(style=Pack(width=depth * 20)))
+                toggle = None
                 if entry.children:
                     def toggle(widget, entry=entry, **kwargs):
                         if entry.location in self.expanded:
@@ -114,10 +111,6 @@ class MarkdownWikiView:
                         else:
                             self.expanded.add(entry.location)
                         self.filter()
-                    row.add(toga.Button('−' if query or entry.location in self.expanded else '+',
-                                        on_press=toggle, style=Pack(width=48, height=48)))
-                else:
-                    row.add(toga.Box(style=Pack(width=48, height=48)))
                 def choose(widget, entry=entry, **kwargs):
                     if entry.page:
                         self.open_page(entry.page)
@@ -127,8 +120,9 @@ class MarkdownWikiView:
                     else:
                         self.expanded.add(entry.location)
                         self.filter()
-                row.add(list_button(toga.Button(('✓ ' if entry.page == self.path else '') + entry.title,
-                                    on_press=choose, style=Pack(flex=1, height=48))))
+                row = hierarchy_row(('✓ ' if entry.page == self.path else '') + entry.title,
+                    depth=depth, expanded=bool(query or entry.location in self.expanded) if entry.children else None,
+                    on_toggle=toggle, on_activate=choose, selected=entry.page == self.path)
                 self.rows.add(row)
                 if query or entry.location in self.expanded:
                     add(entry.children, depth + 1)

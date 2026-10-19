@@ -172,6 +172,15 @@ native callbacks and rejects stale actions. Hosts retain the menu with its view.
 `scroll_content`: optional native colour/tint/row behavior and fresh scroll parenting
 for the pinned Toga layout engine. They do not choose destinations or document policy.
 
+`hierarchy_row(label, depth=0, expanded=None, on_toggle=None, on_activate=None,
+selected=False)` provides distinct 48-unit disclosure/title targets, reserving
+matching columns for leaves. `HierarchyList(entries, choose, row_style=None,
+selected=None)` consumes preorder entries with `label` and `depth`, owns collapsed
+rows, and passes the original entry to `choose`. `selected(entry)` identifies the
+current destination; `row_style(row, selected)` lets hosts apply their palette.
+Rows expose `disclosure` and `title_button`; no filesystem or navigation policy
+is embedded. The Markdown wiki uses the same row builder for folder/page actions.
+
 ## Native text search
 
 `editor_search.EditorSearch(editor, container, insertion_index=1)` supplies literal
