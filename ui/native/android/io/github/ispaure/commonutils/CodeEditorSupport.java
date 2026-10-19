@@ -14,6 +14,7 @@ import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.BaseInputConnection;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +38,10 @@ public final class CodeEditorSupport implements TextWatcher,
         editor.setInputType(android.text.InputType.TYPE_CLASS_TEXT
             | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        // A landscape IME must resize the hosted editor, not replace it with
+        // Android's separate fullscreen extraction window and hide its toolbar.
+        editor.setImeOptions(editor.getImeOptions()
+            | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
         gutter = new Drawable() {
             @Override public void draw(Canvas canvas) { drawGutter(canvas); }
             @Override public void setAlpha(int alpha) {}

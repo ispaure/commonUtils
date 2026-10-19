@@ -55,6 +55,9 @@ class NavigationChrome:
             self.restore()
         if not hidden:
             return
+        if hasattr(adapter, 'restore_keyboard_chrome'):
+            # Snapshot the application's bars, not temporary IME suppression.
+            adapter.restore_keyboard_chrome()
         self.context = context
         capture = not self.restore_callbacks
         if hasattr(adapter, 'navigation'):

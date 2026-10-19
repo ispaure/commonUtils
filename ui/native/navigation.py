@@ -306,6 +306,11 @@ class AndroidNavigation:
         import weakref
         self.host, self.window = host, window
         self.impl = host.root._impl
+        self.old_min_height = host.root._MIN_HEIGHT
+        # OptionContainer's default 100-point floor can exceed the entire
+        # keyboard-sized window and push its children behind the IME.
+        host.root._MIN_HEIGHT = 0
+        self.impl.rehint()
         # The pinned backend constructs Material navigation with an AppCompat
         # context. Its fallback surface can be black while inactive items are
         # also black. Give both native presentations the same Material theme.
@@ -340,6 +345,7 @@ class AndroidNavigation:
         self.native_window.setSoftInputMode((self.old_soft_input & ~WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST)
                                            | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         self.layout_events = 0
+        self.keyboard_chrome = None
         self.mode = 'bottom'
         self.old_listener = self.impl.onItemSelectedListener
         class SelectionListener(dynamic_proxy(NavigationBarView.OnItemSelectedListener)):
@@ -407,21 +413,59 @@ class AndroidNavigation:
 
     def window_resized(self, window, **kwargs):
         self.layout_events += 1
+        # Consumers must see the current IME state before laying out editors;
+        # otherwise one frame still uses full-height controls in a short pane.
+        self.update_keyboard_inset()
         if self.old_window_resize:
             self.old_window_resize(window)
-        self.update_keyboard_inset()
         width = self.impl.scale_out(self.impl.native.getWidth())
         if width > 0:
             self.set_mode('rail' if width >= 600 else 'bottom')
 
     def update_keyboard_inset(self):
         from android.graphics import Rect
+        from java import jclass
         visible, own = Rect(), Rect()
         self.impl.native.getWindowVisibleDisplayFrame(visible)
         self.impl.native.getGlobalVisibleRect(own)
         overlap = max(0, own.bottom - visible.bottom)
         if self.impl.native.getPaddingBottom() != overlap:
             self.impl.native.setPadding(0, 0, 0, overlap)
+        insets = jclass('androidx.core.view.ViewCompat').getRootWindowInsets(self.impl.native)
+        keyboard = bool(insets and insets.isVisible(jclass('androidx.core.view.WindowInsetsCompat$Type').ime()))
+        if self.host.chrome.context is not None:
+            # Immersive readers own their restoration snapshot independently.
+            self.restore_keyboard_chrome()
+            return
+        # On short phones/landscape, application bars can consume almost all
+        # of the resized viewport. Give that space to the focused control.
+        # Latch until dismissal: hiding bars itself changes the measured height.
+        if keyboard and self.keyboard_chrome is None and visible.height() < self.impl.scale_in(400):
+            bar = self.impl.native_navigationview
+            title = self.impl._native_activity.getSupportActionBar()
+            self.keyboard_chrome = (bar, bar.getVisibility(), title, bool(title and title.isShowing()))
+            bar.setVisibility(8)
+            if title is not None:
+                title.hide()
+        elif not keyboard:
+            self.restore_keyboard_chrome()
+
+    def restore_keyboard_chrome(self):
+        if self.keyboard_chrome is not None:
+            bar, visibility, title, showing = self.keyboard_chrome
+            self.keyboard_chrome = None
+            bar.setVisibility(visibility)
+            if title is not None and showing:
+                title.show()
+
+    def transfer_keyboard_chrome(self, view):
+        if self.keyboard_chrome is not None:
+            previous, visibility, title, showing = self.keyboard_chrome
+            # A cached inactive bar must not retain temporary GONE visibility
+            # when rotation later mounts it again after keyboard dismissal.
+            previous.setVisibility(visibility)
+            self.keyboard_chrome = (view, visibility, title, showing)
+            view.setVisibility(8)
 
     def set_mode(self, mode):
         from android.widget import LinearLayout
@@ -455,6 +499,7 @@ class AndroidNavigation:
             self.impl.native.addView(view, LinearLayout.LayoutParams(-1, -2))
         self.mode = mode
         self.impl.native_navigationview = view
+        self.transfer_keyboard_chrome(view)
         for index, option in enumerate(self.impl.options):
             option.menu_item = view.getMenu().getItem(index)
         # Toga emits on_select even for this programmatic layout update. A
@@ -499,6 +544,7 @@ class AndroidNavigation:
                     main_thread=Looper.myLooper() == Looper.getMainLooper())
 
     def dispose(self):
+        self.restore_keyboard_chrome()
         self.set_mode('bottom')
         from android.widget import LinearLayout
         self.bottom.setOnItemSelectedListener(None)
@@ -517,6 +563,8 @@ class AndroidNavigation:
         self.impl.refreshed = self.old_refreshed
         self.window.on_resize = self.old_window_resize
         self.native_window.setSoftInputMode(self.old_soft_input)
+        self.host.root._MIN_HEIGHT = self.old_min_height
+        self.impl.rehint()
         self.impl.native.setPadding(0, 0, 0, 0)
         if self.rail is not None:
             self.rail.setOnItemSelectedListener(None)

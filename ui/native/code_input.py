@@ -169,6 +169,10 @@ class CodeInput(toga.MultilineTextInput):
 
     def _create(self):
         self.backend_name = self.factory.MultilineTextInput.__module__
+        if self.backend_name.startswith('toga_android.'):
+            # Include room for a line and EditText's native vertical padding,
+            # without forcing Toga's 100-point minimum into a short IME pane.
+            self._MIN_HEIGHT = 48
         if self.backend_name.startswith('toga_iOS.'):
             return apple_backend(self)
         return super()._create()

@@ -41,7 +41,13 @@ The Android adapter disables Material 1.12's automatic bottom-navigation inset
 listener: the window/host already reserves system and keyboard space. Otherwise
 Material adds the IME height as bar padding during `adjustResize`, expanding the
 bar until the weighted content has no height. Destination buttons retain their
-normal height above the keyboard.
+normal height above the keyboard. When the IME leaves less than 400 logical units
+of visible window height, the adapter temporarily hides application navigation
+and the title bar until dismissal. It latches this state through layout changes
+and rail transitions, restores original visibility, and yields to immersive
+reader chrome ownership. System bars remain under their existing owner.
+The adapter also removes Toga's 100-unit root height floor while installed, so
+very short IME viewports use the actual window allocation instead of overflowing.
 
 `host.chrome.set_page_swipes(active, navigation=None)` reserves horizontal reader
 gestures by disabling the Apple navigation controller's edge and, when available,
@@ -265,6 +271,9 @@ extends Toga's MultilineTextInput. It retains the native keyboard, IME, undo and
 selection. iOS draws a gutter over UITextView's text canvas; Android attaches
 `CodeEditorSupport` to the existing EditText. Logical line numbers follow native
 wrapped-line geometry and scrolling rather than estimating character widths.
+On Android the input can shrink to 48 logical units instead of Toga's 100-unit
+minimum, keeping a writing line and native padding inside short panes. Android disables fullscreen
+IME extraction; Source mode keeps the application's toolbar and native editor.
 Call `set_filename` on rename, `set_language(alias)` for an override (None restores
 detection), and `dispose()` when retiring a view. Existing `.value`, `.readonly`
 and EditorSearch contracts remain available; `backend_name` identifies the host
