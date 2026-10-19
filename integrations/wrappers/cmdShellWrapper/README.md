@@ -136,3 +136,8 @@ callback. The callback receives a write-only, nonseekable binary stream. Archive
 writers therefore use streaming headers on every platform, including Windows
 pipes whose native seek operations can appear to succeed. The wrapper drains
 stderr without retaining it and applies cancellation and elapsed time limits.
+Failed commands raise `binary.BinaryCommandError`, an `OSError` subclass with
+`returncode` and `stderr` attributes. Diagnostics are empty by default; callers
+may set `max_stderr` to retain at most that many bytes in memory while the rest
+is drained. The exception message never includes these bytes. They may contain
+secrets: consumers must translate or redact them before presentation or logging.

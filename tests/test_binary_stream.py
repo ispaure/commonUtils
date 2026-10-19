@@ -4,10 +4,22 @@ import sys
 import unittest
 import zipfile
 from commonUtils.archives.zip_access import open_archive
-from commonUtils.integrations.wrappers.cmdShellWrapper.binary import _BinarySink, run_bytes
+from commonUtils.integrations.wrappers.cmdShellWrapper.binary import BinaryCommandError, _BinarySink, run_bytes
 
 
 class BinaryStreamTests(unittest.TestCase):
+    def test_failed_command_diagnostics_are_opt_in_bounded_and_not_in_message(self):
+        command = [sys.executable, '-c',
+                   'import sys; sys.stderr.buffer.write(b"private-sentinel" * 10000); sys.exit(7)']
+        for limit in (0, 37):
+            with self.subTest(limit=limit), self.assertRaises(BinaryCommandError) as caught:
+                run_bytes(command, max_stderr=limit)
+            error = caught.exception
+            self.assertEqual(error.returncode, 7)
+            self.assertEqual(error.stderr, (b'private-sentinel' * 10000)[:limit])
+            self.assertNotIn('private-sentinel', str(error))
+            self.assertNotIn('private-sentinel', repr(error))
+
     def write_archive(self, stream, password=None):
         with open_archive(stream, 'w', password=password) as archive:
             archive.writestr('page.png', b'page bytes\r\n\x1a\x00' * 1000)
