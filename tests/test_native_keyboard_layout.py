@@ -1,9 +1,13 @@
 """IME chrome lifetime: resizing, dismissal and independent reader ownership."""
 import sys
+import importlib.util
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import patch
-from commonUtils.ui.native.navigation import AndroidNavigation
+if importlib.util.find_spec('toga'):
+    from commonUtils.ui.native.navigation import AndroidNavigation
+else:
+    AndroidNavigation = None
 
 
 class Rect:
@@ -12,6 +16,7 @@ class Rect:
         return self.bottom - self.top
 
 
+@unittest.skipUnless(AndroidNavigation is not None, 'Optional Toga backend is not installed')
 class KeyboardLayoutTests(unittest.TestCase):
     def adapter(self, *, height=300, visibility=0, title_showing=True):
         state = NS(keyboard=True, height=height, padding=0, visibility=visibility, showing=title_showing)
