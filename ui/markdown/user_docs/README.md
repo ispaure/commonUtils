@@ -109,10 +109,11 @@ Open Read aloud, select a voice/language and press Play. A selected passage take
 priority; otherwise playback starts from the visible reading area. The same button
 changes to Pause while speaking and Resume while paused. Engines without pause/resume
 support disable it during playback; Stop remains available. Speed depends on the native
-speech engine. Back/forward estimate a
+speech engine. Click outside the popup to hide its controls while playback continues;
+click the speaker again to reopen them. Back/forward estimate a
 15-second jump; highlights may use estimated timing where word events are unavailable.
 
-Playback stops when content is replaced, editing begins, the panel closes or the
+Playback stops when content is replaced, editing begins or the
 reader closes. Speech does not edit the file. If no engine/voice is available, the
 panel explains the problem; available voices depend on the operating system.
 

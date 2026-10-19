@@ -145,6 +145,8 @@ class SpeechTests(QtTestCase):
 
     def test_dismissing_controls_keeps_playback_until_reader_hides(self):
         speech = self.speech('Some text')
+        self.assertFalse(any(button.text() == '×' or button.accessibleName() == 'Close read aloud'
+                             for button in speech.panel.findChildren(qt.QToolButton)))
         speech.start()
         speech.panel.close()
         self.assertEqual(speech.engine.state(), Speech.State.Speaking)

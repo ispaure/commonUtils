@@ -105,6 +105,8 @@ class ResourceBrowser(qt.QWidget):
         self.tree.setSortingEnabled(True)
         self.tree.sortByColumn(0, qt.Qt.SortOrder.AscendingOrder)
         self.tree.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
+        self.tree.header().setSectionResizeMode(1, qt.QHeaderView.ResizeMode.ResizeToContents)
+        self.tree.header().setSectionResizeMode(2, qt.QHeaderView.ResizeMode.ResizeToContents)
         self.views = BrowserViews(self.model, self.tree, self)
         self.views.navigation_root = provider.root
         self.view_selector.currentIndexChanged.connect(self.views.set_mode)

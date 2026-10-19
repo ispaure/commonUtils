@@ -8,7 +8,7 @@ from unittest.mock import patch
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.runtime.browsing import BrowseEntry, BrowseColumn, BrowseRole
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.file_browser.entry_model import EntryModel
+from commonUtils.ui.file_browser.entry_model import EntryModel, ProviderEntryModel
 from commonUtils.ui.file_browser.model import BrowserTree, ByteSortModel, _BrowserSelection
 from commonUtils.ui.file_browser.views import BrowserViews
 from commonUtils.ui.resource_browser import ResourceBrowser
@@ -50,6 +50,30 @@ class MemoryProvider:
 class EntryBrowserTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
+
+    def test_provider_columns_and_readable_local_modified_dates(self):
+        from datetime import datetime
+        from commonUtils.filesystem import format_datetime
+        provider = MemoryProvider()
+        model = ProviderEntryModel(provider)
+        self.assertEqual([model.headerData(i, qt.Qt.Orientation.Horizontal) for i in range(3)],
+                         ['Name', 'Date Modified', 'Size'])
+        for stamp, expected in (
+                ('2026-02-11T18:45:00', 'Feb 11, 2026 at 6:45 PM'),
+                ('2026-02-11T23:45:00.123456789Z',
+                 format_datetime(datetime.fromisoformat('2026-02-11T23:45:00+00:00').astimezone())),
+                ('2026-02-11T18:45:00-05:00',
+                 format_datetime(datetime.fromisoformat('2026-02-11T18:45:00-05:00').astimezone())),
+                ('', '—'), ('invalid', '—')):
+            with self.subTest(stamp=stamp):
+                model.set_children(provider.root, model.entries([
+                    dict(name='note.txt', path='note.txt', directory=False, size=100, modified=stamp)]))
+                index = model.browse_index(provider.root / 'note.txt', 1)
+                self.assertEqual(index.data(), expected)
+                self.assertEqual(index.data(BrowseRole.SortValue), stamp)
+                size = index.siblingAtColumn(2)
+                self.assertEqual(size.data(), '100 B')
+                self.assertEqual(size.data(BrowseRole.SortValue), 100)
 
     def test_recursive_search_opens_nested_results_and_close_restores_folder(self):
         class Provider(MemoryProvider):

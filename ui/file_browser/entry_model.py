@@ -1,8 +1,9 @@
 """Qt projection of the portable browse tree, plus a directory-provider adapter."""
+from datetime import datetime
 from pathlib import Path
 from .. import pyside as qt
 from ...runtime.browsing import BrowseEntry, BrowseColumn, BrowseRole, BrowseTree, provider_entries
-from ...filesystem import format_size
+from ...filesystem import format_size, format_datetime
 from .model import BrowserTree
 
 
@@ -187,8 +188,19 @@ class ProviderEntryModel(EntryModel):
         self.provider = provider
         self.thumbnail = thumbnail
         super().__init__(BrowseEntry(provider.root, provider.root.name or str(provider.root), True),
-                         (BrowseColumn('name', 'Name'), BrowseColumn('size', 'Size', 'bytes'),
-                          BrowseColumn('modified', 'Modified')), parent)
+                         (BrowseColumn('name', 'Name'), BrowseColumn('modified', 'Date Modified'),
+                          BrowseColumn('size', 'Size', 'bytes')), parent)
+
+    def data(self, index, role=qt.Qt.ItemDataRole.DisplayRole):
+        value = super().data(index, role)
+        if (role == qt.Qt.ItemDataRole.DisplayRole and index.isValid()
+                and self.columns[index.column()].key == 'modified'):
+            try:
+                modified = datetime.fromisoformat(value).astimezone() if value else None
+            except (ValueError, OverflowError):
+                modified = None
+            return format_datetime(modified)
+        return value
 
     def ensure_directory(self, directory):
         relative = self.provider.relative(directory)
