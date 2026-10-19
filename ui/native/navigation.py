@@ -96,6 +96,7 @@ class AppleNavigation:
         self.keyboard_inset = 0
         self.keyboard_visible = False
         self.keyboard_tab_visibility = None
+        self.keyboard_layout_pending = False
         self.keyboard_live = True
         self.keyboard_block = Block(self.refresh_keyboard, None, objc_id)
         self.notification_center = ObjCClass('NSNotificationCenter').defaultCenter
@@ -213,6 +214,26 @@ class AppleNavigation:
             self.keyboard_inset = overlap
             self.parent.additionalSafeAreaInsets = insets
             self.parent.view.setNeedsLayout()
+            self.queue_keyboard_layout()
+
+    def queue_keyboard_layout(self):
+        if self.keyboard_live and not self.keyboard_layout_pending:
+            self.keyboard_layout_pending = True
+            self.window.app.loop.call_soon(self.layout_keyboard)
+
+    def layout_keyboard(self):
+        self.keyboard_layout_pending = False
+        if self.keyboard_live:
+            self.parent.view.layoutIfNeeded()
+            # Keyboard/bar geometry changes without changing the window size,
+            # so Toga would otherwise suppress the consumer resize callback.
+            self.window.on_resize()
+
+    def tabs_hidden(self):
+        from rubicon.objc import SEL
+        if self.controller.respondsToSelector(SEL('setTabBarHidden:animated:')):
+            return bool(self.controller.isTabBarHidden())
+        return bool(self.controller.tabBar.isHidden())
 
     def refresh_keyboard_chrome(self):
         if not self.keyboard_live or not self.keyboard_visible or self.host.chrome.context is not None:
@@ -232,6 +253,8 @@ class AppleNavigation:
         else:
             self.controller.tabBar.setHidden(hidden)
         self.controller.view.setNeedsLayout()
+        self.parent.view.setNeedsLayout()
+        self.queue_keyboard_layout()
 
     def restore_keyboard_chrome(self):
         if self.keyboard_tab_visibility is not None:

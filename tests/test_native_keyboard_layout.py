@@ -105,6 +105,7 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         class View:
             bounds = NS(size=NS(width=400, height=800))
             def setNeedsLayout(self): pass
+            def layoutIfNeeded(self): pass
             def convertRect(self, rect, **kwargs): return rect
             @property
             def safeAreaInsets(self): return NS(bottom=34 + state.insets.bottom)
@@ -124,11 +125,15 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         adapter.controller, adapter.parent = controller, parent
         adapter.window = NS(_impl=NS(native=NS(isKeyWindow=lambda: state.key,
             screen=NS(coordinateSpace=object()), convertRect=lambda rect, **kwargs: rect)))
+        state.queued, state.resizes = [], 0
+        adapter.window.app = NS(loop=NS(call_soon=state.queued.append))
+        adapter.window.on_resize = lambda: setattr(state, 'resizes', state.resizes + 1)
         adapter.host = NS(chrome=NS(context=None))
         adapter.old_additional_insets = NS(bottom=0)
         adapter.keyboard_inset = 0
         adapter.keyboard_visible = False
         adapter.keyboard_tab_visibility = None
+        adapter.keyboard_layout_pending = False
         adapter.keyboard_live = True
         return adapter, state
 
@@ -190,3 +195,16 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         self.assertTrue(state.hidden)
         self.frame(adapter, top=800)
         self.assertFalse(state.hidden)
+
+    def test_resize_is_coalesced_and_retired_with_the_adapter(self):
+        adapter, state = self.adapter()
+        self.frame(adapter)
+        self.frame(adapter)
+        self.assertEqual(len(state.queued), 1)
+        state.queued.pop()()
+        self.assertEqual(state.resizes, 1)
+        self.frame(adapter, top=800)
+        self.assertEqual(len(state.queued), 1)
+        adapter.keyboard_live = False
+        state.queued.pop()()
+        self.assertEqual(state.resizes, 1)

@@ -30,6 +30,10 @@ iOS 18 and later; older systems use native view visibility. Floating keyboards
 hide the tabs without claiming a full-width keyboard inset. Immersive reader
 chrome keeps independent restoration ownership; leaving a reader while typing
 reapplies temporary keyboard suppression.
+`tabs_hidden()` reports the active UIKit tab-container visibility, which can differ
+from `tabBar.isHidden`. Keyboard geometry changes coalesce a consumer resize
+callback even when the window dimensions stay constant, so callers can release
+floating-bar clearance and reflow their content.
 Android bottom-bar/rail transitions suppress Toga's programmatic selection event;
 rotation changes presentation without invoking host navigation or retiring routes.
 
