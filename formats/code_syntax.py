@@ -56,6 +56,15 @@ def detect_language(path, text=""):
         return "html+php"
     if name.endswith((".py", ".pyi")):
         return "python"
+    # The common editor formats are unambiguous. Avoid loading/scanning the
+    # Pygments filename registry on the UI thread merely to open a local note.
+    for suffixes, language in (
+        ((".md", ".markdown"), "markdown"), ((".txt",), "text"),
+        ((".json",), "json"), ((".yaml", ".yml"), "yaml"),
+        ((".toml",), "toml"), ((".ini",), "ini"),
+    ):
+        if name.endswith(suffixes):
+            return language
     try:
         from pygments.lexers import get_lexer_for_filename
 

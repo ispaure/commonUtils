@@ -1,10 +1,18 @@
 """Native and desktop syntax data share language definitions without Qt imports."""
 import unittest
+from unittest.mock import patch
 from commonUtils.formats.code_spans import line_offsets, syntax_spans, MAX_HIGHLIGHT_CHARS
 from commonUtils.formats.code_syntax import detect_language, LANGUAGES
 
 
 class CodeSpanTests(unittest.TestCase):
+    def test_typing_in_ordinary_notes_does_not_scan_the_lexer_registry(self):
+        with patch('pygments.lexers.get_lexer_for_filename', side_effect=AssertionError('Scanned lexer registry')):
+            self.assertEqual(detect_language('Note.MD', '# title'), 'markdown')
+            self.assertEqual(detect_language('Note.markdown', 'changed text'), 'markdown')
+            self.assertEqual(detect_language('Note.txt', 'plain text'), 'text')
+            self.assertEqual(detect_language('settings.json', '{}'), 'json')
+
     def test_logical_line_starts_use_native_utf16_coordinates(self):
         self.assertEqual(line_offsets(''), [0])
         self.assertEqual(line_offsets('😀 one\nwrapped\n'), [0, 7, 15])

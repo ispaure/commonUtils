@@ -207,6 +207,8 @@ gestures for a visible reader; see the [native component contract](../../ui/nati
 | Native source input, line numbers and syntax colours | `code_input.CodeInput(loop=..., filename=...)`; call `dispose()` on retirement |
 
 `formats.code_syntax` shares language choices and detection with desktop;
+ordinary text, Markdown, JSON, YAML, TOML and INI filenames resolve directly,
+without scanning the Pygments filename registry on each editor change.
 `formats.code_spans` provides bounded UTF-16 colour spans and logical line starts
 without Qt. The native input uses the host's Pygments installation.
 
