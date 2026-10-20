@@ -15,8 +15,9 @@ previous successfully loaded location, including a previous storage selection.
 The bounded history lasts only for this browser session and is cleared on closing.
 
 **Search** opens a full-width field to search this folder and its subfolders.
-Folder listings load in the background without reading file contents; scans stop
-after 10,000 entries and report incomplete results. Closing search restores the
-folder listing. Sorting offers natural names, sizes or modified times in either direction;
+Folder listings load in the background without reading file contents. Matches
+appear while the scan continues; the status reports ongoing searches, partial
+results and failures. Searches cover the subtree unless the host sets a scan
+limit. Closing search restores the folder listing. Sorting offers natural names, sizes or modified times in either direction;
 folders stay before files. Search resets when navigating elsewhere. Hidden selected
 items are deselected so actions cannot target an item excluded by the filter.

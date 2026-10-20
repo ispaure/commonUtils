@@ -86,6 +86,26 @@ class ResourceSearchTests(unittest.TestCase):
             search_resources(provider, 'books', 'note', cancelled=lambda: True)
 
 
+class ProgressiveResourceSearchTests(unittest.TestCase):
+    def test_progress_publishes_nested_folder_before_descending_and_detaches_rows(self):
+        from types import SimpleNamespace
+        from commonUtils.runtime.resource_search import search_resources
+        reports = []
+        def listing(path, *, cancelled):
+            if not path:
+                return [dict(path='Books', name='Books', directory=True)]
+            if path == 'Books':
+                return [dict(path='Books/Murakami', name='Murakami', directory=True)]
+            self.assertEqual(reports[0].rows[0]['path'], 'Books/Murakami')
+            self.assertFalse(reports[0].complete)
+            return [dict(path='Books/Murakami/Murakami.epub', name='Murakami.epub', directory=False)]
+        provider = SimpleNamespace(relative=lambda value: value, list=listing)
+        result = search_resources(provider, '', 'murakami', progress=reports.append)
+        self.assertTrue(result.complete)
+        self.assertEqual(len(result.rows), 2)
+        self.assertEqual(len(reports[0].rows), 1)
+
+
 class LargeResourceSearchTests(unittest.TestCase):
     def test_default_search_reaches_matches_beyond_ten_thousand_entries(self):
         from types import SimpleNamespace

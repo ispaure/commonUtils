@@ -2,6 +2,7 @@
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
+from time import monotonic
 from .operations import check_cancelled
 
 
@@ -13,11 +14,22 @@ class SearchResult:
     errors: list
 
 
-def search_resources(provider, directory, query, *, cancelled=lambda: False, max_entries=None):
+def search_resources(provider, directory, query, *, cancelled=lambda: False, max_entries=None, progress=None):
     directory = provider.relative(directory)
     query = query.strip().casefold()
     queue, visited, rows, errors = deque([directory]), set(), [], []
     scanned = 0
+    reported = False
+    last_report = monotonic()
+    def report():
+        nonlocal reported, last_report
+        now = monotonic()
+        if progress is not None and ((rows and not reported) or now - last_report >= .25):
+            # A detached snapshot can cross the worker/UI boundary while the
+            # breadth-first scan continues through unrelated, slower folders.
+            progress(SearchResult(list(rows), scanned, False, list(errors)))
+            reported = bool(rows)
+            last_report = now
     scope = getattr(provider, 'operation', None)
     with scope(cancelled) if scope else nullcontext():
         recursive = getattr(provider, 'search_entries', None)
@@ -34,6 +46,7 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                     item = dict(row)
                     item['name'] = path[len(directory) + 1:] if directory else path
                     rows.append(item)
+                report()
             return SearchResult(rows, scanned, True, errors)
         while queue:
             check_cancelled(cancelled)
@@ -61,4 +74,5 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                     rows.append(item)
                 if row['directory']:
                     queue.append(path)
+                report()
     return SearchResult(rows, scanned, not errors, errors)

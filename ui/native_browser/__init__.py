@@ -27,6 +27,7 @@ class NativeBrowser:
         self.search_directory = ''
         self.folder_tree = None
         self.search_epoch = 0
+        self.searching = False
         self.search_cancelled = Event()
         self.navigation_busy = False
         self.back_button = toga.Button('Back', on_press=self.go_back, enabled=False, style=Pack(height=44))
@@ -85,6 +86,7 @@ class NativeBrowser:
             self.search.value = ''
         self.search_cancelled.set()
         self.search_epoch += 1
+        self.searching = False
         self.search_provider, self.search_directory = provider, directory
         self.folder_tree = tree
         self.set_tree(tree)
@@ -132,6 +134,7 @@ class NativeBrowser:
         self.search_cancelled.set()
         self.search_cancelled = Event()
         self.search_epoch += 1
+        self.searching = False
         self._spawn(self._apply_query(self.search_epoch, self.search_cancelled))
 
     async def _apply_query(self, epoch, cancelled):
@@ -155,22 +158,48 @@ class NativeBrowser:
     async def _search_subfolders(self, epoch, cancelled):
         from ...runtime.resource_search import search_resources
         provider, directory, query = self.search_provider, self.search_directory, self.search.value
-        if self.closed or epoch != self.search_epoch or cancelled.is_set():
+        def current():
+            return not self.closed and epoch == self.search_epoch and not cancelled.is_set()
+        if not current():
             return
+        loop = asyncio.get_running_loop()
+        published = -1
+        self.searching = True
+        self.render()
         self.page_label.text = 'Searching subfolders…'
-        try:
-            result = await asyncio.to_thread(search_resources, provider, directory, query, cancelled=cancelled.is_set)
-            if self.closed or epoch != self.search_epoch or cancelled.is_set():
+        def publish(result, *, finished=False):
+            nonlocal published
+            if not current():
                 return
-            root = provider.root / provider.relative(directory)
-            tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
-            tree.set_children(root, provider_entries(provider, result.rows))
-            self.set_tree(tree)
-            if not result.complete:
-                self.page_label.text += ' · Partial results'
+            self.searching = not finished
+            if len(result.rows) != published:
+                root = provider.root / provider.relative(directory)
+                tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
+                tree.set_children(root, provider_entries(provider, result.rows))
+                self.set_tree(tree)
+                published = len(result.rows)
+            elif finished and not result.rows:
+                self.render()
+            if finished:
+                self.page_label.text = f'{len(result.rows)} matches'
+                if not result.complete:
+                    self.page_label.text += ' · Partial results'
+            else:
+                self.page_label.text = f'Searching… {len(result.rows)} found · {result.scanned} checked'
+        def progress(result):
+            loop.call_soon_threadsafe(publish, result)
+        try:
+            result = await asyncio.to_thread(search_resources, provider, directory, query,
+                                            cancelled=cancelled.is_set, progress=progress)
+            publish(result, finished=True)
         except Exception as error:
-            if not self.closed and epoch == self.search_epoch and not cancelled.is_set():
+            if current():
+                self.searching = False
+                self.render()
                 self.page_label.text = 'Search failed: ' + str(error)[:80]
+        finally:
+            if current():
+                self.searching = False
 
     async def go_back(self, widget=None, **kwargs):
         if self.closed or self.navigation_busy or not self.on_navigate or self.history.previous() is None:

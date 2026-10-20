@@ -368,6 +368,11 @@ provider listings breadth-first, validates child scope and produces relative lab
 for nested matches. Desktop ResourceBrowser and NativeBrowser debounce searches
 for 400 ms after the last edit and run this scan on cancellable workers.
 The default scan visits the full subtree; callers can explicitly set max_entries.
+An optional `progress(SearchResult)` callback runs on the scanning thread with detached,
+incomplete snapshots. It publishes the first match immediately, then throttles
+updates to at most four per second. Callers marshal these snapshots to their UI loop;
+the returned result carries final completeness and errors. NativeBrowser publishes
+these matches while scanning continues and discards obsolete query results.
 An optional provider search_entries(directory, cancelled=...) iterator supplies a
 recursive listing directly; its rows must stay strictly beneath the requested
 directory. Partial or failed listings must not be presented as complete.
