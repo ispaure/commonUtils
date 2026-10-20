@@ -7,6 +7,7 @@ utterances; stopping clears the queue before asking the native engine to stop.
 from collections import deque
 from bisect import bisect_right
 import re
+import math
 from time import monotonic
 from .. import pyside as qt
 from ..appearance.icons import set_painted_icon
@@ -80,6 +81,11 @@ class ReadAloud(qt.QObject):
         self._utterance_words = []
         self._utterance_word_index = 0
         self._native_words = False
+        self.timer_duration = self.timer_remaining = 0
+        self.timer_deadline = None
+        self.sleep_tick = qt.QTimer(self)
+        self.sleep_tick.setInterval(1000)
+        self.sleep_tick.timeout.connect(self._tick_sleep_timer)
         self.word_timer = qt.QTimer(self)
         self.word_timer.setSingleShot(True)
         self.word_timer.timeout.connect(self._estimated_word)
@@ -109,23 +115,49 @@ class ReadAloud(qt.QObject):
         layout = qt.QVBoxLayout(self.panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
-        layout.addWidget(qt.QLabel('Read aloud'))
         self.message = qt.QLabel('Reads selected text, or ' + self.scope + '.')
         self.message.setWordWrap(True)
-        layout.addWidget(self.message)
-        form = qt.QFormLayout()
-        self.language = qt.QComboBox()
-        self.voice = qt.QComboBox()
-        self.speed = qt.QDoubleSpinBox()
-        self.speed.setRange(-1, 1)
-        self.speed.setSingleStep(.1)
-        self.speed.setDecimals(1)
-        self.speed.setToolTip('0 is normal speed; negative is slower, positive faster')
-        for label, widget in (('Language', self.language), ('Voice', self.voice), ('Speed', self.speed)):
-            widget.setMinimumHeight(32)
-            form.addRow(label, widget)
-        layout.addLayout(form)
-        row = qt.QHBoxLayout()
+        header = qt.QHBoxLayout()
+        header.addWidget(qt.QLabel('Speed'))
+        header.addStretch()
+        self.speed_value = qt.QLabel('100%')
+        font = self.speed_value.font(); font.setBold(True); self.speed_value.setFont(font)
+        header.addWidget(self.speed_value)
+        layout.addLayout(header)
+        speed_row = qt.QHBoxLayout()
+        self.speed = qt.QSlider(qt.Qt.Orientation.Horizontal)
+        self.speed.setRange(50, 200)
+        self.speed.setSingleStep(25); self.speed.setPageStep(25)
+        self.speed.setTickInterval(25)
+        self.speed.setTickPosition(qt.QSlider.TickPosition.TicksBelow)
+        self.speed.setValue(100)
+        self.speed.setAccessibleName('Reading speed')
+        for label, widget in (('50%', self.speed), ('200%', None)):
+            limit = qt.QLabel(label)
+            limit.setForegroundRole(qt.QPalette.ColorRole.PlaceholderText)
+            font = limit.font(); font.setPointSizeF(max(8, font.pointSizeF() - 2)); limit.setFont(font)
+            speed_row.addWidget(limit)
+            if widget is not None: speed_row.addWidget(widget, 1)
+        layout.addLayout(speed_row)
+        timer_row = qt.QHBoxLayout()
+        timer_row.addWidget(qt.QLabel('Sleep timer'))
+        self.timer_choice = qt.QComboBox()
+        for label, seconds in (('Off', 0), ('15 min', 900), ('30 min', 1800), ('45 min', 2700), ('1 hr', 3600)):
+            self.timer_choice.addItem(label, seconds)
+        self.timer_choice.setAccessibleName('Sleep timer duration')
+        timer_row.addWidget(self.timer_choice, 1)
+        self.reset_timer_button = reader_button(self.panel, 'Reset timer', icon='reset')
+        self.reset_timer_button.setEnabled(False)
+        timer_row.addWidget(self.reset_timer_button)
+        layout.addLayout(timer_row)
+        self.timer_label = qt.QLabel('Timer off')
+        font = self.timer_label.font(); font.setBold(True); self.timer_label.setFont(font)
+        layout.addWidget(self.timer_label)
+        self.timer_choice.currentIndexChanged.connect(self._select_timer)
+        self.reset_timer_button.clicked.connect(self.reset_timer)
+        self.speed.valueChanged.connect(self._speed_changed)
+        self.speed.sliderReleased.connect(lambda: self._speed_changed(self.speed.value()))
+        row = self.playback_row = qt.QHBoxLayout()
         self.back = reader_button(self.panel, 'Back 15 seconds', icon='back15')
         self.forward = reader_button(self.panel, 'Forward 15 seconds', icon='forward15')
         for button in (self.back, self.forward):
@@ -134,11 +166,18 @@ class ReadAloud(qt.QObject):
         self.pause = self.read  # Preserve the existing handle for shared consumers.
         self.stop_button = reader_button(self.panel, 'Stop', icon='stop')
         for button, callback in ((self.back, lambda: self.skip(-15)), (self.read, self.toggle_playback),
-                                 (self.stop_button, self.stop),
-                                 (self.forward, lambda: self.skip(15))):
-            row.addWidget(button)
+                                 (self.forward, lambda: self.skip(15)), (self.stop_button, self.stop)):
+            button.setMinimumSize(44, 44)
+            row.addWidget(button, 1)
             button.clicked.connect(callback)
         layout.addLayout(row)
+        layout.addWidget(self.message)
+        form = qt.QFormLayout()
+        self.language, self.voice = qt.QComboBox(), qt.QComboBox()
+        for label, widget in (('Language', self.language), ('Voice', self.voice)):
+            widget.setMinimumHeight(32)
+            form.addRow(label, widget)
+        layout.addLayout(form)
         try:
             from PySide6.QtTextToSpeech import QTextToSpeech
             self.speech_type = QTextToSpeech
@@ -156,7 +195,7 @@ class ReadAloud(qt.QObject):
             self.language.currentIndexChanged.connect(self._language_changed)
             self._voices()
             self.voice.currentIndexChanged.connect(self._voice_changed)
-            self.speed.valueChanged.connect(self.engine.setRate)
+            self.engine.setRate(0)
             self._state_changed(self.engine.state())
         except (ImportError, RuntimeError) as error:
             self.message.setText(f'Read aloud is unavailable: {error}')
@@ -167,6 +206,54 @@ class ReadAloud(qt.QObject):
         self.panel.resize(380, self.panel.sizeHint().height())
         self._position_panel()
         self.panel.show()
+
+    def _speed_changed(self, value):
+        value = max(50, min(200, 50 + round((value - 50) / 25) * 25))
+        self.speed.blockSignals(True)
+        self.speed.setValue(value)
+        self.speed.blockSignals(False)
+        self.speed_value.setText(f'{value}%')
+        self._word_events.clear()
+        if self.engine is not None:
+            # Qt rates use -1..1; keep normal speed at zero.
+            self.engine.setRate((value - 100) / (100 if value >= 100 else 50))
+
+    def _select_timer(self):
+        self.timer_duration = self.timer_choice.currentData()
+        self.reset_timer_button.setEnabled(bool(self.timer_duration))
+        self.reset_timer()
+
+    def reset_timer(self):
+        self.timer_remaining = self.timer_duration
+        running = self.engine is not None and self.engine.state() == self.speech_type.State.Speaking
+        self.timer_deadline = monotonic() + self.timer_remaining if running and self.timer_duration else None
+        self._tick_sleep_timer()
+
+    def _set_timer_running(self, running):
+        if self.timer_deadline is not None:
+            self.timer_remaining = max(0, self.timer_deadline - monotonic())
+        if running and self.timer_duration and self.timer_remaining <= 0:
+            self.timer_remaining = self.timer_duration
+        self.timer_deadline = monotonic() + self.timer_remaining if running and self.timer_duration else None
+        self._tick_sleep_timer()
+
+    def _tick_sleep_timer(self):
+        if self.timer_deadline is not None:
+            self.timer_remaining = max(0, self.timer_deadline - monotonic())
+        minutes, seconds = divmod(math.ceil(self.timer_remaining), 60)
+        self.timer_label.setText(f'Time remaining: {minutes:02d}:{seconds:02d}' if self.timer_duration else 'Timer off')
+        if self.timer_deadline is not None and self.timer_remaining <= 0:
+            self.timer_deadline = None
+            self.sleep_tick.stop()
+            if self.engine.engineCapabilities() & self.speech_type.Capability.PauseResume:
+                self.engine.pause()
+            else:
+                self.stop()
+            self.message.setText('Timer finished · Play to start a new timer.')
+        elif self.timer_deadline is not None:
+            self.sleep_tick.start()
+        else:
+            self.sleep_tick.stop()
 
     def _position_panel(self):
         anchor = self.anchor or self.owner
@@ -218,6 +305,11 @@ class ReadAloud(qt.QObject):
         self.pending.clear()
         self._speaking = False
         self.engine.stop()
+        # Consumers can mirror the speech range into another page/view.
+        # Clear those copies before painting the replacement range.
+        widget = self._highlight_widget
+        self._clear_highlight()
+        self._highlight_widget = widget
         self._position = position
         relative = max(0, position - self._source_base)
         prefix = self._source_text.encode('utf-16-le')[:relative * 2].decode('utf-16-le', errors='ignore')
@@ -260,7 +352,7 @@ class ReadAloud(qt.QObject):
             first, last = self._word_events[0], self._word_events[-1]
             if last[0] - first[0] > 1 and last[1] > first[1]:
                 return max(1, min(8, (last[1] - first[1]) / (last[0] - first[0])))
-        return max(1, 3 * (1 + self.speed.value()))
+        return max(1, 3 * self.speed.value() / 100)
 
     def _estimated_word(self):
         if not self._speaking or self._native_words:
@@ -321,6 +413,7 @@ class ReadAloud(qt.QObject):
         paused = state == states.Paused
         finished = state == states.Ready and self._speaking
         self._speaking = speaking or paused
+        self._set_timer_running(speaking)
         if paused: self._word_events.clear()
         label = 'Pause' if speaking else 'Resume' if paused else 'Play'
         self.pause.setText(label)

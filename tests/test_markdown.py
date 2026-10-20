@@ -60,6 +60,30 @@ class MarkdownTests(QtTestCase):
         self.assertTrue(viewer.speech.action.isVisible())
         self.assertTrue(viewer.speech.anchor.isVisible())
 
+    def test_speech_reads_rendered_link_labels_and_selected_passages(self):
+        from commonUtils.tests.test_read_aloud import SilentEngine
+        viewer = self.viewer
+        viewer.set_editing(True)
+        viewer.editor.setPlainText('# Heading\n\n[Readable label](https://example.invalid/hidden) '
+                                  'and **bold**.\n\n[Reference][target]\n\n'
+                                  '[target]: https://example.invalid/reference\n\n'
+                                  'Visible https://visible.invalid/path\n\n'
+                                  '`[literal](https://code.invalid)`')
+        viewer.set_editing(False)
+        viewer.speech.engine_factory = SilentEngine
+        viewer.speech.show()
+        viewer.speech.start()
+        spoken = viewer.speech._source_text
+        self.assertIn('Heading\nReadable label and bold.', spoken)
+        self.assertIn('Reference', spoken)
+        self.assertNotIn('https://example.invalid', spoken)
+        self.assertIn('https://visible.invalid/path', spoken)
+        self.assertIn('[literal](https://code.invalid)', spoken)
+        viewer.speech.stop()
+        self.assertTrue(viewer.browser.find('Readable label'))
+        viewer.speech.start()
+        self.assertEqual(viewer.speech.engine.spoken[-1], 'Readable label')
+
     def test_long_document_and_html_block_keep_tail_in_reading_and_editing(self):
         text = '# Long\n\n' + 'Paragraph text.\n\n' * 3000 + '<div>\nText\n\nTAIL_SENTINEL'
         self.first.write_text(text)

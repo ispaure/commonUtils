@@ -48,6 +48,64 @@ class SpeechTests(QtTestCase):
         speech.show()
         return speech
 
+    def test_speed_detents_and_timer_follow_play_pause_reset_and_expiry(self):
+        from unittest.mock import patch
+        speech = self.speech('word ' * 200)
+        self.assertEqual(speech.speed.value(), 100)
+        speech.speed.setValue(138)
+        self.assertEqual(speech.speed.value(), 150)
+        self.assertEqual(speech.speed_value.text(), '150%')
+        self.assertEqual([speech.playback_row.itemAt(i).widget().accessibleName() for i in range(4)],
+                         ['Back 15 seconds', 'Play', 'Forward 15 seconds', 'Stop'])
+        with patch('commonUtils.ui.readers.read_aloud.monotonic') as clock:
+            clock.return_value = 100
+            speech.timer_choice.setCurrentIndex(1)
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 15:00')
+            self.assertFalse(speech.sleep_tick.isActive())
+            speech.start()
+            clock.return_value = 110
+            speech._tick_sleep_timer()
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 14:50')
+            speech.toggle_pause()
+            clock.return_value = 500
+            speech._tick_sleep_timer()
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 14:50')
+            speech.reset_timer_button.click()
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 15:00')
+            self.assertEqual(speech.engine.state(), Speech.State.Paused)
+            speech.toggle_pause()
+            clock.return_value = 1401
+            speech._tick_sleep_timer()
+            self.assertEqual(speech.engine.state(), Speech.State.Paused)
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 00:00')
+            self.assertIn('Timer finished', speech.message.text())
+            speech.toggle_pause()
+            self.assertEqual(speech.timer_label.text(), 'Time remaining: 15:00')
+            speech.timer_choice.setCurrentIndex(0)
+            self.assertEqual(speech.timer_label.text(), 'Timer off')
+            self.assertFalse(speech.reset_timer_button.isEnabled())
+
+    def test_skip_clears_mirrored_ranges_before_replacement_and_preserves_other_marks(self):
+        widget = qt.QTextBrowser(self.owner)
+        widget.setPlainText(' '.join(f'word{i}' for i in range(200)))
+        mark = qt.QTextEdit.ExtraSelection()
+        mark.cursor = widget.textCursor()
+        mark.format.setProperty(qt.QTextFormat.Property.UserProperty + 78, True)
+        widget.setExtraSelections([mark])
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show(); speech.start()
+        changes = []
+        speech.positionChanged.connect(lambda *value: changes.append(value))
+        speech.skip(15)
+        self.assertEqual(changes[0], (-1, -1))
+        self.assertEqual(changes[-1][0], speech._position)
+        selections = widget.extraSelections()
+        self.assertEqual(len(selections), 2)
+        self.assertTrue(selections[0].format.property(qt.QTextFormat.Property.UserProperty + 78))
+        self.assertEqual(selections[1].cursor.selectedText(), 'word45')
+        speech.stop()
+        self.assertEqual(len(widget.extraSelections()), 1)
+
     def test_speech_starts_at_visible_text_and_highlights_one_word(self):
         widget = qt.QTextBrowser(self.owner)
         widget.resize(240, 120)
@@ -117,7 +175,7 @@ class SpeechTests(QtTestCase):
 
     def test_single_playback_button_starts_pauses_resumes_and_resets(self):
         speech = self.speech('A sentence. ' * 800)
-        controls = speech.read.parentWidget().layout().itemAt(3).layout()
+        controls = speech.playback_row
         self.assertEqual(controls.count(), 4)
         self.assertIs(speech.pause, speech.read)
         self.assertEqual(speech.read.accessibleName(), 'Play')

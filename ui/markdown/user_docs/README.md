@@ -106,12 +106,23 @@ if that theme's image has not been generated. Temporary rendering files are clea
 ## Read aloud
 
 Open Read aloud, select a voice/language and press Play. A selected passage takes
-priority; otherwise playback starts from the visible reading area. The same button
+priority; otherwise playback starts from the visible reading area. Speech follows
+the rendered reading view: links read their visible labels without the underlying
+destinations, and formatting markers are omitted. URLs and code written visibly
+in the document remain readable. The same button
 changes to Pause while speaking and Resume while paused. Engines without pause/resume
-support disable it during playback; Stop remains available. Speed depends on the native
-speech engine. Click outside the popup to hide its controls while playback continues;
+support disable it during playback; Stop remains available. The speed slider snaps
+from 50% to 200% in 25% steps, with gray limit labels and the selected percentage.
+Actual speed depends on the native speech engine. Sleep timer offers Off, 15, 30,
+45 or 60 minutes. Its bold countdown runs only while speaking. The circular-arrow
+reset icon restores the selected duration while preserving playback/pause state.
+At expiry, capable engines pause; other engines stop. Play starts a fresh timer.
+The playback row is backward 15 seconds, Play/Pause, forward 15 seconds and Stop.
+Language and voice controls remain below the playback section. Click outside the popup to hide its controls while playback continues;
 click the speaker again to reopen them. Back/forward estimate a
-15-second jump; highlights may use estimated timing where word events are unavailable.
+15-second jump; each jump clears the previous speech highlight before showing the
+new word, including mirrored reader panes. Unrelated search/selection marks are
+preserved. Highlights may use estimated timing where word events are unavailable.
 
 Playback stops when content is replaced, editing begins or the
 reader closes. Speech does not edit the file. If no engine/voice is available, the

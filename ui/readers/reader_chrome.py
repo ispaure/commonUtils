@@ -70,6 +70,9 @@ class ReaderIcon(qt.QIconEngine):
                 painter.drawPolyline([qt.QPointF(16, 2), qt.QPointF(21, 5), qt.QPointF(17, 8)])
             font = qt.QFont(painter.font()); font.setPixelSize(10); painter.setFont(font)
             painter.drawText(qt.QRectF(3, 4, 18, 17), qt.Qt.AlignmentFlag.AlignCenter, '15')
+        elif self.name == 'reset':
+            painter.drawArc(qt.QRectF(3, 3, 18, 18), 50 * 16, 280 * 16)
+            painter.drawPolyline([qt.QPointF(8, 2), qt.QPointF(3, 5), qt.QPointF(7, 8)])
         elif self.name == 'play':
             painter.drawPolygon([qt.QPointF(7, 4), qt.QPointF(20, 12), qt.QPointF(7, 20)])
         elif self.name == 'pause':
