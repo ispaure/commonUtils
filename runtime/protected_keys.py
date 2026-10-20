@@ -155,4 +155,3 @@ class IOSKeys:
 
     def set_label(self, identity, label):
         self.perform('label', identity, label)
-

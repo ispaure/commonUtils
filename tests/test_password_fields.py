@@ -33,4 +33,3 @@ class PasswordFieldTests(QtTestCase):
         wrapper.line_edit.visibility_action.trigger()
         self.assertEqual(wrapper.line_edit.echoMode(), qt.QLineEdit.EchoMode.Normal)
         self.assertEqual(wrapper.txt(), 'synthetic secret')
-

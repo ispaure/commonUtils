@@ -49,7 +49,7 @@ Setext title
 > Another paragraph
 
 Normal wrapped
-paragraph with _emphasis_, ~~old~~ and **bold**.  
+paragraph with _emphasis_, ~~old~~ and **bold**.\x20\x20
 Hard break.
 
 ---
