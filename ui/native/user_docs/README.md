@@ -41,7 +41,17 @@ A native app can show an offline Markdown wiki. The hamburger button shows folde
 again to return to the article. Wider windows keep the list beside the article. Use the chevron to
 expand or collapse folders, and tap the title separately to open its page. File names & titles searches
 navigation labels and names; Page text searches Markdown source. Clear the query
-to show the full tree. The viewer is read-only; the host app owns editing.
+to show the full tree. The search-mode selector appears only while a library
+query is entered. Matching text is highlighted when you open a result; a match
+in a filename alone may have no matching passage in the rendered page.
+
+Use the magnifying glass for **Find in this page**. Its controls sit above the
+article, separate from library search, with a current/total count and Previous/Next
+arrows that wrap. Search is literal and case-insensitive, including text across
+inline formatting. **Done** removes page marks while keeping library marks until
+the library query is cleared. At most 5,000 matches per scope are highlighted;
+a count ending in `+` indicates that limit. Search changes no source text, links
+or speech highlights. The viewer is read-only; the host app owns editing.
 
 The top bar provides Back, Forward and Up. Back/Forward revisit pages you have
 opened. Up opens the containing folder's same-named Markdown page; from that
@@ -49,7 +59,8 @@ folder page it opens the parent folder's page. At the documentation root,
 README.md or index.md can serve as the folder page. Up is disabled when that
 folder has no page or you are already at the root page.
 
-Expanded child pages and folders are indented beneath their parent; titles at
+When the root folder has a same-named page, it is the single top entry and all
+other documentation is nested beneath it. Expanded child pages and folders are indented beneath their parent; titles at
 the same depth line up. Markdown articles support tables (swipe sideways when
 wide), nested lists, quotes, emphasis, code and local heading links. Raw HTML is
 shown as text; images show alternative text and external links remain inert.

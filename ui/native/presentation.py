@@ -129,7 +129,8 @@ def navigation_button(direction, label, *, on_press=None, enabled=True):
     """48-point arrow control with native glyphs and an accessible action name."""
     import toga
     from toga.style import Pack
-    symbols = {'back': ('chevron.left', '‹', (((15, 5), (8, 12), (15, 19)),)),
+    symbols = {'find': ('magnifyingglass', '⌕', (((11, 3), (5, 5), (3, 11), (5, 16), (11, 18), (16, 16), (18, 11), (16, 5), (11, 3)), ((16, 16), (22, 22)))),
+               'back': ('chevron.left', '‹', (((15, 5), (8, 12), (15, 19)),)),
                'forward': ('chevron.right', '›', (((9, 5), (16, 12), (9, 19)),)),
                'up': ('arrow.up', '↑', (((5, 11), (12, 4), (19, 11)), ((12, 4), (12, 21))))}
     symbol, fallback, lines = symbols[direction]

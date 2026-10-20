@@ -6,6 +6,16 @@ from .. import pyside as qt
 from ...filesystem.local_access import check_local_path
 from ...formats.markdown_wiki import resolve_document_path
 from ...persistence.text import likely_binary
+from ...formats.markdown import split_frontmatter
+from .extensions import reading_source
+from .links import render_links
+from .presentation import style_document
+
+
+class _PreviewDocument(qt.QTextDocument):
+    def loadResource(self, kind, url):
+        # Hovering must not load embedded images or other local/remote resources.
+        return None
 
 
 class LinkPreview(qt.QObject):
@@ -23,13 +33,17 @@ class LinkPreview(qt.QObject):
         self.title = qt.QLabel()
         self.title.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.title.setWordWrap(True)
-        self.snippet = qt.QPlainTextEdit()
+        self.snippet = qt.QTextBrowser()
+        self.snippet.setDocument(_PreviewDocument(self.snippet))
+        self.snippet.setOpenLinks(False)
+        self.snippet.setOpenExternalLinks(False)
+        self.snippet.setTextInteractionFlags(qt.Qt.TextInteractionFlag.NoTextInteraction)
         self.snippet.setReadOnly(True)
         self.snippet.setAccessibleName('Linked file snippet')
         self.snippet.setFont(qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont))
         self.snippet.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.snippet.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.snippet.setLineWrapMode(qt.QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.snippet.setLineWrapMode(qt.QTextEdit.LineWrapMode.WidgetWidth)
         layout.addWidget(self.title)
         layout.addWidget(self.snippet)
         self.popup.resize(460, 260)
@@ -86,7 +100,22 @@ class LinkPreview(qt.QObject):
             return
         self.link = link
         self.title.setText(path.name)
-        self.snippet.setPlainText(snippet or '(Empty file)')
+        if path.suffix.lower() in ('.md', '.markdown'):
+            font = self.viewer.browser.font()
+            self.snippet.setFont(font)
+            self.snippet.document().setDefaultFont(font)
+            rendered, callouts = reading_source(split_frontmatter(snippet).body)
+            self.snippet.document().setMarkdown(render_links(rendered or '(Empty file)'),
+                qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub |
+                qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
+            style_document(self.snippet.document(), self.viewer.browser.palette(), callouts=callouts)
+        else:
+            font = qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont)
+            self.snippet.setFont(font)
+            self.snippet.document().setDefaultFont(font)
+            self.snippet.setPlainText(snippet or '(Empty file)')
+        self.snippet.verticalScrollBar().setValue(0)
+        self.snippet.horizontalScrollBar().setValue(0)
         screen = qt.QGuiApplication.screenAt(position) or self.viewer.screen()
         bounds = screen.availableGeometry()
         self.popup.resize(min(460, bounds.width()), min(260, bounds.height()))

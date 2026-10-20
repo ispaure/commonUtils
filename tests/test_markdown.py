@@ -531,7 +531,7 @@ class MarkdownTests(QtTestCase):
         self.assertNotIn('Save', visible_file)
         self.assertNotIn('Save As…', visible_file)
         self.assertNotIn('Edit / Read', [action.text() for action in window._view_menu.actions()])
-        self.assertEqual(viewer.find_action.text(), 'Find…')
+        self.assertEqual(viewer.find_action.text(), 'Find in this page…')
         viewer.show_find()
         self.assertTrue(viewer.replace_text.isHidden())
         for action in (viewer.new_action, viewer.save_action, viewer.save_as_action):

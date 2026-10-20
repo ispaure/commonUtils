@@ -73,3 +73,21 @@ adapter. Missing/inaccessible keys raise `KeyStoreUnavailable`; no plaintext
 fallback is provided. Hosts own namespace constants, backup exclusions, metadata
 records and encrypted payloads. Changing a namespace/AAD string makes existing
 keys inaccessible; preserve those strings during consumer migrations.
+
+## Portable speech sessions
+
+`speech.utterances(text, start=0, end=None, limit=1000, breaks=())` yields
+`(text, start, end)` with UTF-16 code-unit offsets. The session never reads a
+book, document, preference store or UI. `SpeechSession(engine, on_range=...,
+on_state=..., clock=...)` queues bounded utterances and rejects retired generation
+callbacks. Engines supply `ready`, `error`, `speak(text, voice, speed, token)`,
+`stop()` and `close()`, and receive `started`, `progress`, `completed` and `failed`
+callbacks. An optional engine loop schedules approximate word progress.
+`can_speak` is a caller-supplied gate checked before each utterance.
+
+`PlaybackTimer(loop, changed=..., expired=..., clock=...)` tracks active listening
+time. Pause preserves the remaining budget; Play after expiry starts a fresh
+budget. `dispose()` cancels outstanding timer handles. The host owns source text,
+selection, saved voice preferences, privacy gating and when to dispose a session.
+Desktop Qt read-aloud retains its existing chunking adapter; sharing the portable
+module does not merge native and desktop widget behavior.

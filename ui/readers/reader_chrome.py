@@ -39,6 +39,12 @@ class ReaderIcon(qt.QIconEngine):
                     x, y, sx, sy = x + sx * 5, y + sy * 5, -sx, -sy
                 painter.drawLine(qt.QLineF(x, y, x + sx * 5, y))
                 painter.drawLine(qt.QLineF(x, y, x, y + sy * 5))
+        elif self.name == 'close':
+            painter.drawLine(qt.QLineF(6, 6, 18, 18))
+            painter.drawLine(qt.QLineF(18, 6, 6, 18))
+        elif self.name == 'search':
+            painter.drawEllipse(qt.QRectF(4, 4, 11, 11))
+            painter.drawLine(qt.QLineF(14, 14, 20, 20))
         elif self.name == 'up':
             painter.drawPolyline([qt.QPointF(5, 15), qt.QPointF(12, 9), qt.QPointF(19, 15)])
         elif self.name in ('previous', 'next', 'previous-file', 'next-file'):
@@ -78,6 +84,11 @@ class ReaderIcon(qt.QIconEngine):
         elif self.name == 'pause':
             painter.drawRoundedRect(qt.QRectF(6, 4, 4, 16), 1, 1)
             painter.drawRoundedRect(qt.QRectF(14, 4, 4, 16), 1, 1)
+        elif self.name == 'speaker':
+            painter.drawPolygon([qt.QPointF(3, 9), qt.QPointF(7, 9), qt.QPointF(12, 5),
+                                 qt.QPointF(12, 19), qt.QPointF(7, 15), qt.QPointF(3, 15)])
+            painter.drawArc(qt.QRectF(10, 7, 8, 10), -65 * 16, 130 * 16)
+            painter.drawArc(qt.QRectF(9, 3, 14, 18), -60 * 16, 120 * 16)
         elif self.name == 'stop':
             painter.drawRoundedRect(qt.QRectF(5, 5, 14, 14), 1, 1)
         elif self.name == 'edit':
@@ -226,6 +237,23 @@ def reading_spin(parent, *, minimum, maximum, value, label, suffix='', step=1, c
     return spin
 
 
+class _PopupReplayGuard(qt.QObject):
+    def eventFilter(self, popup, event):
+        if event.type() == qt.QEvent.Type.MouseButtonPress:
+            # Qt clears this attribute on each new press. Restore it before
+            # the popup's default outside-press handler dismisses the window.
+            popup.setAttribute(qt.Qt.WidgetAttribute.WA_NoMouseReplay, True)
+        return False
+
+
+def prevent_reader_popup_replay(popup):
+    """Keep dismissal clicks from being replayed onto a reader toolbar."""
+    if not hasattr(popup, '_reader_replay_guard'):
+        popup._reader_replay_guard = _PopupReplayGuard(popup)
+        popup.installEventFilter(popup._reader_replay_guard)
+    popup.setAttribute(qt.Qt.WidgetAttribute.WA_NoMouseReplay, True)
+
+
 def show_reader_popup(popup, anchor, *, align_right=False):
     """Place a popup below its control, clamped to that control's screen."""
     point = anchor.mapToGlobal(qt.QPoint(anchor.width() if align_right else 0, anchor.height()))
@@ -233,4 +261,5 @@ def show_reader_popup(popup, anchor, *, align_right=False):
     x = point.x() - popup.width() if align_right else point.x()
     popup.move(max(screen.left(), min(x, screen.right() - popup.width() + 1)),
                max(screen.top(), min(point.y(), screen.bottom() - popup.height() + 1)))
+    prevent_reader_popup_replay(popup)
     popup.show()

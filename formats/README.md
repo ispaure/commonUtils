@@ -382,3 +382,13 @@ handled at the application boundary. See [file-type details](README.md).
 For nested XML, repeated elements, namespace-aware attributes and atomic XML
 saving, see [XML document examples](xmlType.md). Existing simple-field editing remains
 compatible with direct-child formats such as ComicInfo.
+
+## Bounded image header inspection
+
+`image_headers.image_header(data, max_bytes=...)` returns an immutable
+`ImageHeader(format, width, height, animated=False)` for PNG, JPEG or WebP bytes.
+The explicit byte bound limits input; malformed or unsupported headers raise
+`ValueError`. WebP extended headers report the animation flag rather than imposing
+a caller's animation policy. Header inspection does not validate the complete
+pixel stream or certify successful decoding. Consumers choose allowed formats,
+dimension/pixel limits and whether to accept animation before their native decoder.

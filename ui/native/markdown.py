@@ -32,19 +32,23 @@ class MarkdownWikiView:
         self.reading = False
         self.pending_fragment = ''
         self.wide = None
-        self.search = toga.TextInput(placeholder='Search documentation', on_change=DebouncedCallback(self.filter),
+        self.search = toga.TextInput(placeholder='Search library', on_change=DebouncedCallback(self.filter),
                                      style=Pack(height=48))
         self.mode = toga.Selection(items=['File names & titles', 'Page text'],
                                    on_change=self.filter, style=Pack(height=48))
         self.rows = toga.Box(style=Pack(direction=COLUMN))
         self.notice = toga.Label('')
-        self.browse = toga.Box(children=[self.search, self.mode, self.notice,
+        self.browse = toga.Box(children=[toga.Label('Library search'), self.search,
             toga.ScrollContainer(content=self.rows, horizontal=False, style=Pack(flex=1))],
             style=Pack(direction=COLUMN, flex=1))
         self.web = toga.WebView(on_navigation_starting=self.follow_link,
                                 on_webview_load=self.page_loaded, style=Pack(flex=1))
         self.title = toga.Label('Documentation', style=Pack(margin_bottom=8))
         self.article = toga.Box(children=[self.title, self.web], style=Pack(direction=COLUMN, flex=1))
+        from .markdown_search import MarkdownPageSearch
+        self.page_search = MarkdownPageSearch(self.web, self.article, insertion_index=1)
+        self.page_search.button.on_press = self.show_page_search
+
         self.sidebar = AdaptiveSidebar(self.browse, self.article, width=max(0, width - 24),
                                        label='Documentation folders and search')
         self.browse_button = self.sidebar.menu_button
@@ -53,7 +57,7 @@ class MarkdownWikiView:
         self.back_button = navigation_button('back', 'Back', on_press=self.back, enabled=False)
         self.forward_button = navigation_button('forward', 'Forward', on_press=self.forward, enabled=False)
         self.up_button = navigation_button('up', 'Up to parent folder page', on_press=self.up, enabled=False)
-        self.navigation = navigation = toga.Box(children=[self.browse_button, self.back_button, self.forward_button, self.up_button],
+        self.navigation = navigation = toga.Box(children=[self.browse_button, self.page_search.button, self.back_button, self.forward_button, self.up_button],
                               style=Pack(direction=ROW))
         self.view = toga.Box(children=[navigation, self.content], style=Pack(direction=COLUMN, flex=1, margin=12))
         self.reflow(width)
@@ -79,6 +83,7 @@ class MarkdownWikiView:
             self.navigation.insert(0, self.browse_button)
 
     def layout(self):
+        self._sync_notice()
         if self.reading:
             self.sidebar.show_detail()
         else:
@@ -89,6 +94,7 @@ class MarkdownWikiView:
         self.reading = not self.sidebar.sidebar_open
 
     def show_browse(self, widget=None, **kwargs):
+        self._sync_notice()
         self.reading = False
         self.sidebar.show_sidebar()
 
@@ -97,10 +103,18 @@ class MarkdownWikiView:
             return
         self.rows.clear()
         query = self.search.value or ''
+        searching = bool(query.strip())
+        if searching and self.mode not in self.browse.children:
+            self.browse.insert(2, self.mode)
+        elif not searching and self.mode in self.browse.children:
+            self.browse.remove(self.mode)
+        if hasattr(self, 'page_search'):
+            self.page_search.set_library_query(query)
         mode = 'content' if self.mode.value == 'Page text' else 'filename'
         entries = self.catalog.search(query, mode)
         self.notice.text = ('No matching pages.' if not entries else
             (f'{len(self.catalog.errors)} pages or folders could not be read.' if self.catalog.errors else ''))
+        self._sync_notice()
         def add(entries, depth=0):
             for entry in entries:
                 toggle = None
@@ -127,6 +141,18 @@ class MarkdownWikiView:
                 if query or entry.location in self.expanded:
                     add(entry.children, depth + 1)
         add(entries)
+
+    def _sync_notice(self):
+        if self.notice.text and self.notice not in self.browse.children:
+            self.browse.insert(len(self.browse.children) - 1, self.notice)
+        elif not self.notice.text and self.notice in self.browse.children:
+            self.browse.remove(self.notice)
+
+    def show_page_search(self, widget=None, **kwargs):
+        if self.path is not None:
+            self.reading = True
+            self.layout()
+            self.page_search.show()
 
     def open_page(self, path, *, remember=True, linked=False, fragment=''):
         path = Path(path).resolve()
@@ -155,7 +181,7 @@ class MarkdownWikiView:
             self.history.append(path)
             self.history_index = len(self.history) - 1
         self.path = path
-        self.expanded.update(folder for folder in path.parents if self.catalog.root in folder.parents)
+        self.expanded.update(folder for folder in path.parents if folder == self.catalog.root or self.catalog.root in folder.parents)
         self.update_navigation()
         self.url_prefix = '/wiki/' + uuid4().hex + '/'
         self.base = 'https://markdown.invalid' + self.url_prefix + quote(path.name)
@@ -164,6 +190,7 @@ class MarkdownWikiView:
         html = re.sub(r'href="([^"]*)"', lambda match:
                       'href="' + self.base + '?target=' + quote(unescape(match[1]), safe='') + '"', html)
         self.pending_fragment = fragment
+        self.page_search.loading()
         self.web.set_content(self.base, html)
         self.title.text = self.catalog.title(text, path.stem)
         self.reading = True
@@ -178,11 +205,13 @@ class MarkdownWikiView:
             + json.dumps(unquote(fragment)) + ');if(heading)heading.scrollIntoView();})()')
 
     def page_loaded(self, widget=None, **kwargs):
+        self.page_search.loaded(reveal=not bool(self.pending_fragment))
         if self.pending_fragment:
             fragment, self.pending_fragment = self.pending_fragment, ''
             self.scroll_fragment(fragment)
 
     def update_navigation(self):
+        self.page_search.button.enabled = self.path is not None
         self.back_button.enabled = self.history_index > 0
         self.forward_button.enabled = 0 <= self.history_index < len(self.history) - 1
         self.up_button.enabled = self.catalog.parent_page(self.path) is not None

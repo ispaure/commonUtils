@@ -269,6 +269,29 @@ this avoids Android WebView ignoring the HTML base URL. Document scripts remain
 blocked by the content policy. `open_page(..., fragment="heading-id")` requests a
 scroll after the page loads.
 
+## Rendered Markdown search
+
+`markdown_search.MarkdownPageSearch(web, container, insertion_index=0, valid=...)`
+owns a transient two-row page search panel. `show()`/`hide()` insert/remove it;
+`set_library_query(text)` supplies independent library marks. Call `loading()`
+before replacing HTML and `loaded(reveal=True)` from the WebView load callback.
+For explicit heading navigation use `reveal=False`, then scroll to the heading.
+Preserve other load callbacks, including host font bindings. The validity callback
+gates asynchronous evaluation/results; call `dispose()` before retiring private
+content or an owner to clear queries, pending debounce and visible controls.
+
+Search runs only through host-evaluated, JSON-serialized JavaScript. Authored
+scripts remain blocked. Text ranges cover literal, case-insensitive matches across
+inline elements, with block boundaries kept separate. Each scope retains at most
+5,000 ranges. Modern WebViews use CSS highlight ranges; older engines paint empty,
+pointer-transparent overlays that follow scroll/resize without splitting text
+nodes. Both paths retain source DOM, links, user selection and speech marks.
+Library queries can match raw Markdown/filenames that have no visible-page match.
+
+`MarkdownWikiView.page_search` exposes this controller. Its navigation button
+opens the article before showing search on a phone; hosts using a native toolbar
+can expose `show_page_search` in their reader action menu instead.
+
 ## Wiki scopes and landing pages
 
 A conventional wiki has a `docs/docs.md` scope landing, audience subfolders and
@@ -358,3 +381,26 @@ is opt-in; code spans, fenced code and escaped embeds remain literal.
 event loop and invokes the callback after 400 ms without another edit. `cancel()`
 retires a pending callback. Native browser filename search delays both filtering
 and recursive scanning; editing cancels the previous scan immediately.
+
+## Offline speech and private WebViews
+
+`speech.NativeSpeech(loop)` selects the installed Toga backend, enumerates usable
+offline voices and implements the engine contract in `runtime.speech`. Android
+progress delivery uses `android/io/github/ispaure/commonutils/SpeechListener.java`;
+include the shared native Java root when building. The listener carries opaque
+utterance tokens and ranges, not source text or document names. Disposal detaches
+native callbacks and suppresses queued deliveries. System media controls, audio
+session/privacy policy and document title publication remain consumer-owned.
+
+`private_webview.PrivateWebView(max_html_bytes=..., **toga_options)` creates a
+nonpersistent WKWebView on iOS or a cache-disabled Android WebView. Backend
+selection follows Toga's factory. `private_webview_supported()` reports those
+supported backends. `set_content` checks encoded UTF-8 bytes before entering Toga;
+`clear_private_content()` retires callbacks, clears the live document and disposes
+the native view idempotently. Unsupported backends fail closed. Callers choose
+HTML byte limits and supply navigation, resource and credential-validity policy.
+The component does not sanitize HTML or authorize arbitrary URLs.
+
+Consumer host regressions and mocked native disposal cover these adapters.
+Physical speech, WebView storage behavior and platform accessibility still need
+native-device validation after a backend upgrade.

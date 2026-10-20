@@ -39,6 +39,22 @@ class WikiCatalogTests(unittest.TestCase):
             self.assertTrue({'After blank', 'After properties', 'Setext title'} <= names)
             self.assertFalse(any(e.location.name == 'linked' for e in catalog.entries))
 
+    def test_same_named_root_is_single_parent_and_search_keeps_ancestry(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / 'docs'
+            root.mkdir()
+            home, child = root / 'docs.md', root / 'child.md'
+            home.write_text('# Documentation')
+            child.write_text('# Child\nNeedle')
+            catalog = MarkdownWiki(root)
+            self.assertEqual(len(catalog.entries), 1)
+            entry = catalog.entries[0]
+            self.assertEqual((entry.location, entry.page), (root, home))
+            self.assertEqual([e.page for e in entry.children], [child])
+            self.assertEqual(catalog.search('needle', 'content')[0].children[0].page, child)
+            self.assertEqual(catalog.parent_page(child), home)
+            self.assertIsNone(catalog.parent_page(home))
+
     def test_heading_after_properties_and_blank_lines(self):
         for text in ('---\ntags: [fruit]\n---\n# Apple',
                      '---\n# YAML comment\ntags: [fruit]\n---\n\n\n# Apple ##',
@@ -58,6 +74,41 @@ class WikiCatalogTests(unittest.TestCase):
 class WikiViewerTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
+
+    def test_arrow_selection_opens_page_and_cancel_restores_selection(self):
+        from PySide6.QtTest import QTest
+        with self.temporary_directory() as temporary:
+            root = Path(temporary).resolve() / 'docs'
+            root.mkdir()
+            home, child = root / 'docs.md', root / 'child.md'
+            home.write_text('# Documentation')
+            child.write_text('# Child')
+            viewer = MarkdownViewer(home, directory=root, allow_edit=True)
+            viewer.show()
+            tree = viewer.wiki.tree
+            self.assertEqual(tree.topLevelItemCount(), 1)
+            self.assertTrue(tree.topLevelItem(0).isExpanded())
+            tree.setFocus()
+            QTest.keyClick(tree, qt.Qt.Key.Key_Down)
+            self.assertEqual(viewer.current_path, child)
+            self.assertEqual([Path(entry['url'].toLocalFile()) for entry in viewer.history], [home, child])
+            viewer.set_edit_mode('source')
+            viewer.editor.insertPlainText('Dirty')
+            with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel) as warning:
+                QTest.keyClick(tree, qt.Qt.Key.Key_Up)
+            self.assertEqual(warning.call_count, 1)
+            self.assertEqual(viewer.current_path, child)
+            self.assertEqual(tree.currentItem().data(0, qt.Qt.ItemDataRole.UserRole), child)
+            self.assertTrue(viewer.is_modified)
+            with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel) as warning:
+                QTest.mouseClick(tree.viewport(), qt.Qt.MouseButton.LeftButton,
+                                 pos=tree.visualItemRect(tree.topLevelItem(0)).center())
+            self.assertEqual(warning.call_count, 1)
+            self.assertEqual(viewer.current_path, child)
+            with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Discard):
+                viewer.back()
+            self.assertEqual(viewer.current_path, home)
+            viewer.close()
 
     def test_cross_wiki_links_and_history_switch_scope(self):
         with self.temporary_directory() as temporary:

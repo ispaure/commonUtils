@@ -11,7 +11,7 @@ import math
 from time import monotonic
 from .. import pyside as qt
 from ..appearance.icons import set_painted_icon
-from .reader_chrome import ReaderIcon, reader_button
+from .reader_chrome import ReaderIcon, reader_button, prevent_reader_popup_replay
 
 
 def speech_chunks(text, limit=3000):
@@ -105,11 +105,15 @@ class ReadAloud(qt.QObject):
 
     def show(self):
         if self.panel is not None:
+            if self.panel.isVisible():
+                self.panel.hide()
+                return
             self._position_panel()
             self.panel.show()
             self.panel.raise_()
             return
         self.panel = qt.QDialog(self.owner, qt.Qt.WindowType.Popup)
+        prevent_reader_popup_replay(self.panel)
         self.panel.setWindowTitle('Read aloud')
         self.panel.setModal(False)
         layout = qt.QVBoxLayout(self.panel)

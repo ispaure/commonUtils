@@ -41,6 +41,9 @@ class MarkdownReadingMixin:
         self._render_source(self.markdown_text())
 
     def show_reading_appearance(self):
+        if self.appearance_popup is not None and self.appearance_popup.isVisible():
+            self.appearance_popup.hide()
+            return
         app = qt.QApplication.instance()
         open_settings = getattr(app, '_commonutils_open_settings', None)
         if callable(open_settings):

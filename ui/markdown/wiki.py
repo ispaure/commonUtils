@@ -19,32 +19,55 @@ class WikiPanel(qt.QWidget):
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.search = qt.QLineEdit()
-        self.search.setPlaceholderText('Search documentation…')
-        self.search.setAccessibleName('Search documentation')
+        self.search.setPlaceholderText('Search library…')
+        self.search.setClearButtonEnabled(True)
+        from ..appearance.icons import painted_icon
+        from ..readers.reader_chrome import ReaderIcon
+        self.search.addAction(painted_icon(ReaderIcon, 'search'), qt.QLineEdit.ActionPosition.LeadingPosition)
+        self.search.setAccessibleName('Search all pages in this library')
+        self.search.setToolTip('Filter pages across this library; use Find in this page for the open document')
         self.mode = qt.QComboBox()
         self.mode.addItem('File names & titles', 'filename')
         self.mode.addItem('Page text', 'content')
         self.mode.setAccessibleName('Documentation search mode')
+        self.mode.hide()
         self.tree = qt.QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setAccessibleName('Documentation files and folders')
         self.notice = qt.QLabel()
         self.notice.setWordWrap(True)
-        for widget in (self.search, self.mode, self.tree, self.notice):
+        self.notice.setTextFormat(qt.Qt.TextFormat.PlainText)
+        self.notice.hide()
+        search_row = qt.QHBoxLayout()
+        search_row.addWidget(qt.QLabel('Library'))
+        search_row.addWidget(self.search, 1)
+        layout.addLayout(search_row)
+        for widget in (self.mode, self.tree, self.notice):
             layout.addWidget(widget)
         layout.setStretch(2, 1)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.setInterval(400)
         self.timer.timeout.connect(self.populate)
-        self.search.textChanged.connect(lambda: self.timer.start())
+        self.search.textChanged.connect(self.query_changed)
         self.mode.currentIndexChanged.connect(self.populate)
-        self.tree.itemClicked.connect(self.open_item)
+        self.tree.currentItemChanged.connect(self.selection_changed)
+        self.tree.itemClicked.connect(lambda item, column:
+            self.open_item(item) if not item.data(0, qt.Qt.ItemDataRole.UserRole) else None)
         self.tree.itemActivated.connect(self.open_item)
         viewer.path_changed.connect(self.select_path)
         self.populate()
 
+    def query_changed(self):
+        self.mode.setVisible(bool(self.search.text().strip()))
+        self.timer.start()
+        if hasattr(self.viewer, '_search_timer'):
+            if not self.search.text().strip():
+                self.viewer._clear_search_selection('library')
+            self.viewer._refresh_search_highlights()
+
     def populate(self):
+        blocked = self.tree.blockSignals(True)
         self.tree.clear()
         role = qt.Qt.ItemDataRole.UserRole
         def add(entries, parent):
@@ -53,18 +76,28 @@ class WikiPanel(qt.QWidget):
                 item.setData(0, role, entry.page)
                 item.setToolTip(0, str(entry.location.relative_to(self.catalog.root)))
                 add(entry.children, item)
+                if entry.location == self.catalog.root:
+                    item.setExpanded(True)
         add(self.catalog.search(self.search.text(), self.mode.currentData()), self.tree)
         if self.search.text().strip():
             self.tree.expandAll()
         self.notice.setText('No matching pages.' if not self.tree.topLevelItemCount() else
                             (f'{len(self.catalog.errors)} pages or folders could not be read.' if self.catalog.errors else ''))
+        self.notice.setVisible(bool(self.notice.text()))
         self.select_path(self.viewer.current_path)
+        self.tree.blockSignals(blocked)
+
+    def selection_changed(self, item, previous):
+        if item is not None and item.data(0, qt.Qt.ItemDataRole.UserRole):
+            self.open_item(item)
 
     def open_item(self, item, column=0):
         path = item.data(0, qt.Qt.ItemDataRole.UserRole)
         if path:
-            self.viewer.open_document(path)
+            if path != self.viewer.current_path:
+                self.viewer.open_document(path)
             self.select_path(self.viewer.current_path)
+            self.viewer._reveal_library_match()
         else:
             item.setExpanded(not item.isExpanded())
 
@@ -89,11 +122,15 @@ class WikiPanel(qt.QWidget):
         while iterator.value():
             item = iterator.value()
             if path and item.data(0, qt.Qt.ItemDataRole.UserRole) == path:
+                blocked = self.tree.blockSignals(True)
                 self.tree.setCurrentItem(item)
+                self.tree.blockSignals(blocked)
                 parent = item.parent()
                 while parent:
                     parent.setExpanded(True)
                     parent = parent.parent()
                 return
             iterator += 1
+        blocked = self.tree.blockSignals(True)
         self.tree.setCurrentItem(None)
+        self.tree.blockSignals(blocked)

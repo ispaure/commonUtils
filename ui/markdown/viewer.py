@@ -6,6 +6,7 @@ from .. import pyside as qt
 from ..appearance.status_line import StatusLine
 from ..readers.reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button, show_reader_popup
 from .editing import MarkdownEditingMixin
+from .search import MarkdownSearchMixin
 from .formatted import MarkdownFormattedMixin
 from .properties import MarkdownProperties
 from .headings import _iter_headings
@@ -17,7 +18,7 @@ from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
 from ...formats.markdown import split_frontmatter
 
 
-class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTablesMixin, qt.QWidget):
+class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTablesMixin, qt.QWidget):
     """Preview-only by default; allow_edit=True enables optional Markdown editing."""
     path_changed = qt.Signal(object)
     modified_changed = qt.Signal(bool)
@@ -104,12 +105,17 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self.pages.addWidget(self.browser)
         self.pages.addWidget(self.editor)
         self.pages.addWidget(self.formatted_editor)
+        self.document_panel = qt.QWidget()
+        self.document_layout = qt.QVBoxLayout(self.document_panel)
+        self.document_layout.setContentsMargins(0, 0, 0, 0)
+        self.document_layout.setSpacing(READER_SPACING)
+        self.document_layout.addWidget(self.pages, 1)
         if directory is not None:
             from .wiki import WikiPanel
             self.wiki = WikiPanel(self, directory)
             self.wiki_splitter = qt.QSplitter()
             self.wiki_splitter.addWidget(self.wiki)
-            self.wiki_splitter.addWidget(self.pages)
+            self.wiki_splitter.addWidget(self.document_panel)
             self.wiki_splitter.setStretchFactor(1, 1)
             self.wiki_splitter.setSizes([260, 740])
             layout.addWidget(self.wiki_splitter, 1)
@@ -117,7 +123,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
                 path = self.wiki.catalog.first_page
         else:
             self.wiki = None
-            layout.addWidget(self.pages, 1)
+            layout.addWidget(self.document_panel, 1)
         self.properties = MarkdownProperties(self)
         self.properties.changed.connect(self._apply_properties)
         layout.insertWidget(1, self.properties)
@@ -142,7 +148,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self._properties_timer.setInterval(200)
         self._properties_timer.timeout.connect(lambda: self.properties.refresh(self.editor.toPlainText()))
         self.editor.textChanged.connect(lambda: self._properties_timer.start())
-        self._build_editor_actions(layout)
+        self._build_editor_actions(self.document_layout)
         self.diagrams_button = reader_button(self, 'Render Mermaid diagrams', text='Diagrams')
         self.diagrams_button.clicked.connect(self.render_diagrams)
         self.diagrams_button.hide()
@@ -150,7 +156,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         self._build_reading_appearance(toolbar)
         from ..readers.read_aloud import ReadAloud, reader_text
         self.speech = ReadAloud(self, lambda: reader_text(self.browser), text_widget=self.browser)
-        self.speech.anchor = reader_button(self, 'Read aloud', action=self.speech.action, text='Read aloud')
+        self.speech.anchor = reader_button(self, 'Read aloud', action=self.speech.action, icon='speaker')
         toolbar.addWidget(self.speech.anchor)
         self.browser.textChanged.connect(self.speech.stop)
         self.edit_button.toggled.connect(self.speech.stop)
@@ -170,6 +176,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         for shortcut, callback in ((self.back_shortcut, self.back), (self.forward_shortcut, self.forward)):
             shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(callback)
+        self._init_search_highlights()
         self._update_buttons()
         self._diagram_renderer = None
         self._reading_palette_timer = qt.QTimer(self)
@@ -193,6 +200,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
                 self.status.setText(error)
 
     def show_contents(self):
+        if self.toc_popup is not None and self.toc_popup.isVisible():
+            self.toc_popup.hide()
+            return
         self._render_source(self.markdown_text())
         if self.toc_popup is not None:
             self.toc_popup.close()
@@ -399,7 +409,7 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditi
         elif self.appearance_popup is not None and self.appearance_popup.isVisible():
             self.appearance_popup.close()
         elif self.find_bar.isVisible():
-            self.find_bar.hide()
+            self.close_find()
             (self.active_editor() if self.edit_button.isChecked() else self.browser).setFocus()
         else:
             self.fullscreen.leave()

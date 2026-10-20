@@ -23,6 +23,10 @@ class MarkdownWiki:
         self.errors = []
         self.pages = {}
         self.entries = self._folder(self.root)
+        landing = self.folder_page(self.root)
+        if landing is not None and landing.stem == self.root.name:
+            children = tuple(entry for entry in self.entries if entry.page != landing)
+            self.entries = (WikiEntry(self.root, self.title(self.pages[landing], self.root.name), landing, children),)
 
     def _read(self, path):
         try:

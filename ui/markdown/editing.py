@@ -48,7 +48,7 @@ class MarkdownEditingMixin:
         self.copy_action = self._action('Copy', lambda: (self.active_editor() if self.edit_button.isChecked() else self.browser).copy(), key.Copy)
         self.paste_action = self._action('Paste', lambda: self.active_editor().paste(), key.Paste)
         self.select_all_action = self._action('Select All', lambda: (self.active_editor() if self.edit_button.isChecked() else self.browser).selectAll(), key.SelectAll)
-        self.find_action = self._action('Find / Replace…' if self.allow_edit else 'Find…', self.show_find, key.Find, ('Ctrl+F',))
+        self.find_action = self._action('Find / Replace in this page…' if self.allow_edit else 'Find in this page…', self.show_find, key.Find, ('Ctrl+F',))
         self.bold_action = self._action('Bold', lambda: self.wrap_selection('**', 'text'), key.Bold, ('Ctrl+B',))
         self.italic_action = self._action('Italic', lambda: self.wrap_selection('*', 'text'), key.Italic, ('Ctrl+I',))
         self.code_action = self._action('Inline code', lambda: self.wrap_selection('`', 'code'))
@@ -94,25 +94,44 @@ class MarkdownEditingMixin:
             button.hide()
         self.editor_toolbar.hide()
         self.find_bar = qt.QWidget()
-        row = qt.QHBoxLayout(self.find_bar)
-        row.setContentsMargins(0, 0, 0, 0)
+        find_layout = qt.QVBoxLayout(self.find_bar)
+        find_layout.setContentsMargins(0, 0, 0, 0)
+        row = qt.QHBoxLayout()
+        find_layout.addLayout(row)
         self.find_text = qt.QLineEdit()
-        self.find_text.setPlaceholderText('Find text')
+        self.find_text.setPlaceholderText('Find in this page…')
+        self.find_text.setAccessibleName('Find in this page')
+        self.find_text.setClearButtonEnabled(True)
+        row.addWidget(qt.QLabel('This page'))
+        row.addWidget(self.find_text, 1)
+        for title, glyph, callback in (('Previous match', 'previous', self.find_previous),
+                                       ('Next match', 'next', self.find_next), ('Close search', 'close', self.close_find)):
+            button = reader_button(self, title, icon=glyph)
+            button.clicked.connect(lambda checked=False, callback=callback: callback())
+            row.addWidget(button)
+        self.replace_row = qt.QWidget()
+        replace_layout = qt.QHBoxLayout(self.replace_row)
+        replace_layout.setContentsMargins(0, 0, 0, 0)
         self.replace_text = qt.QLineEdit()
         self.replace_text.setPlaceholderText('Replace with')
-        row.addWidget(self.find_text, 1)
         self.replace_text.setVisible(self.allow_edit)
-        row.addWidget(self.replace_text, 1)
-        for title, callback in (('Next', self.find_next), ('Replace', self.replace_match),
-                                ('Replace all', self.replace_all), ('Close', self.find_bar.hide)):
+        replace_layout.addWidget(self.replace_text, 1)
+        for title, callback in (('Replace', self.replace_match), ('Replace all', self.replace_all)):
             button = qt.QPushButton(title)
             button.clicked.connect(lambda checked=False, callback=callback: callback())
-            if title in ('Replace', 'Replace all'):
-                button.setVisible(self.allow_edit)
-                button.setEnabled(self.allow_edit)
-            row.addWidget(button)
+            replace_layout.addWidget(button)
+        find_layout.addWidget(self.replace_row)
+        self.replace_row.hide()
         self.find_text.returnPressed.connect(self.find_next)
-        layout.addWidget(self.find_bar)
+        self.find_count = qt.QLabel()
+        self.find_count.setMinimumWidth(0)
+        self.find_count.setAccessibleName('Page search matches')
+        row.insertWidget(2, self.find_count)
+        layout.insertWidget(0, self.find_bar)
+        self.find_button = reader_button(self, 'Find in this page', icon='search')
+        self.find_button.setToolTip('Find in this page (Ctrl+F / ⌘F)')
+        self.find_button.clicked.connect(self.show_find)
+        self.navigation_toolbar.addWidget(self.find_button)
         self.find_bar.hide()
         for action in (self.cut_action, self.paste_action, self.bold_action, self.italic_action, self.code_action, self.link_action):
             action.setEnabled(False)
@@ -147,6 +166,7 @@ class MarkdownEditingMixin:
             action.setEnabled(not enabled)
         self.edit_mode.setVisible(enabled)
         self.replace_text.setEnabled(enabled)
+        self.replace_row.setVisible(enabled and self.allow_edit)
         self.properties.set_editable(enabled and self.edit_mode.currentData() == "formatted")
         label = 'Read Markdown' if enabled else 'Edit Markdown'
         set_painted_icon(self.edit_button, ReaderIcon, 'read' if enabled else 'edit')
@@ -342,21 +362,33 @@ class MarkdownEditingMixin:
     def show_find(self):
         self.find_bar.show()
         self.replace_text.setEnabled(self.edit_button.isChecked())
+        self.replace_row.setVisible(self.edit_button.isChecked() and self.allow_edit)
         self.find_text.setFocus()
         self.find_text.selectAll()
+        self._refresh_search_highlights()
 
-    def find_next(self):
+    def close_find(self):
+        self.find_bar.hide()
+        self._clear_search_selection('page')
+        self._refresh_search_highlights()
+
+    def find_previous(self):
+        return self.find_next(backward=True)
+
+    def find_next(self, backward=False):
         target = self.active_editor() if self.edit_button.isChecked() else self.browser
         if not self.find_text.text():
             return False
+        flags = qt.QTextDocument.FindFlag.FindBackward if backward else qt.QTextDocument.FindFlag(0)
         original = target.textCursor()
-        if target.find(self.find_text.text()):
+        if target.find(self.find_text.text(), flags):
+            self._select_search_match(target, target.textCursor(), 'page')
             return True
-        target.moveCursor(qt.QTextCursor.MoveOperation.Start)
-        if target.find(self.find_text.text()):
+        target.moveCursor(qt.QTextCursor.MoveOperation.End if backward else qt.QTextCursor.MoveOperation.Start)
+        if target.find(self.find_text.text(), flags):
+            self._select_search_match(target, target.textCursor(), 'page')
             return True
         target.setTextCursor(original)
-        self.status.setText('No matching text.')
         return False
 
     def replace_match(self):

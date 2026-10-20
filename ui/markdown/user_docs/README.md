@@ -56,8 +56,12 @@ saving without edits preserves the original bytes. Callout documents automatical
 use Source editing to preserve their markers. Switching modes retains unsaved text,
 but rebuilding formatted content after source edits resets rich-edit undo history.
 
-Find is literal and case-insensitive. Replace operates only while editing; Replace
-all is one undo step. Preview-only windows do not offer write actions.
+On desktop, the magnifying glass in the top toolbar (or Ctrl+F / Command+F) opens
+**Find in this page** above the document. Matches highlight as you type, with a
+match count and Previous/Next buttons that wrap through the page. Close or Escape
+clears page-search highlights and its selected match while preserving manual selections.
+Up to 5,000 matches per search are highlighted; `+` marks that limit. Find is literal and case-insensitive. Replace
+controls appear only while editing; Replace all is one undo step. Preview-only windows do not offer write actions.
 
 ## Edit properties
 
@@ -105,7 +109,7 @@ if that theme's image has not been generated. Temporary rendering files are clea
 
 ## Read aloud
 
-Open Read aloud, select a voice/language and press Play. A selected passage takes
+Click the speaker icon to open Read aloud, select a voice/language and press Play. A selected passage takes
 priority; otherwise playback starts from the visible reading area. Speech follows
 the rendered reading view: links read their visible labels without the underlying
 destinations, and formatting markers are omitted. URLs and code written visibly
@@ -119,7 +123,7 @@ reset icon restores the selected duration while preserving playback/pause state.
 At expiry, capable engines pause; other engines stop. Play starts a fresh timer.
 The playback row is backward 15 seconds, Play/Pause, forward 15 seconds and Stop.
 Language and voice controls remain below the playback section. Click outside the popup to hide its controls while playback continues;
-click the speaker again to reopen them. Back/forward estimate a
+click the speaker to toggle the panel open or closed. Back/forward estimate a
 15-second jump; each jump clears the previous speech highlight before showing the
 new word, including mirrored reader panes. Unrelated search/selection marks are
 preserved. Highlights may use estimated timing where word events are unavailable.
@@ -149,8 +153,16 @@ current buffer; inspect a reported saved destination before retrying Save As.
 
 ## Browse documentation folders
 
-A host can open a Markdown directory as a wiki. Use the left tree to browse nested
-folders and pages, and the inline search to filter file names/titles or page text.
+A host can open a Markdown directory as a wiki. Arrow keys in the left tree open
+the highlighted page immediately; Cancel on an unsaved edit restores the current
+page selection. A page named after the root folder becomes the single top entry,
+with the rest of the documentation nested beneath it. Use the left tree to browse nested
+folders and pages. On desktop, **Library** search filters pages across the library;
+its file names/titles or page text selector appears only while a query is entered.
+Opening a result highlights matching text in the document and scrolls to its first
+match. File-name-only matches may have no matching text in the page. Library marks
+remain while the library query is present, independently of **Find in this page**.
+The file tree and document share the same bottom edge; empty notices take no space.
 Folders with a same-named Markdown file open that page. Its first body heading (after optional YAML properties and blank lines)
 becomes the label; otherwise the folder name is used. Expanding the folder still
 shows its other pages. Clear search to see the full hierarchy again. Page changes
@@ -163,8 +175,10 @@ folder page it opens the parent folder's page. At the documentation root,
 README.md or index.md can serve as the folder page. Up is disabled when that
 folder has no page or you are already at the root page.
 
-In desktop reading mode, hover a local Markdown/text/code link to see a short
-source snippet in a preview window. Moving off the link closes it immediately.
+In desktop reading mode, hover a local Markdown/text/code link to see a compact
+preview. Markdown targets render with the reader’s heading, emphasis, list
+and table styling; text and code targets show their literal source in monospace.
+Embedded images are not loaded. Moving off the link closes it immediately.
 This does not open the file or change your reading history. Editing mode does
 not show hover previews. Missing, binary and external web links have no preview.
 
@@ -172,3 +186,6 @@ A folder opens its same-named page (for example, `banana/banana.md`). Guides
 begin with a title heading, which also names them in the tree. A link to another
 documentation wiki changes the sidebar to that guide's files. Back and Forward
 return to the corresponding guide and tree. Search clears on a scope change.
+
+Floating Contents and reading appearance panels close when you click outside them
+or click their toolbar button again.

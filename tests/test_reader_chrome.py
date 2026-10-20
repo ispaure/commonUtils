@@ -21,6 +21,37 @@ class ReaderChromeTests(QtTestCase):
         self.app.processEvents()
         return window, action, controller
 
+    def test_markdown_floating_controls_toggle_and_disable_click_replay(self):
+        from commonUtils.ui.markdown import MarkdownViewer
+        from commonUtils.tests.test_read_aloud import SilentEngine
+        viewer = MarkdownViewer()
+        self.addCleanup(viewer.close)
+        viewer.resize(800, 600)
+        viewer.show()
+        viewer.set_editing(False)
+        viewer.speech.engine_factory = SilentEngine
+        for button, popup in ((viewer.toc_button, lambda: viewer.toc_popup),
+                              (viewer.appearance_button, lambda: viewer.appearance_popup),
+                              (viewer.speech.anchor, lambda: viewer.speech.panel)):
+            button.click()
+            self.assertTrue(popup().isVisible())
+            self.assertTrue(popup().testAttribute(qt.Qt.WidgetAttribute.WA_NoMouseReplay))
+            button.click()
+            self.assertFalse(popup().isVisible())
+            button.click()
+            self.assertTrue(popup().isVisible())
+            from PySide6.QtTest import QTest
+            # A press inside clears Qt's replay flag; an outside press must
+            # restore it before dismissal, even after using panel controls.
+            QTest.mouseClick(popup(), qt.Qt.MouseButton.LeftButton, pos=qt.QPoint(3, 3))
+            outside = popup().mapFromGlobal(button.mapToGlobal(button.rect().center()))
+            QTest.mousePress(popup(), qt.Qt.MouseButton.LeftButton, pos=outside)
+            self.assertFalse(popup().isVisible())
+            self.assertTrue(popup().testAttribute(qt.Qt.WidgetAttribute.WA_NoMouseReplay))
+            QTest.mouseRelease(popup(), qt.Qt.MouseButton.LeftButton, pos=outside)
+        self.assertFalse(viewer.speech.anchor.icon().isNull())
+        self.assertEqual(viewer.speech.anchor.toolButtonStyle(), qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
+
     def test_fullscreen_toggle_and_native_exit_update_action_and_button(self):
         window, action, controller = self.window()
         button = reader_button(window, 'Full screen', action=action, icon='fullscreen')
