@@ -189,3 +189,20 @@ return to the corresponding guide and tree. Search clears on a scope change.
 
 Floating Contents and reading appearance panels close when you click outside them
 or click their toolbar button again.
+
+## Images and animated GIFs
+
+Local GIF images animate in Read mode and the Formatted editor. Use ordinary
+Markdown image references such as `![Demo](assets/demo.gif)`; relative paths resolve
+from the Markdown file’s folder. Playback pauses while that view is hidden.
+
+Drag image files from your file browser into either editor to insert them at the
+drop position. Formatted mode displays the image immediately; Source mode inserts
+its editable Markdown reference. Saved documents use relative paths where possible,
+including paths to sibling folders. Spaces and special path characters are encoded
+automatically. Drops into unsaved documents use absolute file URLs.
+Images remain in their original locations; move them together with the document
+when sharing relative references. A drop can be undone in one step.
+
+Storage-provider documents keep their existing resource-loading policy; local file
+drops and direct GIF decoders are disabled for those documents.

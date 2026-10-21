@@ -6,11 +6,12 @@ from .syntax import _units
 from .links import link_spans, reference_destinations
 from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
 from .preview import LivePreviewHighlighter
+from .images import ImageDropMixin, AnimatedImages
 from .syntax import HEADING, fenced_regions
 from .presentation import style_document
 
 
-class SourceMarkdownEdit(ColumnGuide, qt.QPlainTextEdit):
+class SourceMarkdownEdit(ImageDropMixin, ColumnGuide, qt.QPlainTextEdit):
     """Source editor with paired delimiters around the current selection."""
     def keyPressEvent(self, event):
         cursor = self.textCursor()
@@ -24,13 +25,14 @@ class SourceMarkdownEdit(ColumnGuide, qt.QPlainTextEdit):
         super().keyPressEvent(event)
 
 
-class FormattedMarkdownEdit(qt.QTextEdit):
+class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
     linkActivated = qt.Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._live_document = LiveMarkdownDocument(self)
         self.setDocument(self._live_document)
+        self.animated_images = AnimatedImages(self)
         self._pressed_link = None
         self._highlighter = LivePreviewHighlighter(self)
         self._wrapped_selection = None
@@ -123,6 +125,8 @@ class FormattedMarkdownEdit(qt.QTextEdit):
     def insertFromMimeData(self, source):
         if self.isReadOnly():
             return
+        if self._image_urls(source):
+            return ImageDropMixin.insertFromMimeData(self, source)
         cursor = self.textCursor()
         cursor.beginEditBlock()
         super().insertFromMimeData(source)

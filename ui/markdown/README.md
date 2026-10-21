@@ -190,3 +190,19 @@ clears when changing scopes so a previous query cannot hide the new guide.
 scopes without application-specific ownership rules. Custom directories retain
 the supplied root while browsing contained pages. This is navigation scoping,
 not an access boundary; normal local-file access checks still apply.
+
+## Animated images and file drops
+
+Local GIF image resources use retained `QMovie` decoders in the reading browser
+and formatted editor. Frames update the document resource cache and invalidate
+layout painting without changing Markdown, the dirty flag or undo history. Hidden
+surfaces pause playback; removing images or navigating retires unused decoders.
+Relative resources resolve through the document base URL. Direct animation loading
+respects protected local roots and never bypasses a supplied resource loader.
+Provider-backed resources retain their existing static rendering contract.
+
+Local image-file drops insert Markdown references in Source mode and image formats
+in Formatted mode, with one undo operation per drop. The viewer supplies the saved
+document folder for relative paths; unsaved documents and separate Windows drives
+use absolute file URLs. Files are referenced in place. Provider-backed documents
+disable this local-file insertion path. See the [user guide](user_docs/README.md#images-and-animated-gifs).

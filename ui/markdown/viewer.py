@@ -15,6 +15,7 @@ from .reading import MarkdownReadingMixin
 from .links import render_links
 from .tables import MarkdownTablesMixin
 from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
+from .images import AnimatedImages
 from ...formats.markdown import split_frontmatter
 
 
@@ -79,6 +80,7 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         toolbar.addWidget(self.toc_button)
         layout.addLayout(toolbar)
         self.browser = MarkdownBrowser()
+        self.browser.animated_images = AnimatedImages(self.browser)
         self.browser.setOpenLinks(False)
         self.browser.setOpenExternalLinks(False)
         self.browser.setAccessibleName('Markdown document')
@@ -89,6 +91,9 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         self.editor.setFont(qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont))
         self.editor.document().modificationChanged.connect(self._modified_changed)
         self.formatted_editor = FormattedMarkdownEdit()
+        for editor in (self.editor, self.formatted_editor):
+            editor.image_base = lambda: self._loaded_path.parent if self._loaded_path else None
+            editor.local_image_drops = storage is None
         for widget in (self.browser, self.formatted_editor):
             configure_text(widget)
         configure_text(self.editor, source=True)
