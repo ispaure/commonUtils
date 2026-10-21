@@ -85,7 +85,8 @@ def apple_bar_title(text, width, actions, *, color=None, reference=None):
     label.text = label.accessibilityLabel = text
     label.font = ObjCClass('UIFont').systemFontOfSize(17, weight=.6)
     label.textAlignment, label.lineBreakMode = 1, 5
-    label.textColor = color if color is not None else ObjCClass('UIColor').labelColor
+    from .appearance import default_apple_color
+    label.textColor = color if color is not None else default_apple_color('text')
     view.addSubview(label)
     return view, label
 

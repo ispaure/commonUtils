@@ -120,7 +120,8 @@ def disclosure(button, *, apple_color=None):
         image = ObjCClass('UIImage').systemImageNamed('chevron.right')
         accessory = ObjCClass('UIImageView').alloc().initWithImage(image)
         accessory.translatesAutoresizingMaskIntoConstraints = False
-        accessory.tintColor = apple_color('muted') if apple_color is not None else ObjCClass('UIColor').secondaryLabelColor
+        from .appearance import default_apple_color
+        accessory.tintColor = (apple_color or default_apple_color)('muted')
         accessory.isAccessibilityElement = False
         native.addSubview(accessory)
         accessory.trailingAnchor.constraintEqualToAnchor(native.trailingAnchor, constant=-8).active = True

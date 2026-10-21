@@ -8,6 +8,12 @@ from commonUtils.ui.appearance.colors import argb, contrast_ratio, readable_acce
 
 
 class NativeSurfaceTests(TestCase):
+    def test_default_apple_colors_accept_property_and_method_bridges(self):
+        token = object()
+        for color in (token, lambda: token):
+            with patch.dict('sys.modules', {'rubicon.objc': NS(ObjCClass=lambda name: NS(tertiarySystemFillColor=color))}):
+                self.assertIs(appearance.default_apple_color('hover'), token)
+
     def test_background_replacement_preserves_asymmetric_content_padding(self):
         class Native:
             padding = (12, 6, 32, 8)

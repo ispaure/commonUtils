@@ -22,7 +22,8 @@ def default_apple_color(role):
     names = dict(text='labelColor', muted='secondaryLabelColor', surface='secondarySystemBackgroundColor',
                  hover='tertiarySystemFillColor', accent='systemBlueColor', border='separatorColor',
                  transparent='clearColor')
-    return getattr(ObjCClass('UIColor'), names[role])
+    color = getattr(ObjCClass('UIColor'), names[role])
+    return color() if callable(color) else color
 
 
 

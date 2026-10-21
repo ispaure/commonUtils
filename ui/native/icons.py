@@ -102,6 +102,7 @@ def apple_vector(spec):
     renderer = UIGraphicsImageRenderer.alloc().initWithSize(CGSize(24, 24))
     def draw(context):
         color = ObjCClass('UIColor').blackColor
+        color = color() if callable(color) else color
         color.setStroke()
         color.setFill()
         path = ObjCClass('UIBezierPath').bezierPath()
