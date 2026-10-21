@@ -491,3 +491,23 @@ widget's full touch area. Supply semantic UIKit colors and Android palette roles
 `accent`/`border`; defaults are neutral native colors. Direction follows the
 platform unless explicitly forced. Hosts own value reversal, theme refresh
 registration, reader progress and page changes.
+
+## Surface appearance primitives
+
+`ui.native.appearance.SurfacePainter` accepts explicit `palette(dark)`,
+`apple_color(role)`, `high_contrast()`, and optional button-preparation and
+post-paint callbacks. `paint(impl, SurfaceStyle(...))` applies colors, outline,
+radius, content insets, optional glass and accessory tint. `batch()` coalesces
+nested offscreen painting to each widget's final style. Registries of application
+widgets, bar placement, theme installation and E Ink policy remain with the host.
+
+Android templates and immutable color-state lists are cached, but every returned
+drawable has independent mutable state. Replacing a background preserves content
+padding. `clear_surface_caches()` supports backend replacement. `accessible_name`
+sets native labels without changing visible text. `DynamicAppleColors(palette)`
+retains dynamic UIKit role providers and their bridge blocks; hosts supply role
+values. Neutral default colors are shared by native lists and sliders.
+
+Portable `ui.appearance.colors` supplies `argb`, `contrast_ratio`, and
+`readable_accent`. These helpers and importing the native appearance module do not
+load Toga or Qt. The host chooses its palette and required contrast policies.

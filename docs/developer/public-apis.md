@@ -247,3 +247,6 @@ without toolkit imports or application-specific loading state.
 
 `ui.native.transitions` and `ui.native.sliders` supply reusable
 [page motion and slider painting](../../ui/native/README.md#transitions-and-sliders).
+
+`ui.native.appearance` provides callback-driven [surface painting and batching](../../ui/native/README.md#surface-appearance-primitives).
+`ui.appearance.colors` contains toolkit-independent ARGB and contrast utilities.

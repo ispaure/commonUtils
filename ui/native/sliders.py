@@ -5,12 +5,12 @@ def style_slider(slider, *, apple_color=None, palette=None, force_ltr=False):
     backend = type(slider._impl).__module__
     if backend.startswith('toga_iOS.'):
         if apple_color is None:
-            from .recycled_list import default_apple_color
+            from .appearance import default_apple_color
             apple_color = default_apple_color
         _apple(slider._impl.native, apple_color, force_ltr)
     elif backend.startswith('toga_android.'):
         if palette is None:
-            from .recycled_list import default_palette
+            from .appearance import default_palette
             palette = default_palette
         _android(slider._impl.native, palette, force_ltr)
 

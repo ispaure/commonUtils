@@ -5,6 +5,7 @@ Keep its public data contract, but supply an actual recycling backend there.
 """
 import toga
 from dataclasses import dataclass
+from .appearance import default_palette, default_apple_color
 
 
 def thumbnail_image(image, *, size=28):
@@ -26,20 +27,6 @@ def thumbnail_image(image, *, size=28):
     result._impl.native = ObjCClass('UIImage').imageWithCGImage(result._impl.native.CGImage,
         scale=renderer.format.scale, orientation=0)
     return result
-
-
-def default_palette(dark=False):
-    return dict(text='#eeeeee' if dark else '#202020', muted='#aaaaaa' if dark else '#606060',
-                surface='#202020' if dark else '#ffffff', hover='#404040' if dark else '#e8e8e8',
-                accent='#80b0ff' if dark else '#2060d0', border='#606060' if dark else '#cccccc')
-
-
-def default_apple_color(role):
-    from rubicon.objc import ObjCClass
-    names = dict(text='labelColor', muted='secondaryLabelColor', surface='secondarySystemBackgroundColor',
-                 hover='tertiarySystemFillColor', accent='systemBlueColor', border='separatorColor',
-                 transparent='clearColor')
-    return getattr(ObjCClass('UIColor'), names[role])
 
 
 @dataclass(frozen=True)

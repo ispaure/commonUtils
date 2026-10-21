@@ -45,3 +45,12 @@ using the control's current color; the containing button supplies its accessible
 name and tooltip. `formatting_icons.FormattingIcon` paints those same paths
 through the palette-aware `set_painted_icon()` adapter. Keep geometry in the
 shared module so desktop and mobile cannot drift into different icon sets.
+
+## Portable color calculations
+
+`ui.appearance.colors` provides `argb(hex_color)`, `contrast_ratio(first, second)`
+and `readable_accent(accent, foreground, background)`. Integer channels accept
+signed Android ARGB values. Accent blending moves toward the supplied foreground
+until reaching 4.5:1 contrast or falling back to that foreground. These calculations
+do not import Qt or Toga. Native painting and role providers are documented in the
+[native surface guide](../native/README.md#surface-appearance-primitives).
