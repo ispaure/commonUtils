@@ -532,3 +532,14 @@ its optional `style_button` callback supplies consumer presentation.
 and `collapsible(..., style_button=..., changed=...)` build presentation without
 owning preferences, validation or page routing. Group palette roles are explicit.
 Collapsed controls stay alive and retain their values.
+
+## Retained native bars
+
+`bars.apple_bar_group` mounts existing controls in a constrained UIKit group;
+`native_control` prepares each control, and the caller retains the returned item.
+`apple_bar_separator` creates fixed spacing. `apple_bar_title` centers a truncated
+label relative to its window (or explicit `reference`), with an explicit color.
+Only action groups in the same row constrain title width. `android_bar` returns
+(root, title, status), mounting controls returned by `native_control` and reserving
+symmetric title clearance. Hosts retain controls and own routes, privacy, status
+messages, fullscreen behavior, release and window/app assignment.

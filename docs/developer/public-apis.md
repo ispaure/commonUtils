@@ -259,3 +259,7 @@ platform bridges lazily.
 Native forms: `commonUtils.ui.native.forms.wrap_text`, `fit_text`, `fit_section`,
 `FittedLabel`, `disclosure`, `group_rows`, `collapsible`. Import requires Toga;
 platform bridges remain lazy. Consumer callbacks own styling and layout notification.
+
+Native bars: `commonUtils.ui.native.bars.apple_bar_group`, `apple_bar_separator`,
+`apple_bar_title`, `centered_title_width`, `android_bar`. Platform bridges load
+only when a native constructor is called. Returned native views are consumer-owned.
