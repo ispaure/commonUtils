@@ -231,3 +231,6 @@ Mobile consumers import `PasswordInput` from `commonUtils.ui.native.password_inp
 It exposes the input value, enabled state, focus and confirmation handler plus an
 accessible native eye button. See [native password entry](../../ui/native/README.md#password-entry).
 Both start masked and hide again on clear. Hosts own credentials and workflows.
+
+`ui.native.draw_ready.wait_for_draw` supplies bounded native draw acknowledgement;
+see [draw lifecycle](../../ui/native/README.md#native-draw-acknowledgement).

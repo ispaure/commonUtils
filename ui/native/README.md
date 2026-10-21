@@ -434,3 +434,14 @@ The component does not sanitize HTML or authorize arbitrary URLs.
 Consumer host regressions and mocked native disposal cover these adapters.
 Physical speech, WebView storage behavior and platform accessibility still need
 native-device validation after a backend upgrade.
+
+## Native draw acknowledgement
+
+`ui.native.draw_ready.wait_for_draw(widget, timeout=.5)` waits for a native draw
+acknowledgement and returns a Boolean. `False` means timeout or an unsupported
+backend, never proof that pixels appeared. Timeout and cancellation remove the
+native listener; queued acknowledgements cannot complete a retired wait. Hosts
+must recheck route, document and privacy lifetime after awaiting it.
+
+Android hosts compile `ui/native/android`, including `DrawReady.java`. UIKit uses
+a temporary noninteractive view. No file-opening or application state is inspected.
