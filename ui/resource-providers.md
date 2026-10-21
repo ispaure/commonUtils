@@ -321,6 +321,11 @@ model.set_children(('taxonomy', 0),
 
 ### Native list and tile presentation
 
+The [continuous native browser](native_browser/README.md#continuous-mobile-browsing)
+uses this same model and callbacks with recycled rows and viewport-limited tiles.
+Import it explicitly as `ui.native_browser.recycled.RecycledBrowser`; the base
+class below retains its existing paginated presentation.
+
 `NativeBrowser(selected=callback, thumbnail=loader, details=loader, preview=True)`
 creates a native Toga component. Hosts publish prepared BrowseTree snapshots via
 `set_tree(tree)` or provider rows through `set_entries(provider, directory, rows)`.

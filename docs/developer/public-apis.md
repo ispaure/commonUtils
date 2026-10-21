@@ -174,6 +174,12 @@ visible thumbnail loading and generic/rich file details. Source work, credential
 and activation remain host-owned. See the [resource provider contract](../../ui/resource-providers.md#native-list-and-tile-presentation)
 for callback, revision, bounded-cache and shutdown requirements.
 
+`ui.native_browser.recycled.RecycledBrowser` adds continuous recycled lists and
+viewport-limited tiles. `BrowserPresentation` supplies appearance hooks;
+`ui.native.recycled_list.RecycledList` and `ListAppearance` expose the reusable
+row component independently. See the [continuous browser guide](../../ui/native_browser/README.md#continuous-mobile-browsing)
+and [list contract](../../ui/native/README.md#recycled-lists).
+
 `formats.markdown_wiki.MarkdownWiki` supplies a GUI-free local documentation
 catalog with folder landing pages, body-heading titles (after optional YAML frontmatter) and recursive text/name search.
 

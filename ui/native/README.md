@@ -9,6 +9,36 @@ The namespace also preserves the existing desktop `display_msg_box_ok` and
 `display_msg_box_ok_cancel` APIs. They load the desktop dialog backend only when
 called; importing the native navigation package does not load a UI toolkit.
 
+## Recycled lists
+
+`ui.native.recycled_list.RecycledList` extends Toga DetailedList with recycled
+UITableView cells on iOS and a Java ListView adapter on Android. Import it
+explicitly; Toga remains optional for non-native consumers. The Android host must
+compile `ui/native/android` as a Java source root, including
+`io.github.ispaure.commonutils.FileListView`.
+
+Rows supply `title`, `subtitle`, `folder` and `icon` (a Toga image or `None`).
+For incremental thumbnails, also supply `index` and `thumbnail`; mutate the
+current source row to update its visible image without rebuilding the table.
+`on_visible(row)` reports rows needing images, `on_select` activates a row, and
+`on_primary_action(row=...)` handles contextual actions. `select_index(index)`
+changes selection without activation. `clear()` scrubs rows and selection.
+Use `primary_action=None` when contextual actions are unavailable.
+
+`ListAppearance` injects `palette(dark)`, `apple_color(role)`, `high_contrast()`
+and `icon(folder)` callbacks, plus positive integer native dimensions:
+`row_height=48`, `body_text=17`, `caption_text=13`, `icon_size=28`. Text dimensions
+configure Android's sp fonts; UIKit retains native text fonts. Palette roles are
+`text`, `muted`, `surface`, `hover`, `accent` and `border`; Apple also accepts
+`transparent`. Defaults use neutral Android colors and semantic UIKit colors.
+Hosts call `refresh_palette()` for Android theme/high-contrast changes; Apple
+color callbacks should return dynamic colors. No app-wide theme registry is
+installed by the shared component.
+
+`thumbnail_image(image, size=28)` fits a row image while preserving the UIKit
+renderer scale on Retina devices. Generic browsing composition and its lifecycle
+are described in the [native browser guide](../native_browser/README.md).
+
 ## Configurable navigation
 
 `NativeNavigationHost(items, state=None, on_select=None, prefer_sidebar=True)`

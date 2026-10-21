@@ -6,6 +6,11 @@ below the list, including available format metadata. Hosts may omit this informa
 for an Open/Save picker and supply their own folder and Open buttons.
 The host application determines how many items fit on one scrolling page.
 
+Hosts using the continuous browser show all matching rows in one scrolling list;
+scroll to reach later items instead of using Previous/Next. Tiles load as they
+enter the visible area. A row's contextual button selects it for actions; a
+normal tap opens it when the host supplies an Open action.
+
 Covers load in the background. Missing or locked covers leave names selectable;
 view changes and closing stop obsolete work. Thumbnails stay in memory.
 
