@@ -263,3 +263,7 @@ platform bridges remain lazy. Consumer callbacks own styling and layout notifica
 Native bars: `commonUtils.ui.native.bars.apple_bar_group`, `apple_bar_separator`,
 `apple_bar_title`, `centered_title_width`, `android_bar`. Platform bridges load
 only when a native constructor is called. Returned native views are consumer-owned.
+
+`commonUtils.runtime.signals.CoalescedSignal`: loop-local weak async broadcast;
+`waiter(initial=True)` returns a coalescing async callback, `notify()` wakes all
+live subscribers. No GUI imports, timers or retained application owners.

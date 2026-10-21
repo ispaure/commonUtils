@@ -91,3 +91,11 @@ budget. `dispose()` cancels outstanding timer handles. The host owns source text
 selection, saved voice preferences, privacy gating and when to dispose a session.
 Desktop Qt read-aloud retains its existing chunking adapter; sharing the portable
 module does not merge native and desktop widget behavior.
+
+## Coalesced async signals
+
+`signals.CoalescedSignal` broadcasts without timers or retained owners. Call
+`waiter(initial=True)` for each subscriber, await its returned closure, and call
+`notify()` on the owning loop thread. A burst becomes one wakeup per subscriber;
+notifications arriving before a wait are preserved. `initial=False` waits for the
+first notification. Cancel in-flight waits and release the closure on retirement.
