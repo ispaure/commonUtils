@@ -3,6 +3,7 @@ import subprocess
 import sys
 import unittest
 from dataclasses import FrozenInstanceError
+from importlib.util import find_spec
 from commonUtils.ui.native.icons import IconSpec
 
 
@@ -14,6 +15,7 @@ class NativeIconTests(unittest.TestCase):
         self.assertEqual(icon.fills, ())
         self.assertFalse(icon.apple_vector)
 
+    @unittest.skipUnless(find_spec('toga'), 'Native button test requires Toga')
     def test_renderer_preserves_callbacks_state_and_layout_without_platform_imports(self):
         code = '''
 import sys

@@ -2,10 +2,14 @@
 import os
 os.environ.setdefault('TOGA_BACKEND', 'toga_dummy')
 import unittest
-import toga
-from commonUtils.ui.native.forms import wrap_text, fit_text, FittedLabel, collapsible
+from importlib.util import find_spec
+HAS_TOGA = find_spec('toga') is not None
+if HAS_TOGA:
+    import toga
+    from commonUtils.ui.native.forms import wrap_text, fit_text, FittedLabel, collapsible
 
 
+@unittest.skipUnless(HAS_TOGA, 'Native form tests require Toga')
 class NativeFormTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
