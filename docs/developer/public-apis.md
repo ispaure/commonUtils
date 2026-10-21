@@ -237,3 +237,7 @@ see [draw lifecycle](../../ui/native/README.md#native-draw-acknowledgement).
 
 `ui.native.keyboard` supplies window-scoped iOS and subtree-bound Android
 [keyboard dismissal](../../ui/native/README.md#keyboard-dismissal).
+
+`runtime.progress.CoalescedProgress` and `runtime.streams.progress` provide
+[coalesced cumulative read progress](../../runtime/streams/README.md#measured-reads)
+without toolkit imports or application-specific loading state.

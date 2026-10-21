@@ -46,3 +46,21 @@ including the final EOF read. `file_sha256(path, cancelled=...)` hashes a file u
 the same rules. Cancellation raises `OperationCancelled`; a partial copy remains
 in the supplied output stream. These helpers do not delete files or publish staged
 outputs. Use a disposable destination and promote only after your own validation.
+
+## Measured reads
+
+`runtime.streams.progress.reading_stream(stream, progress=None, total=None)`
+wraps binary `.read()` calls in at most 64 KiB reads and reports cumulative
+`(completed, total)` values. Unknown totals are `None`; ordinary file totals are
+inferred from the remaining bytes. Without a callback it yields the original
+stream. Entry emits `(0, total)` and scope exit emits `(None, None)`, including on
+failure. It does not close the underlying stream. Other delegated stream methods
+are not measured. `ReadingProvider(provider, progress=...)` applies the same
+measurement to a provider's `open()` using its entry size.
+
+`runtime.progress.CoalescedProgress(loop, changed, active=..., interval=.05)`
+accepts `publish(completed=None, total=None)` from workers and coalesces updates
+onto the owning loop. `changed(completed, total)` runs only while `active()`.
+Call `close()` on that loop before retiring the owner; late publications become
+no-ops. The caller chooses status text, percent/indeterminate presentation and
+active-session policy. Unlike copy/hash callbacks, these counts are cumulative.
