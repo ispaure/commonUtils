@@ -103,3 +103,9 @@ reading direction and which settings persist.
 Native icon controls keep their full button hit target and accessible action name.
 Leading glyphs remain part of the same control as its title. Applications supply
 the artwork, labels and colors; rendering preserves callbacks and enabled state.
+
+## Forms
+
+Form labels fit the available pane, including long unbroken identifiers and
+changing status messages. Disclosure buttons retain their full accessible hit
+area. Collapsing advanced fields hides them while preserving entered values.

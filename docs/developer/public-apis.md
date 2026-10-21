@@ -255,3 +255,7 @@ Native icon rendering: `commonUtils.ui.native.icons.IconSpec`, `IconRenderer`,
 `android_drawable`, `android_path`, `apple_symbols`, `apple_vector`.
 Artwork and palette policy are explicit consumer inputs; drawing helpers import
 platform bridges lazily.
+
+Native forms: `commonUtils.ui.native.forms.wrap_text`, `fit_text`, `fit_section`,
+`FittedLabel`, `disclosure`, `group_rows`, `collapsible`. Import requires Toga;
+platform bridges remain lazy. Consumer callbacks own styling and layout notification.

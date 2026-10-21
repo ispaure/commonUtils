@@ -521,3 +521,14 @@ applies existing button icons or leading glyphs without replacing callbacks or m
 Android tint callback owns palette policy; default tint follows native text colors.
 `android_drawable` returns a fresh mutable drawable. Only immutable Apple symbol
 pixels are cached. Applications own named artwork, accessible labels and policy.
+
+## Native form primitives
+
+`forms.wrap_text` uses an explicit measurement function. `fit_text` preserves
+source text and caches measurements, using the native Apple font where available;
+its optional `style_button` callback supplies consumer presentation.
+`fit_section` accepts a `reserved_width(row)` callback for label/control rows.
+`FittedLabel` refits changing status text. `disclosure`, `group_rows(surface=...)`
+and `collapsible(..., style_button=..., changed=...)` build presentation without
+owning preferences, validation or page routing. Group palette roles are explicit.
+Collapsed controls stay alive and retain their values.
