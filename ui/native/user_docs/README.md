@@ -91,3 +91,11 @@ The app decides which image files are accessible and supplies their bytes;
 the renderer embeds them without fetching network resources. Missing or
 unsupported images show alternative text. Views without this opt-in, including
 the documentation wiki, continue to show image alternative text.
+
+## Text and reader controls
+
+Where enabled by the host, pinch text to preview a new size and release to save
+it. Page changes can use a short slide; system reduced-motion settings and the
+host's animation preferences determine whether it appears. Reader sliders keep
+full touch areas around their slim visual tracks. The host controls page order,
+reading direction and which settings persist.

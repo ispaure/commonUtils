@@ -474,3 +474,20 @@ it, the binding reapplies `get_size()`. `on_error(error)` handles save failures.
 `alignment()` returns a supported text alignment; `alignment_variable` names the
 CSS custom property. Hosts retain format settings, privacy guards and document
 ownership. The shared helper imports no application modules.
+
+## Transitions and sliders
+
+`ui.native.transitions.page_direction(previous, current, right_to_left=False)`
+returns the page movement direction. `begin_page_slide(widget, direction,
+enabled=True, duration=.22)` captures an outgoing UIKit transition;
+`finish_page_slide(...)` animates replacement Android content. Call them around
+content replacement. Zero direction or `enabled=False` skips animation; platform
+reduced-motion/disabled-animation settings remain authoritative. The host chooses
+whether E Ink or other application policy disables effects.
+
+`ui.native.sliders.style_slider(widget, apple_color=None, palette=None,
+force_ltr=False)` paints slim tracks and circular thumbs while preserving the
+widget's full touch area. Supply semantic UIKit colors and Android palette roles
+`accent`/`border`; defaults are neutral native colors. Direction follows the
+platform unless explicitly forced. Hosts own value reversal, theme refresh
+registration, reader progress and page changes.

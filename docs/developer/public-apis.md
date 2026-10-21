@@ -244,3 +244,6 @@ without toolkit imports or application-specific loading state.
 
 `ui.native.text_size.TextSizeBinding` supplies callback-driven native pinch
 [text sizing and WebView reflow](../../ui/native/README.md#pinch-text-sizing).
+
+`ui.native.transitions` and `ui.native.sliders` supply reusable
+[page motion and slider painting](../../ui/native/README.md#transitions-and-sliders).
