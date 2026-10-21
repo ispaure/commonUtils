@@ -234,3 +234,6 @@ Both start masked and hide again on clear. Hosts own credentials and workflows.
 
 `ui.native.draw_ready.wait_for_draw` supplies bounded native draw acknowledgement;
 see [draw lifecycle](../../ui/native/README.md#native-draw-acknowledgement).
+
+`ui.native.keyboard` supplies window-scoped iOS and subtree-bound Android
+[keyboard dismissal](../../ui/native/README.md#keyboard-dismissal).

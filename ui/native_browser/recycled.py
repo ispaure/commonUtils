@@ -37,7 +37,11 @@ class BrowserPresentation:
         widget.style.background_color = '#dce9ff' if selected else 'transparent'
 
     def bind_keyboard(self, browser):
-        pass
+        from ..native.keyboard import SearchDismissal
+        binding = getattr(browser, '_search_dismissal', None)
+        if binding is None:
+            binding = browser._search_dismissal = SearchDismissal(browser.search)
+        binding.bind((browser.widget,))
 
 
 class RecycledBrowser(NativeBrowser):
@@ -338,6 +342,10 @@ class RecycledBrowser(NativeBrowser):
         self._thumbnail_requested.clear()
         self._thumbnail_pending.clear()
         super().stop()
+        binding = getattr(self, '_search_dismissal', None)
+        if binding is not None:
+            binding.dispose()
+            self._search_dismissal = None
         self.entry_rows = {}
 
     def dismiss_item_menu(self):

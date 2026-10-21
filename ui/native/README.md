@@ -445,3 +445,16 @@ must recheck route, document and privacy lifetime after awaiting it.
 
 Android hosts compile `ui/native/android`, including `DrawReady.java`. UIKit uses
 a temporary noninteractive view. No file-opening or application state is inspected.
+
+## Keyboard dismissal
+
+`ui.native.keyboard.install(window)` installs an iOS observer gesture and returns
+a `KeyboardDismissal` (or `None` on other backends). Retain it for the window and
+call `dispose()` when retiring it. Outside taps dismiss without consuming the
+original touch; editable text controls and WebViews retain selection behavior.
+
+`SearchDismissal(search_widget)` owns one Android outside-touch listener.
+Call `bind(roots)` with explicit Toga subtrees when controls are added; retained
+controls are not rebound. Text inputs are excluded. `dispose()` makes installed
+callbacks inert without retaining every bound row. These helpers do not decide
+which toolbars, status fields or editor controls should collapse for the IME.
