@@ -449,20 +449,10 @@ class AndroidNavigation:
 
     @staticmethod
     def home_icon():
-        from android.graphics import Path, Paint
-        from android.graphics.drawable import ShapeDrawable
-        from android.graphics.drawable.shapes import PathShape
-        path = Path()
-        path.moveTo(2, 11)
-        path.lineTo(12, 3)
-        path.lineTo(22, 11)
-        path.moveTo(5, 9)
-        for x, y in ((5, 21), (9, 21), (9, 14), (15, 14), (15, 21), (19, 21), (19, 9)):
-            path.lineTo(x, y)
-        drawable = ShapeDrawable(PathShape(path, 24, 24))
-        drawable.getPaint().setStyle(Paint.Style.STROKE)
-        drawable.getPaint().setStrokeWidth(1.6)
-        drawable.getPaint().setAntiAlias(True)
+        from .icons import IconSpec, android_drawable
+        spec = IconSpec('', '', (((2, 11), (12, 3), (22, 11)),
+            ((5, 9), (5, 21), (9, 21), (9, 14), (15, 14), (15, 21), (19, 21), (19, 9))), stroke_width=1.6)
+        drawable = android_drawable(spec)
         drawable.setIntrinsicWidth(24)
         drawable.setIntrinsicHeight(24)
         return drawable

@@ -250,3 +250,8 @@ without toolkit imports or application-specific loading state.
 
 `ui.native.appearance` provides callback-driven [surface painting and batching](../../ui/native/README.md#surface-appearance-primitives).
 `ui.appearance.colors` contains toolkit-independent ARGB and contrast utilities.
+
+Native icon rendering: `commonUtils.ui.native.icons.IconSpec`, `IconRenderer`,
+`android_drawable`, `android_path`, `apple_symbols`, `apple_vector`.
+Artwork and palette policy are explicit consumer inputs; drawing helpers import
+platform bridges lazily.

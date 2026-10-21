@@ -511,3 +511,13 @@ values. Neutral default colors are shared by native lists and sliders.
 Portable `ui.appearance.colors` supplies `argb`, `contrast_ratio`, and
 `readable_accent`. These helpers and importing the native appearance module do not
 load Toga or Qt. The host chooses its palette and required contrast policies.
+
+## Consumer-supplied icons
+
+`icons.IconSpec` describes symbol names, fallback text, paths, circles, arcs,
+filled contours and optional centered text. `IconRenderer(icons, tint_android=...)`
+applies existing button icons or leading glyphs without replacing callbacks or menus.
+`apply(..., preserve_layout=True)` retains layout and enabled state. The optional
+Android tint callback owns palette policy; default tint follows native text colors.
+`android_drawable` returns a fresh mutable drawable. Only immutable Apple symbol
+pixels are cached. Applications own named artwork, accessible labels and policy.

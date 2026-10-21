@@ -133,49 +133,9 @@ def navigation_button(direction, label, *, on_press=None, enabled=True):
                'back': ('chevron.left', '‹', (((15, 5), (8, 12), (15, 19)),)),
                'forward': ('chevron.right', '›', (((9, 5), (16, 12), (9, 19)),)),
                'up': ('arrow.up', '↑', (((5, 11), (12, 4), (19, 11)), ((12, 4), (12, 21))))}
-    symbol, fallback, lines = symbols[direction]
-    button = toga.Button(fallback, on_press=on_press, enabled=enabled,
-                         style=Pack(width=48, height=48))
-    button.accessible_name = label
-    button.control_icon = direction
-    backend = type(button._impl).__module__
-    if backend.startswith('toga_iOS.'):
-        from rubicon.objc import ObjCClass
-        native = button._impl.native
-        button.text = ''
-        native.setImage(ObjCClass('UIImage').systemImageNamed(symbol), forState=0)
-        config = ObjCClass('UIImageSymbolConfiguration').configurationWithPointSize(22, weight=5)
-        native.setPreferredSymbolConfiguration(config, forImageInState=0)
-        native.accessibilityLabel = label
-    elif backend.startswith('toga_android.'):
-        from android.graphics import Path, Paint
-        from android.graphics.drawable import ShapeDrawable
-        from android.graphics.drawable.shapes import PathShape
-        path = Path()
-        for line in lines:
-            path.moveTo(*line[0])
-            for point in line[1:]:
-                path.lineTo(*point)
-        drawable = ShapeDrawable(PathShape(path, 24, 24))
-        paint = drawable.getPaint()
-        paint.setStyle(Paint.Style.STROKE)
-        paint.setStrokeWidth(1.8)
-        paint.setStrokeCap(Paint.Cap.ROUND)
-        paint.setStrokeJoin(Paint.Join.ROUND)
-        paint.setAntiAlias(True)
-        native = button._impl.native
-        density = native.getResources().getDisplayMetrics().density
-        size, padding = round(24 * density), round(12 * density)
-        drawable.setBounds(0, 0, size, size)
-        drawable.setTintList(native.getTextColors())
-        button.text = ''
-        native.setMinimumWidth(0)
-        native.setMinimumHeight(0)
-        native.setPadding(padding, padding, padding, padding)
-        native.setCompoundDrawablesRelative(drawable, None, None, None)
-        native.setContentDescription(label)
-        button._impl._control_drawable = drawable
-    return button
+    from .icons import IconRenderer, IconSpec
+    button = toga.Button(on_press=on_press, enabled=enabled, style=Pack(width=48, height=48))
+    return IconRenderer({name: IconSpec(*artwork) for name, artwork in symbols.items()}).apply(button, direction, label)
 
 
 class HierarchyList:

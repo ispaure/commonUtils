@@ -99,3 +99,7 @@ it. Page changes can use a short slide; system reduced-motion settings and the
 host's animation preferences determine whether it appears. Reader sliders keep
 full touch areas around their slim visual tracks. The host controls page order,
 reading direction and which settings persist.
+
+Native icon controls keep their full button hit target and accessible action name.
+Leading glyphs remain part of the same control as its title. Applications supply
+the artwork, labels and colors; rendering preserves callbacks and enabled state.
