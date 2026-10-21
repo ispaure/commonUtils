@@ -241,3 +241,6 @@ see [draw lifecycle](../../ui/native/README.md#native-draw-acknowledgement).
 `runtime.progress.CoalescedProgress` and `runtime.streams.progress` provide
 [coalesced cumulative read progress](../../runtime/streams/README.md#measured-reads)
 without toolkit imports or application-specific loading state.
+
+`ui.native.text_size.TextSizeBinding` supplies callback-driven native pinch
+[text sizing and WebView reflow](../../ui/native/README.md#pinch-text-sizing).

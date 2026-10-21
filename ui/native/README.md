@@ -458,3 +458,19 @@ Call `bind(roots)` with explicit Toga subtrees when controls are added; retained
 controls are not rebound. Text inputs are excluded. `dispose()` makes installed
 callbacks inert without retaining every bound row. These helpers do not decide
 which toolbars, status fields or editor controls should collapse for the IME.
+
+## Pinch text sizing
+
+`ui.native.text_size.TextSizeBinding(widget, loop=..., get_size=..., save_size=...,
+changed=..., active=..., alive=..., minimum=12, maximum=32, web=False, ...)`
+installs native pinch recognition through `install()`. Call `attach_load()` for a
+WebView, `apply(size)` for settings changes and `dispose()` when retiring a binding.
+Native text and existing WebView DOMs update without replacing document content.
+
+Gestures preview a clamped size, save once on completion and restore the current
+size on cancellation. `changed()` lets a host refresh related surfaces; without
+it, the binding reapplies `get_size()`. `on_error(error)` handles save failures.
+`active()` gates gestures and `alive()` gates all updates, including queued reflow.
+`alignment()` returns a supported text alignment; `alignment_variable` names the
+CSS custom property. Hosts retain format settings, privacy guards and document
+ownership. The shared helper imports no application modules.
