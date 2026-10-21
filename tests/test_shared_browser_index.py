@@ -105,7 +105,7 @@ class SharedBrowserTests(QtTestCase):
         self.worker.start()
         self.wait(lambda: browser.model.folder_totals.get(self.child) is not None
                   and browser.model.folder_totals[self.child].files == 2 and not browser.folder_busy)
-        self.assertEqual(self.wait(lambda: self.queue.status(identity))['state'], 'done')
+        self.wait(lambda: self.queue.status(identity)['state'] == 'done')
         def receipt_count():
             with self.queue._connection() as db:
                 return db.execute('SELECT count(*) FROM jobs').fetchone()
@@ -123,7 +123,7 @@ class SharedBrowserTests(QtTestCase):
         self.worker = Thread(target=self.queue.run, args=(self.stop.is_set,))
         self.worker.start()
         self.wait(lambda: not second.folder_busy)
-        self.assertEqual(self.wait(lambda: self.queue.status(identity))['state'], 'done')
+        self.wait(lambda: self.queue.status(identity)['state'] == 'done')
 
     def test_receipt_poll_waits_for_a_real_queue_writer_lock(self):
         identity = self.queue.submit(self.root)
