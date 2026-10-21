@@ -392,3 +392,14 @@ The explicit byte bound limits input; malformed or unsupported headers raise
 a caller's animation policy. Header inspection does not validate the complete
 pixel stream or certify successful decoding. Consumers choose allowed formats,
 dimension/pixel limits and whether to accept animation before their native decoder.
+
+`image_headers.gif_header(data, max_bytes=...)` separately inspects GIF87a/89a
+containers and reports whether they contain multiple image frames. It verifies
+canvas/frame dimensions, palettes and data sub-block boundaries through a trailer;
+truncation raises `ValueError`. It does not decompress or certify LZW pixel data.
+The existing `image_header` PNG/JPEG/WebP contract is unchanged.
+
+`markdown_images.image_size(label)` parses Obsidian image size hints as
+`(caption, width, height)`, accepting `Caption|400`, `Caption|400x200` or a numeric
+label alone. Dimensions are positive integers of up to six digits; malformed
+hints stay literal. Desktop and native Markdown renderers share this parser.

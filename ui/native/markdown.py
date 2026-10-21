@@ -13,15 +13,17 @@ from toga.style.pack import COLUMN, ROW
 
 from ...formats.markdown_wiki import MarkdownWiki, resolve_document_path, documentation_root
 from .markdown_preview import markdown_preview
+from .markdown_images import local_image_source
 from .adaptive import AdaptiveSidebar, allocated_width
 from .presentation import hierarchy_row, navigation_button
 
 
 class MarkdownWikiView:
-    def __init__(self, directory, path=None, *, width=390, font_size=16, render=None, open_file=None):
+    def __init__(self, directory, path=None, *, width=390, font_size=16, render=None, open_file=None, image_source_factory=None):
         self.open_file = open_file
         self.font_size = font_size
         self.render = render or markdown_preview
+        self.image_source_factory = image_source_factory or (local_image_source if render is None else None)
         self.catalog = MarkdownWiki(directory)
         self.history = []
         self.history_index = -1
@@ -165,7 +167,11 @@ class MarkdownWikiView:
             from ...filesystem.local_access import check_local_path
             check_local_path(path)
             text = path.read_text(encoding='utf-8-sig')
-            html = self.render(text, self.font_size, local_links=True)
+            options = dict(local_links=True)
+            if self.image_source_factory is not None:
+                root = documentation_root(path, self.catalog.root)
+                options['image_source'] = self.image_source_factory(path, root)
+            html = self.render(text, self.font_size, **options)
         except (OSError, UnicodeError, ValueError) as error:
             self.notice.text = str(error)
             self.reading = False

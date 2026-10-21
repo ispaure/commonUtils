@@ -394,7 +394,7 @@ own persistence, credential validation, background privacy and disposal policy.
 `markdown_body` and `markdown_preview` accept optional `image_source(target)`.
 The callback returns `(mime_type, bytes)` or `None`; it owns path resolution,
 permissions, revision checks and I/O. The renderer never fetches images itself.
-PNG, JPEG and WebP up to 8 MiB are embedded as data URIs; `OSError`/`ValueError`
+PNG, JPEG, WebP and GIF up to 8 MiB are embedded as data URIs; `OSError`/`ValueError`
 and unsupported data fall back to escaped alt text. Hosts must validate raster
 content and bound their total I/O. An opted-in preview allows only `data:` image
 sources and has a 24 MiB output limit; the default inert preview keeps its 2 MiB
@@ -404,6 +404,32 @@ With an image source, `![[relative/image.webp]]` is parsed as an image embed.
 The reusable `embedded_image` and `wiki_image` helpers allow formatted editors to
 apply the same image policy without loading an application module. Wiki parsing
 is opt-in; code spans, fenced code and escaped embeds remain literal.
+
+The default `MarkdownWikiView` renderer uses
+`markdown_images.local_image_source(document, root)` for page-relative local
+images within the documentation root. A custom `render` callback keeps its old
+arguments unless `image_source_factory(document, root)` is explicitly supplied;
+then the renderer also receives the per-page `image_source` keyword. Logistics'
+Documentation reader opts in through this factory as well.
+
+`markdown_images.folder_image_source(provider, document)` supplies the bounded
+shared resolver for folder-backed native readers/editors. It accepts a rooted
+provider with `relative`, `entry` and `open` methods; paths resolve relative to
+the document's provider key. All reads stay behind that provider, with revision
+and access rechecks (including cached resources), no plaintext image files, an
+8 MiB/16 megapixel per-image limit and a 16 MiB per-render byte budget. Encoded
+spaces, `#` and percent signs are decoded only in the URL path. Network URLs,
+absolute paths, root escapes and linked local files are rejected. PNG/JPEG/WebP
+use the existing header probe; GIF uses the complete bounded container probe.
+Animated WebP remains unsupported by this resolver.
+
+GIF bytes are embedded unchanged, letting iOS/Android WebViews play all frames
+in preview and formatted editing. Native image markup caps widths at its content
+container. Obsidian `![[image.gif|400]]`, `![Caption|400](image.gif)` and numeric
+Markdown alt labels support pixel widths; `400x200` also supplies a height.
+Explicit dimensions scale together when capped; width-only hints preserve the
+intrinsic aspect ratio. Invalid hints remain ordinary alt text. Hosts retain
+source syntax when serializing edits; animation never writes Markdown or files.
 
 ### Search input delay
 

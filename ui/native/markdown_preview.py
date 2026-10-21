@@ -6,6 +6,7 @@ from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
+from ...formats.markdown_images import image_size
 
 _ALIAS = re.compile(r'\[\[([^]\n|]+)\|([^]\n]+)\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
 
@@ -34,10 +35,19 @@ def embedded_image(target, alt, image_source=None):
             image = image_source(target)
             if image is not None:
                 mime, data = image
-                if mime not in {'image/png', 'image/jpeg', 'image/webp'} or not isinstance(data, bytes) or len(data) > 8 * 1024 * 1024:
+                if mime not in {'image/png', 'image/jpeg', 'image/webp', 'image/gif'} or not isinstance(data, bytes) or len(data) > 8 * 1024 * 1024:
                     raise ValueError('Invalid embedded image.')
+                caption, width, height = image_size(alt)
+                style = 'max-width:100%;height:auto'
+                dimensions = ''
+                if width is not None:
+                    dimensions = f' width="{width}"'
+                    style += f';width:{width}px'
+                    if height is not None:
+                        dimensions += f' height="{height}"'
+                        style += f';aspect-ratio:{width}/{height}'
                 encoded = base64.b64encode(data).decode('ascii')
-                return f'<img src="data:{mime};base64,{encoded}" alt="{escape(alt, quote=True)}" style="max-width:100%;height:auto">'
+                return f'<img src="data:{mime};base64,{encoded}" alt="{escape(caption, quote=True)}"{dimensions} style="{style}">'
         except (OSError, ValueError):
             pass
     return '<span class="image-alt">' + escape(alt) + '</span>'
@@ -56,8 +66,8 @@ def wiki_image(state, silent):
         return False
     if not silent:
         token = state.push('image', 'img', 0)
-        token.attrSet('src', target.strip())
-        token.content = alt or target.strip()
+        token.attrSet('src', quote(target.strip(), safe='/:%'))
+        token.content = (target.strip() + '|' + alt) if image_size(alt)[1] is not None else (alt or target.strip())
         child = Token('text', '', 0)
         child.content = token.content
         token.children = [child]

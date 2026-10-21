@@ -197,7 +197,12 @@ Local GIF image resources use retained `QMovie` decoders in the reading browser
 and formatted editor. Frames update the document resource cache and invalidate
 layout painting without changing Markdown, the dirty flag or undo history. Hidden
 surfaces pause playback; removing images or navigating retires unused decoders.
-Relative resources resolve through the document base URL. Direct animation loading
+Relative resources resolve through the document base URL. A retained image object
+handler caps drawing at the page width and scales both dimensions together,
+including explicit `|widthxheight` hints. Resizing does not mutate image formats,
+source, dirty state or undo history. Obsidian `![[image.gif|400]]` and standard
+`![Caption|400](image.gif)` hints share `formats.markdown_images.image_size`;
+wiki embeds retain their exact source through formatted editing/export. Direct animation loading
 respects protected local roots and never bypasses a supplied resource loader.
 Provider-backed resources retain their existing static rendering contract.
 

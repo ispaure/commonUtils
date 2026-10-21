@@ -192,7 +192,8 @@ or click their toolbar button again.
 
 ## Images and animated GIFs
 
-Local GIF images animate in Read mode and the Formatted editor. Use ordinary
+Local GIF images animate in Read mode and the Formatted editor. Images fit within
+the page width and reflow when the window changes size. Use ordinary
 Markdown image references such as `![Demo](assets/demo.gif)`; relative paths resolve
 from the Markdown file’s folder. Playback pauses while that view is hidden.
 
@@ -203,6 +204,12 @@ including paths to sibling folders. Spaces and special path characters are encod
 automatically. Drops into unsaved documents use absolute file URLs.
 Images remain in their original locations; move them together with the document
 when sharing relative references. A drop can be undone in one step.
+
+Use Obsidian image embeds such as `![[assets/demo.gif|400]]` or standard Markdown
+`![Demo|400](assets/demo.gif)` to request a width in pixels. Add `|400x200` for
+an explicit width and height. Both forms shrink proportionally if needed to fit
+the page; smaller images stay small. The source size survives editing and saving.
+Code examples and escaped embeds remain literal.
 
 Storage-provider documents keep their existing resource-loading policy; local file
 drops and direct GIF decoders are disabled for those documents.

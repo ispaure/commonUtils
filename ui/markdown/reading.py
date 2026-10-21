@@ -5,6 +5,7 @@ from ...formats.markdown import split_frontmatter
 from .extensions import reading_source, mermaid_blocks
 from .headings import _iter_headings
 from .links import render_links
+from .images import prepare_wiki_images, configure_images
 from .presentation import style_document
 from ..readers.reader_chrome import reader_button, reading_spin, show_reader_popup
 
@@ -86,8 +87,10 @@ class MarkdownReadingMixin:
         # Treat embedded HTML as literal Markdown rather than losing authored text.
         body = self._diagram_renderer.substitute(parts.body, self.browser.document()) if self._diagram_renderer else parts.body
         rendered, callouts = reading_source(body, self._folded_callouts)
-        self.browser.document().setMarkdown(render_links(rendered),
+        prepared, images = prepare_wiki_images(render_links(rendered))
+        self.browser.document().setMarkdown(prepared,
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
+        configure_images(self.browser.document(), images)
         style_document(self.browser.document(), self.browser.palette(), callouts=callouts)
         self._callouts = callouts
         self.diagrams_button.setVisible(bool(mermaid_blocks(parts.body)) and not self.edit_button.isChecked())

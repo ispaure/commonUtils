@@ -51,6 +51,8 @@ and conflict policy belong to callers. See [filesystem](../../filesystem/README.
 | --- | --- |
 | Text/CSV data | `TXTFile`, `CSVFile`; existing write semantics are not universally atomic |
 | JSON data | `JSONFile.read_json/write_json`; atomic writes, non-finite numbers rejected |
+| Raster metadata | `formats.image_headers.image_header` (PNG/JPEG/WebP), `gif_header` (GIF container); explicit byte bounds, no pixel decoding |
+| Markdown image sizes | `formats.markdown_images.image_size`; shared Obsidian width/height hint parsing |
 | Structured XML | `XMLFile`; [XML examples](../../formats/xmlType.md) cover namespaces and repeated elements |
 | INI documents | `INIFile.read/get/set/save`; string values, formatting preservation, parse/I/O errors propagate |
 | Typed INI fields | `configuration.ini_schema`; explicit opt-in suffix validation, separate from INI storage |
@@ -267,3 +269,9 @@ only when a native constructor is called. Returned native views are consumer-own
 `commonUtils.runtime.signals.CoalescedSignal`: loop-local weak async broadcast;
 `waiter(initial=True)` returns a coalescing async callback, `notify()` wakes all
 live subscribers. No GUI imports, timers or retained application owners.
+
+Native Markdown hosts can use
+`ui.native.markdown_images.folder_image_source(provider, document)` for bounded,
+revision-checked provider image reads, including animated GIFs. Feed its callback
+to `markdown_preview` or a formatted editor using `embedded_image`. See the
+[native image contract](../../ui/native/README.md#host-supplied-markdown-images).

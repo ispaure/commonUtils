@@ -160,3 +160,26 @@ class MarkdownImageTests(QtTestCase):
                 decoder.assert_not_called()
         finally:
             release()
+
+    def test_missing_and_invalid_gifs_do_not_start_decoders_or_dirty_source(self):
+        (self.root / 'broken.gif').write_bytes(b'GIF89a truncated')
+        source = '![Bad](broken.gif) ![Missing](missing.gif)'
+        self.path.write_text(source)
+        self.viewer.open_document(self.path)
+        qt.QApplication.processEvents()
+        self.assertFalse(self.viewer.formatted_editor.animated_images.movies)
+        self.assertFalse(self.viewer.is_modified)
+        self.assertEqual(self.viewer.markdown_text(), source)
+        self.viewer.set_editing(False)
+        qt.QApplication.processEvents()
+        self.assertFalse(self.viewer.browser.animated_images.movies)
+        self.assertFalse(self.viewer.is_modified)
+
+    def test_decoder_error_retires_movie_without_changing_source(self):
+        movie = self.assert_animates(self.viewer.formatted_editor)
+        source = self.viewer.markdown_text()
+        movie.error.emit(qt.QImageReader.ImageReaderError.InvalidDataError)
+        self.assertFalse(self.viewer.formatted_editor.animated_images.movies)
+        self.assertEqual(movie.state(), qt.QMovie.MovieState.NotRunning)
+        self.assertEqual(self.viewer.markdown_text(), source)
+        self.assertFalse(self.viewer.is_modified)

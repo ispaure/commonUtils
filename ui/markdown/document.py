@@ -3,6 +3,7 @@ import re
 from .. import pyside as qt
 from .syntax import _units
 from .links import link_spans, _REFERENCE
+from .images import WIKI_IMAGE_SOURCE
 from .syntax import fenced_regions, HEADING, inline_spans, FENCE_OPEN, fence_close
 
 
@@ -46,6 +47,22 @@ class LiveMarkdownDocument(qt.QTextDocument):
             key = f'{prefix}{len(tokens)}z'
             tokens[key] = text
             return key
+        image_changes = []
+        block = clone.begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                original_image = fragment.charFormat().property(WIKI_IMAGE_SOURCE)
+                if fragment.charFormat().isImageFormat() and original_image:
+                    image_changes.append((fragment.position(), fragment.length(), token(original_image)))
+                iterator += 1
+            block = block.next()
+        for position, length, replacement in reversed(image_changes):
+            cursor = qt.QTextCursor(clone)
+            cursor.setPosition(position)
+            cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(replacement, qt.QTextCharFormat())
         regions = list(fenced_regions(clone))
         for opening, closing, _, _ in reversed(regions):
             cursor = qt.QTextCursor(clone)

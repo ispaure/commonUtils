@@ -6,7 +6,7 @@ from .syntax import _units
 from .links import link_spans, reference_destinations
 from .document import LiveMarkdownDocument, materialize_formats, protect_escapes, restore_escapes, space_headings, heading_top_margin
 from .preview import LivePreviewHighlighter
-from .images import ImageDropMixin, AnimatedImages
+from .images import ImageDropMixin, AnimatedImages, prepare_wiki_images, configure_images
 from .syntax import HEADING, fenced_regions
 from .presentation import style_document
 
@@ -42,11 +42,13 @@ class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
 
     def setMarkdown(self, markdown):
         self._highlighter.setDocument(None)
-        protected, tokens = protect_escapes(markdown)
+        prepared, images = prepare_wiki_images(markdown)
+        protected, tokens = protect_escapes(prepared)
         self.document().setMarkdown(protected,
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         materialize_formats(self)
         restore_escapes(self.document(), tokens)
+        configure_images(self.document(), images)
         # Qt imports heading text with a relative size adjustment, which takes
         # precedence over the highlighter's collapsed-marker font. Normalize
         # it to the same absolute sizes used for headings typed in this editor.
