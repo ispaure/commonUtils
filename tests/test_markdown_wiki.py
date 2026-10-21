@@ -75,6 +75,28 @@ class WikiViewerTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 
+    def test_repopulation_retires_referenced_items_without_a_pending_reset(self):
+        with self.temporary_directory() as temporary:
+            root = Path(temporary).resolve()
+            first, second = root / 'first.md', root / 'second.md'
+            first.write_text('# First')
+            second.write_text('# Second')
+            viewer = MarkdownViewer(first, directory=root)
+            panel = viewer.wiki
+            old = [panel.tree.topLevelItem(i) for i in range(panel.tree.topLevelItemCount())]
+            panel.search.setText('Second')
+            self.assertTrue(panel.timer.isActive())
+            panel.populate()
+            self.assertFalse(panel.timer.isActive())
+            self.assertTrue(all(item.treeWidget() is None for item in old))
+            self.assertEqual({item.text(0) for item in old}, {'First', 'Second'})
+            self.assertEqual(panel.tree.topLevelItemCount(), 1)
+            target = panel.tree.topLevelItem(0)
+            panel.open_item(target)
+            self.assertEqual(viewer.current_path, second)
+            self.assertIs(panel.tree.currentItem(), target)
+            viewer.close()
+
     def test_arrow_selection_opens_page_and_cancel_restores_selection(self):
         from PySide6.QtTest import QTest
         with self.temporary_directory() as temporary:

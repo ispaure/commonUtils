@@ -67,8 +67,15 @@ class WikiPanel(qt.QWidget):
             self.viewer._refresh_search_highlights()
 
     def populate(self):
+        self.timer.stop()
         blocked = self.tree.blockSignals(True)
-        self.tree.clear()
+        self.tree.setCurrentItem(None)
+        # Detach nodes before retiring their Python wrappers. Keep them alive
+        # through the replacement so a model reset cannot delete an item still
+        # referenced by selection or document-navigation handlers.
+        retired = []
+        while self.tree.topLevelItemCount():
+            retired.append(self.tree.takeTopLevelItem(0))
         role = qt.Qt.ItemDataRole.UserRole
         def add(entries, parent):
             for entry in entries:
