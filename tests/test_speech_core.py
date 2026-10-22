@@ -52,3 +52,28 @@ class SpeechCoreTests(unittest.TestCase):
         self.assertFalse(timer.running)
         timer.dispose()
         self.assertIsNone(timer.handle)
+
+    def test_pause_speed_skip_and_late_completion_use_one_transition_owner(self):
+        now = [100]
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        ranges, states = Mock(), Mock()
+        session = SpeechSession(engine, on_range=ranges, on_state=states, clock=lambda: now[0])
+        session.play(' '.join(f'word{i}😀' for i in range(100)))
+        first = session.token
+        engine.started(first)
+        engine.progress(first, 0, 7)
+        session.pause()
+        session.skip(15)
+        self.assertEqual(session.state, 'paused')
+        self.assertTrue(session.ranges[0][0].startswith('word45😀'))
+        session.set_speed(1.5)
+        session.resume()
+        current = session.token
+        self.assertNotEqual(current, first)
+        count = engine.speak.call_count
+        engine.completed(first)
+        self.assertEqual(engine.speak.call_count, count)
+        session.can_speak = lambda: False
+        engine.completed(current)
+        self.assertEqual(session.state, 'stopped')
+        session.dispose()

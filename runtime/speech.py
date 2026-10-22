@@ -75,7 +75,7 @@ class PlaybackTimer:
         self.deadline = None
 
 
-def utterances(text, start=0, end=None, *, limit=1000, breaks=()):
+def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_breaks=True):
     """Keep browser offsets intact, including astral characters and block edges."""
     units = [0]
     for char in text:
@@ -93,7 +93,7 @@ def utterances(text, start=0, end=None, *, limit=1000, breaks=()):
         stop = left + 1
         while stop < right and units[stop + 1] - units[left] <= limit:
             if units[stop] in boundaries or (
-                text[stop - 1] in ".!?。！？" and text[stop].isspace()
+                sentence_breaks and text[stop - 1] in ".!?。！？" and text[stop].isspace()
             ):
                 break
             stop += 1
@@ -119,11 +119,17 @@ class SpeechSession:
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()
         self.elapsed = 0
+        self.native_paused = False
         engine.completed = self.completed
         engine.failed = self.failed
         engine.progress = self.progress
         engine.started = self.started
         self.word_timer = None
+
+    def utterances(self, text, start=0, end=None, *, breaks=()):
+        return utterances(text, start, end, breaks=breaks,
+                          limit=getattr(self.engine, 'utterance_limit', 1000),
+                          sentence_breaks=getattr(self.engine, 'sentence_breaks', True))
 
     def play(self, text, start=0, end=None, *, voice="", speed=1, breaks=()):
         if self.closed:
@@ -145,7 +151,7 @@ class SpeechSession:
             ):
                 self.words.append(units)
             units += utf16_length(match[0])
-        self.ranges = list(utterances(text, start, end, breaks=breaks))
+        self.ranges = list(self.utterances(text, start, end, breaks=breaks))
         self.voice, self.speed, self.index = voice, speed, 0
         if self.ranges:
             self.state = "speaking"
@@ -198,6 +204,8 @@ class SpeechSession:
             self.utterance_words.append(
                 (base + start, base + start + utf16_length(match[0]))
             )
+        if self.utterance_words:
+            self.on_range(*self.utterance_words[0])
         if not self.native_progress and not getattr(
             self.engine, "native_word_events", False
         ):
@@ -254,6 +262,10 @@ class SpeechSession:
             self.cancel_timer()
             self.elapsed = max(0, self.clock() - self.started_at)
             self.state = "paused"
+            if getattr(self.engine, 'pause_utterance', lambda: False)():
+                self.native_paused = True
+                self.on_state("paused", "Paused · Resume continues from the current word.")
+                return
             self.generation += 1
             self.token = str(self.generation)
             self.engine.stop()
@@ -268,7 +280,16 @@ class SpeechSession:
     def resume(self):
         if not self.closed and self.state == "paused":
             self.state = "speaking"
-            self.next()
+            if self.native_paused:
+                self.native_paused = False
+                self.started_at = self.clock() - self.elapsed
+                self.engine.resume_utterance()
+                self.on_state("speaking", "Reading aloud · current word highlighted")
+                if not self.native_progress and not getattr(self.engine, 'native_word_events', False):
+                    index = next((i for i, (start, _) in enumerate(self.utterance_words) if start >= self.position), 0)
+                    self.estimated_word(self.token, index)
+            else:
+                self.next()
 
     def set_speed(self, speed):
         """Re-synthesize from the current word; native rates apply per utterance."""
@@ -278,6 +299,8 @@ class SpeechSession:
         if speaking:
             self.pause()
         self.speed = speed
+        if self.native_paused:
+            getattr(self.engine, 'set_speed', lambda speed: None)(speed)
         if speaking:
             self.resume()
 
@@ -306,8 +329,9 @@ class SpeechSession:
         # Retire pixels and callbacks before stopping the old native utterance.
         self.on_range(-1, -1)
         self.engine.stop()
+        self.native_paused = False
         self.ranges = list(
-            utterances(self.text, self.words[target], self.end, breaks=self.breaks)
+            self.utterances(self.text, self.words[target], self.end, breaks=self.breaks)
         )
         self.index, self.elapsed = 0, 0
         if paused:
@@ -324,6 +348,7 @@ class SpeechSession:
         self.generation += 1
         self.token = str(self.generation)
         self.state = "stopped"
+        self.native_paused = False
         self.engine.stop()
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()

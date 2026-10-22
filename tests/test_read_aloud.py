@@ -61,21 +61,21 @@ class SpeechTests(QtTestCase):
             clock.return_value = 100
             speech.timer_choice.setCurrentIndex(1)
             self.assertEqual(speech.timer_label.text(), 'Time remaining: 15:00')
-            self.assertFalse(speech.sleep_tick.isActive())
+            self.assertFalse(speech.playback.handle is not None)
             speech.start()
             clock.return_value = 110
-            speech._tick_sleep_timer()
+            speech.playback._tick()
             self.assertEqual(speech.timer_label.text(), 'Time remaining: 14:50')
             speech.toggle_pause()
             clock.return_value = 500
-            speech._tick_sleep_timer()
+            speech.playback._tick()
             self.assertEqual(speech.timer_label.text(), 'Time remaining: 14:50')
             speech.reset_timer_button.click()
             self.assertEqual(speech.timer_label.text(), 'Time remaining: 15:00')
             self.assertEqual(speech.engine.state(), Speech.State.Paused)
             speech.toggle_pause()
             clock.return_value = 1401
-            speech._tick_sleep_timer()
+            speech.playback._tick()
             self.assertEqual(speech.engine.state(), Speech.State.Paused)
             self.assertEqual(speech.timer_label.text(), 'Time remaining: 00:00')
             self.assertIn('Timer finished', speech.message.text())
@@ -120,7 +120,7 @@ class SpeechTests(QtTestCase):
         selections = widget.extraSelections()
         self.assertLess(len(selections[0].cursor.selectedText()), 15)
         self.assertGreaterEqual(selections[0].cursor.selectionStart(), base)
-        speech._estimated_word()
+        speech.session.estimated_word(speech.session.token, 1)
         selections = widget.extraSelections()
         self.assertLess(len(selections[0].cursor.selectedText()), 15)
 
@@ -134,10 +134,10 @@ class SpeechTests(QtTestCase):
         selections = widget.extraSelections()
         self.assertEqual(selections[0].cursor.selectedText(), 'word45😀')
         speech.toggle_pause(); speech.skip(-15)
-        self.assertEqual(speech.engine.state(), Speech.State.Paused)
-        self.assertTrue(speech.engine.spoken[-1].startswith('word0😀'))
+        self.assertEqual(speech.session.state, 'paused')
+        self.assertTrue(speech.session.ranges[0][0].startswith('word0😀'))
         speech.stop()
-        self.assertFalse(speech.word_timer.isActive())
+        self.assertFalse(speech.session.word_timer is not None)
         self.assertFalse(speech.back.isEnabled())
         self.assertFalse(speech.forward.isEnabled())
 
@@ -154,7 +154,7 @@ class SpeechTests(QtTestCase):
         speech.engine.sayingWord.emit('paragraph', 0, 7, 9)
         selections = widget.extraSelections()
         self.assertEqual(selections[0].cursor.selectedText(), 'paragraph')
-        self.assertFalse(speech.word_timer.isActive())
+        self.assertFalse(speech.session.word_timer is not None)
 
     def test_queue_pause_and_stop_cancel_scheduled_next_utterance(self):
         speech = self.speech('A sentence. ' * 800)
@@ -171,7 +171,7 @@ class SpeechTests(QtTestCase):
         speech.stop()
         self.app.processEvents()
         self.assertEqual(len(speech.engine.spoken), 2)
-        self.assertFalse(speech.pending)
+        self.assertFalse(speech.session.ranges)
 
     def test_single_playback_button_starts_pauses_resumes_and_resets(self):
         speech = self.speech('A sentence. ' * 800)
@@ -180,7 +180,7 @@ class SpeechTests(QtTestCase):
         self.assertIs(speech.pause, speech.read)
         self.assertEqual(speech.read.accessibleName(), 'Play')
         speech.read.click()
-        pending = list(speech.pending)
+        pending = list(speech.session.ranges)
         self.assertEqual(speech.engine.state(), Speech.State.Speaking)
         self.assertEqual(speech.read.accessibleName(), 'Pause')
         speech.read.click()
@@ -189,14 +189,15 @@ class SpeechTests(QtTestCase):
         speech.read.click()
         self.assertEqual(speech.engine.state(), Speech.State.Speaking)
         self.assertEqual(len(speech.engine.spoken), 1)
-        self.assertEqual(list(speech.pending), pending)
+        self.assertEqual(list(speech.session.ranges), pending)
         speech.stop_button.click()
         self.assertEqual(speech.read.accessibleName(), 'Play')
         self.assertTrue(speech.read.isEnabled())
         speech.read.click()
         self.assertEqual(len(speech.engine.spoken), 2)
-        speech.pending.clear()
+        del speech.session.ranges[speech.session.index + 1:]
         speech.engine.change(Speech.State.Ready)
+        self.app.processEvents()
         self.assertEqual(speech.read.accessibleName(), 'Play')
         speech.engine.change(Speech.State.Error)
         self.assertFalse(speech.read.isEnabled())
