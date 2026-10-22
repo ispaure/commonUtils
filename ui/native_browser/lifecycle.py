@@ -67,4 +67,8 @@ class BrowserLifecycle:
     async def close(self):
         self.stop()
         while self.tasks:
-            await asyncio.gather(*tuple(self.tasks), return_exceptions=True)
+            tasks = tuple(self.tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            # gather may finish synchronously for already-completed tasks,
+            # before their queued discard callbacks can run on the loop.
+            self.tasks.difference_update(tasks)

@@ -39,3 +39,74 @@ class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(work.encoded)
         self.assertFalse(work.decoded)
         await work.close()
+
+    async def test_retired_tile_keeps_its_storage_worker_owned_until_close(self):
+        from commonUtils.ui.native_browser.recycled import RecycledBrowser
+        work = BrowserLifecycle()
+        started, release, finished = Event(), Event(), Event()
+        cancelled = Event()
+        entry = SimpleNamespace(identity='retired', revision=1, payload={})
+        published = []
+        def loader(*args):
+            started.set()
+            try:
+                if not release.wait(5):
+                    raise TimeoutError('Synthetic storage read did not retire')
+                return b'cover'
+            finally:
+                finished.set()
+        task = work.spawn(work.thumbnail(entry, loader, published.append,
+            epoch=work.epoch, cancelled=cancelled))
+        close = None
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 5))
+            browser = SimpleNamespace(
+                _tile_cards={'retired': (entry, SimpleNamespace(children=[SimpleNamespace(children=[])]),
+                                        SimpleNamespace(text='name'), cancelled, task)},
+                buttons={'retired': object()}, entry_rows={'retired': object()})
+            RecycledBrowser._retire_tile(browser, 'retired')
+            self.assertTrue(cancelled.is_set())
+            # Let cancellation propagate while storage remains explicitly blocked.
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertIn(task, work.tasks, 'A running storage read lost its owner')
+            close = asyncio.create_task(work.close())
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertFalse(close.done(), 'Close released a running storage worker')
+            self.assertIn(task, work.tasks)
+            self.assertFalse(finished.is_set())
+        finally:
+            release.set()
+            await work.close()
+            if close is not None:
+                await close
+        self.assertTrue(finished.is_set())
+        self.assertFalse(work.tasks)
+        self.assertEqual(published, [])
+
+    def test_close_drains_done_tasks_before_their_callbacks_run(self):
+        # A subprocess timeout catches a tight event-loop spin without stranding
+        # the suite itself. The queued discard callback has deliberately not run.
+        import os
+        from pathlib import Path
+        import subprocess
+        import sys
+        environment = os.environ.copy()
+        environment['PYTHONPATH'] = os.pathsep.join(filter(None, (
+            str(Path(__file__).resolve().parents[2]), environment.get('PYTHONPATH'))))
+        script = '''
+import asyncio
+from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
+async def main():
+    work = BrowserLifecycle()
+    completed = asyncio.get_running_loop().create_future()
+    work.retain(completed)
+    completed.set_result(None)
+    await work.close()
+    assert not work.tasks
+asyncio.run(main())
+'''
+        completed = subprocess.run([sys.executable, '-c', script], env=environment,
+                                   capture_output=True, text=True, timeout=15)
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)

@@ -439,10 +439,10 @@ class RecycledBrowser(NativeBrowser):
         self._tile_restore = self._loop.call_soon(restore)
 
     def _retire_tile(self, identity):
-        _, card, button, cancelled, task = self._tile_cards.pop(identity)
+        _, card, button, cancelled, _ = self._tile_cards.pop(identity)
+        # Cancelling the awaiter cannot stop its to_thread storage read. Keep
+        # lifecycle ownership and its concurrency slot until that read retires.
         cancelled.set()
-        if task is not None:
-            task.cancel()
         button.text = ''
         for view in card.children[0].children:
             if isinstance(view, toga.ImageView):

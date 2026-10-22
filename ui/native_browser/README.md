@@ -64,8 +64,16 @@ native decoded images are bounded to 64 entries. Invalidating a snapshot signals
 its cancellation event and advances the epoch, so late results cannot publish.
 Unavailable covers do not prevent selecting the resource.
 
+When a tile leaves the viewport, its cancellation event is signalled while its
+storage-read task stays retained until the loader returns. Cancelling an async
+awaiter cannot stop a blocking worker thread; retaining the task also keeps its
+concurrency slot occupied until the read retires. Queued obsolete requests skip
+loading when they acquire a slot.
+
 `stop()` invalidates work and clears caches immediately; `await close()` waits for
-retained tasks, including cooperative worker completion. Do not release storage
-leases merely because rows disappeared. For a memory trim,
-`work.prune(set())` clears both cache tiers without changing selection. They must also release their own displayed
-image references when appropriate. Stop/close remain the retirement path.
+retained tasks, including cooperative worker completion. Close explicitly drains
+completed tasks even before their queued retirement callbacks run. Do not release
+storage leases merely because rows disappeared. For a memory trim,
+`work.prune(set())` clears both cache tiers without changing selection. Hosts must
+also release their own displayed image references when appropriate. Stop/close
+remain the retirement path.
