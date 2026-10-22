@@ -97,3 +97,23 @@ and present errors after returning to the GUI thread. Do not silently swallow
 failure or generalize one operation's policy to every helper.
 
 [Developer hub](README.md)
+
+## Consolidated internal owners
+
+Resource contracts and virtual identifiers live under `runtime.resources`;
+optional Qt resource windows live under `ui.resources`. Native dialog dispatch is
+an ordinary lazy `ui.native.dialogs` import. These groups preserve namespace
+isolation without filesystem loaders or legacy aliases.
+
+`runtime.speech.SpeechSession` owns portable playback transitions for both native
+and Qt read-aloud. Qt engine callbacks/scheduling adapt that session through
+`ui.readers.qt_speech`; document text, voices and UI remain caller-owned.
+`ui.native_browser.lifecycle.BrowserLifecycle` owns epochs, task retirement and
+thumbnail caches shared by paginated and recycled presentation.
+
+Layer composition, transfer phases, ZIP member plans, directory-index writer
+phases and workspace drops also have explicit internal owners. Their contracts
+and caller policy boundaries are documented in the [API map](public-apis.md),
+[configuration](../../configuration/README.md), [persistence](../../persistence/README.md),
+[archives](../../archives/README.md), [index](../../filesystem/index/README.md)
+and [workspace](../../ui/workspaces.md) guides.

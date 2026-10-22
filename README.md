@@ -3,8 +3,9 @@
 commonUtils is a reusable Python library for file automation and desktop tools.
 It provides filesystem objects and format registration, persistent directory
 indexing, archive and process operations, configuration and atomic persistence,
-and shared Qt browsers, readers and editors. Applications supply their own
-workflows, domain file types, dependency policy and settings.
+shared Qt browsers, readers and editors, and optional native mobile components.
+Portable resource and speech mechanisms remain independent of toolkit presentation.
+Applications supply their own workflows, domain file types, dependency policy and settings.
 
 Logistics and Blue Hole are existing consumers. Application features built on
 these components remain owned by their consuming projects.
@@ -78,6 +79,8 @@ choose which components to expose.
 - [Code editing and diff/merge review](ui/code_editor/user_docs/README.md)
 - [Archive contents and previews](ui/archive_view/user_docs/README.md)
 - [Shared text and INI editors](ui/user_docs/README.md)
+- [Native list/tile browsing](ui/native_browser/user_docs/README.md)
+- [Native component workflows](ui/native/user_docs/README.md)
 
 ## Contributing
 

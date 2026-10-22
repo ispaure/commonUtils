@@ -24,3 +24,11 @@ See the [compatibility audit and deployment blockers](mobile-foundation.md).
 
 [Mobile test guide](mobile-testing.md): manually run the embedded Android/iOS
 smoke harness, inspect evidence and distinguish host checks from mobile results.
+
+## Resource integration
+
+Use the [resource runtime map](../../runtime/resources/README.md) for storage
+contracts and virtual paths, and [Qt resource windows](../../ui/resources/README.md)
+for picker/editor operation ownership. Shared native browsing and speech lifetimes
+are covered in the [native browser](../../ui/native_browser/README.md) and
+[reader controls](../../ui/readers/README.md) guides.

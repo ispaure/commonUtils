@@ -2,7 +2,7 @@
 
 Providers let a host reuse browsing and document presentation without exposing a
 normal filesystem. The library owns no account, encryption, remote routing or
-credential policy. Structural types live in `runtime/resource_provider.py`;
+credential policy. Structural types live in `runtime/resources/provider.py`;
 implementers need not inherit them.
 
 ## Directory browsing
@@ -118,8 +118,8 @@ library contains no encryption, credential or remote-service knowledge.
 ## Module ownership and explicit capabilities
 
 Import contracts, `ResourceCapabilities` and path validation from
-`runtime.resource_provider`, `LocalFiles` from `runtime.local_files`, and complete
-mutations from `runtime.resource_mutations`. `WritableDirectoryProvider` describes
+`runtime.resources.provider`, `LocalFiles` from `runtime.resources.local`, and complete
+mutations from `runtime.resources.mutations`. `WritableDirectoryProvider` describes
 revision-bearing entries, streams and mutation hooks. A provider declares immutable
 `capabilities` (`create`, `rename`, `delete`, `replace`); an undeclared provider is
 read-only. The browser checks these declarations independently for each action.
@@ -166,7 +166,7 @@ state. Hosts retain their own archive readers, size limits and UI policy.
 ## Complete folder actions and raw-path boundaries
 
 UI callers use `create_resource_folder` and `rename_resource` from
-`runtime.resource_mutations`, alongside save/move/delete. These check capabilities
+`runtime.resources.mutations`, alongside save/move/delete. These check capabilities
 and cancellation before invoking backend primitives; controllers should not call
 `mkdir` or `rename` directly.
 
@@ -188,7 +188,7 @@ provider locks or closes. Unregister only when ownership actually ends.
 
 ## Shared Open / Save As selection
 
-`runtime.resource_selection.ResourceSelection(provider, mode, extensions)` is the
+`runtime.resources.selection.ResourceSelection(provider, mode, extensions)` is the
 widget-independent picker model. `list` filters/sorts directories and file types;
 `resolve(directory, name)` validates relative paths, open targets, parent folders,
 capabilities and destination collisions. `save` and `destination` are create-only;
@@ -196,7 +196,7 @@ mutation-time revalidation remains mandatory. Unavailable ordinary local entries
 are omitted only in picker listings, never in recursive mutation inventories.
 
 `ResourceChoice(provider, path, release)` transfers an owned provider lease;
-`close()` is idempotent. The Qt `ui.resource_picker.ResourcePicker` reuses
+`close()` is idempotent. The Qt `ui.resources.picker.ResourcePicker` reuses
 `ResourceBrowser` with a read-only selection model and host-supplied location
 factories. Closing waits for worker cancellation before releasing storage.
 `ResourceTaskDialog` and `resource_tasks_pending` let hosts veto shutdown while
@@ -205,7 +205,7 @@ resource jobs retire. Mobile hosts can render the same model with native widgets
 `ResourceTextSession` reads bounded text with revision checks, preserves encoding
 and line endings, and saves through verified resource transactions. Save returns
 a new baseline only after reopening unchanged; reopening failure after publication
-raises `MutationIncomplete`. `ui.resource_editor.ResourceTextWindow` is an optional
+raises `MutationIncomplete`. `ui.resources.editor.ResourceTextWindow` is an optional
 session-only plain editor; hosts supply Open/Save As selection and window routing.
 It creates no recovery or recent-file records. Hosts remain responsible for
 removing existing ordinary recovery drafts before a private handoff. Platform
@@ -220,7 +220,7 @@ conservative root-overlap rejection. This never bypasses local protected-root
 checks or permits moving an item into itself or its descendants.
 
 
-`runtime.resource_mutations.save_resource_and_reopen(provider, path, data,
+`runtime.resources.mutations.save_resource_and_reopen(provider, path, data,
 reopen=callback, expected_revision=None, cancelled=...)` combines verified
 publication with a host-owned reader preparation callback. Publication failures
 propagate without invoking the callback. After publication, the callback must
@@ -377,7 +377,7 @@ bare terms are Unicode-casefolded substrings joined with AND; double-quoted phra
 preserve adjacency/order with equivalent whitespace, underscore and hyphen separators.
 `runtime.browsing.query_entries` filters supplied labels with these rules and
 sorts natural names, numeric sizes or modified values in either direction while
-retaining containers first. `runtime.resource_search.search_resources` walks
+retaining containers first. `runtime.resources.search.search_resources` walks
 provider listings breadth-first, validates child scope and produces relative labels
 for nested matches. Desktop ResourceBrowser and NativeBrowser debounce searches
 for 400 ms after the last edit and run this scan on cancellable workers.
@@ -405,7 +405,7 @@ source ownership, failures and domain-specific file activation.
 
 ### Local streamed archive sources
 
-`runtime.archive_source.LocalArchiveSource(path, max_read=..., max_members=...)`
+`runtime.resources.archives.LocalArchiveSource(path, max_read=..., max_members=...)`
 implements a revision-checked, seekable local archive source without an overall
 file-size cap or extraction. `open_archive` yields a ZIP facade with bounded `read`
 for explicitly requested members; `open(member)` exposes a stream for host-owned

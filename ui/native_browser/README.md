@@ -49,3 +49,23 @@ images, with at most 24 pending visible-row requests. The inherited worker and
 encoded-cache limits still apply. Tiles retain at most 40 two-item rows and
 cancel thumbnail work when cards leave the window. Snapshot/query epochs reject
 late results. These limits bound widgets/images, not the complete row inventory.
+
+## Shared work and thumbnail lifetime
+
+`lifecycle.BrowserLifecycle` owns thumbnail epochs,
+cooperative cancellation, retained async tasks and encoded/decoded caches.
+`paginated.PaginatedRenderer` builds bounded widget pages; `RecycledBrowser`
+provides native recycled rows and bounded tiles. Rendering policy stays separate
+while both use the same worker and revision lifetime.
+
+Thumbnail cache keys are `(entry.identity, entry.revision)`. At most two loaders
+run concurrently. Encoded data is bounded to 64 entries and 8 MiB; recycled
+native decoded images are bounded to 64 entries. Invalidating a snapshot signals
+its cancellation event and advances the epoch, so late results cannot publish.
+Unavailable covers do not prevent selecting the resource.
+
+`stop()` invalidates work and clears caches immediately; `await close()` waits for
+retained tasks, including cooperative worker completion. Do not release storage
+leases merely because rows disappeared. For a memory trim,
+`work.prune(set())` clears both cache tiers without changing selection. They must also release their own displayed
+image references when appropriate. Stop/close remain the retirement path.

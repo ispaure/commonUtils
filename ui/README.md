@@ -129,3 +129,6 @@ continues to live at `ui/settings.ini`.
 - [Settings editor widgets](settings/README.md): Typed INI editors, layered overrides, settings sections and font previews. Parsing, persistence and host-owned paths remain in configuration.
 - [Shared UI appearance](appearance/README.md): Opt-in themes, live font styling and palette-aware painted icons.
 - [Optional native Toga components](native/README.md): Configurable destinations, native Back routing, chrome restoration and image gestures. Consumers supply workflows and package the Android bridges.
+- [Qt resource windows](resources/README.md): provider-backed browsing, Open/Save As,
+  text editing and retained operation ownership. Portable storage contracts live
+  in [runtime resources](../runtime/resources/README.md).

@@ -249,3 +249,18 @@ pause/resume it. Hosts pass both defaults and override paths; no feature discove
 or automatic migration runs here. Dirty editors retain their pending values and
 continue using snapshot conflict checks; notification is not permission to discard
 an unsaved buffer. Other writers may call notify explicitly or rely on detection.
+
+## One effective-value composition path
+
+`layered.effective_settings` delegates default parsing and personal overlay to
+`composition.parse_defaults` and `composition.overlay`. Registered legacy
+`config_section_map` readers use this same precedence path. Personal fields win
+using the receiving parser's key policy; interpolation stays disabled and UTF-8
+BOM defaults remain supported. Reads do not create or rewrite either file.
+
+Parser policy is explicit: canonical calls default to case-sensitive keys and
+normalization after parsing; legacy calls retain their requested key case,
+duplicate handling and optional bypass fallback. Sharing precedence does not make
+all readers strict typed-schema consumers. Host path registration, migrations and
+malformed-override preservation remain unchanged. Focused tests are in
+`tests/test_layered_settings.py`.

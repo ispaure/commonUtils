@@ -70,3 +70,19 @@ for callback ownership, cancellation and partial-failure results.
 `encode` and `modified` methods accept the host's draft; `accept` updates the
 baseline after publication while preserving encoding and newline behavior. It has
 no filesystem, account, archive or recovery policy.
+
+## Verified transfer phases
+
+`transfers.py` contains shared mechanics used by filesystem transfers, relocation
+and virtual resource moves. `try_rename` returns false only for an `EXDEV`
+cross-volume failure; other rename errors propagate. `verify_unchanged` compares a
+captured state with a fresh snapshot before destructive cleanup. The caller
+supplies the snapshot and exception policy.
+
+`cleanup_published` wraps source cleanup after a verified destination exists.
+Failure raises `MutationIncomplete` with `destination_published=True` and the
+known source state/removals, or `unknown` if source-state inspection also fails.
+It never describes a published destination as rolled back. Hosts refresh both
+locations and choose recovery rather than replaying the full transfer blindly.
+These helpers do not choose overwrite, link, encryption or directory-merge policy,
+and provide no cross-process lock or crash-recovery journal.

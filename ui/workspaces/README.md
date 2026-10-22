@@ -25,3 +25,10 @@ modules have been removed; update imports and mock patch targets to this package
 - `scoped_tabs`
 
 [Workspace contracts](../workspaces.md), [layout](../workspace_layout.md) and [scoped tabs](../scoped_tabs.md).
+
+## Drag and header owners
+
+`drops.DropCoordinator` resolves eligible workspaces, placement and preview, then
+revalidates eligibility before committing adoption. Both drag transports use this
+same boundary; `headers.DockTabHeader` owns single-tab header controls and painting.
+See [drop and retirement contracts](../workspaces.md#drop-resolution-and-pane-retirement).

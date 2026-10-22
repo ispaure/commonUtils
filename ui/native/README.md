@@ -178,7 +178,7 @@ resource release and theme updates. Unsupported backends install no native hooks
 ## System documents
 
 `documents.pick_document(app, title=...)` returns `(access, reference)` or None
-on cancellation. `runtime.document_access` supplies scoped iOS NSURL, Android
+on cancellation. `runtime.resources.documents` supplies scoped iOS NSURL, Android
 ContentResolver and local-path stream adapters. Access closes with the context;
 no persistent grants or bookmarks are retained. Import into host-owned storage
 while that context is open.
@@ -574,3 +574,11 @@ Only action groups in the same row constrain title width. `android_bar` returns
 (root, title, status), mounting controls returned by `native_control` and reserving
 symmetric title clearance. Hosts retain controls and own routes, privacy, status
 messages, fullscreen behavior, release and window/app assignment.
+
+## Desktop-native message boxes
+
+`ui.native` is a regular lazy package. Its `display_msg_box_ok` and
+`display_msg_box_ok_cancel` wrappers import `ui.native.dialogs` only when called.
+That module owns desktop platform dispatch; explicitly imported Toga adapters
+remain separate. No neighboring-file loader, synthetic module or standalone
+namespace alias is needed. See [UI backend selection](../README.md#backends-and-diagnostics).

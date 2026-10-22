@@ -131,3 +131,17 @@ Providers retain workers through cancellation and use RAM thumbnail caches. See
 [shared item presentation](../../ui/resource-providers.md#shared-item-presentation).
 Native mobile list/tile views consume the same snapshots, with shared query/sort
 projection, bounded recursive provider search and navigation history. Consumer adapters own local, crypt and remote I/O.
+
+## Resource import migration and retained lifetimes
+
+Use `runtime.resources` submodules and `ui.resources` adapters listed in the
+[API map](public-apis.md#resource-and-dialog-owners). There are no forwarding
+modules for the removed flat resource paths. Native message boxes use ordinary
+`ui.native.dialogs` package imports; do not load a neighboring `native.py` file
+or recreate a synthetic dialog module. Vendored imports retain their own namespace.
+
+Provider path validation, Qt resource operation retirement and native browser
+thumbnail/task retirement have separate owners. Retain provider leases until the
+corresponding close operation finishes. A stale callback must not publish after
+a provider/session generation changes. Transfer publication state remains explicit
+when source cleanup fails; an exception does not imply destination rollback.

@@ -25,3 +25,19 @@ elapsed time follows a monotonic deadline and freezes in paused/stopped states.
 consumers can clear mirrored panes. The next word emits its replacement range.
 Search and other untagged extra selections survive cleanup. See the
 [read-aloud workflow](../markdown/user_docs/README.md#read-aloud).
+
+## Portable playback and the Qt adapter
+
+`ReadAloud` delegates playback, pause/resume, speed, skipping, word ranges and
+retired-generation rejection to `runtime.speech.SpeechSession`; its listening
+budget uses `PlaybackTimer`. `qt_speech.QtScheduler` supplies GUI-owned single-shot
+timers and `QtSpeechEngine` translates QTextToSpeech state/word callbacks into
+portable session events. Completion schedules the next utterance after the native
+state callback returns, avoiding reentrant engine starts.
+
+The adapter checks the installed engine's word-progress and pause/resume
+capabilities. Utterances are bounded at 3,000 UTF-16 units with native word events
+or 350 without; the portable session supplies approximate progress where needed.
+Host selection/UTF-16 mapping, highlighting and voice preferences stay with
+`ReadAloud`. A Qt host still needs an installed usable speech engine; portable
+session tests do not establish voice availability on a device.

@@ -131,3 +131,26 @@ unchanged members, preserves comments/portable member attributes and returns
 expected content hashes. Hosts validate inputs, configure encryption, verify the
 finished output and publish it. Entry ordering and compression overrides are explicit
 names; this layer contains no EPUB/comic rules.
+
+## Member plans and streamed writes
+
+`rebuilding.member_plan(original, replacements, include=None, first=(), stored=())`
+yields `MemberOperation` records for retained/replaced members followed by new
+replacements. `include` filters existing members; replacements not retained by
+that filter are still appended. `first` ranks existing members and `stored`
+selects uncompressed output names. It is an operation iterator, not input/path
+validation or a publication transaction.
+
+`write_members` consumes that plan, streams unchanged files, checks cancellation
+between members/chunks and returns an expected name-to-length/SHA-256 manifest
+(with `None` for directories). `max_member_bytes` bounds streamed original members;
+callers must bound replacement bytes separately. `rewrite_members` combines the
+plan/write path and preserves the archive comment by default.
+
+`members.copy_member_info` copies portable timestamps, comments, platform and
+attribute fields into the output adapter's ZipInfo type; crypto flags/headers
+are not copied. `members.name_key` supplies normalized identity for callers'
+collision checks. Editing/access entry points retain their own validation,
+authentication, staging and finished-output verification. EPUB ordering and
+comic metadata rules remain consumer policy. Focused regressions live in
+`tests/test_archive_rebuilding.py` and archive operation tests.

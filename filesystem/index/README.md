@@ -146,11 +146,24 @@ Automatic age-based removal is not enabled. Use explicit clearing deliberately.
 
 ## Maintenance map
 
-`metadata` owns public records and nonpersistent snapshots; `reader` streams immutable
-SQL views; `store` and `scan` own scheduling/checkpoints; `reconcile` updates affected
-folders; `schema` migrates records; `totals` derives aggregates; `search`, `order` and
-`exclusions` centralize matching, stable ordering and scope policy. Public callers
-should not depend on database IDs or mutate the schema directly.
+`store.DirectoryCache` remains the public facade and schedules work; `scan`
+traverses folders. Internal phases have explicit owners:
+
+| Module | Responsibility |
+| --- | --- |
+| `writer.WriterSession` | Cancellable thread/process writer lease, legacy backup migration, WAL/schema setup and connection retirement |
+| `generations` | Bounded durable checkpoints and completed-generation publication/retirement |
+| `seeding` | Reuse of saved descendant branches with explicit exclusions |
+| `snapshots` | Snapshot assembly and retained read ownership |
+| `reader`, `metadata` | Immutable SQL views and public records |
+| `reconcile`, `schema`, `totals` | Affected-folder updates, migrations and aggregates |
+| `search`, `order`, `exclusions` | Matching, stable ordering and scope policy |
+
+Writer phases run under the same owned lease; snapshot readers retain their own
+consistent views and must close independently. Cancellation can leave resumable
+folder checkpoints; incomplete work is not published as a completed replacement.
+These internal splits do not change cache paths, schema or the public facade.
+Callers must not depend on database IDs or mutate the schema directly.
 
 ## Compact cache (schema 4)
 

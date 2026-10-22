@@ -160,9 +160,9 @@ See [runtime](../../runtime/README.md).
 - [UI settings](../../ui/settings/README.md): canonical modules under `ui.settings`.
 - [UI appearance](../../ui/appearance/README.md): canonical modules under `ui.appearance`, including shared desktop/native-WebView formatting vectors.
 
-Provider-backed file work uses `runtime.local_files.LocalFiles`, contracts and
-capabilities in `runtime.resource_provider`, and complete operations in
-`runtime.resource_mutations`. Use `persistence.publication.save_transaction` for
+Provider-backed file work uses `runtime.resources.local.LocalFiles`, contracts and
+capabilities in `runtime.resources.provider`, and complete operations in
+`runtime.resources.mutations`. Use `persistence.publication.save_transaction` for
 backend-specific staged saves and `persistence.text.TextSession` for in-memory
 text baselines. See the [provider API guide](../../ui/resource-providers.md).
 
@@ -208,7 +208,7 @@ gestures for a visible reader; see the [native component contract](../../ui/nati
 | Cooperative dispatch context repair | `event_loop.bind_cooperative_loop(loop)`; no loop creation |
 | Disposable pressure/configuration notifications | `memory.MemoryPressure`; host callbacks choose effects |
 | System document selection / stream export | `documents.pick_document`, `export_stream`, `cancel_document_picker` |
-| Scoped native document byte access | `runtime.document_access`; no retained permission/bookmark |
+| Scoped native document byte access | `runtime.resources.documents`; no retained permission/bookmark |
 | Native action menus | `menus.NativeMenu`; host supplies guarded invocation/context/fallback |
 | Optional native row/tint/layout mechanics | `presentation` |
 | Literal Find/Replace | `editor_search.EditorSearch(editor, container)`; host notifies text changes |
@@ -275,3 +275,14 @@ Native Markdown hosts can use
 revision-checked provider image reads, including animated GIFs. Feed its callback
 to `markdown_preview` or a formatted editor using `embedded_image`. See the
 [native image contract](../../ui/native/README.md#host-supplied-markdown-images).
+
+## Resource and dialog owners
+
+- [Resource runtime](../../runtime/resources/README.md): canonical provider,
+  selection, mutation, archive, document and path-validation modules.
+- [Qt resource windows](../../ui/resources/README.md): browser, picker, editor
+  and cooperative operation ownership.
+- `ui.native` remains an optional lazy package. Its `display_msg_box_ok` and
+  `display_msg_box_ok_cancel` wrappers load `ui.native.dialogs` on invocation;
+  `dialogs.py` owns desktop-native message boxes. Explicit Toga components remain
+  in their own modules. Importing the package loads neither Qt nor Toga.

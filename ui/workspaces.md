@@ -125,3 +125,21 @@ Collapsed native dock headers explicitly hide their close/new controls as well a
 reducing header height to zero. Grouped tab bars hide their New Tab button when
 suppressed or retired. The active toolbar/tab strip retains the legitimate New Tab
 action; hidden title-bar children must not leave stray controls during transitions.
+
+## Drop resolution and pane retirement
+
+`workspaces.drops.DropCoordinator` supplies the common resolve/preview/commit
+path for tab and floating-window drags. Eligibility checks live Qt objects,
+closing state, visible destinations, matching `dock_group`, destination tab limits
+and the source's `can_move_tab` policy. Commit checks again, since a preview does
+not reserve the destination. Cancelling a revealed destination restores its prior
+presentation through the host-supplied callback.
+
+`workspaces.headers.DockTabHeader` owns the single-tab header presentation.
+Dock adoption/retirement remains with the workspace, including hidden views whose
+workers are still busy. Scoped editor tabs reuse the header-button helper and
+horizontal drop geometry while retaining their own bounded target resolution
+and application close/transfer policy. A failed or cancelled drag must
+retain the source pane, its document state and worker owners. Focused tests cover
+compatibility, tab limits, cancellation, header ownership and close retirement;
+native floating-window/menu behavior additionally requires a real Qt host.

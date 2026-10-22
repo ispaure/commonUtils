@@ -42,12 +42,12 @@ print(get_arch())
 
 ## Virtual resource streams
 
-`resource_provider` defines structural directory and archive source contracts;
-`range_reader.RangeReader` supplies bounded seekable reads without disk caching.
+`resources.provider` defines structural directory and archive source contracts;
+`resources.range_reader.RangeReader` supplies bounded seekable reads without disk caching.
 See [resource provider contracts](../ui/resource-providers.md) for revisions,
 cancellation, staging verification and ownership.
 
-`local_files.LocalFiles` implements rooted storage, while `resource_mutations`
+`resources.local.LocalFiles` implements rooted storage, while `resources.mutations`
 owns complete verified save/move/delete operations. Providers declare
 `ResourceCapabilities`; mutation results live in `operations`. Atomic publication
 and the shared save transaction belong to `persistence.publication`.
@@ -59,7 +59,7 @@ toolkit; see the [browsing contract](../ui/resource-providers.md#shared-item-pre
 
 `browsing.BrowseHistory` owns bounded opaque navigation locations; `query_entries`
 filters and naturally sorts loaded snapshots without storage access.
-`archive_source.LocalArchiveSource` provides revision-checked local ZIP streaming
+`resources.archives.LocalArchiveSource` provides revision-checked local ZIP streaming
 and bounded member reads without an overall archive-size limit. Formats and hosts
 choose buffer/header limits and retain domain validation.
 
@@ -89,8 +89,9 @@ callbacks. An optional engine loop schedules approximate word progress.
 time. Pause preserves the remaining budget; Play after expiry starts a fresh
 budget. `dispose()` cancels outstanding timer handles. The host owns source text,
 selection, saved voice preferences, privacy gating and when to dispose a session.
-Desktop Qt read-aloud retains its existing chunking adapter; sharing the portable
-module does not merge native and desktop widget behavior.
+Qt read-aloud also uses `SpeechSession` and `PlaybackTimer`;
+`ui.readers.qt_speech` adapts Qt scheduling and engine callbacks. Each platform
+retains its own widgets, voice selection and installed-engine availability.
 
 ## Coalesced async signals
 
@@ -99,3 +100,6 @@ module does not merge native and desktop widget behavior.
 `notify()` on the owning loop thread. A burst becomes one wakeup per subscriber;
 notifications arriving before a wait are preserved. `initial=False` waits for the
 first notification. Cancel in-flight waits and release the closure on retirement.
+
+The [resource module map](resources/README.md) lists canonical imports and
+identifier validation. Former flat resource modules have been removed.

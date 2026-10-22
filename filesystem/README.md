@@ -65,3 +65,12 @@ File snapshots compare pathname and descriptor identity/size/mtime across APIs,
 then compare each full revision before/after reading. Windows can report creation
 time through pathname `stat` and change time through `fstat`; their ctime fields
 are not compared to one another. Both still participate in their own stability checks.
+
+## Transfer implementation boundary
+
+`transfers` and `relocation` share rename fallback, source revalidation and
+post-publication cleanup mechanics from
+[persistence transfers](../persistence/README.md#verified-transfer-phases).
+Their plans and link/collision policies remain distinct; virtual provider moves
+also retain their own capability and encoding checks. Read `MutationIncomplete`
+publication/source state before deciding whether a retry is safe.
