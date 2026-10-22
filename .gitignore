@@ -1,1 +1,5 @@
 *.pyc
+
+# Local test evidence and its former documentation location.
+/test-results/
+/docs/developer/mobile-evidence/

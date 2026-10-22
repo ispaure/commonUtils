@@ -89,6 +89,10 @@ successfully started Python; no commonUtils smoke cases ran in that attempt.
 
 ## Local validation and evidence status
 
+Raw reports are retained locally under ignored `test-results/mobile-evidence/`.
+They are not included in the repository or consumer release packages. Keep
+reusable test drivers and fixtures tracked in their existing test owners.
+
 From the Logistics checkout:
 
 ```sh
@@ -108,14 +112,14 @@ errors or skips, and passed the runtime evidence verifier:
 
 | Runtime | Recorded environment | Result record |
 | --- | --- | --- |
-| Android | x86_64 Android emulator; pinned API 35 testbed | [Android JSON](mobile-evidence/2026-10-12-android-rerun.json) |
-| iOS | arm64 iPhone 16e simulator, iOS 26.2; Xcode 16.4 (16F6) | [iOS JSON](mobile-evidence/2026-10-12-ios-rerun.json) |
+| Android | x86_64 Android emulator; pinned API 35 testbed | Android JSON (local artifact `test-results/mobile-evidence/2026-10-12-android-rerun.json`) |
+| iOS | arm64 iPhone 16e simulator, iOS 26.2; Xcode 16.4 (16F6) | iOS JSON (local artifact `test-results/mobile-evidence/2026-10-12-ios-rerun.json`) |
 
 These small records preserve the result payloads retrieved from completed job
 logs, with their source commit and job/run IDs. Full diagnostic artifacts remain
 subject to the 14-day retention period. The original revision `1b3d7cd` passed
-[Android](mobile-evidence/2026-10-12-android.json), while its
-[first iOS attempt](mobile-evidence/2026-10-12-ios-initial.json) failed before
+Android (local artifact `test-results/mobile-evidence/2026-10-12-android.json`), while its
+first iOS attempt (local artifact `test-results/mobile-evidence/2026-10-12-ios-initial.json`) failed before
 smoke execution because of the packaging mismatch described above. Both targets
 were rerun after the fix. No physical-device result is claimed. The local Xcode
 installation had no available simulators; these are GitHub-hosted results.
