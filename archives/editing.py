@@ -4,8 +4,9 @@ from tempfile import TemporaryDirectory
 import os
 
 from ..runtime.operations import check_cancelled
-from ..runtime.streams import copy_stream
-from .zip_access import authenticate, copy_member_info, _name_key, open_archive, archive_manifest, create_archive
+from .members import name_key
+from .rebuilding import rewrite_members
+from .zip_access import authenticate, open_archive, archive_manifest, create_archive
 
 
 def update_zip(path, *, sources=(), remove=(), password=None,
@@ -33,8 +34,8 @@ def update_zip(path, *, sources=(), remove=(), password=None,
             additions = archive_manifest(extra, cancelled=cancelled)
         else:
             additions = {}
-        names = {_name_key(name) for name in retained}
-        if any(_name_key(name) in names for name in additions):
+        names = {name_key(name) for name in retained}
+        if any(name_key(name) in names for name in additions):
             raise ValueError('An added entry already exists. Remove it first or choose a different source name.')
         expected = retained | additions
         staged = Path(temp) / 'result.zip'
@@ -43,19 +44,9 @@ def update_zip(path, *, sources=(), remove=(), password=None,
                 if not included:
                     continue
                 with open_archive(source_path, password=secret) as incoming:
-                    if source_path == path:
-                        output.comment = incoming.comment
-                    for item in incoming.infolist():
-                        if item.filename not in included:
-                            continue
-                        check_cancelled(cancelled)
-                        progress(0, 0, f'Rebuilding {item.filename}')
-                        info = copy_member_info(item, output)
-                        if item.is_dir():
-                            output.writestr(info, b'')
-                        else:
-                            with incoming.open(item) as source, output.open(info, 'w', force_zip64=True) as target:
-                                copy_stream(source, target, cancelled=cancelled)
+                    rewrite_members(incoming, output, {}, include=included,
+                                    preserve_comment=source_path == path,
+                                    cancelled=cancelled, progress=progress)
         if archive_manifest(staged, password=password, progress=progress, cancelled=cancelled) != expected:
             raise ValueError('Archive verification failed; original archive was kept')
         if path.is_symlink() or identity(path.stat()) != identity(before):

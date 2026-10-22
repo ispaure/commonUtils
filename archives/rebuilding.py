@@ -3,7 +3,8 @@ from hashlib import sha256
 import zipfile
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import iter_chunks, stream_signature
-from .zip_access import copy_member_info
+from dataclasses import dataclass
+from .members import copy_member_info
 
 
 def content_manifest(archive, *, cancelled=lambda: False, progress=None):
@@ -36,43 +37,72 @@ def patched_manifest(archive, replacements, *, cancelled=lambda: False):
     return result
 
 
-def rewrite_members(original, output, replacements, *, first=(), stored=(),
-                    max_member_bytes=None, cancelled=lambda: False):
-    """Copy unchanged members, replace/add named bytes, and return expected hashes.
+@dataclass(frozen=True)
+class MemberOperation:
+    name: str
+    info: object = None
+    data: bytes | None = None
+    stored: bool = False
 
-    Hosts own input validation, encryption, format rules, final verification and
-    publication. `first` orders named entries before others; `stored` selects
-    uncompressed entries. Both are explicit names without format-specific meaning.
-    """
-    output.comment = original.comment
-    expected = {}
+
+def member_plan(original, replacements, *, include=None, first=(), stored=()):
+    """Capture ordered retain/replace/add operations; excluded members are removed."""
     ranks = {name: index for index, name in enumerate(first)}
     members = sorted(original.infolist(), key=lambda info: ranks.get(info.filename, len(ranks)))
+    planned = set()
     for info in members:
+        name = info.filename
+        if include is not None and name not in include:
+            continue
+        planned.add(name)
+        yield MemberOperation(name, info, replacements.get(name), name in stored)
+    for name, data in replacements.items():
+        if name not in planned:
+            yield MemberOperation(name, data=data, stored=name in stored)
+
+
+def write_members(original, output, plan, *, max_member_bytes=None,
+                  cancelled=lambda: False, progress=None):
+    """Stream one operation plan; encryption and publication belong to the caller."""
+    expected = {}
+    for operation in plan:
         check_cancelled(cancelled)
-        target = copy_member_info(info, output)
-        if info.filename in stored:
+        name, info, data = operation.name, operation.info, operation.data
+        if progress:
+            progress(0, 0, f'Rebuilding {name}')
+        target = copy_member_info(info, output) if info is not None else name
+        if info is not None and operation.stored:
             target.compress_type = zipfile.ZIP_STORED
-        if info.filename in replacements:
-            data = replacements[info.filename]
-            output.writestr(target, data)
-            expected[info.filename] = len(data), sha256(data).hexdigest()
+        if data is not None:
+            if info is None:
+                output.writestr(target, data, compress_type=zipfile.ZIP_STORED if operation.stored else zipfile.ZIP_DEFLATED)
+            else:
+                output.writestr(target, data)
+            expected[name] = len(data), sha256(data).hexdigest()
         elif info.is_dir():
             output.writestr(target, b'')
-            expected[info.filename] = None
+            expected[name] = None
         else:
             if max_member_bytes is not None and info.file_size > max_member_bytes:
                 raise ValueError('Archive member exceeds the processing limit.')
             digest, length = sha256(), 0
-            with original.open(info) as incoming, output.open(target, 'w') as outgoing:
+            with original.open(info) as incoming, output.open(target, 'w', force_zip64=True) as outgoing:
                 for chunk in iter_chunks(incoming, cancelled=cancelled):
+                    length += len(chunk)
+                    if max_member_bytes is not None and length > max_member_bytes:
+                        raise ValueError('Archive member exceeds the processing limit.')
                     outgoing.write(chunk)
                     digest.update(chunk)
-                    length += len(chunk)
-            expected[info.filename] = length, digest.hexdigest()
-    for name, data in replacements.items():
-        if name not in expected:
-            check_cancelled(cancelled)
-            output.writestr(name, data, compress_type=zipfile.ZIP_STORED if name in stored else zipfile.ZIP_DEFLATED)
-            expected[name] = len(data), sha256(data).hexdigest()
+            expected[name] = length, digest.hexdigest()
     return expected
+
+
+def rewrite_members(original, output, replacements, *, first=(), stored=(),
+                    max_member_bytes=None, cancelled=lambda: False,
+                    include=None, preserve_comment=True, progress=None):
+    """Plan and stream replacements/additions with optional retained-member selection."""
+    if preserve_comment:
+        output.comment = original.comment
+    return write_members(original, output,
+                         member_plan(original, replacements, include=include, first=first, stored=stored),
+                         max_member_bytes=max_member_bytes, cancelled=cancelled, progress=progress)

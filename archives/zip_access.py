@@ -9,11 +9,11 @@ from contextlib import contextmanager
 import os
 from pathlib import Path, PurePosixPath
 import stat
-import unicodedata
 from tempfile import NamedTemporaryFile
 import zipfile
 import zlib
 
+from .members import copy_member_info, name_key
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
 
@@ -82,10 +82,6 @@ def open_archive(path, mode='r', *, password=None, compression=zipfile.ZIP_DEFLA
         raise
 
 
-def _name_key(name):
-    return unicodedata.normalize('NFC', PurePosixPath(name).as_posix()).casefold()
-
-
 def validate_members(archive):
     """Validate all names before extraction, for encrypted and plain ZIPs alike."""
     seen = set()
@@ -100,7 +96,7 @@ def validate_members(archive):
             raise ValueError(f'Archive contains a symbolic link: {member.filename}')
         if member.is_dir() and member.file_size:
             raise ValueError(f'Archive directory contains file data: {member.filename}')
-        key = _name_key(name)
+        key = name_key(name)
         if key in seen:
             raise ValueError(f'Duplicate archive member: {member.filename}')
         seen.add(key)
@@ -140,22 +136,6 @@ def archive_manifest(path, *, password=None, cancelled=lambda: False, progress=N
         validate_members(archive)
         from .rebuilding import content_manifest
         return content_manifest(archive, cancelled=cancelled, progress=progress)
-
-
-def copy_member_info(member, target):
-    """ZipInfo types differ between stdlib and pyzipper; copy portable attributes."""
-    if isinstance(target, zipfile.ZipFile):
-        cls = zipfile.ZipInfo
-    else:
-        import pyzipper
-        cls = pyzipper.zipfile_aes.AESZipInfo if isinstance(target, pyzipper.AESZipFile) else zipfile.ZipInfo
-    result = cls(member.filename, member.date_time)
-    for name in ('comment', 'create_system', 'external_attr', 'internal_attr', 'compress_type'):
-        setattr(result, name, getattr(member, name))
-    # AES reports method 99 in stdlib headers; never copy crypto headers/flags.
-    if result.compress_type == 99:
-        result.compress_type = zipfile.ZIP_DEFLATED
-    return result
 
 
 def extract_archive(path, destination, *, password=None, progress=None):
@@ -283,7 +263,7 @@ def create_archive(sources, destination, *, password=None,
         progress(done, 3 * total_bytes, message)
     for path, name in entries:
         check_cancelled(cancelled)
-        key = _name_key(name)
+        key = name_key(name)
         if key in names:
             raise ValueError(f'Selected sources have colliding archive names: {name}')
         names.add(key)

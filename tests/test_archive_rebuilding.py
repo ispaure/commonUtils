@@ -36,3 +36,28 @@ class ArchiveRebuildingTests(unittest.TestCase):
         with ZipFile(self.source()) as original, ZipFile(BytesIO(), 'w') as output:
             with self.assertRaises(OperationCancelled): rewrite_members(original, output, {}, cancelled=lambda: True)
             with self.assertRaises(ValueError): rewrite_members(original, output, {}, max_member_bytes=1)
+
+    def test_filtered_rewrite_uses_the_same_plan_and_preserves_member_metadata(self):
+        from zipfile import ZipInfo
+        from commonUtils.archives.rebuilding import member_plan
+        source, target = BytesIO(), BytesIO()
+        with ZipFile(source, 'w') as original:
+            info = ZipInfo('é😀.txt', (2020, 1, 2, 3, 4, 6))
+            info.comment, info.external_attr = b'entry comment', 0o100755 << 16
+            original.writestr(info, b'before')
+            original.writestr('removed', b'not copied')
+        source.seek(0)
+        with ZipFile(source) as original, ZipFile(target, 'w') as output:
+            output.comment = b'caller-owned'
+            plan = tuple(member_plan(original, {'é😀.txt': b'after', 'added': b'new'}, include={'é😀.txt'}))
+            self.assertEqual([item.name for item in plan], ['é😀.txt', 'added'])
+            expected = rewrite_members(original, output, {'é😀.txt': b'after', 'added': b'new'},
+                                       include={'é😀.txt'}, preserve_comment=False)
+        target.seek(0)
+        with ZipFile(target) as result:
+            self.assertEqual(content_manifest(result), expected)
+            self.assertEqual(result.comment, b'caller-owned')
+            info = result.getinfo('é😀.txt')
+            self.assertEqual(info.comment, b'entry comment')
+            self.assertEqual(info.external_attr, 0o100755 << 16)
+            self.assertEqual(info.date_time, (2020, 1, 2, 3, 4, 6))
