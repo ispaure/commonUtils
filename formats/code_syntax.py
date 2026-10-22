@@ -1,5 +1,54 @@
 """Toolkit-independent language choices shared by desktop and native editors."""
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=2)
+def syntax_style(dark=False):
+    """Shared restrained syntax accents; unstyled tokens inherit host colors.
+
+    Pygments remains optional until highlighting is requested. No foreground or
+    background is supplied for ordinary text, module paths or function names.
+    """
+    from pygments.style import Style
+    from pygments.token import Token, Text, Whitespace, Error, Comment, Keyword
+    from pygments.token import Name, String, Number, Operator, Generic
+
+    keyword = '#c78962' if dark else '#2449c4'
+    string = '#70a875' if dark else '#237c32'
+    number = '#739bc4' if dark else '#235fc1'
+    builtin = '#ac91c7' if dark else '#6042a6'
+    comment = '#858990' if dark else '#777c84'
+
+    class EditorStyle(Style):
+        background_color = None
+        styles = {
+            Token: '', Text: '', Whitespace: '', Error: '',
+            Comment: 'italic ' + comment,
+            Comment.Preproc: 'noitalic ' + keyword,
+            Keyword: keyword,
+            Operator.Word: keyword,
+            String: string,
+            Number: number,
+            Name: '',
+            Name.Builtin: builtin,
+            Name.Exception: builtin,
+            Name.Builtin.Pseudo: 'noinherit',
+            Name.Function: '', Name.Class: '', Name.Namespace: '',
+            Name.Decorator: '#b6a16b' if dark else '#88651c',
+            Name.Tag: keyword,
+            Name.Attribute: builtin,
+            Generic.Heading: keyword,
+            Generic.Subheading: keyword,
+            Generic.Emph: 'italic',
+            Generic.Strong: 'bold',
+            Generic.Deleted: '#cf7777' if dark else '#af3434',
+            Generic.Inserted: string,
+        }
+
+    return EditorStyle
+
+
 LANGUAGES = (
     ("Plain Text", "text"),
     ("Python", "python"),

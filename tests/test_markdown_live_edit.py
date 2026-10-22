@@ -15,6 +15,21 @@ class LiveMarkdownTests(QtTestCase):
         self.editor = FormattedMarkdownEdit()
         self.addCleanup(self.editor.deleteLater)
 
+    def test_loading_markdown_starts_cursor_and_view_at_beginning(self):
+        self.editor.resize(500, 200)
+        self.editor.show()
+        for source in ('\n\n'.join(f'Paragraph {i}' for i in range(80)),
+                       '# Heading\n\n**Bold** and `code`\n\nLast paragraph'):
+            with self.subTest(source=source[:30]):
+                self.editor.setMarkdown(source)
+                self.app.processEvents()
+                self.assertEqual(self.editor.textCursor().position(), 0)
+                self.assertFalse(self.editor.textCursor().hasSelection())
+                self.assertEqual(self.editor.verticalScrollBar().value(), 0)
+                self.assertFalse(self.editor.document().isModified())
+                self.assertFalse(self.editor.document().isUndoAvailable())
+                self.editor.moveCursor(qt.QTextCursor.MoveOperation.End)
+
     def test_inactive_emphasis_markers_have_zero_advance_without_mutating_text(self):
         self.editor.setMarkdown('Before **bold** after\n\nElsewhere')
         source = self.editor.toPlainText()

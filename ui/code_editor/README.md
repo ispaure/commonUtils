@@ -28,6 +28,15 @@ lexer. RegexLexer states propagate between blocks; other lexer families use a
 bounded per-block fallback. Long blocks and large documents skip highlighting.
 See the included Pygments BSD license and the implementation notes in the module.
 
+`commonUtils.formats.code_syntax.syntax_style(dark=False)` supplies the shared
+Pygments style for Qt highlighting, native `formats.code_spans.syntax_spans`, and
+Markdown reading code blocks. It loads Pygments only on demand. Accents use muted
+orange keywords in dark mode and blue keywords in light mode, green strings,
+blue numbers, purple built-ins and italic gray comments. Ordinary identifiers,
+module paths, function names, operators and punctuation inherit host text colors;
+the style does not apply a document foreground or background. Qt chooses the
+variant from the editor's Base palette and refreshes after palette changes.
+
 `commonUtils.persistence.text` supplies Qt-independent BOM/encoding handling, text/binary
 sniffing, normalized text snapshots and atomic conflict-checked byte writes. Use
 explicit codecs for ambiguous legacy encodings and retain snapshots until save.

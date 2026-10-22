@@ -76,6 +76,11 @@ class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
         style_document(self.document(), self.palette())
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
+        # Direct document imports and syntax materialization move the widget's
+        # cursor to the end. Start newly loaded content like QTextEdit.setText.
+        self.moveCursor(qt.QTextCursor.MoveOperation.Start)
+        self.verticalScrollBar().setValue(0)
+        self.horizontalScrollBar().setValue(0)
         self._highlighter.setDocument(self.document())
         self._highlighter.refresh_cursor()
 

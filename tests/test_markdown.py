@@ -592,6 +592,21 @@ class MarkdownTests(QtTestCase):
         self.assertTrue(viewer.save_document())
         self.assertIn('Explicitly edited', self.second.read_text())
 
+    def test_links_preserve_read_and_edit_modes_in_editable_viewer(self):
+        viewer = self.viewer
+        for editing, mode in ((False, 'formatted'), (True, 'formatted'),
+                              (True, 'source'), (False, 'source')):
+            with self.subTest(editing=editing, mode=mode):
+                viewer.open_document(self.first)
+                viewer.set_edit_mode(mode)
+                viewer.set_editing(editing)
+                viewer.follow_link(qt.QUrl('second%20page.MD#details'))
+                self.assertEqual(viewer.current_path, self.second.resolve())
+                self.assertEqual(viewer.edit_button.isChecked(), editing)
+                self.assertEqual(viewer.edit_mode.currentData(), mode)
+                self.assertIs(viewer.pages.currentWidget(),
+                              viewer.active_editor() if editing else viewer.browser)
+
     def test_window_lifetime_and_browser_markdown_activation(self):
         self.assertIsInstance(file_from_path(self.second), MarkdownFile)
         self.assertIsInstance(file_from_path('missing.markdown'), MarkdownFile)

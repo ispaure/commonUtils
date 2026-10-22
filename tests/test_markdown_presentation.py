@@ -116,6 +116,34 @@ class MarkdownPresentationTests(QtTestCase):
         self.assertIn('Keep this literal', viewer.browser.toPlainText())
         self.assertEqual(viewer.markdown_text(), source)
 
+    def test_python_fences_share_editor_accents_and_leave_names_neutral(self):
+        from commonUtils.formats.code_syntax import syntax_style
+        from commonUtils.ui.markdown.presentation import highlight_code
+        from pygments.token import Keyword, String
+
+        source = '```python\nfrom package.module import helper\ndef hello():\n    return "😀 text"\n```'
+        for dark in (False, True):
+            document = qt.QTextDocument()
+            document.setMarkdown(source)
+            palette = qt.QPalette()
+            palette.setColor(qt.QPalette.ColorRole.Base, qt.QColor('#292d33' if dark else '#faf9f6'))
+            original = document.toPlainText()
+            highlight_code(document, palette)
+            self.assertEqual(document.toPlainText(), original)
+
+            def char_format(word):
+                start = original.index(word)
+                cursor = qt.QTextCursor(document)
+                cursor.setPosition(start)
+                cursor.setPosition(start + 1, qt.QTextCursor.MoveMode.KeepAnchor)
+                return cursor.charFormat()
+
+            for word, token in [('from', Keyword), ('return', Keyword), ('"', String)]:
+                expected = '#' + syntax_style(dark).style_for_token(token)['color']
+                self.assertEqual(char_format(word).foreground().color().name(), expected)
+            for word in ('package.module', 'helper', 'hello'):
+                self.assertFalse(char_format(word).hasProperty(qt.QTextFormat.Property.ForegroundBrush))
+
     def test_missing_mermaid_renderer_keeps_code_and_explains_optional_install(self):
         source = '```mermaid\ngraph TD\nA-->B\n```\n'
         viewer = self.viewer(source)

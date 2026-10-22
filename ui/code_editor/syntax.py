@@ -10,7 +10,7 @@ PYGMENTS_LICENSE.txt). Its compiled-rule adapter is tested with pinned 2.19.2.
 
 from .. import pyside as qt
 
-from ...formats.code_syntax import LANGUAGES, COMMENT_PREFIX, detect_language
+from ...formats.code_syntax import LANGUAGES, COMMENT_PREFIX, detect_language, syntax_style
 
 
 def regex_tokens(lexer, text, stack):
@@ -146,13 +146,11 @@ class SyntaxHighlighter(qt.QSyntaxHighlighter):
 
     def refresh_theme(self):
         try:
-            from pygments.styles import get_style_by_name
-
             dark = (
                 self.editor.palette().color(qt.QPalette.ColorRole.Base).lightness()
                 < 128
             )
-            style = get_style_by_name("native" if dark else "default")
+            style = syntax_style(dark)
             if style is self.style:
                 return
             self.style = style

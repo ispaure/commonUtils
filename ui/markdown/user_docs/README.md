@@ -12,7 +12,8 @@ Ordinary file-browser activation opens preview. Hold Alt/Option while opening to
 start editing, or use a host action explicitly labeled as an editor.
 
 Use Contents to jump to headings and Back/Forward to return to earlier documents
-and scroll positions. Relative links resolve beside the current document. Wiki links
+and scroll positions. Following a Markdown link keeps the current Read/Edit mode
+and Formatted/Source choice. Relative links resolve beside the current document. Wiki links
 such as `[[Notes|My notes]]` target local documents; extensionless targets gain `.md`.
 A similarly named document elsewhere in a vault is not automatically discovered.
 Web/mail links open in the operating system's default application. Local non-Markdown
@@ -32,6 +33,8 @@ blank lines. A language such as `vbnet` appears as a small label above the code.
 Recognized languages receive syntax colors when Pygments is available; unknown
 languages remain readable plain code. Both triple-backtick and longer fences work.
 Language labels are presentation only and are not added to copied code or source.
+Code blocks share the code editor's light/dark syntax accents; module paths and
+function names keep the existing plain code color.
 
 ## Choose an editing mode
 
@@ -40,6 +43,7 @@ the current rendered document, including unsaved edits, and **Edit** returns to 
 editor. Standalone windows can also enable editing when opened with Alt held.
 
 **Formatted** mode lets you edit rendered headings, emphasis, lists, links and tables.
+Newly loaded formatted content starts with the caret and view at the beginning.
 Supported Markdown markers become visible when the caret touches or is inside an
 element, or a selection overlaps it. Hovering leaves the markers hidden. Click a
 link label to navigate, including while editing; click its revealed syntax to edit

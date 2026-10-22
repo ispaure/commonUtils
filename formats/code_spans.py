@@ -1,5 +1,5 @@
 """Bounded Pygments colour spans and UTF-16 line positions for native editors."""
-from .code_syntax import detect_language
+from .code_syntax import detect_language, syntax_style
 
 MAX_HIGHLIGHT_CHARS = 128 * 1024
 MAX_SPANS = 20000
@@ -25,7 +25,6 @@ def syntax_spans(text, filename='', *, language=None, dark=False):
     if language == 'text' or len(text) > MAX_HIGHLIGHT_CHARS:
         return language, []
     from pygments.lexers import get_lexer_by_name
-    from pygments.styles import get_style_by_name
     try:
         if language == 'blade':
             from .code_blade import BladeLexer
@@ -34,7 +33,7 @@ def syntax_spans(text, filename='', *, language=None, dark=False):
             lexer = get_lexer_by_name(language, stripnl=False, ensurenl=False)
     except ValueError:
         return 'text', []
-    style = get_style_by_name('native' if dark else 'default')
+    style = syntax_style(dark)
     positions = [0]
     for char in text:
         positions.append(positions[-1] + (2 if ord(char) > 0xffff else 1))

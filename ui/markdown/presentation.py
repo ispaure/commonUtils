@@ -227,18 +227,12 @@ def highlight_code(document, palette):
     """Optional language-aware reading colors; source characters stay untouched."""
     try:
         from pygments.lexers import get_lexer_by_name
-        from pygments.token import Comment, Keyword, Literal, Name
         from pygments.util import ClassNotFound
+        from ...formats.code_syntax import syntax_style
     except ImportError:
         return
     dark = palette.color(qt.QPalette.ColorRole.Base).lightness() < 128
-    colors = {
-        Comment: palette.color(qt.QPalette.ColorRole.PlaceholderText),
-        Keyword: qt.QColor('#c792ea' if dark else '#7c3cad'),
-        Literal.String: qt.QColor('#a5d6a7' if dark else '#247443'),
-        Literal.Number: qt.QColor('#f0b56c' if dark else '#955522'),
-        Name.Function: qt.QColor('#82b1ff' if dark else '#245da6'),
-    }
+    style = syntax_style(dark)
     block = document.begin()
     while block.isValid():
         fmt = block.blockFormat()
@@ -264,14 +258,17 @@ def highlight_code(document, palette):
                 for char in code:
                     offsets.append(offsets[-1] + (2 if ord(char) > 0xffff else 1))
                 for offset, kind, value in lexer.get_tokens_unprocessed(code):
-                    color = next((color for category, color in colors.items() if kind in category), None)
-                    if color is None or not value:
+                    spec = style.style_for_token(kind)
+                    if not spec['color'] or not value:
                         continue
                     cursor = qt.QTextCursor(document)
                     cursor.setPosition(start + offsets[offset])
                     cursor.setPosition(start + offsets[offset + len(value)], qt.QTextCursor.MoveMode.KeepAnchor)
                     chars = qt.QTextCharFormat()
-                    chars.setForeground(color)
+                    chars.setForeground(qt.QColor('#' + spec['color']))
+                    chars.setFontItalic(spec['italic'])
+                    if spec['bold']:
+                        chars.setFontWeight(qt.QFont.Weight.Bold)
                     cursor.mergeCharFormat(chars)
         block = block.next()
 

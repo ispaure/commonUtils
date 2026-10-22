@@ -26,6 +26,10 @@ regions without deleting their content. Large/complex inputs have bounded analys
 
 Syntax highlighting is optional. Without a lexer, or for very large documents or
 long lines, text can remain uncolored while still editable. Coloring is not validation.
+Dark mode uses muted orange keywords; light mode uses blue keywords. Strings are
+green, numbers blue, built-ins purple and comments italic gray. Module paths and
+function names retain ordinary text colors. Syntax colors follow the host's
+light/dark appearance without replacing its plain text or background colors.
 
 ## Find and replace
 
