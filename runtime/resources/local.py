@@ -63,7 +63,10 @@ class LocalFiles:
         info = target.stat()
         directory = target.is_dir()
         revision = (info.st_dev, info.st_ino) if directory else (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
-        return dict(name=Path(path).name, path=path, directory=directory, size=info.st_size,
+        hidden = (Path(path).name.startswith('.')
+                  or bool(getattr(info, 'st_file_attributes', 0) & getattr(stat_module, 'FILE_ATTRIBUTE_HIDDEN', 0))
+                  or bool(getattr(info, 'st_flags', 0) & getattr(stat_module, 'UF_HIDDEN', 0)))
+        return dict(name=Path(path).name, path=path, directory=directory, size=info.st_size, hidden=hidden,
                     modified=datetime.fromtimestamp(info.st_mtime).astimezone().isoformat(sep=' ', timespec='seconds'), revision=revision)
 
     def list(self, path='', *, cancelled=lambda: False):

@@ -2,12 +2,34 @@
 
 from collections import OrderedDict
 from pathlib import Path
+import stat
+import sys
 from .. import pyside as qt
 from ...filesystem.directories import Directory
 from ...formats.registry import file_types, object_from_path
 from ...filesystem import format_size, format_datetime
 from ...filesystem.transfers import validate_name
 from ...runtime.browsing import BrowseRole
+
+
+def hidden_path(path, *, info=None):
+    """Recognize dot names and native hidden metadata for a local entry."""
+    path = Path(path)
+    if path.name.startswith('.'):
+        return True
+    info = info if info is not None else qt.QFileInfo(str(path))
+    if info.isHidden():
+        return True
+    if sys.platform == 'darwin':
+        try:
+            return bool(path.lstat().st_flags & stat.UF_HIDDEN)
+        except OSError:
+            pass
+    return False
+
+
+def hidden_brush():
+    return qt.QApplication.palette().brush(qt.QPalette.ColorRole.PlaceholderText)
 
 
 class BrowserFileSystemModel(qt.QFileSystemModel):
@@ -97,6 +119,9 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
         return self.index(self.filePath(index), index.column())
 
     def data(self, index, role=qt.Qt.ItemDataRole.DisplayRole):
+        if (index.isValid() and role == qt.Qt.ItemDataRole.ForegroundRole
+                and hidden_path(self.filePath(index), info=self.fileInfo(index))):
+            return hidden_brush()
         if index.isValid() and role in BrowseRole._value2member_map_:
             if role == BrowseRole.Identity:
                 return self.browse_identity(index)

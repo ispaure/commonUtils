@@ -120,7 +120,7 @@ def _bind_file_cell(interface, cell, index):
     # Keep it bounded for every row, including the last and single-row groups.
     cell.separatorInset = UIEdgeInsets(0, interface.appearance.icon_size + 28, 0, 12)
     _bind_separator(cell, last=index == len(interface.data) - 1, color=apple_color('border'))
-    cell.textLabel.textColor = apple_color('text')
+    cell.textLabel.textColor = apple_color('muted' if getattr(row, 'hidden', False) else 'text')
     cell.detailTextLabel.textColor = apple_color('muted')
     _bind_actions(interface, cell, row)
     interface.row_visible(index)

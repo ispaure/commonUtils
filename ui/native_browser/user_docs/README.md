@@ -6,6 +6,11 @@ below the list, including available format metadata. Hosts may omit this informa
 for an Open/Save picker and supply their own folder and Open buttons.
 The host application determines how many items fit on one scrolling page.
 
+In the continuous browser, dot-prefixed files and folders use muted grey names
+in List and Tiles, including search results. Providers can also mark an entry
+hidden using its native metadata. Hidden entries remain selectable and open normally;
+Android keeps selected-row text readable against the selection background.
+
 Hosts using the continuous browser show all matching rows in one scrolling list;
 scroll to reach later items instead of using Previous/Next. Tiles load as they
 enter the visible area. A row's contextual button selects it for actions; a

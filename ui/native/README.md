@@ -199,6 +199,9 @@ Android activity and `fallback()` supplies other-backend UI. `dispose()` detache
 native callbacks and rejects stale actions. Hosts retain the menu with its view.
 Deferred recycled-row menus retain the copied Objective-C completion owner across
 asynchronous command loading; a Rubicon `ObjCBlock` alone retains only its pointer.
+Recycled rows may carry `hidden=True` to mute their title on iOS and Android.
+Every cell bind restores the current row's colour, including after recycling;
+Android selected rows retain the palette's selection foreground for contrast.
 
 `presentation` supplies `surface`, `list_button`, `template_icon` and
 `scroll_content`: optional native colour/tint/row behavior and fresh scroll parenting

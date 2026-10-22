@@ -7,6 +7,12 @@ implementers need not inherit them.
 
 ## Directory browsing
 
+Provider rows may include `hidden: bool` for native hidden metadata. `LocalFiles`
+sets it from dot names and the filesystem's Hidden/UF_HIDDEN flags during entry
+loading. The continuous native browser also recognizes dot-prefixed leaf names
+for providers without this field, and passes the state to recycled list rows and
+tile captions. Rendering does not probe provider paths for hidden metadata.
+
 `ResourceBrowser(provider, parent=None, directory=None, actions=(), thumbnail=None)` uses the
 `DirectoryProvider` contract:
 

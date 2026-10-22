@@ -1,5 +1,6 @@
 """Search result layout: names get space first; paths remain inspectable."""
 from .. import pyside as qt
+from .model import hidden_path
 
 
 def configure_search_columns(tree):
@@ -26,6 +27,11 @@ def style_search_row(row, tree):
     font = qt.QFont(tree.font())
     font.setWeight(qt.QFont.Weight.DemiBold)
     row.setFont(0, font)
+    path = row.data(0, qt.Qt.ItemDataRole.UserRole)
+    hidden = path is not None and hidden_path(path)
+    for column in range(3):
+        row.setForeground(column, tree.palette().brush(qt.QPalette.ColorRole.PlaceholderText)
+                          if hidden else qt.QBrush())
     row.setForeground(3, tree.palette().color(qt.QPalette.ColorRole.PlaceholderText))
 
 

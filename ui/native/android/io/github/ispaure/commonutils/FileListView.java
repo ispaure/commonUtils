@@ -143,6 +143,8 @@ public final class FileListView extends ListView {
                     bottom - halfStroke, dp(16) - halfStroke, dp(16) - halfStroke, outline);
         }
     }
+    private boolean[] hiddenRows = new boolean[0];
+
     public void setRows(String[] names, String[] descriptions, boolean[] directories, int revision) {
         // Invalidate both attached and scrapped cells so private names/icons
         // cannot survive a lock, close, or provider change in the recycler.
@@ -150,11 +152,18 @@ public final class FileListView extends ListView {
         titles = names;
         subtitles = descriptions;
         folders = directories;
+        hiddenRows = new boolean[names.length];
         generation = revision;
         thumbnails.clear();
         clearChoices();
         rows.notifyDataSetChanged();
         setSelection(0);
+        invalidateViews();
+    }
+
+    public void setHiddenRows(boolean[] hidden) {
+        hiddenRows = hidden;
+        rows.notifyDataSetChanged();
         invalidateViews();
     }
 
@@ -230,7 +239,7 @@ public final class FileListView extends ListView {
 
     private void paint(View view, boolean selected) {
         Holder holder = (Holder) view.getTag();
-        int foreground = selected ? selectedTextColor : textColor;
+        int foreground = selected ? selectedTextColor : holder.hidden ? mutedColor : textColor;
         view.setBackgroundColor(selected ? selectedColor : surfaceColor);
         holder.title.setTextColor(foreground);
         holder.subtitle.setTextColor(selected ? foreground : mutedColor);
@@ -242,7 +251,7 @@ public final class FileListView extends ListView {
     private static final class Holder {
         ImageView icon;
         TextView title, subtitle, actions;
-        boolean preview;
+        boolean preview, hidden;
     }
 
     private final class Rows extends BaseAdapter {
@@ -291,6 +300,7 @@ public final class FileListView extends ListView {
                 recycled = row;
             } else holder = (Holder) recycled.getTag();
             holder.title.setText(titles[position]);
+            holder.hidden = position < hiddenRows.length && hiddenRows[position];
             holder.subtitle.setText(subtitles[position]);
             holder.subtitle.setVisibility(subtitles[position].isEmpty() ? View.GONE : View.VISIBLE);
             holder.icon.setImageBitmap(thumbnails.get(position,

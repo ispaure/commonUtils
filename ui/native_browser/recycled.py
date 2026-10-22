@@ -13,6 +13,10 @@ from ..native.recycled_list import RecycledList, thumbnail_image
 from ..native.presentation import list_button
 
 
+def hidden_entry(entry):
+    return bool(entry.payload.get('hidden', False) or PurePosixPath(entry.label).name.startswith('.'))
+
+
 class BrowserPresentation:
     """Optional presentation hooks; no storage or application state is inspected."""
     def command(self, button, kind, label):
@@ -35,6 +39,8 @@ class BrowserPresentation:
 
     def highlight(self, widget, selected):
         widget.style.background_color = '#dce9ff' if selected else 'transparent'
+        if isinstance(widget, toga.Button) and getattr(widget, 'browser_hidden', False):
+            widget.style.color = '#808080'
 
     def bind_keyboard(self, browser):
         from ..native.keyboard import SearchDismissal
@@ -210,7 +216,7 @@ class RecycledBrowser(NativeBrowser):
                 records.append(dict(
                     title=entry.payload.get('display_name') or PurePosixPath(entry.label).name,
                     subtitle='', icon=self.presentation.file_icon(entry.container), folder=entry.container, entry=entry,
-                    epoch=self.epoch, thumbnail=False, index=index))
+                    epoch=self.epoch, thumbnail=False, index=index, hidden=hidden_entry(entry)))
             # Publish lightweight rows once. Only visible cells decode images.
             self.native_list.data = records
             self._list_rows = {row.entry.identity: row for row in self.native_list.data}
@@ -449,6 +455,7 @@ class RecycledBrowser(NativeBrowser):
         image_box = toga.Box(children=[preview], style=Pack(height=96, align_items='center', justify_content='center'))
         button = toga.Button(entry.payload.get('display_name') or PurePosixPath(entry.label).name,
             on_press=partial(self._select_pressed, entry), style=Pack(height=44))
+        button.browser_hidden = hidden_entry(entry)
         self.presentation.style_button(button)
         self.presentation.middle_filename(button)
         card = toga.Box(children=[image_box, button], style=Pack(direction=COLUMN, flex=1, margin=4))

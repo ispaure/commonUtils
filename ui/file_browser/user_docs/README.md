@@ -18,6 +18,11 @@ selection-detail loading. Column view uses its own final details column; size ma
 use a ranked entry list instead. Optional previews depend on file type and installed
 application features; opening a file may use an application-supplied reader.
 
+Hidden files and folders use muted grey text in these views and cached search
+results. Dot-prefixed names are muted on every desktop platform, along with
+Windows entries marked Hidden and macOS entries carrying the native hidden flag.
+They remain selectable and open normally when displayed.
+
 Keyboard navigation follows the platform: macOS uses Command-Up for the parent,
 Command-Down/Command-O to open, and Return to rename. Windows/Linux use Enter to
 open, F2 to rename and Alt-Up for the parent; Windows also accepts Backspace.

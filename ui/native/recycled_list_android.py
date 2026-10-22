@@ -62,6 +62,7 @@ class AndroidFileList(Widget):
         self.native.setRowKind(getattr(self.interface, 'row_kind', 'File'))
         self.native.setRows([row.title for row in source], [row.subtitle for row in source],
                             [row.folder for row in source], self.generation)
+        self.native.setHiddenRows([bool(getattr(row, 'hidden', False)) for row in source])
         folder, item = (self.interface.appearance.icon(kind) for kind in (True, False))
         self.native.setIcons(folder._impl.native if folder is not None else None,
                              item._impl.native if item is not None else None)
