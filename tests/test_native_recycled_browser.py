@@ -79,7 +79,7 @@ finally:
     app.loop.run_until_complete(browser.close())
     app.main_window.close()
     app.loop.close()
-assert not browser.tasks and not browser._decoded_thumbnails and not browser.native_list.data
+assert not browser.tasks and not browser.work.decoded and not browser.native_list.data
 '''
         env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2]), TOGA_BACKEND='toga_dummy')
         result = subprocess.run([sys.executable, '-c', script], env=env,

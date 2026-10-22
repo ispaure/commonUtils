@@ -65,7 +65,6 @@ class RecycledBrowser(NativeBrowser):
         self._list_indices = {}
         self._list_query = None
         self._list_thumbnail_rows = OrderedDict()
-        self._decoded_thumbnails = OrderedDict()
         self._tile_cards = {}
         self._tile_row_views = {}
         self._tile_range = None
@@ -115,14 +114,6 @@ class RecycledBrowser(NativeBrowser):
         if inline_details and self.preview_enabled:
             self.widget.add(self.info)
 
-    def _spawn(self, coroutine):
-        # Native synchronous text callbacks can arrive between cooperative loop
-        # dispatches. Queue search on the owning loop even without a running-loop
-        # context, as Toga does for its asynchronous event handlers.
-        task = self._loop.create_task(coroutine)
-        self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
-
     def set_entries(self, provider, directory, rows, *, location=None):
         rows = tuple(rows)
         super().set_entries(provider, directory, rows, location=location)
@@ -130,7 +121,6 @@ class RecycledBrowser(NativeBrowser):
     def set_tree(self, tree):
         self.dismiss_item_menu()
         self._population_epoch += 1
-        self._decoded_thumbnails.clear()
         return super().set_tree(tree)
 
     @property
@@ -279,13 +269,13 @@ class RecycledBrowser(NativeBrowser):
 
     def _set_row_thumbnail(self, row, image):
         key = row.entry.identity, row.entry.revision
-        decoded = self._decoded_thumbnails.get(key)
+        decoded = self.work.decoded.get(key)
         if decoded is None:
             decoded = thumbnail_image(image, size=self.native_list.icon_size)
-            self._decoded_thumbnails[key] = decoded
-        self._decoded_thumbnails.move_to_end(key)
-        while len(self._decoded_thumbnails) > 64:
-            self._decoded_thumbnails.popitem(last=False)
+            self.work.decoded[key] = decoded
+        self.work.decoded.move_to_end(key)
+        while len(self.work.decoded) > 64:
+            self.work.decoded.popitem(last=False)
         row.thumbnail = True
         row.icon = decoded
         self._list_thumbnail_rows[row.entry.identity] = row
@@ -303,7 +293,7 @@ class RecycledBrowser(NativeBrowser):
                 or len(self._thumbnail_pending) >= 24):
             return
         self._thumbnail_requested.add(row.entry.identity)
-        decoded = self._decoded_thumbnails.get((row.entry.identity, row.entry.revision))
+        decoded = self.work.decoded.get((row.entry.identity, row.entry.revision))
         if decoded is not None:
             self._set_row_thumbnail(row, decoded)
             return
@@ -323,7 +313,8 @@ class RecycledBrowser(NativeBrowser):
                 return row.icon
             @image.setter
             def image(self, image):
-                if not browser.closed and row.epoch == browser.epoch and browser.mode == 'List':
+                if (not browser.closed and row.epoch == browser.epoch and browser.mode == 'List'
+                        and browser._list_rows.get(row.entry.identity) is row):
                     browser._set_row_thumbnail(row, image)
         try:
             await self._load_thumbnail(row.entry, Target(), row.epoch, self.cancelled)
@@ -333,7 +324,7 @@ class RecycledBrowser(NativeBrowser):
     def stop(self):
         self.dismiss_item_menu()
         self._clear_tiles()
-        self._decoded_thumbnails.clear()
+        self.work.decoded.clear()
         self.native_list.clear()
         self._list_entries = ()
         self._list_rows.clear()
@@ -477,9 +468,7 @@ class RecycledBrowser(NativeBrowser):
                     if (not cancelled.is_set() and not browser.closed and browser.epoch == epoch
                             and entry.identity in browser._tile_cards):
                         preview.image = image
-            task = self._loop.create_task(self._load_thumbnail(entry, Target(), epoch, cancelled))
-            self.tasks.add(task)
-            task.add_done_callback(self.tasks.discard)
+            task = self.work.spawn(self._load_thumbnail(entry, Target(), epoch, cancelled), loop=self._loop)
         self._tile_cards[entry.identity] = entry, card, button, cancelled, task
         self.buttons[entry.identity] = button
         self.entry_rows[entry.identity] = card

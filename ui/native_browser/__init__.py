@@ -1,13 +1,12 @@
 """Native list/tile browser over the portable browse tree; no Qt or disk probes."""
 import asyncio
-from collections import OrderedDict
 import inspect
-from functools import partial
 from threading import Event
 
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
+from .lifecycle import BrowserLifecycle
 from ...runtime.browsing import BrowseEntry, BrowseTree, BrowseHistory, provider_entries, query_entries
 
 
@@ -42,10 +41,9 @@ class NativeBrowser:
         self.selected = None
         self.tree = None
         self.closed = False
-        self.epoch = 0
-        self.cancelled = Event()
-        self.tasks = set()
-        self.icons = OrderedDict()
+        self.work = BrowserLifecycle()
+        from .paginated import PaginatedRenderer
+        self.renderer = PaginatedRenderer()
         self.buttons = {}
         self.list_button = toga.Button('List', on_press=self.show_list, style=Pack(height=44))
         self.tile_button = toga.Button('Tiles', on_press=self.show_tiles, style=Pack(height=44))
@@ -100,10 +98,10 @@ class NativeBrowser:
     def set_tree(self, tree):
         """Publish a prepared portable snapshot, including non-filesystem identities."""
         self._cancel()
-        self.closed = False
+        self.closed = self.work.closed = False
         # Only retain covers that this snapshot certifies as unchanged.
         valid = {(entry.identity, entry.revision) for entry in tree.entries.values() if entry.revision is not None}
-        self.icons = OrderedDict((key, data) for key, data in self.icons.items() if key in valid)
+        self.work.prune(valid)
         self.tree = tree
         self.page = 0
         self.selected = None
@@ -114,10 +112,24 @@ class NativeBrowser:
                 self._spawn(result)
         self.render()
 
+    @property
+    def epoch(self):
+        return self.work.epoch
+
+    @property
+    def cancelled(self):
+        return self.work.cancelled
+
+    @property
+    def tasks(self):
+        return self.work.tasks
+
+    @property
+    def icons(self):
+        return self.work.encoded
+
     def _cancel(self):
-        self.epoch += 1
-        self.cancelled.set()
-        self.cancelled = Event()
+        self.work.invalidate()
 
     @property
     def entries(self):
@@ -243,13 +255,7 @@ class NativeBrowser:
         self.render()
 
     def _spawn(self, coroutine):
-        try:
-            task = asyncio.get_running_loop().create_task(coroutine)
-        except RuntimeError:
-            coroutine.close()
-            return
-        self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        return self.work.spawn(coroutine, loop=getattr(self, '_loop', None))
 
     @property
     def page_size(self):
@@ -257,63 +263,12 @@ class NativeBrowser:
         return 16 if self.mode == 'Tiles' else 24
 
     def render(self):
-        if self.closed:
-            return
-        self._cancel()
-        clear_box(self.items)
-        self.buttons.clear()
-        count = self.page_size
-        entries = self.entries
-        pages = max(1, (len(entries) + count - 1) // count)
-        self.page = min(self.page, pages - 1)
-        self.page_label.text = f'{len(entries)} items · {self.page + 1}/{pages}'
-        self.previous.enabled, self.next.enabled = self.page > 0, self.page + 1 < pages
-        visible = entries[self.page * count:(self.page + 1) * count]
-        row = None
-        for index, entry in enumerate(visible):
-            key = entry.identity, entry.revision
-            # Generic folders use the platform's text glyph. Do not allocate
-            # an empty native image widget when no preview can be displayed.
-            image = (toga.ImageView(style=Pack(width=96 if self.mode == 'Tiles' else 36,
-                                             height=96 if self.mode == 'Tiles' else 36))
-                     if not entry.container and (self.thumbnail or key in self.icons) else None)
-            if image is not None and key in self.icons:
-                image.image = toga.Image(src=self.icons[key])
-                self.icons.move_to_end(key)
-            button = toga.Button(('📁 ' if entry.container else '') + entry.label,
-                on_press=partial(self._select_pressed, entry), style=Pack(height=44, flex=1))
-            self.buttons[entry.identity] = button
-            if entry.identity == self.selected:
-                button.text = '✓ ' + button.text
-            if self.mode == 'Tiles':
-                if index % 2 == 0:
-                    row = toga.Box(style=Pack(direction=ROW))
-                    self.items.add(row)
-                row.add(toga.Box(children=([image] if image is not None else []) + [button], style=Pack(direction=COLUMN, flex=1, margin=4)))
-            else:
-                self.items.add(toga.Box(children=([image] if image is not None else []) + [button], style=Pack(direction=ROW, margin_bottom=3)))
-            if self.thumbnail and not entry.container and key not in self.icons:
-                self._spawn(self._load_thumbnail(entry, image, self.epoch, self.cancelled))
-        if not visible:
-            self.items.add(toga.Label('No matching items.' if self.search.value else 'This folder is empty.'))
+        self.renderer.render(self)
 
     async def _load_thumbnail(self, entry, image, epoch, cancelled):
-        if not hasattr(self, '_slots'):
-            self._slots = asyncio.Semaphore(2)
-        async with self._slots:
-            if self.closed or cancelled.is_set():
-                return
-            try:
-                data = await asyncio.to_thread(self.thumbnail, entry.payload, (160, 160), cancelled.is_set)
-                if data and not self.closed and epoch == self.epoch:
-                    self.icons[entry.identity, entry.revision] = data
-                    while len(self.icons) > 64:
-                        self.icons.popitem(last=False)
-                    while sum(map(len, self.icons.values())) > 8 * 1024 * 1024:
-                        self.icons.popitem(last=False)
-                    image.image = toga.Image(src=data)
-            except Exception:
-                pass  # Missing/locked covers leave the file name usable.
+        await self.work.thumbnail(entry, self.thumbnail,
+                                  lambda data: setattr(image, 'image', toga.Image(src=data)),
+                                  epoch=epoch, cancelled=cancelled)
 
     async def _select_pressed(self, entry, widget, **kwargs):
         if self.closed or self.navigation_busy or not self.tree or entry.identity not in self.tree.entries:
@@ -371,8 +326,7 @@ class NativeBrowser:
 
     def stop(self):
         self.closed = True
-        self._cancel()
-        self.icons.clear()
+        self.work.stop()
         self.history.clear()
         self.location = None
         self.search_cancelled.set()
@@ -389,5 +343,4 @@ class NativeBrowser:
 
     async def close(self):
         self.stop()
-        if self.tasks:
-            await asyncio.gather(*tuple(self.tasks), return_exceptions=True)
+        await self.work.close()
