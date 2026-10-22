@@ -47,3 +47,18 @@ publication lives in `persistence.publication`; transfer phase helpers live in
 recovery and the lifetime of private sources.
 
 [Runtime guide](../README.md)
+
+## Cache-backed local filename search
+
+`indexed_search.IndexedLocalSearch(database, eligible=...)` composes the directory
+index with resource-provider results. The host explicitly admits physical local
+adapters and supplies the database location. Private, session-only and remote
+providers always use memory-only recursive search, even if admitted by mistake.
+
+Call `prepare(provider, directory, cancelled=...)` off the UI thread to reconcile
+names, then `search(...)` for cached hits. A persisted hit is revalidated through
+`provider.entry`; missing entries are skipped and access errors mark results
+incomplete. Provider guards run before scanning and before results return. Cached
+metadata never grants access to a file. Close `search.cache` after retiring its
+workers. Query rules, symlink exclusion and stale-name behavior match directory
+index search; applications own refresh scheduling and provider eligibility.
