@@ -74,3 +74,54 @@ class FileRowActionTests(unittest.TestCase):
         self.interface._impl.primary_action_enabled = False
         self.module._bind_actions(self.interface, self.cell, self.row)
         self.assertIsNone(self.cell.accessoryView)
+
+    def test_async_menu_retains_copied_completion_until_delivery(self):
+        import asyncio
+        import gc
+        import weakref
+        import sys
+
+        class Completion:
+            pass
+
+        async def exercise():
+            copied, delivered, tasks = [], [], []
+            ready = asyncio.Event()
+
+            def copy():
+                owner = Completion()
+                copied.append(weakref.ref(owner))
+                return owner
+
+            def block(owner, *signature):
+                # Rubicon's ObjCBlock retains a pointer, not its Python owner.
+                reference = weakref.ref(owner)
+                def complete(children):
+                    self.assertIsNotNone(reference(), 'Native completion was released before delivery')
+                    delivered.append(children)
+                return complete
+
+            async def commands(row):
+                await ready.wait()
+                return ['Open', 'Rename']
+
+            def spawn(coroutine):
+                tasks.append(asyncio.create_task(coroutine))
+
+            bridge = sys.modules['rubicon.objc']
+            with patch.object(bridge, 'Block', side_effect=lambda callback, *args: callback), \
+                    patch.object(bridge, 'ObjCClass', return_value=Mock()), \
+                    patch.object(self.module, 'ObjCInstance', return_value=NS(copy=copy)), \
+                    patch.object(self.module, 'ObjCBlock', side_effect=block), \
+                    patch.dict(sys.modules, {'toga': NS(App=NS(app=NS(loop=NS(create_task=spawn))))}):
+                self.interface.menu_provider = commands
+                self.module._bind_actions(self.interface, self.cell, self.row)
+                self.cell.accessoryView.menu_provider_block('native completion pointer')
+                gc.collect()
+                self.assertIsNotNone(copied[0]())
+                await asyncio.sleep(0)
+                ready.set()
+                await asyncio.gather(*tasks)
+                self.assertEqual(delivered, [['Open', 'Rename']])
+
+        asyncio.run(exercise())

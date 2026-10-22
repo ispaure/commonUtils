@@ -206,6 +206,10 @@ wiki embeds retain their exact source through formatted editing/export. Direct a
 respects protected local roots and never bypasses a supplied resource loader.
 Provider-backed resources retain their existing static rendering contract.
 
+Image paragraphs use text-based minimum line heights in Read and Formatted modes,
+including table cells, so paragraph leading does not multiply the image height.
+Text-only paragraphs retain proportional leading.
+
 Local image-file drops insert Markdown references in Source mode and image formats
 in Formatted mode, with one undo operation per drop. The viewer supplies the saved
 document folder for relative paths; unsaved documents and separate Windows drives

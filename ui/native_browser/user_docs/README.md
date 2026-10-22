@@ -20,6 +20,10 @@ previous successfully loaded location, including a previous storage selection.
 The bounded history lasts only for this browser session and is cleared on closing.
 
 **Search** opens a full-width field to search this folder and its subfolders.
+Matching ignores case. Bare words all have to occur, in any order; double-quoted
+phrases require adjacent ordered words, with spaces, underscores and hyphens
+treated as equivalent separators. Hosts may supply a persistent local search
+backend; the default provider search keeps its results in memory.
 Folder listings load in the background without reading file contents. Matches
 appear while the scan continues; the status reports ongoing searches, partial
 results and failures. Searches cover the subtree unless the host sets a scan

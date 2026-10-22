@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from time import monotonic
 from .operations import check_cancelled
+from .name_search import search_terms, matches_name
 
 
 @dataclass
@@ -16,7 +17,7 @@ class SearchResult:
 
 def search_resources(provider, directory, query, *, cancelled=lambda: False, max_entries=None, progress=None):
     directory = provider.relative(directory)
-    query = query.strip().casefold()
+    terms = search_terms(query)
     queue, visited, rows, errors = deque([directory]), set(), [], []
     scanned = 0
     reported = False
@@ -42,7 +43,7 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                 if max_entries is not None and scanned >= max_entries:
                     return SearchResult(rows, scanned, False, errors)
                 scanned += 1
-                if query in row['name'].casefold():
+                if matches_name(row['name'], terms):
                     item = dict(row)
                     item['name'] = path[len(directory) + 1:] if directory else path
                     rows.append(item)
@@ -67,7 +68,7 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                 if max_entries is not None and scanned >= max_entries:
                     return SearchResult(rows, scanned, False, errors)
                 scanned += 1
-                if query in row['name'].casefold():
+                if matches_name(row['name'], terms):
                     item = dict(row)
                     # Show the relative location to distinguish equal names in subfolders.
                     item['name'] = path[len(directory) + 1:] if directory else path

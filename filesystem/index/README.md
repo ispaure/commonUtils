@@ -5,6 +5,10 @@ and `storage_totals` from `commonUtils.filesystem.index`. This subsystem owns me
 persistent search and sizes; [File Browser user workflows](../../ui/file_browser/user_docs/README.md)
 belong with the UI.
 
+The process-wide `directory_cache` is created on first access. Importing
+`DirectoryCache` alone does not resolve desktop storage defaults; mobile hosts
+must supply an explicit app-private `database` path.
+
 ## Read and own a snapshot
 
 ```python

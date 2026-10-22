@@ -67,6 +67,24 @@ class NavigationTests(unittest.TestCase):
 
 
 class ResourceSearchTests(unittest.TestCase):
+    def test_keywords_and_phrases_match_the_folder_projection_and_recursive_scan(self):
+        from types import SimpleNamespace
+        from commonUtils.runtime.browsing import query_entries
+        from commonUtils.runtime.resource_search import search_resources
+        names = ('The End of Eternityla.epub', 'END_ETERNITY.pdf', 'Eternity End.md', 'Straße.md')
+        provider = SimpleNamespace(relative=lambda value: value,
+            list=lambda folder, cancelled: [dict(path=name, name=name, directory=False) for name in names])
+        entries = [BrowseEntry(name, name) for name in names]
+        for query, expected in (
+                ('end ETERNITY', set(names[:3])),
+                ('"end eternity"', {'END_ETERNITY.pdf'}),
+                ('"end of eternity"', {names[0]}),
+                ('"end eternity', {'END_ETERNITY.pdf'}),
+                ('STRASSE', {'Straße.md'})):
+            with self.subTest(query=query):
+                self.assertEqual({entry.label for entry in query_entries(entries, query)}, expected)
+                self.assertEqual({row['name'] for row in search_resources(provider, '', query).rows}, expected)
+
     def test_recursive_matches_are_scoped_bounded_and_cancellable(self):
         from types import SimpleNamespace
         from commonUtils.runtime.resource_search import search_resources

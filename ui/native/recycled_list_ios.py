@@ -43,10 +43,12 @@ def _bind_actions(interface, cell, row):
         # row's commands or a previous credential generation.
         def provide(completion):
             completion = ObjCInstance(completion).copy()
-            complete = ObjCBlock(completion, None, objc_id)
             owner = button.owner()
             current = button.row
             async def load():
+                # ObjCBlock stores only a pointer. Keep the copied Objective-C
+                # owner in this coroutine until the asynchronous load completes.
+                complete = ObjCBlock(completion, None, objc_id)
                 if (owner is None or not owner.enabled or current is None or button.row is not current
                         or current.index >= len(owner.data) or owner.data[current.index] is not current):
                     complete(ns_from_py([]))

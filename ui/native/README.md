@@ -197,6 +197,8 @@ Apple primary-action menus or Android anchored popups. Actions are `(title, call
 pairs; `invoke(callback)` performs host guards/scheduling. `context()` supplies the
 Android activity and `fallback()` supplies other-backend UI. `dispose()` detaches
 native callbacks and rejects stale actions. Hosts retain the menu with its view.
+Deferred recycled-row menus retain the copied Objective-C completion owner across
+asynchronous command loading; a Rubicon `ObjCBlock` alone retains only its pointer.
 
 `presentation` supplies `surface`, `list_button`, `template_icon` and
 `scroll_content`: optional native colour/tint/row behavior and fresh scroll parenting

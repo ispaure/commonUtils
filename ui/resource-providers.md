@@ -366,7 +366,10 @@ Back restores its prior history on failed loads. `runtime.browsing.BrowseHistory
 retains at most 100 locations; identical refreshes do not add another visit.
 No source resolution, credentials or I/O belong to this history model.
 
-`runtime.browsing.query_entries` filters supplied labels case-insensitively and
+`runtime.name_search` owns the keyword/phrase rules also used by SQLite snapshots:
+bare terms are Unicode-casefolded substrings joined with AND; double-quoted phrases
+preserve adjacency/order with equivalent whitespace, underscore and hyphen separators.
+`runtime.browsing.query_entries` filters supplied labels with these rules and
 sorts natural names, numeric sizes or modified values in either direction while
 retaining containers first. `runtime.resource_search.search_resources` walks
 provider listings breadth-first, validates child scope and produces relative labels
@@ -382,7 +385,13 @@ An optional provider search_entries(directory, cancelled=...) iterator supplies 
 recursive listing directly; its rows must stay strictly beneath the requested
 directory. Partial or failed listings must not be presented as complete.
 Partial results report limits or unreadable folders; credentials failures abort.
-Search retains no durable index or file content. Sorting reprojects the current
+The default search retains no durable index or file content. Hosts can pass
+`NativeBrowser(resource_search=callback)` to select a different backend. It runs
+on the search worker with `(provider, directory, query, cancelled=..., progress=...)`
+and returns `SearchResult`; progress has the same detached-result contract. The
+host owns database policy, source eligibility and reconciliation. No UI access
+belongs in this callback. Final results replace earlier snapshots even when the
+number of matches stays the same. Sorting reprojects the current
 snapshot without rescanning; closing search restores the original folder tree. Selection is cleared when filtered out
 and `selected(None)` notifies the host. Search resets on location changes. Closing
 clears history, query and private display data. Hosts retain navigation, selected

@@ -165,8 +165,9 @@ class BrowseHistory:
 def query_entries(entries, text='', *, sort='name', descending=False):
     """Filter a supplied folder snapshot; sort groups while retaining folders first."""
     import re
-    query = text.strip().casefold()
-    rows = [entry for entry in entries if not query or query in entry.label.casefold()]
+    from .name_search import search_terms, matches_name
+    terms = search_terms(text)
+    rows = [entry for entry in entries if matches_name(entry.label, terms)]
     def name_key(entry):
         return tuple((1, int(part)) if part.isdigit() else (0, part.casefold())
                      for part in re.split(r'(\d+)', entry.label))

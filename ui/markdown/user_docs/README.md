@@ -200,6 +200,8 @@ Local GIF images animate in Read mode and the Formatted editor. Images fit withi
 the page width and reflow when the window changes size. Use ordinary
 Markdown image references such as `![Demo](assets/demo.gif)`; relative paths resolve
 from the Markdown file’s folder. Playback pauses while that view is hidden.
+In Read and Formatted modes, following text keeps normal paragraph spacing
+even when the embedded image is tall.
 
 Drag image files from your file browser into either editor to insert them at the
 drop position. Formatted mode displays the image immediately; Source mode inserts

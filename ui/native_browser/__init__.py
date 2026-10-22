@@ -18,7 +18,9 @@ def clear_box(box):
 
 class NativeBrowser:
     """A bounded native presentation. Hosts own storage, navigation and rich data."""
-    def __init__(self, *, selected=None, open_folder=None, navigate=None, thumbnail=None, details=None, preview=True):
+    def __init__(self, *, selected=None, open_folder=None, navigate=None, thumbnail=None, details=None, preview=True,
+                 resource_search=None):
+        self.resource_search = resource_search
         self.on_selected = selected
         self.on_open_folder, self.on_navigate = open_folder, navigate
         self.history = BrowseHistory()
@@ -172,7 +174,7 @@ class NativeBrowser:
             if not current():
                 return
             self.searching = not finished
-            if len(result.rows) != published:
+            if len(result.rows) != published or finished:
                 root = provider.root / provider.relative(directory)
                 tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
                 tree.set_children(root, provider_entries(provider, result.rows))
@@ -189,9 +191,12 @@ class NativeBrowser:
         def progress(result):
             loop.call_soon_threadsafe(publish, result)
         try:
-            result = await asyncio.to_thread(search_resources, provider, directory, query,
+            result = await asyncio.to_thread(self.resource_search or search_resources, provider, directory, query,
                                             cancelled=cancelled.is_set, progress=progress)
             publish(result, finished=True)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
         except Exception as error:
             if current():
                 self.searching = False

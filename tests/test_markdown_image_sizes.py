@@ -97,3 +97,47 @@ class MarkdownImageSizeTests(QtTestCase):
         self.editor.textCursor().insertImage(fmt)
         width, height = self.dimensions()
         self.assertEqual((width, height), (100, 50))
+
+    def test_image_to_text_gap_stays_small_in_reader_and_formatted_editor(self):
+        for embed in ('![Large](large.png)', '![[large.png|400x300]]'):
+            source = embed + '\n\nFollowing text\n'
+            path = self.root / 'note.md'
+            path.write_text(source)
+            viewer = MarkdownViewer(path, allow_edit=True)
+            viewer.set_editing(False)
+            viewer.show()
+            for surface in (viewer.browser, viewer.formatted_editor):
+                for width in (700, 320):
+                    with self.subTest(embed=embed, surface=type(surface).__name__, width=width):
+                        viewer.resize(width, 600)
+                        # The editor is hidden while reading; give it a layout
+                        # allocation too, as when switching into Formatted mode.
+                        if surface is viewer.formatted_editor:
+                            viewer.set_editing(True)
+                            viewer.set_edit_mode('formatted')
+                        qt.QApplication.processEvents()
+                        document = surface.document()
+                        block = document.begin()
+                        layout = document.documentLayout()
+                        image_rect = layout.blockBoundingRect(block)
+                        text_rect = layout.blockBoundingRect(block.next())
+                        self.assertGreater(image_rect.height(), 100)
+                        gap = text_rect.top() - image_rect.bottom()
+                        self.assertLessEqual(gap, 20)
+                        self.assertGreaterEqual(gap, 0)
+                        self.assertFalse(viewer.is_modified)
+                        self.assertEqual(viewer.markdown_text(), source)
+            viewer.deleteLater()
+
+    def test_inline_image_does_not_push_next_line_down_by_its_height(self):
+        self.editor.setMarkdown('Before ![Large|400](large.png) ' + 'Following text ' * 20 + '\n\nTail')
+        qt.QApplication.processEvents()
+        document = self.editor.document()
+        block = document.begin()
+        self.assertGreater(block.layout().lineCount(), 1)
+        first = block.layout().lineAt(0)
+        following = block.layout().lineAt(1)
+        self.assertGreater(first.height(), 190)
+        self.assertLessEqual(following.y() - first.y() - first.height(), 20)
+        # Ordinary paragraphs retain their proportional prose spacing.
+        self.assertEqual(block.next().blockFormat().lineHeight(), 145)

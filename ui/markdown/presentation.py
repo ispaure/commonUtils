@@ -63,8 +63,11 @@ def style_document(document, palette, *, callouts=None):
         separator = False
         iterator = block.begin()
         inline_code = []
+        has_image = False
         while not iterator.atEnd():
             fragment = iterator.fragment()
+            if fragment.isValid() and fragment.charFormat().isImageFormat():
+                has_image = True
             if fragment.isValid() and fragment.charFormat().fontFixedPitch():
                 inline_code.append((fragment.position(), fragment.length()))
             if fragment.isValid() and fragment.text() == '\u200b' and fragment.charFormat().anchorHref() == 'callout-end:0':
@@ -141,6 +144,20 @@ def style_document(document, palette, *, callouts=None):
             fmt.setTopMargin(0)
             fmt.setBottomMargin(0)
             fmt.setLineHeight(125, qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
+        if has_image and fmt.lineHeightType() == qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value:
+            # Proportional leading also multiplies the image's height, leaving
+            # a large blank area after tall images. Keep the prose line height
+            # as a minimum so inline and standalone images occupy their own size.
+            text_height = qt.QFontMetricsF(document.defaultFont()).height()
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.isValid() and not fragment.charFormat().isImageFormat():
+                    font = fragment.charFormat().font().resolve(document.defaultFont())
+                    text_height = max(text_height, qt.QFontMetricsF(font).height())
+                iterator += 1
+            fmt.setLineHeight(text_height * fmt.lineHeight() / 100,
+                              qt.QTextBlockFormat.LineHeightTypes.MinimumHeight.value)
         cursor.setBlockFormat(fmt)
         block = block.next()
     for table in tables(document.rootFrame()):
