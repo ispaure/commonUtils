@@ -6,6 +6,7 @@ from .paths import resource_path, resource_name
 from .provider import require_capability, WritableDirectoryProvider
 from ..operations import check_cancelled, MutationResult, MutationIncomplete
 from ...persistence.publication import mutation_lock, save_transaction
+from ...persistence.transfers import verify_unchanged, cleanup_published
 
 
 def inventory(provider: WritableDirectoryProvider, path, *, cancelled=lambda: False):
@@ -120,20 +121,14 @@ def move_resource(source: WritableDirectoryProvider, path, destination: Writable
                     if _digest(source, row['path'], cancelled) != _digest(destination, output, cancelled):
                         raise ValueError('Destination verification failed; source preserved.')
                 created = True
-            if inventory(source, path, cancelled=cancelled) != rows:
-                raise ValueError('Source changed during transfer; source preserved.')
+            verify_unchanged(rows, lambda: inventory(source, path, cancelled=cancelled),
+                             message='Source changed during transfer; source preserved.')
             check_cancelled(cancelled)
             destination.rename(temporary, target)
             created = False
-            try:
-                result = delete_resource(source, path, cancelled=cancelled, expected=rows)
-            except Exception as error:
-                result = error.result if isinstance(error, MutationIncomplete) else MutationResult()
-                state = result.source_state
-                detail = ('The source was retained.' if state == 'unchanged' else
-                          'Source cleanup is incomplete; refresh to inspect remaining items.')
-                raise MutationIncomplete('The verified destination was saved. ' + detail,
-                    MutationResult(True, state, result.removed_paths)) from error
+            result = cleanup_published(
+                lambda: delete_resource(source, path, cancelled=cancelled, expected=rows),
+                source_state=lambda: 'unchanged')
             return MutationResult(True, result.source_state, result.removed_paths)
         finally:
             if created:

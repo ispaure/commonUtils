@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import errno
 import os
 import shutil
 from .rename import rename_path
+from ..persistence.publication import save_transaction
+from ..persistence.transfers import try_rename, verify_unchanged, cleanup_published
 
 
 @dataclass(frozen=True)
@@ -104,26 +105,26 @@ def transfer_paths(paths, directory, *, move=False, cancelled=lambda: False, rep
                 completed.append((source, source))
                 continue
             target = _destination(source, directory)
-            if move:
-                try:
-                    rename_path(source, target)
-                    completed.append((source, target))
-                    continue
-                except OSError as error:
-                    if error.errno != errno.EXDEV:
-                        raise
+            if move and try_rename(source, target, rename=rename_path):
+                completed.append((source, target))
+                continue
             before = _snapshot(source) if move else None
             with TemporaryDirectory(dir=directory, prefix='.file-transfer-') as temporary:
                 staged = Path(temporary) / 'item'
-                _copy(source, staged)
-                if move and before != _snapshot(source):
-                    raise RuntimeError('The source changed during copying; it has been kept in place.')
-                rename_path(staged, target)
+                def validate():
+                    if move:
+                        verify_unchanged(before, lambda: _snapshot(source), error=RuntimeError,
+                                         message='The source changed during copying; it has been kept in place.')
+                save_transaction(stage=lambda: _copy(source, staged), verify=lambda: None,
+                                 validate=validate, publish=lambda: rename_path(staged, target),
+                                 cleanup=lambda: None)
             if move:
-                if source.is_dir() and not source.is_symlink():
-                    shutil.rmtree(source)
-                else:
-                    source.unlink()
+                def remove():
+                    if source.is_dir() and not source.is_symlink():
+                        shutil.rmtree(source)
+                    else:
+                        source.unlink()
+                cleanup_published(remove, source_state=lambda: 'unchanged' if _snapshot(source) == before else 'partial')
             completed.append((source, target))
         except Exception as error:
             failures.append((source, str(error)))

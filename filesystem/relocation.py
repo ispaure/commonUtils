@@ -1,12 +1,12 @@
 """Verified non-overwriting directory relocation, including link target rebasing."""
-import errno
 import os
 from pathlib import Path
 import shutil
 import stat
 from tempfile import mkdtemp
-from ..persistence.publication import rename_exclusive, serialize_mutation
+from ..persistence.publication import rename_exclusive, serialize_mutation, save_transaction
 from .snapshots import verified_file_snapshot
+from ..persistence.transfers import try_rename, verify_unchanged, cleanup_published
 
 
 def without_extended_prefix(value):
@@ -75,28 +75,29 @@ def relocate_directory(source, destination):
                                                or _resolved(path).is_relative_to(_resolved(source)))
                          for folder, directories, files in os.walk(source, followlinks=False)
                          for path in (Path(folder) / name for name in (*directories, *files)))
-    if not relative_links:
-        try:
-            rename_exclusive(source, destination)
-            return
-        except OSError as error:
-            if error.errno != errno.EXDEV:
-                raise
+    if not relative_links and try_rename(source, destination, rename=rename_exclusive):
+        return
     expected = _manifest(source)
     stage = Path(mkdtemp(prefix='.directory-relocate-', dir=destination.parent))
     copied = stage / 'contents'
     try:
-        shutil.copytree(source, copied, symlinks=True)
-        for relative, description in expected.items():
-            if description[0] in {'link', 'internal-link'}:
-                link = copied / relative
-                link.unlink()
-                target = _resolved(destination) / description[1] if description[0] == 'internal-link' else Path(description[1])
-                link.symlink_to(target, target_is_directory=(source / relative).is_dir())
-        if _manifest(copied, link_root=destination) != expected or _manifest(source) != expected:
-            raise ValueError('Storage changed during relocation; the original was preserved.')
-        rename_exclusive(copied, destination)
-        # The verified destination is already published before source cleanup.
-        shutil.rmtree(source)
+        def copy():
+            shutil.copytree(source, copied, symlinks=True)
+            for relative, description in expected.items():
+                if description[0] in {'link', 'internal-link'}:
+                    link = copied / relative
+                    link.unlink()
+                    target = _resolved(destination) / description[1] if description[0] == 'internal-link' else Path(description[1])
+                    link.symlink_to(target, target_is_directory=(source / relative).is_dir())
+        def validate():
+            verify_unchanged(expected, lambda: _manifest(source),
+                             message='Storage changed during relocation; the original was preserved.')
+        def verify():
+            verify_unchanged(expected, lambda: _manifest(copied, link_root=destination),
+                             message='Storage changed during relocation; the original was preserved.')
+        save_transaction(stage=copy, verify=verify, validate=validate,
+                         publish=lambda: rename_exclusive(copied, destination), cleanup=lambda: None)
+        cleanup_published(lambda: shutil.rmtree(source),
+                          source_state=lambda: 'unchanged' if _manifest(source) == expected else 'partial')
     finally:
         shutil.rmtree(stage)
