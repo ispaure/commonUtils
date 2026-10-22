@@ -2,7 +2,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 from zipfile import ZipFile
-from ..archives.zip_access import validate_members
+from ...archives.zip_access import validate_members
 
 
 class BoundedArchive:

@@ -4,9 +4,10 @@ from pathlib import Path
 from datetime import datetime
 import os
 import stat as stat_module
-from .resource_provider import ResourceCapabilities, resource_path
-from .operations import check_cancelled
-from ..persistence.publication import mutation_lock, rename_exclusive
+from .paths import resource_path
+from .provider import ResourceCapabilities
+from ..operations import check_cancelled
+from ...persistence.publication import mutation_lock, rename_exclusive
 
 
 class LocalFiles:
@@ -28,7 +29,7 @@ class LocalFiles:
 
     def _physical(self, path, directory=False):
         target = self.root / self.relative(path)
-        from ..filesystem.local_access import check_local_path
+        from ...filesystem.local_access import check_local_path
         check_local_path(target)
         return target
 
@@ -109,7 +110,7 @@ class LocalFiles:
             source, destination = self.relative(source), self.relative(destination)
             if not source or not destination or destination.startswith(source + '/'):
                 raise ValueError('Cannot move a storage root or a folder into itself.')
-            from .resource_mutations import inventory
+            from .mutations import inventory
             inventory(self, source)
             original = self._locate(source)
             if self._locate(destination).exists():

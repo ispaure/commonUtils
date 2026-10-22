@@ -3,7 +3,7 @@ from pathlib import Path
 from . import pyside as qt
 from .resource_browser import ResourceBrowser
 from .tasks.operation_progress import OperationProgress
-from ..runtime.resource_selection import ResourceSelection, ResourceChoice
+from ..runtime.resources.selection import ResourceSelection, ResourceChoice
 
 
 class ResourcePicker(qt.QDialog):

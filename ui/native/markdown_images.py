@@ -64,6 +64,6 @@ def folder_image_source(provider, document):
 def local_image_source(document, root):
     """Build a provider-scoped source for a local Markdown wiki page."""
     from pathlib import Path
-    from ...runtime.local_files import LocalFiles
+    from ...runtime.resources.local import LocalFiles
     root, document = Path(root).resolve(), Path(document).resolve()
     return folder_image_source(LocalFiles(root), document.relative_to(root).as_posix())

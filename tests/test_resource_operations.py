@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from commonUtils.runtime.local_files import LocalFiles
-from commonUtils.runtime.resource_mutations import move_resource, delete_resource, inventory
+from commonUtils.runtime.resources.local import LocalFiles
+from commonUtils.runtime.resources.mutations import move_resource, delete_resource, inventory
 
 
 class ResourceOperationsTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class ResourceOperationsTests(unittest.TestCase):
             with self.assertRaises(ValueError): inventory(source, 'linked')
 
     def test_save_as_is_verified_no_clobber_and_view_aliases_rejected(self):
-        from commonUtils.runtime.resource_mutations import save_resource_bytes
+        from commonUtils.runtime.resources.mutations import save_resource_bytes
         with TemporaryDirectory() as directory:
             provider = LocalFiles(directory)
             save_resource_bytes(provider, 'first.txt', b'first')
@@ -108,8 +108,8 @@ class ResourceOperationsTests(unittest.TestCase):
             self.assertEqual(events[-1], 'cleanup')
 
     def test_read_only_capabilities_prevent_mutations(self):
-        from commonUtils.runtime.resource_provider import ResourceCapabilities
-        from commonUtils.runtime.resource_mutations import save_resource_bytes
+        from commonUtils.runtime.resources.provider import ResourceCapabilities
+        from commonUtils.runtime.resources.mutations import save_resource_bytes
         with TemporaryDirectory() as directory:
             provider = LocalFiles(directory)
             (provider.root / 'note').write_bytes(b'original')
@@ -179,8 +179,8 @@ class ResourceOperationsTests(unittest.TestCase):
             self.assertEqual((source.root / 'note').read_bytes(), (target.root / 'saved').read_bytes())
 
     def test_folder_and_rename_entrypoints_check_capability_and_cancellation(self):
-        from commonUtils.runtime.resource_mutations import create_resource_folder, rename_resource
-        from commonUtils.runtime.resource_provider import ResourceCapabilities
+        from commonUtils.runtime.resources.mutations import create_resource_folder, rename_resource
+        from commonUtils.runtime.resources.provider import ResourceCapabilities
         from commonUtils.runtime.operations import OperationCancelled
         with TemporaryDirectory() as directory:
             provider = LocalFiles(directory)

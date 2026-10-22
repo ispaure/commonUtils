@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from commonUtils.filesystem.local_access import protect_local_root, check_local_path, provider_record_access
 from commonUtils.persistence import atomic_write_bytes
-from commonUtils.runtime.local_files import LocalFiles
+from commonUtils.runtime.resources.local import LocalFiles
 
 
 class LocalAccessTests(unittest.TestCase):

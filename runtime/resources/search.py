@@ -3,8 +3,8 @@ from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
 from time import monotonic
-from .operations import check_cancelled
-from .name_search import search_terms, matches_name
+from ..operations import check_cancelled
+from ..name_search import search_terms, matches_name
 
 
 @dataclass

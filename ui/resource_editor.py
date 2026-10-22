@@ -1,7 +1,7 @@
 """Provider-backed text editor: all drafts are session-only, even after export."""
 from . import pyside as qt
 from .tasks.operation_progress import OperationProgress
-from ..runtime.resource_selection import ResourceTextSession
+from ..runtime.resources.selection import ResourceTextSession
 
 
 class ResourceTextWindow(qt.QMainWindow):

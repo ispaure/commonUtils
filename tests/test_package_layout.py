@@ -47,7 +47,8 @@ vendor.__path__ = [str(root.parent)]
 sys.modules['_vendor'] = vendor
 vendored = importlib.import_module('_vendor.commonUtils')
 for name in ('runtime.platform', 'formats.registry', 'filesystem.index.metadata',
-             'integrations.wrappers.cmdShellWrapper.command', 'ui.native.dialogs'):
+             'integrations.wrappers.cmdShellWrapper.command', 'ui.native.dialogs', 'runtime.resources.provider',
+             'runtime.resources.local', 'runtime.resources.selection'):
     module = importlib.import_module('_vendor.commonUtils.' + name)
     standalone = importlib.import_module('commonUtils.' + name)
     assert module is not standalone

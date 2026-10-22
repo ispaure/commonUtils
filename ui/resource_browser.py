@@ -2,7 +2,7 @@
 from collections import deque
 from contextlib import nullcontext
 from types import SimpleNamespace
-from ..runtime.resource_provider import DirectoryProvider, capabilities
+from ..runtime.resources.provider import DirectoryProvider, capabilities
 from pathlib import Path
 from . import pyside as qt
 from .tasks.operation_progress import OperationProgress
@@ -15,7 +15,7 @@ from .file_browser.thumbnails import image_thumbnail
 from ..runtime.browsing import BrowseRole
 from ..runtime.operations import check_cancelled
 from ..filesystem import format_size
-from ..runtime.resource_mutations import delete_resource, create_resource_folder, rename_resource
+from ..runtime.resources.mutations import delete_resource, create_resource_folder, rename_resource
 
 
 class ResourceBreadcrumbBar(BreadcrumbBar):
@@ -336,7 +336,7 @@ class ResourceBrowser(qt.QWidget):
     def _start_search(self):
         if self.closing or not self.search_pending or self.operation.busy or self.search_operation.busy:
             return
-        from ..runtime.resource_search import search_resources
+        from ..runtime.resources.search import search_resources
         query, directory = self.filter.text().strip(), self.navigation.directory
         self._active_search = query, directory
         self.search_pending = False
@@ -429,7 +429,7 @@ class ResourceBrowser(qt.QWidget):
     def _mkdir(self):
         name, accepted = qt.QInputDialog.getText(self, 'New folder', 'Folder name:')
         if accepted and name:
-            from ..runtime.resource_provider import resource_path
+            from ..runtime.resources.paths import resource_path
             try:
                 name = resource_path(name)
                 if '/' in name:
@@ -443,7 +443,7 @@ class ResourceBrowser(qt.QWidget):
     def _rename(self, row):
         name, accepted = qt.QInputDialog.getText(self, 'Rename', 'New name:', text=row['name'])
         if accepted and name:
-            from ..runtime.resource_provider import resource_path
+            from ..runtime.resources.paths import resource_path
             try:
                 name = resource_path(name)
                 if '/' in name:

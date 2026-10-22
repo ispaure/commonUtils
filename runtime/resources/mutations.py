@@ -2,9 +2,10 @@
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
-from .resource_provider import resource_path, require_capability, WritableDirectoryProvider
-from .operations import check_cancelled, MutationResult, MutationIncomplete
-from ..persistence.publication import mutation_lock, save_transaction
+from .paths import resource_path, resource_name
+from .provider import require_capability, WritableDirectoryProvider
+from ..operations import check_cancelled, MutationResult, MutationIncomplete
+from ...persistence.publication import mutation_lock, save_transaction
 
 
 def inventory(provider: WritableDirectoryProvider, path, *, cancelled=lambda: False):
@@ -19,9 +20,7 @@ def inventory(provider: WritableDirectoryProvider, path, *, cancelled=lambda: Fa
         result[relative] = row
         if row['directory']:
             for child in provider.list(current, cancelled=cancelled):
-                name = resource_path(child['name'])
-                if '/' in name or not name:
-                    raise ValueError('Invalid child name.')
+                name = resource_name(child['name'])
                 visit('/'.join(p for p in (current, name) if p), '/'.join(p for p in (relative, name) if p))
     visit(path, '')
     return result

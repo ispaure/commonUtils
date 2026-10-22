@@ -2,10 +2,11 @@
 from dataclasses import dataclass
 from contextlib import nullcontext
 from pathlib import Path
-from .resource_provider import resource_path, require_capability
-from .operations import check_cancelled
-from .resource_mutations import save_resource_and_reopen
-from ..persistence.text import TextSession
+from .paths import resource_path
+from .provider import require_capability
+from ..operations import check_cancelled
+from .mutations import save_resource_and_reopen
+from ...persistence.text import TextSession
 
 
 @dataclass
@@ -33,7 +34,7 @@ class ResourceSelection:
     def list(self, path='', *, cancelled=lambda: False):
         # A picker may omit unavailable local entries without weakening recursive
         # mutation inventories on the actual provider.
-        from .local_files import LocalFiles
+        from .local import LocalFiles
         if type(self.provider) is LocalFiles:
             rows = []
             for child in self.provider._locate(path).iterdir():

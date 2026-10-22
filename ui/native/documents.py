@@ -3,7 +3,7 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from ...runtime.platform import get_os, OS
-from ...runtime.document_access import AndroidDocuments, IOSDocuments, LocalDocuments
+from ...runtime.resources.documents import AndroidDocuments, IOSDocuments, LocalDocuments
 
 _ios_delegate_class = None
 _ios_pickers = {}

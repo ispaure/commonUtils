@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from commonUtils.runtime.local_files import LocalFiles
-from commonUtils.runtime.resource_selection import ResourceSelection, ResourceTextSession, ResourceChoice
+from commonUtils.runtime.resources.local import LocalFiles
+from commonUtils.runtime.resources.selection import ResourceSelection, ResourceTextSession, ResourceChoice
 from commonUtils.runtime.operations import MutationIncomplete
 
 
@@ -48,7 +48,7 @@ class ResourceSelectionTests(unittest.TestCase):
 
     def test_save_reopen_distinguishes_collision_failure_and_late_cancel(self):
         from threading import Event
-        from commonUtils.runtime.resource_mutations import save_resource_and_reopen
+        from commonUtils.runtime.resources.mutations import save_resource_and_reopen
         with TemporaryDirectory() as directory:
             provider = LocalFiles(directory)
             path = Path(directory) / 'note.txt'
@@ -70,3 +70,17 @@ class ResourceSelectionTests(unittest.TestCase):
                                          reopen=lambda: (_ for _ in ()).throw(OSError('reader unavailable')))
             self.assertTrue(error.exception.result.destination_published)
             self.assertEqual((Path(directory) / 'other.txt').read_bytes(), b'keep published copy')
+
+
+class ResourcePathTests(unittest.TestCase):
+    def test_virtual_paths_do_not_use_local_filesystem_normalization(self):
+        from commonUtils.runtime.resources.paths import resource_path, resource_name
+        for value, expected in (('', ''), ('.', ''), ('folder/note', 'folder/note'), ('😀.md', '😀.md')):
+            self.assertEqual(resource_path(value), expected)
+        for value in ('../escape', '/root', 'C:drive', 'a//b', 'a/./b', 'a/../b', 'a\\b', 'a\x00b'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                resource_path(value)
+        for value in ('', '.', 'nested/name', '../outside'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                resource_name(value)
+        self.assertEqual(resource_name('😀.md'), '😀.md')
