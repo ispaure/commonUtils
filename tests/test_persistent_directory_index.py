@@ -188,7 +188,7 @@ class PersistentIndexTests(unittest.TestCase):
             sleep(seconds)
         # Observe actual OS-lock contention before cancelling. Schema creation can
         # take more than two seconds on Windows CI; it is not the behavior under test.
-        with patch('commonUtils.filesystem.index.store.sleep', side_effect=lock_wait):
+        with patch('commonUtils.filesystem.index.writer.sleep', side_effect=lock_wait):
             worker.start()
             try:
                 self.assertTrue(entered.wait(30), f'Scan did not start: {errors}')

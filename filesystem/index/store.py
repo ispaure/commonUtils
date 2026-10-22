@@ -1,5 +1,5 @@
 """Directory scan scheduling, validation, and durable per-folder checkpoints."""
-from contextlib import contextmanager, closing
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -8,19 +8,23 @@ import stat
 import sys
 from threading import RLock
 from weakref import WeakSet
-from time import sleep, time, perf_counter
+from time import time, perf_counter
 
 from .scan import DirectoryScan
+from .writer import WriterSession
+from .snapshots import assemble_snapshot
+from .seeding import seed_descendants
+from .generations import checkpoint
 from .metadata import Entry, Snapshot, fingerprint, entry_fingerprint
 from .allocation import allocated_size
 # Keep these long-standing imports available to existing consumers/instrumentation.
 from .reader import SqlEntries, SqlDirectories, _entry
-from ...runtime.operations import check_cancelled, OperationCancelled
+from ...runtime.operations import check_cancelled
 from .order import _sort_key, _encode_sort_parts
 from ..storage import cache_directory
 from .totals import store_folder_stats
 from .exclusions import scan_exclusions, is_excluded
-from .schema import initialize_schema, ensure_folder, copy_entries, write_entries, delete_children, delete_entries, retire_generation
+from .schema import ensure_folder, write_entries, delete_children, delete_entries, retire_generation
 
 
 def directory_index_path():
@@ -146,84 +150,10 @@ class DirectoryCache(DirectoryScan):
             handled.add(target)
         return None
 
-    @contextmanager
     def _writer(self, cancelled, report=lambda done, total, message: None):
-        while not self._work_lock.acquire(timeout=.05):
-            check_cancelled(cancelled)
-        try:
-            check_cancelled(cancelled)
-            self.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            with self.database.with_suffix('.lock').open('a+b') as lock:
-                if os.name == 'nt':
-                    import msvcrt
-                    lock.seek(0, 2)
-                    if not lock.tell():
-                        lock.write(b'0'); lock.flush()
-                else:
-                    import fcntl
-                while True:
-                    check_cancelled(cancelled)
-                    try:
-                        if os.name == 'nt':
-                            lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-                        else:
-                            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        break
-                    except BlockingIOError:
-                        sleep(.05)
-                    except OSError as error:
-                        if os.name != 'nt' or error.errno not in (13, 11, 36):
-                            raise
-                        sleep(.05)
-                try:
-                    self._migrate_legacy(cancelled)
-                    connection = sqlite3.connect(self.database)
-                    try:
-                        connection.execute('PRAGMA journal_mode=WAL')
-                        connection.execute('PRAGMA foreign_keys=ON')
-                        connection.set_progress_handler(lambda: int(cancelled()), 10_000)
-                        initialize_schema(connection, cancelled, report)
-                        yield connection
-                    except OperationCancelled:
-                        # Flush bounded pending work when cancellation arrives between folders.
-                        connection.set_progress_handler(None,0)
-                        connection.commit()
-                        raise
-                    except sqlite3.OperationalError:
-                        if cancelled():
-                            raise OperationCancelled('Operation cancelled; saved folder checkpoints can be resumed') from None
-                        raise
-                    finally:
-                        connection.close()
-                finally:
-                    if os.name == 'nt':
-                        lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-                    else:
-                        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        finally:
-            self._work_lock.release()
+        return WriterSession(self.database, self._work_lock, self._legacy_database).open(cancelled, report)
 
-    def _migrate_legacy(self, cancelled):
-        # Called under the destination writer lock. SQLite backup includes committed
-        # WAL data even when an older application is still using the original DB.
-        # Retain the original for older consumers and recovery; never overwrite an
-        # existing canonical cache or import into explicitly supplied databases.
-        source = self._legacy_database
-        if source is None or source == self.database or self.database.exists() or not source.is_file():
-            return
-        from tempfile import NamedTemporaryFile
-        with NamedTemporaryFile(dir=self.database.parent, prefix='.index-migration-', delete=False) as stream:
-            staged = Path(stream.name)
-        try:
-            with closing(sqlite3.connect(f'{source.absolute().as_uri()}?mode=ro', uri=True)) as old:
-                with closing(sqlite3.connect(staged)) as new:
-                    old.backup(new, pages=128, progress=lambda *args: check_cancelled(cancelled), sleep=.05)
-                    if new.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
-                        raise RuntimeError('Existing directory index failed its integrity check')
-            check_cancelled(cancelled)
-            staged.replace(self.database)
-        finally:
-            staged.unlink(missing_ok=True)
+
 
     @staticmethod
     def _folder_identity(folder, root):
@@ -322,13 +252,9 @@ class DirectoryCache(DirectoryScan):
             raise
 
     def _checkpoint(self, db, cancelled, *, force=False):
-        if force or cancelled() or self._checkpoint_entries>=4096 or time()-self._checkpoint_at>=.5:
-            started = perf_counter()
-            db.commit()
-            self.last_metrics['checkpoint_seconds'] += perf_counter()-started
-            self.last_metrics['checkpoints'] += 1
-            self._checkpoint_entries = 0
-            self._checkpoint_at = time()
+        self._checkpoint_entries, self._checkpoint_at = checkpoint(
+            db, entries=self._checkpoint_entries, saved_at=getattr(self, '_checkpoint_at', time()),
+            metrics=self.last_metrics, cancelled=cancelled, force=force)
 
     def _validate(self, db, generation, root, cancelled, report, *, root_only=False, check_files=True):
         started = perf_counter()
@@ -492,66 +418,11 @@ class DirectoryCache(DirectoryScan):
                 self._totals_interval = max(2, min(60, (self._totals_last - started) * 20))
                 report(0, 0, 'Saved progressive folder totals')
 
-    def _snapshot(self, db, generation, root, recursive, *, reused=False, resumed=False, complete=True, parent=None,
-                  metadata_checked=True, reader=None, cancelled=lambda: False, scope=None):
-        if reader is None and not db.execute('SELECT 1 FROM folder_totals WHERE generation=? LIMIT 1', (generation,)).fetchone():
-            store_folder_stats(db, generation, root, cancelled)
-            db.commit()
-        entries = SqlEntries(self.database, generation, parent=parent, connection=reader, scope=scope)
-        self._readers.add(entries)
-        errors = tuple((Path(path), error) for path, error in db.execute('SELECT path,error FROM errors WHERE generation=?', (generation,)))
-        scanned = db.execute('SELECT scanned_at FROM scans WHERE id=?', (generation,)).fetchone()[0]
-        directories = SqlDirectories(entries)
-        has_totals = db.execute("SELECT 1 FROM sqlite_master WHERE name='folder_totals'").fetchone()
-        total = db.execute('SELECT complete FROM folder_totals WHERE generation=? AND path=?',
-                           (generation, str(root))).fetchone() if has_totals else None
-        complete = complete and (total is None or bool(total[0]))
-        return Snapshot(root, recursive, entries, errors, scanned or time(), directories=directories, reused=reused,
-                        validated_at=time(), resumed=resumed, complete=complete, metadata_checked=metadata_checked)
+    def _snapshot(self, db, generation, root, recursive, **options):
+        return assemble_snapshot(self.database, self._readers, db, generation, root, recursive, **options)
 
     def _seed_descendants(self, db, generation, root, cancelled, report):
-        """Merge overlapping saved branches, preferring their most specific checkpoint."""
-        sources = db.execute('SELECT root,coalesce(building,completed) FROM roots '
-                             'WHERE recursive=1 AND root!=? AND (building IS NOT NULL OR completed IS NOT NULL) '
-                             'ORDER BY length(root) DESC,root', (str(root),)).fetchall()
-        covered = []
-        for source_text, source in sources:
-            check_cancelled(cancelled)
-            branch = Path(source_text)
-            if root not in branch.parents or is_excluded(branch, self._excluded_paths):
-                continue
-            report(0, 0, f'Reusing saved branch {branch}')
-            folder_exclusions, parameters, excluded_branches = [], [], []
-            for nested in covered:
-                if branch not in nested.parents:
-                    continue
-                prefix = str(nested).rstrip(os.sep) + os.sep
-                upper = prefix[:-1] + chr(ord(os.sep) + 1)
-                excluded_branches.append(nested)
-                folder_exclusions.append('NOT (path=? OR (path>=? AND path<?))')
-                parameters.append((str(nested),prefix,upper))
-            folder_where = ''.join(' AND '+clause for clause in folder_exclusions)
-            folder_args = tuple(value for group in parameters for value in group)
-            prefix = source_text.rstrip(os.sep) + os.sep
-            upper = prefix[:-1] + chr(ord(os.sep) + 1)
-            delete_entries(db, generation, scope=branch, exclude=excluded_branches)
-            for table in ('folders','errors'):
-                db.execute(f'DELETE FROM {table} WHERE generation=? AND (path=? OR (path>=? AND path<?))'+folder_where,
-                           (generation,source_text,prefix,upper)+folder_args)
-            copy_entries(db, generation, source, exclude=excluded_branches)
-            db.execute('INSERT OR IGNORE INTO folders SELECT ?,path,CASE WHEN path=? THEN ? ELSE parent END,status,identity '
-                       'FROM folders WHERE generation=?'+folder_where, (generation, source_text, str(branch.parent), source)+folder_args)
-            db.execute('INSERT OR IGNORE INTO errors SELECT ?,path,error FROM errors WHERE generation=?'+folder_where,
-                       (generation, source)+folder_args)
-            # Link separately indexed deep branches into the new root's queue.
-            # Parent enumeration can then remove a branch that no longer exists.
-            for ancestor in branch.parents:
-                if ancestor == root:
-                    break
-                db.execute("INSERT OR IGNORE INTO folders VALUES(?,?,?,'pending',NULL)",
-                           (generation,str(ancestor),str(ancestor.parent)))
-            covered.append(branch)
-        return bool(covered)
+        return seed_descendants(db, generation, root, cancelled, report, excluded_paths=self._excluded_paths)
 
     def reconcile_folder(self, root, *, changes=(), full=False, once=False, cancelled=lambda: False,
                          report=lambda done, total, message: None, recursive_initial=True):
