@@ -141,3 +141,24 @@ Failed commands raise `binary.BinaryCommandError`, an `OSError` subclass with
 may set `max_stderr` to retain at most that many bytes in memory while the rest
 is drained. The exception message never includes these bytes. They may contain
 secrets: consumers must translate or redact them before presentation or logging.
+
+## Disk-spooled binary capture
+
+`capture.run_captured(arguments, ...)` is the alternative for commands requiring
+separate binary stdout, stderr progress and a final diagnostic tail. It returns
+`CapturedCommand(stdout, stderr, returncode, truncated)`; nonzero exit status is
+returned for the caller to interpret. Stdout reads use the requested `limit` and
+stderr retains its final 64 KiB. Temporary spool files can grow on disk while the
+command runs; these are memory bounds, not disk quotas. The existing `run_bytes`
+API retains its pipe-based bounded-output behavior.
+
+Supply `environment`, `cwd`, `input_data`, `timeout`, `cancelled` and a raw-byte
+`progress` callback as needed. Timeouts and cooperative cancellation terminate the
+process tree. On platforms without `os.pread`, progress is left to the caller using
+the final stderr tail. `discard_output=True` routes both streams to DEVNULL.
+Callers own input-size limits, environment filtering, tool options and diagnostics.
+
+`runtime.diagnostics.redaction.redact(text)` filters URL userinfo/query strings and
+common authorization/password/token assignments in complete diagnostic text. It is
+best effort, cannot recognize every secret, and cannot safely redact credentials
+split across arbitrary streaming chunks. Discard output for sensitive commands.

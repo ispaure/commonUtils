@@ -31,3 +31,8 @@ copying a setting with `from ... import ...`. There is no universal library-wide
 operation's contract and inspect both worker errors and per-item results.
 
 [Runtime overview](../README.md) · [Lifecycle guidance](../../docs/developer/architecture.md)
+
+`redaction.redact(text)` provides best-effort filtering of URL credentials/query
+strings and common token/password/authorization assignments in complete diagnostic
+text. Callers choose its use; arbitrary chunks can split credentials. Discard output
+for sensitive commands instead of relying on this filter as a security boundary.

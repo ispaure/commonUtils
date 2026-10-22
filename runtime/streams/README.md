@@ -64,3 +64,13 @@ onto the owning loop. `changed(completed, total)` runs only while `active()`.
 Call `close()` on that loop before retiring the owner; late publications become
 no-ops. The caller chooses status text, percent/indeterminate presentation and
 active-session policy. Unlike copy/hash callbacks, these counts are cumulative.
+
+## Incremental data events
+
+`sse.SSEDataDecoder(max_record=...)` yields UTF-8 data payloads from blank-line
+separated LF/CRLF events, joining multiple `data:` fields with a newline. Other
+fields and comments are ignored; this is data-only framing, not a full SSE client.
+Pending records remain buffered at EOF. Limits apply to pending data plus the
+incoming chunk before consumption; overflow raises `SSERecordLimit`. Iterate each
+feed before feeding again. Application completion markers, JSON schemas, total
+response limits and tool semantics belong to the caller.
