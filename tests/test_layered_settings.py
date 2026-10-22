@@ -63,3 +63,46 @@ class LayeredSettingsTests(unittest.TestCase):
             register_settings(self.defaults, self.defaults)
         with self.assertRaises(ValueError):
             LayeredSettings(self.defaults, self.personal).save({('Options', 'size_int'): None}, scope='application')
+
+    def test_legacy_and_canonical_share_override_precedence_without_writing(self):
+        from commonUtils.configuration.layered import effective_settings
+        from commonUtils.configuration.legacy import config_section_map
+        self.defaults.write_text('\ufeff[Options]\nMixed = default\npercent = 50%\n', encoding='utf-8')
+        self.personal.parent.mkdir()
+        self.personal.write_text('[Options]\nMixed = personal\n', encoding='utf-8')
+        before = self.defaults.read_bytes(), self.personal.read_bytes()
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'mixed'), 'personal')
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'Mixed', case_sensitive_keys=True), 'personal')
+        self.assertIsNone(config_section_map(self.defaults, 'Options', 'mixed', case_sensitive_keys=True))
+        self.assertEqual(effective_settings(self.defaults)['Options']['Mixed'], 'personal')
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'percent'), '50%')
+        self.assertEqual(before, (self.defaults.read_bytes(), self.personal.read_bytes()))
+        self.personal.write_text('malformed', encoding='utf-8')
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'Mixed', case_sensitive_keys=True), 'default')
+        self.assertEqual(self.personal.read_text(), 'malformed')
+
+    def test_legacy_duplicate_and_bypass_policies_remain_explicit(self):
+        from configparser import DuplicateOptionError, MissingSectionHeaderError
+        from unittest.mock import patch
+        from commonUtils.configuration.legacy import config_section_map
+        self.defaults.write_text('[Options]\nName = first\nname = last\n', encoding='utf-8')
+        with self.assertRaises(DuplicateOptionError):
+            config_section_map(self.defaults, 'Options', 'name')
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'name', allow_duplicates=True), 'last')
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'Name', case_sensitive_keys=True), 'first')
+        self.defaults.write_text('bad header\n[Options]\nname = scanned\n', encoding='utf-8')
+        with self.assertRaises(MissingSectionHeaderError):
+            config_section_map(self.defaults, 'Options', 'name')
+        with patch('commonUtils.configuration.legacy.log'):
+            self.assertEqual(config_section_map(self.defaults, 'Options', 'name', fallback_to_bypass=True), 'scanned')
+        self.defaults.unlink()
+        with self.assertRaises(FileNotFoundError):
+            config_section_map(self.defaults, 'Options', 'name')
+
+    def test_registration_changes_select_the_current_override_layer(self):
+        from commonUtils.configuration.legacy import config_section_map
+        other = Path(self.temp.name) / 'other.ini'
+        other.write_text('[Options]\nsize_int = 22\n', encoding='utf-8')
+        register_settings(self.defaults, other)
+        self.assertEqual(config_section_map(self.defaults, 'Options', 'size_int'), '22')
+        self.assertFalse(self.personal.exists())

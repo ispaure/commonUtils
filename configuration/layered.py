@@ -66,24 +66,24 @@ def _read_values(path, stamp):
             for key, value in parser[section].items()}
 
 
-def effective_settings(path, *, case_sensitive=True):
-    """Read a ConfigParser with registered overrides, for non-typed consumers."""
-    parser = INIFile.parse(Path(path).read_text(encoding='utf-8-sig'))
-    if not case_sensitive:
-        from configparser import ConfigParser
-        normalized = ConfigParser(interpolation=None)
-        normalized.read_dict({section: dict(parser[section]) for section in parser.sections()})
-        parser = normalized
+def effective_settings(path, *, case_sensitive=True, allow_duplicates=False,
+                       normalize_after_parse=True):
+    """Compose registered layers with explicit legacy parser policies.
+
+    Canonical callers normalize after case-preserving parsing. Legacy callers
+    parse with their requested case/duplicate policy before the same overlay.
+    """
+    from .composition import parse_defaults, overlay
+    parser = parse_defaults(path, case_sensitive=case_sensitive,
+                            allow_duplicates=allow_duplicates,
+                            normalize_after_parse=normalize_after_parse)
     personal = personal_path(path)
     if personal is not None:
         try:
             values = read_values(personal)
         except (OSError, UnicodeError, Error):
             values = {}
-        for (section, key), value in values.items():
-            if not parser.has_section(section):
-                parser.add_section(section)
-            parser.set(section, key, value)
+        overlay(parser, values)
     return parser
 
 

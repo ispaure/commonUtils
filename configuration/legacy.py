@@ -74,29 +74,12 @@ def config_section_map(
             return None
         return val.strip() if strip_value else val
 
-    # ---- Normal parsing route ----
-    config = configparser.ConfigParser(
-        interpolation=None,
-        strict=not allow_duplicates,
-    )
-    if case_sensitive_keys:
-        config.optionxform = str  # preserve original key case
-
+    # Legacy parse policy is separate from registered-layer precedence.
     try:
-        with path.open("r", encoding="utf-8-sig") as f:
-            config.read_file(f)
-        from .layered import personal_path
-        personal = personal_path(path)
-        if personal is not None:
-            from .layered import read_values
-            try:
-                overrides = read_values(personal)
-            except (OSError, UnicodeError, configparser.Error):
-                overrides = {}
-            for (override_section, key), value in overrides.items():
-                if not config.has_section(override_section):
-                    config.add_section(override_section)
-                config.set(override_section, key, value)
+        from .layered import effective_settings
+        config = effective_settings(path, case_sensitive=case_sensitive_keys,
+                                    allow_duplicates=allow_duplicates,
+                                    normalize_after_parse=False)
     except Exception as e:
         if not fallback_to_bypass:
             # During refactors this is usually preferable: fail loudly.
