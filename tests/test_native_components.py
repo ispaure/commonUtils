@@ -16,7 +16,7 @@ from unittest.mock import patch
 from commonUtils import ui
 from commonUtils.ui import native
 from commonUtils.runtime.platform import OS
-dialogs = native._desktop_dialogs()
+from commonUtils.ui.native import dialogs
 with patch.object(ui, 'use_pyside', False), patch.object(dialogs, 'get_os', return_value=OS.LINUX), \
      patch.object(dialogs, '_display_msg_box_ok_linux', return_value=True) as ok, \
      patch.object(dialogs, '_display_msg_box_ok_cancel_linux', return_value=False) as cancel:
@@ -26,6 +26,18 @@ with patch.object(ui, 'use_pyside', False), patch.object(dialogs, 'get_os', retu
     cancel.assert_called_once_with('Title', 'Message')
 '''
         self.run_isolated(script)
+
+    def test_dialog_dispatch_preserves_each_desktop_transport(self):
+        from unittest.mock import patch
+        from commonUtils.ui.native import dialogs
+        from commonUtils.runtime.platform import OS
+        for platform, suffix in ((OS.WIN, 'windows'), (OS.MAC, 'macos'), (OS.LINUX, 'linux')):
+            for name in ('display_msg_box_ok', 'display_msg_box_ok_cancel'):
+                with self.subTest(platform=platform, name=name), \
+                     patch.object(dialogs, 'get_os', return_value=platform), \
+                     patch.object(dialogs, '_' + name + '_' + suffix, return_value=True) as transport:
+                    self.assertTrue(getattr(dialogs, name)('Synthetic title', r'Line\nTwo'))
+                    transport.assert_called_once_with('Synthetic title', 'Line\nTwo')
 
     def test_state_is_configurable_and_each_destination_retains_its_routes(self):
         state = NavigationState(('gallery', 'notes'))

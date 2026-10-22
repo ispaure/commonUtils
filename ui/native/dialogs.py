@@ -8,7 +8,7 @@ It primarily serves as the native backend for ``commonUtils.ui`` when a Qt appli
 undesirable. For Qt/PySide-based UI functionality, use ``commonUtils.ui.pyside`` instead.
 """
 
-from ..runtime.platform.capabilities import Capability, require_capability
+from ...runtime.platform.capabilities import Capability, require_capability
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
@@ -27,8 +27,8 @@ import ctypes
 import shutil
 import subprocess
 
-from ..runtime.platform import OS, get_os
-from ..integrations.wrappers import cmdShellWrapper
+from ...runtime.platform import OS, get_os
+from ...integrations.wrappers import cmdShellWrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------
