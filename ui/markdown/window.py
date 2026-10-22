@@ -53,7 +53,7 @@ class MarkdownWindow(qt.QMainWindow):
         self.setWindowTitle(f'{title}{" *" if self.viewer.is_modified else ""} — Markdown')
 
     def closeEvent(self, event):
-        from ..resource_picker import resource_tasks_pending
+        from ..resources.picker import resource_tasks_pending
         if resource_tasks_pending(self):
             event.ignore()
             return

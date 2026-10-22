@@ -1,7 +1,8 @@
 """Provider-backed text editor: all drafts are session-only, even after export."""
-from . import pyside as qt
-from .tasks.operation_progress import OperationProgress
-from ..runtime.resources.selection import ResourceTextSession
+from .. import pyside as qt
+from .lifecycle import operations_for
+from ..tasks.operation_progress import OperationProgress
+from ...runtime.resources.selection import ResourceTextSession
 
 
 class ResourceTextWindow(qt.QMainWindow):
@@ -24,6 +25,9 @@ class ResourceTextWindow(qt.QMainWindow):
         self.status.setWordWrap(True)
         self.operation = OperationProgress(self)
         self.operation.completed.connect(self._saved)
+        self.operations = operations_for(self)
+        self.operations.bind(choice.provider)
+        self.operations.own(self.operation, cancel=lambda: None)
         content = qt.QWidget()
         layout = qt.QVBoxLayout(content)
         layout.addWidget(self.editor, 1)
@@ -55,7 +59,8 @@ class ResourceTextWindow(qt.QMainWindow):
             return False
         draft = self.editor.toPlainText()
         self.editor.setReadOnly(True)
-        self.operation.start(lambda report, cancelled: self.session.save(draft, cancelled=cancelled), message='Saving verified text…')
+        session = self.session
+        self.operation.start(lambda report, cancelled: session.save(draft, cancelled=cancelled), message='Saving verified text…')
         return True
 
     def save_as(self):
@@ -67,7 +72,8 @@ class ResourceTextWindow(qt.QMainWindow):
         draft = self.editor.toPlainText()
         self.pending_choice = choice
         self.editor.setReadOnly(True)
-        self.operation.start(lambda report, cancelled: self.session.save_as(choice.provider, choice.path, draft, cancelled=cancelled), message='Saving verified copy…')
+        session = self.session
+        self.operation.start(lambda report, cancelled: session.save_as(choice.provider, choice.path, draft, cancelled=cancelled), message='Saving verified copy…')
 
     def _saved(self, session, error):
         self.editor.setReadOnly(False)
@@ -90,8 +96,9 @@ class ResourceTextWindow(qt.QMainWindow):
             self.close()
 
     def closeEvent(self, event):
-        from .resource_picker import resource_tasks_pending
+        from .picker import resource_tasks_pending
         if resource_tasks_pending(self):
+            self.pending_close = True
             event.ignore()
             return
         if self.operation.busy:

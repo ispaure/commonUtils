@@ -1,9 +1,10 @@
 """One provider-backed browser for Open and Save As; hosts supply storage leases."""
 from pathlib import Path
-from . import pyside as qt
-from .resource_browser import ResourceBrowser
-from .tasks.operation_progress import OperationProgress
-from ..runtime.resources.selection import ResourceSelection, ResourceChoice
+from .. import pyside as qt
+from .browser import ResourceBrowser
+from .lifecycle import ResourceOperations, operations_for
+from ..tasks.operation_progress import OperationProgress
+from ...runtime.resources.selection import ResourceSelection, ResourceChoice
 
 
 class ResourcePicker(qt.QDialog):
@@ -19,6 +20,7 @@ class ResourcePicker(qt.QDialog):
         self.choice = None
         self._pending_resolution = None
         self.closing = False
+        self.operations = ResourceOperations()
         layout = qt.QVBoxLayout(self)
         self.storage = qt.QComboBox()
         self.storage.addItems([label for label, factory in locations])
@@ -40,6 +42,7 @@ class ResourcePicker(qt.QDialog):
         layout.addWidget(self.notice)
         self.operation = OperationProgress(self)
         self.operation.completed.connect(self._resolved)
+        self.operations.own(self.operation)
         layout.addWidget(self.operation)
         buttons = qt.QDialogButtonBox(qt.QDialogButtonBox.StandardButton.Ok | qt.QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.choose)
@@ -49,13 +52,14 @@ class ResourcePicker(qt.QDialog):
         self.switch(0)
 
     def switch(self, index):
-        if self.browser and self.browser.busy or self.operation.busy:
+        if self.operations.busy:
             self.storage.blockSignals(True)
             self.storage.setCurrentIndex(self.active_index)
             self.storage.blockSignals(False)
             return
         if self.browser:
             self.directories[self.active_index] = self.provider.relative(self.browser.navigation.directory)
+            self.operations.retire(self.browser)
             self.browser.hide()
             self.content.removeWidget(self.browser)
             self.browser.deleteLater()
@@ -69,10 +73,12 @@ class ResourcePicker(qt.QDialog):
         try:
             self.provider, self.release = self.locations[index][1]()
             self.setWindowTitle(('🕵️ Private - ' if getattr(self.provider, 'private', False) else '') + title)
+            self.operations.bind(self.provider)
             self.model = ResourceSelection(self.provider, mode=self.mode, extensions=self.extensions)
             directory = self.directories.get(index, '')
             self.folder.setText(directory)
             self.browser = ResourceBrowser(self.model, directory=self.provider.root / directory, parent=self, preview=False)
+            self.operations.own(self.browser, cancel=self.browser.stop)
             self.browser.notice.hide()  # The picker already describes the active storage.
             self.content.addWidget(self.browser)
             self.storage.setEnabled(False)
@@ -126,7 +132,9 @@ class ResourcePicker(qt.QDialog):
         name = self.name.text()
         self.storage.setEnabled(False)
         self.browser.setEnabled(False)
-        self.operation.start(lambda report, cancelled: self.model.resolve(directory, name, cancelled=cancelled), message='Checking selection…')
+        model = self.model
+        self._resolution_identity = self.operations.capture()
+        self.operation.start(lambda report, cancelled: model.resolve(directory, name, cancelled=cancelled), message='Checking selection…')
 
     def _resolved(self, path, error):
         if self.browser and self.browser.busy:
@@ -138,6 +146,8 @@ class ResourcePicker(qt.QDialog):
             self.browser.setEnabled(True)
         if self.closing:
             self.reject()
+        elif not self.operations.accepts(self._resolution_identity):
+            self.notice.setText('Storage changed; choose the selection again.')
         elif error:
             if self.browser and self.browser.closing:
                 self.browser.resume()
@@ -149,12 +159,7 @@ class ResourcePicker(qt.QDialog):
 
     def reject(self):
         self.closing = True
-        busy = self.operation.busy
-        if busy:
-            self.operation.request_cancel()
-        if self.browser:
-            busy = self.browser.stop() or busy
-        if busy:
+        if self.operations.stop():
             return
         self.release()
         self.release = lambda: None
@@ -162,7 +167,7 @@ class ResourcePicker(qt.QDialog):
 
     def closeEvent(self, event):
         self.reject()
-        event.accept() if not (self.operation.busy or self.browser and self.browser.busy) else event.ignore()
+        event.ignore() if self.operations.busy else event.accept()
 
 
 def choose_resource(locations, **options):
@@ -183,13 +188,15 @@ class ResourceTaskDialog(qt.QDialog):
         self.operation = OperationProgress(self)
         qt.QVBoxLayout(self).addWidget(self.operation)
         if parent is not None:
-            parent._resource_tasks = getattr(parent, '_resource_tasks', [])
-            parent._resource_tasks.append(self)
+            operations_for(parent).own(self, busy=lambda: self.operation.busy,
+                                       cancel=self.operation.request_cancel)
         self.operation.completed.connect(self._retired)
 
     def _retired(self, *args):
-        if self.owner is not None and self in self.owner._resource_tasks:
-            self.owner._resource_tasks.remove(self)
+        if self.owner is not None:
+            operations_for(self.owner).retire(self)
+            if getattr(self.owner, 'pending_close', False):
+                self.owner.close()
 
     def reject(self):
         if self.operation.busy:
@@ -206,7 +213,4 @@ class ResourceTaskDialog(qt.QDialog):
 
 
 def resource_tasks_pending(owner):
-    pending = [job for job in getattr(owner, '_resource_tasks', ()) if job.operation.busy]
-    for job in pending:
-        job.operation.request_cancel()
-    return bool(pending)
+    return operations_for(owner).stop()

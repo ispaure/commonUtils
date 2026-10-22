@@ -11,8 +11,8 @@ from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser.entry_model import EntryModel, ProviderEntryModel
 from commonUtils.ui.file_browser.model import BrowserTree, ByteSortModel, _BrowserSelection
 from commonUtils.ui.file_browser.views import BrowserViews
-from commonUtils.ui.resource_browser import ResourceBrowser
-from commonUtils.ui.resource_picker import ResourcePicker
+from commonUtils.ui.resources.browser import ResourceBrowser
+from commonUtils.ui.resources.picker import ResourcePicker
 
 
 def picture():

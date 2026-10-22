@@ -2,20 +2,21 @@
 from collections import deque
 from contextlib import nullcontext
 from types import SimpleNamespace
-from ..runtime.resources.provider import DirectoryProvider, capabilities
+from ...runtime.resources.provider import DirectoryProvider, capabilities
 from pathlib import Path
-from . import pyside as qt
-from .tasks.operation_progress import OperationProgress
-from .file_browser.navigation import BreadcrumbBar
-from .file_browser.controls import navigation_button, ViewModeSelector, FolderSizeControl, create_search_toggle, create_search_panel
-from .file_browser.entry_model import ProviderEntryModel, ProviderTree
-from .file_browser.model import ByteSortModel, _BrowserSelection
-from .file_browser.views import BrowserViews
-from .file_browser.thumbnails import image_thumbnail
-from ..runtime.browsing import BrowseRole
-from ..runtime.operations import check_cancelled
-from ..filesystem import format_size
-from ..runtime.resources.mutations import delete_resource, create_resource_folder, rename_resource
+from .. import pyside as qt
+from .lifecycle import ResourceOperations
+from ..tasks.operation_progress import OperationProgress
+from ..file_browser.navigation import BreadcrumbBar
+from ..file_browser.controls import navigation_button, ViewModeSelector, FolderSizeControl, create_search_toggle, create_search_panel
+from ..file_browser.entry_model import ProviderEntryModel, ProviderTree
+from ..file_browser.model import ByteSortModel, _BrowserSelection
+from ..file_browser.views import BrowserViews
+from ..file_browser.thumbnails import image_thumbnail
+from ...runtime.browsing import BrowseRole
+from ...runtime.operations import check_cancelled
+from ...filesystem import format_size
+from ...runtime.resources.mutations import delete_resource, create_resource_folder, rename_resource
 
 
 class ResourceBreadcrumbBar(BreadcrumbBar):
@@ -37,6 +38,8 @@ class ResourceBrowser(qt.QWidget):
     def __init__(self, provider: DirectoryProvider, parent=None, *, directory=None, actions=(), thumbnail=None, details=None, preview=True):
         super().__init__(parent)
         self.provider = provider
+        self.operations = ResourceOperations()
+        self.operations.bind(provider)
         self.actions = tuple(actions)
         self.thumbnail = thumbnail
         self._queued_listings = deque()
@@ -127,8 +130,8 @@ class ResourceBrowser(qt.QWidget):
         layout.addWidget(self.splitter, 1)
         self.preview = None
         if preview:
-            from .file_browser.controls import ViewIcon
-            from .appearance.icons import set_painted_icon
+            from ..file_browser.controls import ViewIcon
+            from ..appearance.icons import set_painted_icon
             self.preview_toggle = qt.QToolButton(self)
             set_painted_icon(self.preview_toggle, ViewIcon, 4)
             self.preview_toggle.setCheckable(True)
@@ -136,7 +139,7 @@ class ResourceBrowser(qt.QWidget):
             self.preview_toggle.setToolTip('Show file and folder information')
             self.preview_toggle.setAccessibleName('Show file and folder preview')
             row.addWidget(self.preview_toggle)
-            from .file_browser.resource_preview import ResourcePreview
+            from ..file_browser.resource_preview import ResourcePreview
             self.preview = ResourcePreview(self, details)
         self.notice = qt.QLabel('Session-only browsing · Thumbnails stay in memory')
         self.notice.setToolTip('Folder contents stay in memory. Persistent indexing and disk caches are disabled.')
@@ -158,8 +161,15 @@ class ResourceBrowser(qt.QWidget):
         self.forward.clicked.connect(lambda: self._history(1))
         self.up.clicked.connect(lambda: self.navigate(self.navigation.directory.parent))
         self.refresh_button.clicked.connect(self.refresh)
-        from .file_browser.keyboard import BrowserKeyboard
+        from ..file_browser.keyboard import BrowserKeyboard
         self.keyboard = BrowserKeyboard(self, execute=self._view_command)
+        self.operations.own(self.operation)
+        self.operations.own(self.search_operation)
+        self.operations.own(self.views, busy=lambda: self.views.cover_busy, cancel=self.views.stop)
+        if self.preview:
+            self.operations.own(self.preview, cancel=self.preview.stop)
+        self.operations.own(self._queued_listings, busy=lambda: bool(self._queued_listings) or self.search_pending,
+                            cancel=lambda: None)
         self.navigate(directory or provider.root)
 
     def _controls(self, enabled=True):
@@ -173,7 +183,7 @@ class ResourceBrowser(qt.QWidget):
 
     @property
     def busy(self):
-        return self.operation.busy or bool(getattr(self, 'search_pending', False)) or bool(getattr(self, 'search_operation', None) and self.search_operation.busy) or self.views.cover_busy or bool(self._queued_listings) or bool(self.preview and self.preview.busy)
+        return self.operations.busy
 
     def _thumbnail(self, path, size, cancelled):
         provider = getattr(self.provider, 'provider', self.provider)
@@ -221,7 +231,9 @@ class ResourceBrowser(qt.QWidget):
         self.model.pending.add(directory)
         relative = self.provider.relative(directory)
         self._controls(False)
-        self.operation.start(lambda report, cancelled: self.provider.list(relative, cancelled=cancelled), message='Reading folder…')
+        self._listing_identity = self.operations.capture()
+        provider = self.provider
+        self.operation.start(lambda report, cancelled: provider.list(relative, cancelled=cancelled), message='Reading folder…')
 
     def _request_children(self, directory):
         if self.closing:
@@ -246,7 +258,7 @@ class ResourceBrowser(qt.QWidget):
             self.directory_changed.emit(directory)
 
     def _loaded(self, rows, error):
-        if self.closing:
+        if not self.operations.accepts(self._listing_identity):
             self._maybe_idle()
             return
         target = self._listing_target
@@ -336,22 +348,25 @@ class ResourceBrowser(qt.QWidget):
     def _start_search(self):
         if self.closing or not self.search_pending or self.operation.busy or self.search_operation.busy:
             return
-        from ..runtime.resources.search import search_resources
+        from ...runtime.resources.search import search_resources
         query, directory = self.filter.text().strip(), self.navigation.directory
         self._active_search = query, directory
         self.search_pending = False
         self.search_operation.bar.show()
         self.search_operation.cancel_button.show()
-        self.search_operation.start(lambda report, cancelled: search_resources(self.provider,
-            self.provider.relative(directory), query, cancelled=cancelled), message='Searching this folder and its subfolders…')
+        self._search_identity = self.operations.capture()
+        provider = self.provider
+        relative = provider.relative(directory)
+        self.search_operation.start(lambda report, cancelled: search_resources(provider,
+            relative, query, cancelled=cancelled), message='Searching this folder and its subfolders…')
 
     def _search_loaded(self, result, error):
         query, directory = self._active_search
-        if not self.closing and query == self.filter.text().strip() and directory == self.navigation.directory:
+        if self.operations.accepts(self._search_identity) and query == self.filter.text().strip() and directory == self.navigation.directory:
             if error:
                 self.search_operation.message.setText('Search failed: ' + error)
             elif result is not None:
-                from ..runtime.browsing import BrowseEntry, BrowseTree
+                from ...runtime.browsing import BrowseEntry, BrowseTree
                 parts = Path(self.provider.relative(directory)).parts
                 tree = BrowseTree(BrowseEntry(self.provider.root, self.provider.root.name, True),
                                   max_entries=len(result.rows) + len(parts) + 1)
@@ -429,7 +444,7 @@ class ResourceBrowser(qt.QWidget):
     def _mkdir(self):
         name, accepted = qt.QInputDialog.getText(self, 'New folder', 'Folder name:')
         if accepted and name:
-            from ..runtime.resources.paths import resource_path
+            from ...runtime.resources.paths import resource_path
             try:
                 name = resource_path(name)
                 if '/' in name:
@@ -443,7 +458,7 @@ class ResourceBrowser(qt.QWidget):
     def _rename(self, row):
         name, accepted = qt.QInputDialog.getText(self, 'Rename', 'New name:', text=row['name'])
         if accepted and name:
-            from ..runtime.resources.paths import resource_path
+            from ...runtime.resources.paths import resource_path
             try:
                 name = resource_path(name)
                 if '/' in name:
@@ -469,18 +484,14 @@ class ResourceBrowser(qt.QWidget):
         self.closing = True
         self.search_timer.stop()
         self.search_pending = False
-        self.search_operation.request_cancel()
         self._queued_listings.clear()
-        self.operation.request_cancel()
-        self.views.stop()
-        if self.preview:
-            self.preview.stop()
-        return self.busy
+        return self.operations.stop()
 
     def resume(self):
         """Resume a picker after its validation failed and all workers retired."""
         if self.busy:
             raise RuntimeError('Wait for browser workers before resuming.')
+        self.operations.resume()
         self.closing = self.views.closing = False
         self.views.cover_cancelled.clear()
         self.views.badge_timer.start()
