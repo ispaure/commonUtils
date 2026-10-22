@@ -403,3 +403,19 @@ The existing `image_header` PNG/JPEG/WebP contract is unchanged.
 `(caption, width, height)`, accepting `Caption|400`, `Caption|400x200` or a numeric
 label alone. Dimensions are positive integers of up to six digits; malformed
 hints stay literal. Desktop and native Markdown renderers share this parser.
+
+## Optional Pillow encoding
+
+`image_encoding.encode_image(source, allocate_output=..., extension=..., quality=...,
+max_long_edge=None, max_height=None, preserve_alpha=True)` applies EXIF orientation,
+ICC conversion when needed, proportional LANCZOS resizing, and JPEG/WebP encoding.
+It preserves remaining EXIF and updates existing dimension tags. WebP retains alpha
+when requested; JPEG discards alpha. WebP uses method 6; JPEG uses optimization.
+Pillow is required only by this optional module.
+
+`quality` may be an integer or a callback evaluated after source metadata is read.
+`image_is_color` provides chroma-based classification, including uniform tints.
+The caller chooses quality and dimensions, supplies an exclusive staging allocator,
+and owns output verification, failure cleanup, publication and source retention.
+The allocator runs after pixel preparation and before encoding; input is closed
+before return. Unsupported suffixes raise `UnsupportedImageFormat`.

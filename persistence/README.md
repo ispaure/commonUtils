@@ -86,3 +86,14 @@ It never describes a published destination as rolled back. Hosts refresh both
 locations and choose recovery rather than replaying the full transfer blindly.
 These helpers do not choose overwrite, link, encryption or directory-merge policy,
 and provide no cross-process lock or crash-recovery journal.
+
+## Exclusive publication with copy fallback
+
+`exclusive_copy.link_or_copy_exclusive(staged_path, destination)` first hard-links
+without replacement. For unsupported/cross-device links it exclusively creates,
+copies, flushes and fsyncs the destination; failure removes only the target it
+created. The staged source is retained on success and failure. Other link errors
+propagate without copying. The copy fallback exposes a partial destination while
+writing and is **not atomic**. Callers needing atomic no-replace publication must
+continue using `publication.rename_exclusive`; the contracts are intentionally
+different. Hosts own verification, replacement decisions and source deletion.

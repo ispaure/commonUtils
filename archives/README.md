@@ -154,3 +154,13 @@ collision checks. Editing/access entry points retain their own validation,
 authentication, staging and finished-output verification. EPUB ordering and
 comic metadata rules remain consumer policy. Focused regressions live in
 `tests/test_archive_rebuilding.py` and archive operation tests.
+
+## Callback-backed member views
+
+`callbacks.CallbackArchive(members, read_member=..., manifest=None)` adapts explicit
+`ZipInfo` records and a lazy byte callback to `infolist`, `namelist`, `getinfo`,
+`read` and context-managed `open`. Unknown member names fail before invoking the
+callback. An optional manifest callback returns member signatures; cancellation
+is checked before and after it runs. No file, credential or password is opened by
+the facade. The backend owns authentication, size limits, revision checks, caching
+and retirement. `open` wraps a complete member in RAM; it is not a streaming API.
