@@ -27,7 +27,7 @@ class ScopedTabBar(qt.QTabBar):
         super().tabInserted(index)
         if not self.tabsClosable():
             return
-        from .workspace import _tab_button
+        from .headers import _tab_button
         button = _tab_button('×', 'Close tab', self)
         def close():
             current = self.tabAt(button.pos() + button.rect().center())

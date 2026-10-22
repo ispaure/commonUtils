@@ -3,6 +3,7 @@ from weakref import WeakValueDictionary
 from uuid import uuid4
 from .. import pyside as qt
 from shiboken6 import isValid
+from .drops import DropCoordinator
 
 MIME = 'application/x-commonutils-workspace-tab'
 _docks = WeakValueDictionary()
@@ -30,7 +31,7 @@ class DockWindowDrag(qt.QObject):
         self.original_floating = dock.isFloating()
         self.original_active = workspace.active_dock
         self._finished = False
-        self._restore_destination = None
+        self.drop = DropCoordinator(self.workspace)
         self.hotspot = dock.mapFromGlobal(origin)
         self.hotspot.setY(max(15, self.hotspot.y()))
         size = dock.size()
@@ -45,45 +46,22 @@ class DockWindowDrag(qt.QObject):
         from .workspace import _workspaces
         self.preview_destination(point)
         candidates = sorted(tuple(_workspaces), key=lambda owner: owner is not self.workspace.main_workspace)
-        for workspace in candidates:
-            if (isValid(workspace) and workspace.isVisible() and not workspace._closing
-                    and workspace.dock_group == self.workspace.dock_group
-                    and self.dock.workspace.can_move_tab(self.dock, destination=workspace)):
-                local = workspace.mapFromGlobal(point)
-                if workspace.rect().contains(local):
-                    anchor, placement, preview = workspace._drop_location(local, self.dock)
-                    return workspace, anchor, placement, preview
-        return None
+        return self.drop.resolve(self.dock, point, candidates)
 
     def preview_destination(self, point):
-        main = self.workspace.main_workspace
-        inside = main.window().frameGeometry().contains(point)
-        if not inside and self._restore_destination is not None:
-            self._restore_destination()
-            self._restore_destination = None
-        elif inside and self._restore_destination is None:
-            self._restore_destination = self.workspace.reveal_for_drop(point)
+        self.drop.reveal(point)
 
     def finish_destination(self, committed):
-        if self._restore_destination is not None:
-            restore, self._restore_destination = self._restore_destination, None
-            if not committed:
-                restore()
+        self.drop.finish(committed)
 
     def clear_preview(self):
-        from .workspace import _workspaces
-        for workspace in tuple(_workspaces):
-            if isValid(workspace):
-                workspace._drop_preview.hide()
+        self.drop.clear()
 
     def move(self, point):
         self.dock.move(point - self.hotspot)
         self.clear_preview()
         target = self.target(point)
-        if target:
-            workspace, anchor, placement, preview = target
-            workspace._drop_preview.setGeometry(preview)
-            workspace._drop_preview.show(); workspace._drop_preview.raise_()
+        self.drop.preview(target)
         self.dock.raise_()
 
     def finish(self, point, *, cancel=False):
@@ -100,7 +78,7 @@ class DockWindowDrag(qt.QObject):
         completed = False
         if target:
             workspace, anchor, placement, preview = target
-            if workspace.adopt(self.dock, placement=placement, anchor=anchor):
+            if self.drop.commit(self.dock, target):
                 workspace._update_drop_target()
                 completed = True
         elif alive and not cancel:
@@ -187,9 +165,8 @@ class WorkspaceDragMixin:
             return None
         key = bytes(event.mimeData().data(MIME)).decode('ascii', errors='ignore')
         dock = _docks.get(key)
-        return dock if (dock is not None and isValid(dock) and isValid(dock.workspace) and dock in dock.workspace.docks
-                        and dock.workspace.dock_group == self.dock_group
-                        and dock.workspace.can_move_tab(dock, destination=self)) else None
+        from .drops import eligible
+        return dock if dock is not None and eligible(self, dock) else None
 
     def _drop_location(self, point, moving):
         target = next((dock for dock in self.docks if dock is not moving
@@ -212,19 +189,19 @@ class WorkspaceDragMixin:
         if dock is None:
             return False
         point = watched.mapTo(self, event.position().toPoint())
-        target, placement, preview = self._drop_location(point, dock)
+        coordinator = DropCoordinator(self)
+        target = coordinator.resolve(dock, point, (self,), global_point=False)
+        if target is None:
+            event.ignore()
+            return False
         event.setDropAction(qt.Qt.DropAction.MoveAction)
         event.accept()
         if kind == qt.QEvent.Type.Drop:
-            self._drop_preview.hide()
-            if not self.adopt(dock, placement=placement, anchor=target):
+            coordinator.clear()
+            if not coordinator.commit(dock, target):
                 event.ignore()
-                return True
-            self._update_drop_target()
         else:
-            self._drop_preview.setGeometry(preview)
-            self._drop_preview.show()
-            self._drop_preview.raise_()
+            coordinator.preview(target)
         return True
 
     def dragEnterEvent(self, event):
@@ -250,7 +227,7 @@ class NativeWindowDrag(DockWindowDrag):
         qt.QObject.__init__(self, window)
         self.window = window
         self.workspace = window.workspace
-        self._restore_destination = None
+        self.drop = DropCoordinator(self.workspace)
         self.original_geometry = qt.QRect(geometry)
         self._finished = False
         self.timer = qt.QTimer(self)
@@ -262,21 +239,15 @@ class NativeWindowDrag(DockWindowDrag):
     def target(self, point):
         main = self.workspace.main_workspace
         self.preview_destination(point)
-        if (main.isVisible() and not main._closing and self.workspace.docks
-                and main.rect().contains(main.mapFromGlobal(point))):
+        if self.workspace.docks:
             dock = self.workspace.active_dock or self.workspace.docks[0]
-            anchor, placement, preview = main._drop_location(main.mapFromGlobal(point), dock)
-            return main, anchor, placement, preview
+            return self.drop.resolve(dock, point, (main,))
         return None
 
     def move(self, point):
         self.clear_preview()
         target = self.target(point)
-        if target:
-            owner, _, _, preview = target
-            owner._drop_preview.setGeometry(preview)
-            owner._drop_preview.show()
-            owner._drop_preview.raise_()
+        self.drop.preview(target)
 
     def poll(self):
         point = qt.QCursor.pos()
@@ -301,7 +272,7 @@ class NativeWindowDrag(DockWindowDrag):
             capacity = main.policy.max_tabs if main.policy else None
             if capacity is None or len(main.docks) + len(docks) <= capacity:
                 for dock in docks:
-                    if not main.adopt(dock, placement=placement, anchor=anchor):
+                    if not self.drop.commit(dock, target._replace(anchor=anchor, placement=placement)):
                         break
                     anchor, placement = dock, 'tabs'
                     committed = True
