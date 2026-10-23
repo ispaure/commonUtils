@@ -431,6 +431,13 @@ and owns output verification, failure cleanup, publication and source retention.
 The allocator runs after pixel preparation and before encoding; input is closed
 before return. Unsupported suffixes raise `UnsupportedImageFormat`.
 
+The implementation keeps three private phases in the same owner: color/alpha
+preparation, bounded resizing, and EXIF/ICC metadata preparation. `encode_image`
+shows their order and the output allocation boundary directly; applications still
+own staging and publication. Changing a phase must preserve lazy quality timing,
+metadata dimensions after orientation, and the caller's allocated-stage ownership
+on failure.
+
 ## Portable Markdown and string tables
 
 [Markdown](markdown/markdown.md) groups properties, image-size syntax, file activation and local wiki catalogs. [String tables](tables.md) documents the lightweight CSV-backed Cell/Row/Spreadsheet API.

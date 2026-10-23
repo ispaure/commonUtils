@@ -112,3 +112,18 @@ All 14 documentation-layout, portable catalog and real offscreen viewer cases
 pass. Every local link in all 79 wiki pages resolves. No runtime/Perforce API,
 consumer build architecture, dependency or data schema changes. Work is local
 only; no remote was pushed.
+
+## Image encoding phase ownership
+
+The optional Pillow encoder now expresses color/alpha conversion, aspect-ratio
+resizing and metadata preparation as three private functions in its existing
+module. The public function exposes phase order and the caller's allocation
+boundary. Its signature, output policy and consumer ownership do not change.
+
+Eight shared contracts pass, including lazy quality timing, pre-allocation ICC
+errors, unsupported-encoder stage ownership, nested EXIF dimensions and palette
+transparency. A separate old/new comparison across 48 real input/output profiles
+confirms identical bytes, errors, allocation events and retained sources. Existing
+Logistics image and comic consumer checks pass; no user images are modified.
+The initial parity-fixture generator could not serialize a new nested EXIF IFD
+into TIFF; PNG retains nested-IFD coverage and TIFF covers CMYK/Lab profiles.
