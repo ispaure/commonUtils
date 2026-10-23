@@ -74,3 +74,7 @@ post-publication cleanup mechanics from
 Their plans and link/collision policies remain distinct; virtual provider moves
 also retain their own capability and encoding checks. Read `MutationIncomplete`
 publication/source state before deciding whether a retry is safe.
+
+## Local operations and resource adapters
+
+This package owns physical local paths, snapshots and the persistent metadata index. `runtime.resources` owns provider identifiers, capabilities and lifetimes for local/archive/platform storage. Providers adapt local operations and revalidate access; an index hit never grants file access. Shared transfer phases and publication live in `persistence.transfers` and `persistence.publication`, so the two interfaces do not need duplicate transaction engines. Reusable queries live in [search](../search/README.md); UI owns workers and presentation.

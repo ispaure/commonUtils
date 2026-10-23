@@ -348,7 +348,7 @@ class ResourceBrowser(qt.QWidget):
     def _start_search(self):
         if self.closing or not self.search_pending or self.operation.busy or self.search_operation.busy:
             return
-        from ...runtime.resources.search import search_resources
+        from ...search.providers import search_resources
         query, directory = self.filter.text().strip(), self.navigation.directory
         self._active_search = query, directory
         self.search_pending = False

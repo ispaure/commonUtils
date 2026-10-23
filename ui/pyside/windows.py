@@ -55,5 +55,5 @@ class Window:
                 self.dlg.showMaximized()
 
         else:
-            _api.logUtils.exit_msg('Wrong type for Window.dlg')
+            raise TypeError('Wrong type for Window.dlg')
 

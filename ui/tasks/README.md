@@ -15,5 +15,6 @@ modules have been removed; update imports and mock patch targets to this package
 - `process_progress`
 - `process_host`
 - `download`
+- `archive`: optional progress adapter for the legacy ZIP extraction entry point
 
 [Operation progress](../operation_progress.md) and [runtime operations](../../runtime/operations/README.md).

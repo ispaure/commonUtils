@@ -1,6 +1,6 @@
 """Size hints and native HTML are inert, bounded and source-independent."""
 import unittest
-from commonUtils.formats.markdown_images import image_size
+from commonUtils.formats.markdown.images import image_size
 from commonUtils.ui.native.markdown_preview import markdown_preview
 from commonUtils.tests.test_gif_headers import GIF
 

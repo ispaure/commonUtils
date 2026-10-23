@@ -70,7 +70,7 @@ class ResourceSearchTests(unittest.TestCase):
     def test_keywords_and_phrases_match_the_folder_projection_and_recursive_scan(self):
         from types import SimpleNamespace
         from commonUtils.runtime.browsing import query_entries
-        from commonUtils.runtime.resources.search import search_resources
+        from commonUtils.search.providers import search_resources
         names = ('The End of Eternityla.epub', 'END_ETERNITY.pdf', 'Eternity End.md', 'Straße.md')
         provider = SimpleNamespace(relative=lambda value: value,
             list=lambda folder, cancelled: [dict(path=name, name=name, directory=False) for name in names])
@@ -87,7 +87,7 @@ class ResourceSearchTests(unittest.TestCase):
 
     def test_recursive_matches_are_scoped_bounded_and_cancellable(self):
         from types import SimpleNamespace
-        from commonUtils.runtime.resources.search import search_resources
+        from commonUtils.search.providers import search_resources
         from commonUtils.runtime.operations import OperationCancelled
         def listing(path, *, cancelled):
             if path == 'books':
@@ -107,7 +107,7 @@ class ResourceSearchTests(unittest.TestCase):
 class ProgressiveResourceSearchTests(unittest.TestCase):
     def test_progress_publishes_nested_folder_before_descending_and_detaches_rows(self):
         from types import SimpleNamespace
-        from commonUtils.runtime.resources.search import search_resources
+        from commonUtils.search.providers import search_resources
         reports = []
         def listing(path, *, cancelled):
             if not path:
@@ -127,7 +127,7 @@ class ProgressiveResourceSearchTests(unittest.TestCase):
 class LargeResourceSearchTests(unittest.TestCase):
     def test_default_search_reaches_matches_beyond_ten_thousand_entries(self):
         from types import SimpleNamespace
-        from commonUtils.runtime.resources.search import search_resources
+        from commonUtils.search.providers import search_resources
         def listing(path, *, cancelled):
             if not path:
                 return [dict(path=f'file-{i}', name=f'file-{i}', directory=False) for i in range(10001)] + [

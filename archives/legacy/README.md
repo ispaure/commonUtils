@@ -4,7 +4,7 @@ Convenience functions for compression and extraction. Import this module through
 `commonUtils.archives.legacy`; general archive operations also live in `commonUtils.archives`.
 
 Import from `commonUtils.archives.legacy`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+[`compatibility.py`](compatibility.py).
 
 Public entry points: `unzip_file`, `unrar_file`, `zip_file`
 
@@ -20,4 +20,6 @@ Public entry points: `unzip_file`, `unrar_file`, `zip_file`
 
 `zip_file` propagates I/O errors, including failure to publish a generated ZIP
 under a non-`.zip` extension. A failed move preserves the existing destination
-and leaves the intermediate ZIP available.
+and cleans its private staged ZIP. Both plain and encrypted directory ZIPs use the verified core writer; no intermediate ZIP is published beside a non-`.zip` destination.
+
+Optional `show_progress=True` dispatches to `ui.tasks.archive`; this compatibility adapter does not construct widgets. RAR loads patool only when requested. New operations should use the canonical archive APIs directly.

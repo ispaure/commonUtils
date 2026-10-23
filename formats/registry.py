@@ -167,7 +167,8 @@ def register_builtin_file_types():
     with _defaults_lock:
         if _defaults_loaded:
             return
-        from . import txtType, csvType, jsonType, xmlType, zipType, dmgType, appimageType, markdownType, iniType
+        from . import txtType, csvType, jsonType, xmlType, zipType, dmgType, appimageType, iniType
+        from .markdown import file
         _defaults_loaded = True
 
 

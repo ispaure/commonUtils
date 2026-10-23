@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from commonUtils.runtime.resources.indexed_search import IndexedLocalSearch
+from commonUtils.search.indexed import IndexedLocalSearch
 from commonUtils.runtime.resources.local import LocalFiles
 
 

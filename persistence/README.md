@@ -8,7 +8,7 @@ Atomic byte/JSON publication, text decoding and session recovery. Atomic staging
 
 | File | Responsibility / public entry points |
 | --- | --- |
-| [__init__.py](__init__.py) | Atomic byte publication; format validation and overwrite policy stay with callers. |
+| [atomic.py](atomic.py) | Atomic byte publication; format validation and overwrite policy stay with callers. |
 | [session.py](session.py) | Versioned, bounded, atomic private JSON checkpoints without Qt dependencies. |
 | [text.py](text.py) | Bounded text recognition and conflict-checked, lossless atomic text writes. |
 

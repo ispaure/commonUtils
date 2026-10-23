@@ -212,13 +212,20 @@ def directory_entries(source, *, keep_root=True, cancelled=lambda: False):
 
 
 def write_directory(source, destination, *, password=None, keep_root=True):
-    entries = list(directory_entries(source, keep_root=keep_root))
-    with open_archive(destination, 'w', password=password) as archive:
-        for path, name in entries:
-            archive.write(str(path), name)
+    from tempfile import TemporaryDirectory
+    source, destination = Path(source).absolute(), Path(destination).absolute()
+    if destination == source or source in destination.parents:
+        raise ValueError('The output archive must be outside the source directory')
+    if destination.is_symlink():
+        raise ValueError('Output archive cannot be a symbolic link')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix='.commonutils-zip-', dir=destination.parent) as temporary:
+        staged = Path(temporary) / 'archive.zip'
+        create_archive([source], staged, password=password, keep_root=keep_root)
+        os.replace(staged, destination)
 
 
-def create_archive(sources, destination, *, password=None,
+def create_archive(sources, destination, *, password=None, keep_root=True,
                    compression=zipfile.ZIP_DEFLATED, compresslevel=None,
                    progress=lambda done, total, message: None, cancelled=lambda: False):
     """Create a verified separate ZIP atomically; never delete or replace sources.
@@ -247,7 +254,7 @@ def create_archive(sources, destination, *, password=None,
     for root in roots:
         check_cancelled(cancelled)
         if root.is_dir():
-            entries.extend(directory_entries(root, cancelled=cancelled))
+            entries.extend(directory_entries(root, keep_root=keep_root, cancelled=cancelled))
         elif root.is_file():
             entries.append((root, root.name))
         else:

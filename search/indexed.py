@@ -3,13 +3,13 @@
 Provider entry/guard checks remain authoritative over cached metadata. The caller
 must opt in physical local adapters; private and session-only providers stay in RAM.
 """
-from ..operations import check_cancelled
-from .search import SearchResult, search_resources
+from ..runtime.operations import check_cancelled
+from .providers import SearchResult, search_resources
 
 
 class IndexedLocalSearch:
     def __init__(self, database, *, eligible):
-        from ...filesystem.index import DirectoryCache
+        from ..filesystem.index import DirectoryCache
         self.cache = DirectoryCache(database=database)
         self.eligible = eligible
 
@@ -22,7 +22,7 @@ class IndexedLocalSearch:
         if not self.supports(provider):
             return
         folder = provider._locate(directory)
-        from ...filesystem.local_access import check_local_path
+        from ..filesystem.local_access import check_local_path
         check_local_path(folder, recursive=True)
         with self.cache.get(folder, cancelled=cancelled, validate_files=False):
             check_cancelled(cancelled)
@@ -33,7 +33,7 @@ class IndexedLocalSearch:
             return search_resources(provider, directory, query, cancelled=cancelled, progress=progress)
         directory = provider.relative(directory)
         folder = provider._locate(directory)
-        from ...filesystem.local_access import check_local_path
+        from ..filesystem.local_access import check_local_path
         check_local_path(folder, recursive=True)
         snapshot = self.cache.peek(folder, cancelled=cancelled)
         if snapshot is None:

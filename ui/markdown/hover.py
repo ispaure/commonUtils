@@ -4,7 +4,7 @@ from shiboken6 import isValid
 
 from .. import pyside as qt
 from ...filesystem.local_access import check_local_path
-from ...formats.markdown_wiki import resolve_document_path
+from ...formats.markdown.wiki import resolve_document_path
 from ...persistence.text import likely_binary
 from ...formats.markdown import split_frontmatter
 from .extensions import reading_source

@@ -14,7 +14,6 @@ import os
 import ctypes
 
 # Common utilities
-from ...runtime import logging as logUtils
 from ...filesystem import files as fileUtils
 from ...runtime import diagnostics as debugUtils
 from ...integrations import steam as steamUtils

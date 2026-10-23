@@ -13,7 +13,7 @@ See [public API contracts](../docs/developer/public-apis.md) and
 | `CSVFile` | `csvType.py` | Read and write CSV data |
 | `INIFile` | `iniType.py` | String-valued INI documents, formatting preservation and conflict-checked saves |
 | `JSONFile` | `jsonType.py` | Parse JSON and write it atomically |
-| `MarkdownFile` | `markdownType.py` | Text-file operations and activation in the shared Markdown reader |
+| `MarkdownFile` | `markdown/file.py` | Text-file operations and activation in the shared Markdown reader |
 | `XMLFile` | `xmlType.py` | DOM queries, namespace-aware editing and atomic saving, plus inherited line operations |
 | `ArchiveFile` | `archiveType.py` | TAR inspection, staged extraction and passive archive details |
 | `ZIPFile` | `zipType.py` | ZIP extraction and root-entry inspection, with inherited archive details |
@@ -399,7 +399,7 @@ canvas/frame dimensions, palettes and data sub-block boundaries through a traile
 truncation raises `ValueError`. It does not decompress or certify LZW pixel data.
 The existing `image_header` PNG/JPEG/WebP contract is unchanged.
 
-`markdown_images.image_size(label)` parses Obsidian image size hints as
+`markdown.images.image_size(label)` parses Obsidian image size hints as
 `(caption, width, height)`, accepting `Caption|400`, `Caption|400x200` or a numeric
 label alone. Dimensions are positive integers of up to six digits; malformed
 hints stay literal. Desktop and native Markdown renderers share this parser.
@@ -419,3 +419,7 @@ The caller chooses quality and dimensions, supplies an exclusive staging allocat
 and owns output verification, failure cleanup, publication and source retention.
 The allocator runs after pixel preparation and before encoding; input is closed
 before return. Unsupported suffixes raise `UnsupportedImageFormat`.
+
+## Portable Markdown and string tables
+
+[Markdown](markdown/README.md) groups properties, image-size syntax, file activation and local wiki catalogs. [String tables](tables.md) documents the lightweight CSV-backed Cell/Row/Spreadsheet API.

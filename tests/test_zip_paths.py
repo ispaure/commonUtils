@@ -18,7 +18,7 @@ class ZipPathTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.dest = self.root / 'output'
         self.archive = self.root / 'archive.zip'
-        logger = patch.object(zipUtils, 'log')
+        logger = patch('commonUtils.archives.legacy.compatibility.log')
         logger.start()
         self.addCleanup(logger.stop)
 
@@ -39,11 +39,12 @@ class ZipPathTests(unittest.TestCase):
         (source / '01.txt').write_text('page')
         destination = self.root / 'comic.cbz'
         destination.write_bytes(b'original archive')
-        with patch.object(zipUtils.fileUtils.os, 'replace', side_effect=PermissionError('locked')):
+        with patch('commonUtils.archives.zip_access.os.replace', side_effect=PermissionError('locked')):
             with self.assertRaises(PermissionError):
                 zipUtils.zip_file(source, destination, keep_root=False)
         self.assertEqual(destination.read_bytes(), b'original archive')
-        self.assertTrue(destination.with_suffix('.zip').is_file())
+        self.assertFalse(destination.with_suffix('.zip').exists())
+        self.assertFalse(list(self.root.glob('.commonutils-zip-*')))
         self.assertEqual((source / '01.txt').read_text(), 'page')
 
     def test_parent_directory_entries_are_rejected(self):

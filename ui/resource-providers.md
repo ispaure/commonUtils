@@ -372,12 +372,12 @@ Back restores its prior history on failed loads. `runtime.browsing.BrowseHistory
 retains at most 100 locations; identical refreshes do not add another visit.
 No source resolution, credentials or I/O belong to this history model.
 
-`runtime.name_search` owns the keyword/phrase rules also used by SQLite snapshots:
+`search.names` owns the keyword/phrase rules also used by SQLite snapshots:
 bare terms are Unicode-casefolded substrings joined with AND; double-quoted phrases
 preserve adjacency/order with equivalent whitespace, underscore and hyphen separators.
 `runtime.browsing.query_entries` filters supplied labels with these rules and
 sorts natural names, numeric sizes or modified values in either direction while
-retaining containers first. `runtime.resources.search.search_resources` walks
+retaining containers first. `search.providers.search_resources` walks
 provider listings breadth-first, validates child scope and produces relative labels
 for nested matches. Desktop ResourceBrowser and NativeBrowser debounce searches
 for 400 ms after the last edit and run this scan on cancellable workers.

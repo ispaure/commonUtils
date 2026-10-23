@@ -59,6 +59,7 @@ Start at the [developer hub](docs/developer/README.md).
 | [filesystem](filesystem/README.md) | Files, directories, links, traversal, transfers, removal, rename, storage and indexes |
 | [formats](formats/README.md) | File registry; text, CSV, JSON, XML, INI, Markdown and archive types |
 | [archives](archives/README.md) | Create, inspect, extract, edit and verify archives |
+| [search](search/README.md) | Filename/provider queries, document matching and text-file content search |
 | [runtime](runtime/README.md) | Platform detection, diagnostics, cancellation, batches, streams and downloads |
 | [integrations](integrations/README.md) | Applications, web links, Steam and external command adapters |
 | [configuration](configuration/README.md) | Settings reads, optional typed INI schema and editor integration |

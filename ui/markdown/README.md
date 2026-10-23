@@ -128,7 +128,7 @@ without it the existing single-document layout is unchanged. With no initial
 path, the directory's same-named `.md`, `README.md`, `index.md`, or first available
 page opens. An empty directory leaves the viewer empty.
 
-`formats.markdown_wiki.MarkdownWiki` owns the GUI-free catalog used by native
+`formats.markdown.wiki.MarkdownWiki` owns the GUI-free catalog used by native
 mobile consumers too. It traverses visible directories, skips symlinks and reads
 UTF-8 Markdown files up to 1 MiB. Read failures are retained in `errors` for inline
 reporting. Searches use a case-insensitive substring over names/titles or source
@@ -186,7 +186,7 @@ should link to their children so the hierarchy also works outside the viewer.
 Explicit Markdown links into another wiki replace the sidebar catalog with that
 wiki's scope. Back and Forward restore the destination's scope as well. Search
 clears when changing scopes so a previous query cannot hide the new guide.
-`formats.markdown_wiki.documentation_root(path, fallback)` resolves conventional
+`formats.markdown.wiki.documentation_root(path, fallback)` resolves conventional
 scopes without application-specific ownership rules. Custom directories retain
 the supplied root while browsing contained pages. This is navigation scoping,
 not an access boundary; normal local-file access checks still apply.
@@ -201,7 +201,7 @@ Relative resources resolve through the document base URL. A retained image objec
 handler caps drawing at the page width and scales both dimensions together,
 including explicit `|widthxheight` hints. Resizing does not mutate image formats,
 source, dirty state or undo history. Obsidian `![[image.gif|400]]` and standard
-`![Caption|400](image.gif)` hints share `formats.markdown_images.image_size`;
+`![Caption|400](image.gif)` hints share `formats.markdown.images.image_size`;
 wiki embeds retain their exact source through formatted editing/export. Direct animation loading
 respects protected local roots and never bypasses a supplied resource loader.
 Provider-backed resources retain their existing static rendering contract.

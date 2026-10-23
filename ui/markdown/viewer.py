@@ -355,7 +355,7 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         if self.storage is None:
             try:
                 from ...filesystem.local_access import check_local_path
-                from ...formats.markdown_wiki import resolve_document_path
+                from ...formats.markdown.wiki import resolve_document_path
                 candidate = Path(url.toLocalFile())
                 check_local_path(candidate)
                 candidate = resolve_document_path(candidate)

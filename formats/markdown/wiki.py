@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
-from .markdown import split_frontmatter
+from .properties import split_frontmatter
+from ...search.text import contains_text
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,7 @@ class MarkdownWiki:
                 nested = prune(entry.children)
                 value = (self.pages.get(entry.page, '') if mode == 'content' else
                          ' '.join((entry.location.name, entry.title, entry.page.name if entry.page else '')))
-                if not query or query in value.casefold() or nested:
+                if not query or contains_text(value, query) or nested:
                     result.append(WikiEntry(entry.location, entry.title, entry.page, nested))
             return tuple(result)
         return prune(self.entries)

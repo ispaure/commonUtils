@@ -1,5 +1,5 @@
 """Per-editor literal Find/Replace with native selection and retained drafts."""
-import re
+from ...search.text import literal_pattern
 import toga
 from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
@@ -34,7 +34,7 @@ class EditorSearch:
             self.changed()
 
     def pattern(self):
-        return re.compile(re.escape(self.query.value), 0 if self.case.value else re.IGNORECASE) if self.query.value else None
+        return literal_pattern(self.query.value, case=self.case.value)
 
     def changed(self, widget=None, **kwargs):
         self.span = None

@@ -1,5 +1,5 @@
 """Inline documentation navigation for the shared Markdown viewer."""
-from ...formats.markdown_wiki import MarkdownWiki, documentation_root
+from ...formats.markdown.wiki import MarkdownWiki, documentation_root
 from .. import pyside as qt
 from ..readers.reader_chrome import reader_button
 

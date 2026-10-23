@@ -6,7 +6,7 @@ from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
-from ...formats.markdown_images import image_size
+from ...formats.markdown.images import image_size
 
 _ALIAS = re.compile(r'\[\[([^]\n|]+)\|([^]\n]+)\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
 

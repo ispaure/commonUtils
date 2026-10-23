@@ -3,7 +3,7 @@
 Qt-independent feature declarations; browser bindings are created lazily.
 
 Import from `commonUtils.ui.features`. Implementation and public exports live in
-[`__init__.py`](__init__.py).
+[`declarations.py`](declarations.py).
 
 Public entry points: `resolve_type`, `ActionContext`, `FileType`, `FileTypeOverride`, `SelectionAction`, `FileActivation`, `BrowserExtension`, `Feature`
 

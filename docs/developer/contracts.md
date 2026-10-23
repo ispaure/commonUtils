@@ -145,3 +145,9 @@ thumbnail/task retirement have separate owners. Retain provider leases until the
 corresponding close operation finishes. A stale callback must not publish after
 a provider/session generation changes. Transfer publication state remains explicit
 when source cleanup fails; an exception does not imply destination rollback.
+
+## Search and format owner migration
+
+Search imports moved to `search.names`, `search.providers`, `search.indexed`, `search.qt_text` and `search.files`; see [search contracts](../../search/README.md). Desktop matcher offsets and regex syntax are unchanged. Markdown imports use `formats.markdown.{properties,images,wiki,file}`; the package still exports property helpers. String tables use `formats.tables`, preserving Cell/Row/Spreadsheet methods.
+
+Atomic persistence, filesystem information and feature declarations retain their package exports; implementation and mock targets now live in `persistence.atomic`, `filesystem.objects` and `ui.features.declarations`. Legacy print logging callers use `runtime.diagnostics`; UI helpers raise ordinary errors rather than exiting the host process. Personal Dropbox discovery belongs to Logistics, retaining its existing paths.

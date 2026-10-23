@@ -170,7 +170,7 @@ class NativeBrowser:
             self._spawn(self._search_subfolders(self.search_epoch, self.search_cancelled))
 
     async def _search_subfolders(self, epoch, cancelled):
-        from ...runtime.resources.search import search_resources
+        from ...search.providers import search_resources
         provider, directory, query = self.search_provider, self.search_directory, self.search.value
         def current():
             return not self.closed and epoch == self.search_epoch and not cancelled.is_set()

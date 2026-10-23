@@ -5,10 +5,8 @@ Import the specific module you need; importing this area loads no GUI backend.
 
 - `platform`: OS detection and platform constants.
 - `diagnostics`: logging, severity and scoped debug settings.
-- `logging`: timestamp helpers.
 - `operations`: progress events and cooperative cancellation.
 - `streams`: bounded copying, hashing and verified downloads.
-- `helpers`: small shared helpers.
 - [updates](updates/README.md): branch/release discovery, protected installation transactions and detached restart.
 
 Example: `from commonUtils.runtime.operations import check_cancelled`.
@@ -103,3 +101,5 @@ first notification. Cancel in-flight waits and release the closure on retirement
 
 The [resource module map](resources/README.md) lists canonical imports and
 identifier validation. Former flat resource modules have been removed.
+
+Search mechanisms live in [search](../search/README.md); personal filesystem defaults belong to consumers.

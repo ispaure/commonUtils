@@ -165,7 +165,7 @@ class BrowseHistory:
 def query_entries(entries, text='', *, sort='name', descending=False):
     """Filter a supplied folder snapshot; sort groups while retaining folders first."""
     import re
-    from .name_search import search_terms, matches_name
+    from ..search.names import search_terms, matches_name
     terms = search_terms(text)
     rows = [entry for entry in entries if matches_name(entry.label, terms)]
     def name_key(entry):

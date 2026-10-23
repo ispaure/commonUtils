@@ -12,7 +12,7 @@ import sqlite3
 from threading import RLock
 from .metadata import Entry
 from ...runtime.operations import check_cancelled, OperationCancelled
-from .search import search_sql, search_words
+from ...search.names import search_sql, search_words
 
 
 def _entry(row):

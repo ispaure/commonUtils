@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
-from commonUtils.formats.markdown_wiki import MarkdownWiki
+from commonUtils.formats.markdown.wiki import MarkdownWiki
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer, open_markdown

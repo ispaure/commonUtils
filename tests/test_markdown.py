@@ -9,7 +9,7 @@ from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 
 from commonUtils.formats.registry import file_from_path
-from commonUtils.formats.markdownType import MarkdownFile
+from commonUtils.formats.markdown.file import MarkdownFile
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown import MarkdownViewer, open_markdown, _windows
 from commonUtils.ui.file_browser import FileBrowser
@@ -243,7 +243,7 @@ class MarkdownTests(QtTestCase):
         cursor = self.viewer.editor.textCursor()
         cursor.movePosition(qt.QTextCursor.MoveOperation.End)
         cursor.insertText('Extra')
-        with patch('commonUtils.persistence.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.persistence.atomic.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertEqual(self.first.read_bytes(), source)
         self.assertTrue(self.viewer.is_modified)
@@ -432,7 +432,7 @@ class MarkdownTests(QtTestCase):
         with patch.object(qt.QMessageBox, 'warning', return_value=qt.QMessageBox.StandardButton.Cancel):
             self.assertFalse(self.viewer.open_document(self.second))
         self.assertIn('Unsaved rich text', self.viewer.formatted_editor.toPlainText())
-        with patch('commonUtils.persistence.os.replace', side_effect=OSError('blocked')):
+        with patch('commonUtils.persistence.atomic.os.replace', side_effect=OSError('blocked')):
             self.assertFalse(self.viewer.save_document())
         self.assertTrue(self.viewer.is_modified)
         self.assertEqual(self.first.read_bytes(), original)

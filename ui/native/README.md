@@ -243,7 +243,7 @@ text search, page selection and relative Markdown links. A hamburger toggles the
 fit together it pins the tree beside the article. Browse state
 survives page changes and resizing. Links open only cataloged local pages. Hosts own routing,
 close behavior and document editing. Directory/title/search rules come from
-`formats.markdown_wiki.MarkdownWiki`, shared with the Qt Markdown viewer. Import
+`formats.markdown.wiki.MarkdownWiki`, shared with the Qt Markdown viewer. Import
 the Qt or native entry point explicitly for the host toolkit; importing one does
 not require installing the other toolkit.
 
@@ -337,7 +337,7 @@ should link to their children so the hierarchy also works outside the viewer.
 Explicit Markdown links into another wiki replace the sidebar catalog with that
 wiki's scope. Back and Forward restore the destination's scope as well. Search
 clears when changing scopes so a previous query cannot hide the new guide.
-`formats.markdown_wiki.documentation_root(path, fallback)` resolves conventional
+`formats.markdown.wiki.documentation_root(path, fallback)` resolves conventional
 scopes without application-specific ownership rules. Custom directories retain
 the supplied root while browsing contained pages. This is navigation scoping,
 not an access boundary; normal local-file access checks still apply.

@@ -8,7 +8,7 @@ from .allocation import allocated_size
 from time import time
 from ...runtime.operations import check_cancelled
 from ..traversal import natural_path_key
-from .search import search_terms, matches_name
+from ...search.names import search_terms, matches_name
 
 
 @dataclass(frozen=True)

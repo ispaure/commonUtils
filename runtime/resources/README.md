@@ -11,7 +11,7 @@ names and test patch targets together. No global module aliases are installed.
 | Complete verified save, move, rename, folder creation and deletion | `runtime.resources.mutations` |
 | Open/Save As selection, provider leases and text baselines | `runtime.resources.selection` |
 | Portable slash-delimited identifier validation | `runtime.resources.paths` |
-| Recursive provider queries | `runtime.resources.search` |
+| Recursive provider queries | `search.providers` |
 | Local streamed ZIP access | `runtime.resources.archives` |
 | Bounded seekable range reads | `runtime.resources.range_reader` |
 | Scoped local, iOS and Android document byte access | `runtime.resources.documents` |
@@ -50,7 +50,7 @@ recovery and the lifetime of private sources.
 
 ## Cache-backed local filename search
 
-`indexed_search.IndexedLocalSearch(database, eligible=...)` composes the directory
+`search.indexed.IndexedLocalSearch(database, eligible=...)` composes the directory
 index with resource-provider results. The host explicitly admits physical local
 adapters and supplies the database location. Private, session-only and remote
 providers always use memory-only recursive search, even if admitted by mistake.

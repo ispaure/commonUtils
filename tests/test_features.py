@@ -36,7 +36,7 @@ class DeclarationTests(QtTestCase):
             Feature(id='example', requires='other')
 
     def test_deferred_reference_does_not_import_during_declaration(self):
-        with patch('commonUtils.ui.features.importlib.import_module') as imported:
+        with patch('commonUtils.ui.features.declarations.importlib.import_module') as imported:
             Feature(id='deferred', file_types=[FileType('missing.package:FileClass', 'example')],
                     browser=BrowserExtension(actions=[SelectionAction('edit', 'Edit',
                         'missing.package:FileClass', lambda ctx: None)]))

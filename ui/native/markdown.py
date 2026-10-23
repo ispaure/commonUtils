@@ -11,7 +11,7 @@ from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
-from ...formats.markdown_wiki import MarkdownWiki, resolve_document_path, documentation_root
+from ...formats.markdown.wiki import MarkdownWiki, resolve_document_path, documentation_root
 from .markdown_preview import markdown_preview
 from .markdown_images import local_image_source
 from .adaptive import AdaptiveSidebar, allocated_width

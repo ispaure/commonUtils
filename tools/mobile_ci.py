@@ -33,6 +33,8 @@ def stage(source, destination, *, allow_dirty=False):
     package.mkdir(parents=True, exist_ok=False)
     for relative in paths:
         original = source / relative
+        if allow_dirty and not original.exists() and not original.is_symlink():
+            continue  # A tracked deletion is part of this explicit development snapshot.
         if original.is_symlink() or any(parent.is_symlink() for parent in original.parents if parent != source):
             raise ValueError(f'Refusing linked source: {relative}')
         target = package / relative

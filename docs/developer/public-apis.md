@@ -52,7 +52,7 @@ and conflict policy belong to callers. See [filesystem](../../filesystem/README.
 | Text/CSV data | `TXTFile`, `CSVFile`; existing write semantics are not universally atomic |
 | JSON data | `JSONFile.read_json/write_json`; atomic writes, non-finite numbers rejected |
 | Raster metadata | `formats.image_headers.image_header` (PNG/JPEG/WebP), `gif_header` (GIF container); explicit byte bounds, no pixel decoding |
-| Markdown image sizes | `formats.markdown_images.image_size`; shared Obsidian width/height hint parsing |
+| Markdown image sizes | `formats.markdown.images.image_size`; shared Obsidian width/height hint parsing |
 | Structured XML | `XMLFile`; [XML examples](../../formats/xmlType.md) cover namespaces and repeated elements |
 | INI documents | `INIFile.read/get/set/save`; string values, formatting preservation, parse/I/O errors propagate |
 | Typed INI fields | `configuration.ini_schema`; explicit opt-in suffix validation, separate from INI storage |
@@ -182,7 +182,7 @@ viewport-limited tiles. `BrowserPresentation` supplies appearance hooks;
 row component independently. See the [continuous browser guide](../../ui/native_browser/README.md#continuous-mobile-browsing)
 and [list contract](../../ui/native/README.md#recycled-lists).
 
-`formats.markdown_wiki.MarkdownWiki` supplies a GUI-free local documentation
+`formats.markdown.wiki.MarkdownWiki` supplies a GUI-free local documentation
 catalog with folder landing pages, body-heading titles (after optional YAML frontmatter) and recursive text/name search.
 
 ## Optional native Toga components
@@ -286,3 +286,7 @@ to `markdown_preview` or a formatted editor using `embedded_image`. See the
   `display_msg_box_ok_cancel` wrappers load `ui.native.dialogs` on invocation;
   `dialogs.py` owns desktop-native message boxes. Explicit Toga components remain
   in their own modules. Importing the package loads neither Qt nor Toga.
+
+## Search ownership
+
+Use [the search API map](../../search/README.md) for filename, provider, document and multi-file content queries. UI owners retain debounce, workers, highlighting and document navigation. The optional PCRE engine imports QtCore without QtWidgets.

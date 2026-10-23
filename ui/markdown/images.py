@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 from .. import pyside as qt
 from ...filesystem.local_access import check_local_path
-from ...formats.markdown_images import image_size
+from ...formats.markdown.images import image_size
 from .syntax import FENCE_OPEN, fence_close
 
 

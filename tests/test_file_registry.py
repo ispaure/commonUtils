@@ -14,7 +14,7 @@ class ProjectFile(File):
 
 
 from commonUtils.formats.txtType import TXTFile
-from commonUtils.formats.markdownType import MarkdownFile
+from commonUtils.formats.markdown.file import MarkdownFile
 from commonUtils.ui.features import Feature, FileType, FileTypeOverride
 
 

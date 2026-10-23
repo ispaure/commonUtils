@@ -114,3 +114,7 @@ The application-independent [archive API](README.md) adds validated TAR support,
 transactional selected extraction, bounded previews and verified ZIP edits. It
 reuses this module's ZIP operations. Existing low-level extraction callers keep
 their behavior; opt into `archives.extract` for a new staged destination folder.
+
+## Directory ZIP publication
+
+`write_directory(source, destination, password=None, keep_root=True)` uses the same verified creation plan for plain and encrypted ZIPs, stages beside the destination, and replaces only after verification. On failure it preserves an existing destination and removes private staging. `create_archive` accepts `keep_root=True` by default and retains its exclusive no-overwrite publication contract. Symlink sources/outputs and outputs inside the source are refused.
