@@ -37,7 +37,9 @@ other return values count as success unless an exception is raised. Failures
 normally do not prevent later items from running. Supply `stop_on_error=True` to
 stop on the first failure and retain the remainder.
 
-Items must be hashable if they can fail, because failures are dictionary keys.
+Successful items need not be hashable. Items must be hashable if they can fail,
+because failures are dictionary keys; stop-on-error follows the current attempt's
+outcome rather than looking a successful item up in that dictionary.
 Progress counts processed items, including failures, so inspect the result instead
 of assuming a full progress bar means success. Cancellation after the final item
 has completed does not undo its success. Do not pass the batch cancellation callback

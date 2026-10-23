@@ -14,6 +14,16 @@ from commonUtils.runtime.diagnostics import Severity, log
 
 
 class BatchTests(QtTestCase):
+    def test_successful_unhashable_items_do_not_require_failure_dictionary_keys(self):
+        items = [{'path': 'first'}, {'path': 'second'}]
+        for stop_on_error in (False, True):
+            with self.subTest(stop_on_error=stop_on_error):
+                result = run_batch(items, lambda item: True, stop_on_error=stop_on_error)
+                self.assertEqual(result.completed, items)
+                self.assertEqual(result.failed, {})
+                self.assertEqual(result.remaining, [])
+                self.assertFalse(result.cancelled)
+
     def test_batch_errors_do_not_prevent_later_items_and_cancel_waits_for_item(self):
         cancel = Event()
         def work(item):

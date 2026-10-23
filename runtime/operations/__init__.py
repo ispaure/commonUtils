@@ -32,14 +32,16 @@ def run_batch(items, work, *, progress=lambda done, total, message: None, cancel
             result.remaining = list(items[index:])
             break
         progress(index, len(items), f'Processing {item}')
+        item_failed = False
         try:
             if work(item) is False:
                 raise RuntimeError('Operation failed; see the log for details')
             result.completed.append(item)
         except Exception as error:
             result.failed[item] = str(error)
+            item_failed = True
         progress(index + 1, len(items), f'{index + 1} / {len(items)} completed')
-        if item in result.failed and stop_on_error:
+        if item_failed and stop_on_error:
             result.remaining = list(items[index + 1:])
             break
     return result
