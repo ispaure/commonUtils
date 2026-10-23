@@ -79,8 +79,8 @@ class MarkdownReadingMixin:
         previous_cursor = self.browser.textCursor()
         cursor_position, cursor_anchor = ((previous_cursor.position(), previous_cursor.anchor())
                                           if preserve_selection else (0, 0))
-        self.browser.document().setBaseUrl(qt.QUrl.fromLocalFile(str(self._loaded_path.parent) + '/')
-                                         if self._loaded_path else qt.QUrl())
+        self.browser.document().setBaseUrl(qt.QUrl.fromLocalFile(str(self.document_state.loaded_path.parent) + '/')
+                                         if self.document_state.loaded_path else qt.QUrl())
         self.properties.refresh(text)
         parts = split_frontmatter(text)
         # Qt's HTML-block importer can silently discard everything after a div.

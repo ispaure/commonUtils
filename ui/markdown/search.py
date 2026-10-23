@@ -1,41 +1,53 @@
 """Scoped, transient search marks shared by reading and editing surfaces."""
 from .. import pyside as qt
+from collections.abc import Callable, Sequence
 
 _SEARCH_MARK = qt.QTextFormat.Property.UserProperty + 78
 
 
-class MarkdownSearchMixin:
-    def _init_search_highlights(self):
-        self._search_selections = {}
-        self._search_timer = qt.QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(100)
-        self._search_timer.timeout.connect(self._refresh_search_highlights)
-        self.find_text.textChanged.connect(self._page_query_changed)
-        for widget in (self.browser, self.editor, self.formatted_editor):
-            widget.textChanged.connect(lambda: self._search_timer.start())
-        self.pages.currentChanged.connect(lambda: self._search_timer.start())
-        self.path_changed.connect(lambda: self._refresh_search_highlights())
+class SearchHighlights:
+    """Own scoped marks and their timer; receive surfaces and controls explicitly."""
+    def __init__(self, parent: qt.QWidget, widgets: Sequence[qt.QTextEdit | qt.QPlainTextEdit],
+                 pages: qt.QStackedWidget, query: qt.QLineEdit, bar: qt.QWidget, count: qt.QLabel,
+                 *, library_query: Callable[[], str], path_changed):
+        self.widgets = tuple(widgets)
+        self.pages = pages
+        self.query = query
+        self.bar = bar
+        self.count = count
+        self.library_query = library_query
+        self.parent = parent
+        self._connect()
+        path_changed.connect(lambda: self.refresh())
 
-    def _page_query_changed(self):
-        self._clear_search_selection('page')
-        self._refresh_search_highlights()
-        if self.find_text.text():
+    def _connect(self):
+        self.selections = {}
+        self.timer = qt.QTimer(self.parent)
+        self.timer.setSingleShot(True)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.refresh)
+        self.query.textChanged.connect(self.query_changed)
+        for widget in self.widgets:
+            widget.textChanged.connect(lambda: self.timer.start())
+        self.pages.currentChanged.connect(lambda: self.timer.start())
+
+    def query_changed(self):
+        self.clear_selection('page')
+        self.refresh()
+        if self.query.text():
             target = self.pages.currentWidget()
-            match = target.document().find(self.find_text.text())
+            match = target.document().find(self.query.text())
             if not match.isNull():
-                self._select_search_match(target, match, 'page')
+                self.select(target, match, 'page')
 
-    def _refresh_search_highlights(self):
-        if not hasattr(self, 'find_count'):
-            return
-        page_query = self.find_text.text() if not self.find_bar.isHidden() else ''
-        library_query = self.wiki.search.text().strip() if self.wiki is not None else ''
+    def refresh(self):
+        page_query = self.query.text() if not self.bar.isHidden() else ''
+        library_query = self.library_query()
         queries = list(dict.fromkeys(q for q in (library_query, page_query) if q))
         count = 0
         limited = False
         target = self.pages.currentWidget()
-        for widget in (self.browser, self.editor, self.formatted_editor):
+        for widget in self.widgets:
             marks = [entry for entry in widget.extraSelections()
                      if not entry.format.property(_SEARCH_MARK)]
             if widget is target:
@@ -58,30 +70,28 @@ class MarkdownSearchMixin:
                         count = matches
                         limited = matches == 5000
             widget.setExtraSelections(marks)
-        self.find_count.setText(f'{count}{"+" if limited else ""} match' + ('' if count == 1 else 'es') if page_query else '')
+        self.count.setText(f'{count}{"+" if limited else ""} match' + ('' if count == 1 else 'es') if page_query else '')
 
-    def _reveal_library_match(self):
-        self._refresh_search_highlights()
-        if self.wiki is None:
-            return
-        query = self.wiki.search.text().strip()
+    def reveal_library_match(self):
+        self.refresh()
+        query = self.library_query()
         if query:
             target = self.pages.currentWidget()
             match = target.document().find(query)
             if not match.isNull():
-                self._select_search_match(target, match, 'library')
+                self.select(target, match, 'library')
 
-    def _select_search_match(self, target, cursor, scope):
+    def select(self, target, cursor, scope):
         target.setTextCursor(cursor)
         target.ensureCursorVisible()
-        self._search_selections[target] = (scope, cursor.position(), cursor.anchor())
+        self.selections[target] = (scope, cursor.position(), cursor.anchor())
 
-    def _clear_search_selection(self, scope):
-        for target, (owner, position, anchor) in list(self._search_selections.items()):
+    def clear_selection(self, scope):
+        for target, (owner, position, anchor) in list(self.selections.items()):
             if owner != scope:
                 continue
             cursor = target.textCursor()
             if (cursor.position(), cursor.anchor()) == (position, anchor):
                 cursor.clearSelection()
                 target.setTextCursor(cursor)
-            del self._search_selections[target]
+            del self.selections[target]

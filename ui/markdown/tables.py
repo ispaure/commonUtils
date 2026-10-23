@@ -3,82 +3,91 @@ from .. import pyside as qt
 from ..appearance.icons import set_painted_icon
 from ..appearance.formatting_icons import FormattingIcon
 from .presentation import style_table
+from collections.abc import Callable
 
 
-class MarkdownTablesMixin:
-    def _build_table_actions(self):
-        self.table_button = qt.QToolButton()
-        self.table_button.setText('Table')
-        self.table_button.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
-        self._table_menu = qt.QMenu(self.table_button)
-        self.table_button.setMenu(self._table_menu)
-        self.table_insert_action = self._action('Insert table…', self._insert_table_dialog)
-        set_painted_icon(self.table_insert_action, FormattingIcon, 'table')
-        self._table_menu.addAction(self.table_insert_action)
-        self._table_menu.addSeparator()
-        self._table_actions = {}
+class TableEditing:
+    """Own table actions using only an editor, menu and explicit UI callbacks."""
+    def __init__(self, parent: qt.QWidget, editor: qt.QTextEdit, format_menu: qt.QMenu,
+                 *, action: Callable[..., qt.QAction], enabled: Callable[[], bool]):
+        self.parent = parent
+        self.editor = editor
+        self.format_menu = format_menu
+        self.action = action
+        self.enabled = enabled
+        self._build()
+
+    def _build(self):
+        self.button = qt.QToolButton()
+        self.button.setText('Table')
+        self.button.setPopupMode(qt.QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.menu = qt.QMenu(self.button)
+        self.button.setMenu(self.menu)
+        self.insert_action = self.action('Insert table…', self.insert_dialog)
+        set_painted_icon(self.insert_action, FormattingIcon, 'table')
+        self.menu.addAction(self.insert_action)
+        self.menu.addSeparator()
+        self.actions = {}
         for key, title in (('row_above', 'Add row above'), ('row_below', 'Add row below'),
                            ('column_before', 'Add column before'), ('column_after', 'Add column after'),
                            ('delete_row', 'Delete row'), ('delete_column', 'Delete column'),
                            ('delete_table', 'Delete table')):
-            action = self._action(title, lambda key=key: self._edit_table(key))
+            action = self.action(title, lambda key=key: self.edit(key))
             glyph = ('row_add' if key.startswith('row_') else 'column_add' if key.startswith('column_')
                      else {'delete_row': 'row_delete', 'delete_column': 'column_delete', 'delete_table': 'table_delete'}[key])
             set_painted_icon(action, FormattingIcon, glyph)
-            self._table_actions[key] = action
-            self._table_menu.addAction(action)
-        self.table_button.setParent(self)
-        self.table_button.hide()
-        self._table_menu.setTitle('Table')
-        set_painted_icon(self._table_menu.menuAction(), FormattingIcon, 'table')
-        self.format_menu.addMenu(self._table_menu)
-        self.formatted_editor.table_actions = (self.table_insert_action, *self._table_actions.values())
-        self.formatted_editor.cursorPositionChanged.connect(self._update_table_actions)
-        self.formatted_editor.selectionChanged.connect(self._update_table_actions)
-        self.formatted_editor.textChanged.connect(self._update_table_actions)
-        self._update_table_actions()
+            self.actions[key] = action
+            self.menu.addAction(action)
+        self.button.setParent(self.parent)
+        self.button.hide()
+        self.menu.setTitle('Table')
+        set_painted_icon(self.menu.menuAction(), FormattingIcon, 'table')
+        self.format_menu.addMenu(self.menu)
+        self.editor.table_actions = (self.insert_action, *self.actions.values())
+        self.editor.cursorPositionChanged.connect(self.update)
+        self.editor.selectionChanged.connect(self.update)
+        self.editor.textChanged.connect(self.update)
+        self.update()
 
-    def _update_table_actions(self):
-        if not hasattr(self, '_table_actions'):
-            return
-        enabled = self.allow_edit and self.edit_button.isChecked() and self.active_editor() is self.formatted_editor
-        cursor = self.formatted_editor.textCursor()
+    def update(self):
+        enabled = self.enabled()
+        cursor = self.editor.textCursor()
         # Rectangular selections are ambiguous; require a caret in one cell.
         in_table = enabled and cursor.currentTable() is not None and not cursor.hasSelection()
-        self.table_button.setEnabled(enabled)
-        self._table_menu.menuAction().setEnabled(enabled)
-        self.table_insert_action.setEnabled(enabled and cursor.currentTable() is None)
-        for action in self._table_actions.values():
+        self.button.setEnabled(enabled)
+        self.menu.menuAction().setEnabled(enabled)
+        self.insert_action.setEnabled(enabled and cursor.currentTable() is None)
+        for action in self.actions.values():
             action.setEnabled(in_table)
 
-    def _insert_table_dialog(self):
-        self._update_table_actions()
-        if not self.table_insert_action.isEnabled():
+    def insert_dialog(self):
+        self.update()
+        if not self.insert_action.isEnabled():
             return False
-        rows, accepted = qt.QInputDialog.getInt(self, 'Insert table', 'Rows (including header):', 3, 1, 100)
+        rows, accepted = qt.QInputDialog.getInt(self.parent, 'Insert table', 'Rows (including header):', 3, 1, 100)
         if not accepted:
             return False
-        columns, accepted = qt.QInputDialog.getInt(self, 'Insert table', 'Columns:', 2, 1, 100)
+        columns, accepted = qt.QInputDialog.getInt(self.parent, 'Insert table', 'Columns:', 2, 1, 100)
         if not accepted:
             return False
-        cursor = self.formatted_editor.textCursor()
+        cursor = self.editor.textCursor()
         cursor.beginEditBlock()
         fmt = qt.QTextTableFormat()
         fmt.setHeaderRowCount(1)
         fmt.setCellPadding(4)
         table = cursor.insertTable(rows, columns, fmt)
-        style_table(table, self.formatted_editor.palette())
+        style_table(table, self.editor.palette())
         cursor.endEditBlock()
-        self.formatted_editor.setTextCursor(table.cellAt(0, 0).firstCursorPosition())
-        self.formatted_editor.setFocus()
+        self.editor.setTextCursor(table.cellAt(0, 0).firstCursorPosition())
+        self.editor.setFocus()
         return True
 
-    def _edit_table(self, operation):
-        self._update_table_actions()
-        action = self._table_actions.get(operation)
+    def edit(self, operation):
+        self.update()
+        action = self.actions.get(operation)
         if action is None or not action.isEnabled():
             return False
-        cursor = self.formatted_editor.textCursor()
+        cursor = self.editor.textCursor()
         table = cursor.currentTable()
         cell = table.cellAt(cursor)
         row, column = cell.row(), cell.column()
@@ -105,14 +114,14 @@ class MarkdownTablesMixin:
             table.removeColumns(column, 1)
             column = min(column, table.columns() - 1)
         if not remove:
-            style_table(table, self.formatted_editor.palette())
+            style_table(table, self.editor.palette())
         cursor.endEditBlock()
         if remove:
-            cursor = qt.QTextCursor(self.formatted_editor.document())
-            cursor.setPosition(min(start, self.formatted_editor.document().characterCount() - 1))
+            cursor = qt.QTextCursor(self.editor.document())
+            cursor.setPosition(min(start, self.editor.document().characterCount() - 1))
         else:
             cursor = table.cellAt(row, column).firstCursorPosition()
-        self.formatted_editor.setTextCursor(cursor)
-        self.formatted_editor.setFocus()
-        self._update_table_actions()
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
+        self.update()
         return True

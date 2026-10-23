@@ -61,7 +61,7 @@ class WikiPanel(qt.QWidget):
     def query_changed(self):
         self.mode.setVisible(bool(self.search.text().strip()))
         self.timer.start()
-        if hasattr(self.viewer, '_search_timer'):
+        if hasattr(self.viewer, 'search_highlights'):
             if not self.search.text().strip():
                 self.viewer._clear_search_selection('library')
             self.viewer._refresh_search_highlights()

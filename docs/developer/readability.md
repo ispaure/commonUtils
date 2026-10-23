@@ -43,9 +43,9 @@ rules remain unchanged.
 ## Progress
 
 - [x] Review the current source and identify implicit state dependencies.
-- [ ] Add focused state-lifetime and workflow regression coverage.
+- [x] Add focused state-lifetime and workflow regression coverage.
 - [x] Implement explicit indexing state and readable scan phases.
-- [ ] Implement explicit Markdown state and component dependencies.
+- [x] Implement explicit Markdown state and component dependencies.
 - [ ] Update owner documentation and validate affected consumers.
 - [ ] Record final evidence and reassess both areas at 7/10 or higher.
 

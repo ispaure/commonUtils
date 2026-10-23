@@ -49,7 +49,7 @@ class MarkdownTableTests(QtTestCase):
         self.assertIn('After', self.editor.toPlainText())
 
     def test_actions_follow_cell_mode_and_preview_permission(self):
-        self.assertTrue(self.viewer._table_actions['row_above'].isEnabled())
+        self.assertTrue(self.viewer.tables.actions['row_above'].isEnabled())
         self.viewer.set_edit_mode('source')
         self.assertFalse(self.viewer._edit_table('delete_row'))
         self.viewer.set_edit_mode('formatted')

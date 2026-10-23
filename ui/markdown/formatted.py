@@ -1,110 +1,100 @@
-"""Internal same-pane rich Markdown editing and source synchronization."""
+"""Rich/source synchronization with explicit editors, document state and callbacks."""
 from .. import pyside as qt
 from ...formats.markdown import split_frontmatter
 from .headings import _iter_headings
 from .syntax import HEADING
 from .extensions import reading_source
+from .session import MarkdownDocumentState
+from collections.abc import Callable
 
 
-class MarkdownFormattedMixin:
+class FormattedEditing:
+    """Own rich import/synchronization; no access to the containing viewer."""
+    def __init__(self, source: qt.QPlainTextEdit, editor: qt.QTextEdit, mode: qt.QComboBox,
+                 document: MarkdownDocumentState, *, set_mode: Callable[[str], None],
+                 status: Callable[[str], None], modified: Callable[[bool], None]):
+        self.source = source
+        self.editor = editor
+        self.mode = mode
+        self.document = document
+        self.set_mode = set_mode
+        self.status = status
+        self.modified = modified
+
     def active_editor(self):
-        """Current editing widget; source remains available through editor."""
-        return self.formatted_editor if self.edit_mode.currentData() == 'formatted' else self.editor
+        """Choose the rich or source editor from the mode selector."""
+        return self.editor if self.mode.currentData() == 'formatted' else self.source
 
-    def _rich_pending(self):
-        return self._rich_snapshot is not None and self.formatted_editor.document().toMarkdown() != self._rich_snapshot
+    def pending(self):
+        return self.document.rich_snapshot is not None and self.editor.document().toMarkdown() != self.document.rich_snapshot
 
-    def _formatted_changed(self):
-        if self._rich_snapshot is not None:
-            self._modified_changed(self.is_modified)
+    def changed(self):
+        if self.document.rich_snapshot is not None:
+            self.modified(self.source.document().isModified() or self.pending())
 
-    def _load_formatted(self):
-        source = self.editor.toPlainText()
-        self.formatted_editor.document().setBaseUrl(
-            qt.QUrl.fromLocalFile(str(self._loaded_path.parent) + '/') if self._loaded_path else qt.QUrl())
+    def load(self):
+        source = self.source.toPlainText()
+        self.editor.document().setBaseUrl(
+            qt.QUrl.fromLocalFile(str(self.document.loaded_path.parent) + '/') if self.document.loaded_path else qt.QUrl())
         parts = split_frontmatter(source)
         if not parts.complete:
-            self.set_edit_mode('source')
-            self.status.setText('Unclosed YAML properties: repair the closing --- in Source mode.')
+            self.set_mode('source')
+            self.status('Unclosed YAML properties: repair the closing --- in Source mode.')
             return
         if reading_source(parts.body)[1]:
             # Qt's rich exporter escapes [!type] markers after actual edits.
             # Keep these documents in exact-source mode until our live editor
             # can round-trip their custom syntax, rather than damaging callouts.
-            self.set_edit_mode('source')
-            self.status.setText('Callouts are shown in Read mode. Edit their exact Markdown in Source mode.')
+            self.set_mode('source')
+            self.status('Callouts are shown in Read mode. Edit their exact Markdown in Source mode.')
             return
-        if self._rich_source is not None and self._rich_snapshot is not None and parts.body == split_frontmatter(self._rich_source).body:
-            self._rich_source = source
+        if self.document.rich_source is not None and self.document.rich_snapshot is not None and parts.body == split_frontmatter(self.document.rich_source).body:
+            self.document.rich_source = source
             return
-        self._rich_snapshot = None
-        self.formatted_editor.setMarkdown(parts.body)
-        self.formatted_editor.document().setModified(False)
-        self._rich_source = source
-        self._rich_snapshot = self.formatted_editor.document().toMarkdown()
+        self.document.rich_snapshot = None
+        self.editor.setMarkdown(parts.body)
+        self.editor.document().setModified(False)
+        self.document.rich_source = source
+        self.document.rich_snapshot = self.editor.document().toMarkdown()
 
-    def _sync_formatted(self):
-        if not self._rich_pending():
+    def sync(self):
+        if not self.pending():
             return
-        body = self.formatted_editor.document().toMarkdown()
-        source = split_frontmatter(self.editor.toPlainText()).prefix + body
-        self._replace_source_text(source)
-        self._rich_source = self.editor.toPlainText()
-        self._rich_snapshot = body
-        self._modified_changed(True)
+        body = self.editor.document().toMarkdown()
+        source = split_frontmatter(self.source.toPlainText()).prefix + body
+        self.replace_source(source)
+        self.document.rich_source = self.source.toPlainText()
+        self.document.rich_snapshot = body
+        self.modified(True)
 
-    def _replace_source_text(self, text):
+    def replace_source(self, text):
         """Replace source as one undo step without resetting the editor's history."""
-        cursor = self.editor.textCursor()
+        cursor = self.source.textCursor()
         cursor.beginEditBlock()
         cursor.select(qt.QTextCursor.SelectionType.Document)
         cursor.insertText(text)
         cursor.endEditBlock()
-        self.editor.document().setModified(True)
+        self.source.document().setModified(True)
 
-    def markdown_text(self):
+    def text(self):
         """Return current Markdown, synchronizing actual formatted edits only."""
-        self._sync_formatted()
-        return self.editor.toPlainText()
+        self.sync()
+        return self.source.toPlainText()
 
-    def set_edit_mode(self, mode):
-        """Choose 'formatted' (default) or 'source', preserving unsaved edits."""
-        index = self.edit_mode.findData(mode)
-        if index < 0:
-            raise ValueError('Editing mode must be formatted or source')
-        self.edit_mode.setCurrentIndex(index)
-
-    def _change_edit_mode(self, index):
-        self._sync_formatted()
-        if self.edit_button.isChecked():
-            self.set_editing(True)
-
-    def _update_edit_actions(self):
-        if not hasattr(self, 'undo_action'):
-            return
-        self._update_table_actions()
-        enabled = self.edit_button.isChecked()
-        document = self.active_editor().document()
-        self.undo_action.setEnabled(enabled and document.isUndoAvailable())
-        self.redo_action.setEnabled(enabled and document.isRedoAvailable())
-        for action in (self.cut_action, self.paste_action, self.bold_action, self.italic_action,
-                       self.code_action, self.link_action):
-            action.setEnabled(enabled)
-
-    def _scroll_formatted_heading(self, anchor):
-        for _, _, candidate, block in _iter_headings(self.formatted_editor.document(), strip_syntax=True):
+    def scroll_heading(self, anchor):
+        for _, _, candidate, block in _iter_headings(self.editor.document(), strip_syntax=True):
             if candidate == anchor:
-                self.formatted_editor.setTextCursor(qt.QTextCursor(block))
-                self.formatted_editor.ensureCursorVisible()
-                self.formatted_editor.setFocus()
+                self.editor.setTextCursor(qt.QTextCursor(block))
+                self.editor.ensureCursorVisible()
+                self.editor.setFocus()
                 return
 
     def format_inline(self, marker):
-        self.formatted_editor.apply_inline_format(marker)
-        self.formatted_editor.setFocus()
+        self.editor.apply_inline_format(marker)
+        self.editor.setFocus()
 
     def format_blocks(self, prefix):
-        cursor = self.formatted_editor.textCursor()
+        cursor = self.editor.textCursor()
         cursor.beginEditBlock()
         if prefix == '- ':
             fmt = qt.QTextListFormat()
@@ -128,7 +118,7 @@ class MarkdownFormattedMixin:
                     cursor.setBlockFormat(fmt)
                     chars = qt.QTextCharFormat()
                     chars.setFontWeight(qt.QFont.Weight.Bold if level else qt.QFont.Weight.Normal)
-                    size = self.formatted_editor.font().pointSizeF()
+                    size = self.editor.font().pointSizeF()
                     chars.setFontPointSize((size if size > 0 else 12) * ((1.9, 1.6, 1.35, 1.2, 1.1, 1)[level - 1] if level else 1))
                     cursor.select(qt.QTextCursor.SelectionType.BlockUnderCursor)
                     cursor.mergeCharFormat(chars)
@@ -140,13 +130,13 @@ class MarkdownFormattedMixin:
                     break
                 cursor.setPosition(following.position())
         cursor.endEditBlock()
-        self.formatted_editor.setFocus()
+        self.editor.setFocus()
 
     def format_link(self, url):
-        cursor = self.formatted_editor.textCursor()
+        cursor = self.editor.textCursor()
         label = cursor.selectedText().replace('\u2029', ' ') if cursor.hasSelection() else 'link text'
         cursor.beginEditBlock()
         cursor.insertText(f'[{label}](<{url}>)', qt.QTextCharFormat())
         cursor.endEditBlock()
-        self.formatted_editor.setTextCursor(cursor)
-        self.formatted_editor.setFocus()
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()

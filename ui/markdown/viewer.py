@@ -6,20 +6,21 @@ from .. import pyside as qt
 from ..appearance.status_line import StatusLine
 from ..readers.reader_chrome import READER_MARGINS, READER_SPACING, ReaderLabel, ReaderFullscreen, reader_button, show_reader_popup
 from .editing import MarkdownEditingMixin
-from .search import MarkdownSearchMixin
-from .formatted import MarkdownFormattedMixin
+from .session import MarkdownDocumentState
+from .search import SearchHighlights
+from .formatted import FormattedEditing
 from .properties import MarkdownProperties
 from .headings import _iter_headings
 from .presentation import MarkdownBrowser, configure_text
 from .reading import MarkdownReadingMixin
 from .links import render_links
-from .tables import MarkdownTablesMixin
+from .tables import TableEditing
 from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
 from .images import AnimatedImages
 from ...formats.markdown import split_frontmatter
 
 
-class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormattedMixin, MarkdownEditingMixin, MarkdownTablesMixin, qt.QWidget):
+class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
     """Preview-only by default; allow_edit=True enables optional Markdown editing."""
     path_changed = qt.Signal(object)
     modified_changed = qt.Signal(bool)
@@ -30,12 +31,9 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         self.storage = storage
         self.history = []
         self.history_index = -1
-        self._source_bytes = None
-        self._loaded_path = None
+        self.document_state = MarkdownDocumentState()
         self.headings = []
         self.toc_popup = None
-        self._rich_snapshot = None
-        self._rich_source = None
         self._folded_callouts = {}
         self._callouts = {}
         layout = qt.QVBoxLayout(self)
@@ -91,8 +89,12 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         self.editor.setFont(qt.QFontDatabase.systemFont(qt.QFontDatabase.SystemFont.FixedFont))
         self.editor.document().modificationChanged.connect(self._modified_changed)
         self.formatted_editor = FormattedMarkdownEdit()
+        self.formatted = FormattedEditing(self.editor, self.formatted_editor, self.edit_mode,
+                                         self.document_state, set_mode=self.set_edit_mode,
+                                         status=lambda text: self.status.setText(text),
+                                         modified=self._modified_changed)
         for editor in (self.editor, self.formatted_editor):
-            editor.image_base = lambda: self._loaded_path.parent if self._loaded_path else None
+            editor.image_base = lambda: self.document_state.loaded_path.parent if self.document_state.loaded_path else None
             editor.local_image_drops = storage is None
         for widget in (self.browser, self.formatted_editor):
             configure_text(widget)
@@ -181,7 +183,11 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         for shortcut, callback in ((self.back_shortcut, self.back), (self.forward_shortcut, self.forward)):
             shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(callback)
-        self._init_search_highlights()
+        self.search_highlights = SearchHighlights(
+            self, (self.browser, self.editor, self.formatted_editor), self.pages,
+            self.find_text, self.find_bar, self.find_count,
+            library_query=lambda: self.wiki.search.text().strip() if self.wiki is not None else '',
+            path_changed=self.path_changed)
         self._update_buttons()
         self._diagram_renderer = None
         self._reading_palette_timer = qt.QTimer(self)
@@ -203,6 +209,91 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
             self.set_editing(True)
             if error:
                 self.status.setText(error)
+
+    def set_edit_mode(self, mode):
+        """Choose 'formatted' (default) or 'source', preserving unsaved edits."""
+        index = self.edit_mode.findData(mode)
+        if index < 0:
+            raise ValueError('Editing mode must be formatted or source')
+        self.edit_mode.setCurrentIndex(index)
+
+    def _change_edit_mode(self, index):
+        self._sync_formatted()
+        if self.edit_button.isChecked():
+            self.set_editing(True)
+
+    def _update_edit_actions(self):
+        if not hasattr(self, 'undo_action'):
+            return
+        self._update_table_actions()
+        enabled = self.edit_button.isChecked()
+        document = self.active_editor().document()
+        self.undo_action.setEnabled(enabled and document.isUndoAvailable())
+        self.redo_action.setEnabled(enabled and document.isRedoAvailable())
+        for action in (self.cut_action, self.paste_action, self.bold_action, self.italic_action,
+                       self.code_action, self.link_action):
+            action.setEnabled(enabled)
+
+    def active_editor(self):
+        return self.formatted.active_editor()
+
+    def _rich_pending(self):
+        return self.formatted.pending()
+
+    def _load_formatted(self):
+        return self.formatted.load()
+
+    def _sync_formatted(self):
+        return self.formatted.sync()
+
+    def _replace_source_text(self, text):
+        return self.formatted.replace_source(text)
+
+    def markdown_text(self):
+        return self.formatted.text()
+
+    def _scroll_formatted_heading(self, anchor):
+        return self.formatted.scroll_heading(anchor)
+
+    def format_inline(self, marker):
+        return self.formatted.format_inline(marker)
+
+    def format_blocks(self, prefix):
+        return self.formatted.format_blocks(prefix)
+
+    def format_link(self, url):
+        return self.formatted.format_link(url)
+
+    def _formatted_changed(self):
+        self.formatted.changed()
+
+    def _refresh_search_highlights(self):
+        return self.search_highlights.refresh()
+
+    def _reveal_library_match(self):
+        return self.search_highlights.reveal_library_match()
+
+    def _select_search_match(self, target, cursor, scope):
+        return self.search_highlights.select(target, cursor, scope)
+
+    def _clear_search_selection(self, scope):
+        return self.search_highlights.clear_selection(scope)
+
+    def _build_table_actions(self):
+        self.tables = TableEditing(self, self.formatted_editor, self.format_menu, action=self._action,
+                                   enabled=lambda: self.allow_edit and self.edit_button.isChecked()
+                                   and self.active_editor() is self.formatted_editor)
+        self.table_insert_action = self.tables.insert_action
+
+    def _update_table_actions(self):
+        if hasattr(self, 'tables'):
+            self.tables.update()
+
+    def _insert_table_dialog(self):
+        return self.tables.insert_dialog()
+
+    def _edit_table(self, operation):
+        return self.tables.edit(operation)
 
     def show_contents(self):
         if self.toc_popup is not None and self.toc_popup.isVisible():
@@ -272,15 +363,12 @@ class MarkdownViewer(MarkdownSearchMixin, MarkdownReadingMixin, MarkdownFormatte
         except (OSError, UnicodeError, ValueError) as error:
             self.status.setText(f'Cannot open {path}: {error}')
             return False
-        self._source_bytes = data
-        if path != self._loaded_path:
+        if path != self.document_state.loaded_path:
             self._folded_callouts.clear()
-        self._loaded_path = path
+        self.document_state.load(path, data)
         self.document_title.setText(path.name)
         self.editor.setPlainText(text)
         self.editor.document().setModified(False)
-        self._rich_source = None
-        self._rich_snapshot = None
         if self.edit_button.isChecked() and self.edit_mode.currentData() == "formatted":
             self._load_formatted()
         self._render_source(text, preserve_selection=False)

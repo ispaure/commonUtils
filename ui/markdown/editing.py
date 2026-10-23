@@ -5,7 +5,7 @@ from ..appearance.formatting_icons import FormattingIcon
 from pathlib import Path
 
 from .. import pyside as qt
-from .io import _encode_markdown, _write_markdown
+from .io import _write_markdown
 from .extensions import mermaid_blocks
 
 
@@ -16,7 +16,7 @@ class MarkdownEditingMixin:
         return self.editor.document().isModified() or self._rich_pending()
 
     def _modified_changed(self, modified):
-        path = self._loaded_path if self._loaded_path is not None else self.current_path
+        path = self.document_state.loaded_path if self.document_state.loaded_path is not None else self.current_path
         self.location.setText((str(path) if path else 'Untitled') + (' *' if modified else ''))
         if hasattr(self, 'document_title'):
             self.document_title.setText((path.name if path else 'Untitled') + (' *' if modified else ''))
@@ -197,10 +197,7 @@ class MarkdownEditingMixin:
             return False
         self.history.clear()
         self.history_index = -1
-        self._loaded_path = None
-        self._source_bytes = None
-        self._rich_snapshot = None
-        self._rich_source = None
+        self.document_state.new()
         self.editor.clear()
         self.editor.document().setModified(False)
         self.location.setText('Untitled')
@@ -243,37 +240,34 @@ class MarkdownEditingMixin:
 
     def capture_save(self):
         """Return a lossless byte snapshot of the current draft for a storage host."""
-        return _encode_markdown(self.markdown_text(), self._source_bytes, self.is_modified)
+        return self.document_state.capture(self.markdown_text(), self.is_modified)
 
     def begin_save(self):
         """Reserve an asynchronous save; False means a save is already pending."""
-        if not self.allow_edit or getattr(self, '_save_pending', False):
-            return False
-        self._save_pending = True
-        return True
+        return self.document_state.begin_save(self.allow_edit)
 
     def complete_save(self, destination, data, error=None):
         """Accept a published snapshot or retain the draft on failure."""
-        self._save_pending = False
+        self.document_state.save_pending = False
         if error:
             self.status.setText(f'Cannot save {destination}: {error}')
             return False
         return self._finish_save(Path(destination), data)
 
     def save_document(self, path=None):
-        if not self.allow_edit or getattr(self, '_save_pending', False):
+        if not self.allow_edit or self.document_state.save_pending:
             return False
         destination = Path(path).expanduser().absolute() if path is not None else self.current_path
         if destination is None:
             return self.save_as_dialog()
         try:
             data = self.capture_save()
-            expected = self._source_bytes if destination == self._loaded_path else None
+            expected = self.document_state.source_bytes if destination == self.document_state.loaded_path else None
             if self.storage is not None and hasattr(self.storage, 'submit_write'):
-                self._save_pending = True
+                self.document_state.save_pending = True
                 self.status.setText('Saving locally…')
                 def completed(error):
-                    self._save_pending = False
+                    self.document_state.save_pending = False
                     if error:
                         self.status.setText(f'Cannot save {destination}: {error}')
                     else:
@@ -285,14 +279,14 @@ class MarkdownEditingMixin:
             else:
                 _write_markdown(destination, data, expected=expected)
         except (OSError, UnicodeError, ValueError) as error:
-            self._save_pending = False
+            self.document_state.save_pending = False
             self.status.setText(f'Cannot save {destination}: {error}')
             return False
         return self._finish_save(destination, data)
 
     def _finish_save(self, destination, data):
-        self._source_bytes = data
-        self._loaded_path = destination
+        self.document_state.source_bytes = data
+        self.document_state.loaded_path = destination
         self.formatted_editor.document().setBaseUrl(qt.QUrl.fromLocalFile(str(destination.parent) + '/'))
         if self.history_index < 0:
             self.history.append({'url': qt.QUrl.fromLocalFile(str(destination)), 'scroll': 0})

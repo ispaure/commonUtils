@@ -20,6 +20,18 @@ Validate each consumer before updating its pinned or vendored revision.
 
 ## Data and behavior
 
+Markdown embeds retain the widget's explicit navigation/edit/save entry points.
+Document identity and byte/rich-import baselines now live in
+`viewer.document_state`; hosts migrate direct private `_loaded_path` and
+`_source_bytes` assignments to that declared owner. Source editor text and undo
+history remain editor-owned. See [Markdown ownership](../../ui/markdown/README.md#internal-ownership-and-embedding-contracts).
+
+Index scan instrumentation reads transient counters from `cache.active_operation`
+inside the writer operation. That object is detached on success/failure;
+`last_metrics` remains available afterward. Saved database formats and scan,
+reconciliation and snapshot-lifetime contracts are unchanged. See
+[index state ownership](../../filesystem/index/README.md#state-ownership).
+
 File instances retain their original path and cached metadata. Registration changes
 affect future resolutions. Feature bindings filter captured selections by accepted
 types; handlers still validate current state before mutation. Read

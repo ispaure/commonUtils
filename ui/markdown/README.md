@@ -5,6 +5,38 @@ standalone or document-hosted window. They render Markdown with Qt without a web
 engine. See the [user guide](user_docs/README.md) for reading, editing, YAML properties,
 callouts, local links, optional Mermaid diagrams and speech workflows.
 
+## Internal ownership and embedding contracts
+
+The source editor owns editable text and its undo stack. `document_state`
+([MarkdownDocumentState](session.py)) owns the loaded path, exact saved bytes,
+rich-import baselines and pending-save flag. It does not duplicate the editable
+buffer. Loading/new-document transitions reset rich baselines explicitly.
+
+| Component | Dependencies and responsibility |
+| --- | --- |
+| [FormattedEditing](formatted.py) | Source/rich editors, mode selector, document state and three callbacks; import, synchronize and format rich edits without knowing the viewer |
+| [SearchHighlights](search.py) | Text surfaces, search controls, page stack and library-query callback; scoped transient selections and its parented refresh timer |
+| [TableEditing](tables.py) | Rich editor, menu, action factory and enabled predicate; table actions and undo operations |
+| Viewer | Document navigation, signal integration, lifecycle and stable embedding entry points |
+| Editing/reading helpers | Widget action assembly, save/read presentation and interaction with the viewer's declared state/components |
+
+Three former behavior mixins are now composed components. The remaining two
+helpers contain widget integration; they do not own hidden copies of the rich
+baseline or search/table state. Widget entry points such as `markdown_text()`,
+`set_edit_mode()`, saving and IDE callback hooks remain explicit methods. No
+dynamic attribute forwarding is installed.
+
+Hosts which previously assigned `_loaded_path` or `_source_bytes` should assign
+`document_state.loaded_path` and `document_state.source_bytes`. A private-document
+host discarding its draft calls `document_state.new()` before clearing editor
+surfaces. The Notes and IDE consumers exercise these boundaries. Search marks do
+not dirty documents, unchanged rich imports do not normalize exact source, and
+actual rich synchronization remains one source undo operation.
+
+[Ownership tests](../../tests/test_markdown_ownership.py) construct rich editing
+without a viewer. The existing Markdown/search/table/frontmatter suites exercise
+integrated navigation, mode changes, YAML preservation, save conflicts and undo.
+
 ## Create and retain a reader
 
 Create QApplication first. This standalone example needs PySide6:
