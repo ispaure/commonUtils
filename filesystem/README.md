@@ -105,3 +105,10 @@ renames and ordinary clipboard copies keep their prior path. Cancellation remain
 between clipboard items. Source checks are not an external writer lock: another
 process can still edit after the last check, so callers must coordinate writers
 when strict exclusion is required.
+
+Storage relocation also rechecks the source immediately before cleanup, including
+root-link revisions. A late source edit or retargeted root link after publication
+retains the source and new location and raises `MutationIncomplete` with
+`destination_published=True`. Relative/internal link rebasing and no-overwrite
+migration policy are unchanged; callers must resolve both-location conflicts
+rather than blindly retrying a completed publication.

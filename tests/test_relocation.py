@@ -100,6 +100,50 @@ class RelocationTests(unittest.TestCase):
             self.assertEqual(old.joinpath('file').read_bytes(), b'externally changed')
             self.assertFalse(new.exists())
 
+    def test_late_source_edit_after_publication_is_preserved_with_the_new_copy(self):
+        from commonUtils.runtime.operations import MutationIncomplete
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            old, new = root / 'old', root / 'new'
+            old.mkdir()
+            (old / 'file').write_bytes(b'original ciphertext')
+            rename = relocation.rename_exclusive
+            def publish(source, destination):
+                if Path(source) == old:
+                    raise OSError(errno.EXDEV, 'different device')
+                result = rename(source, destination)
+                (old / 'file').write_bytes(b'new edit after publication')
+                return result
+            with patch.object(relocation, 'rename_exclusive', side_effect=publish):
+                with self.assertRaises(MutationIncomplete) as caught:
+                    relocation.relocate_directory(old, new)
+            self.assertTrue(caught.exception.result.destination_published)
+            self.assertEqual((old / 'file').read_bytes(), b'new edit after publication')
+            self.assertEqual((new / 'file').read_bytes(), b'original ciphertext')
+            self.assertFalse(list(root.glob('.directory-relocate-*')))
+
+    def test_changed_root_link_after_publication_is_not_removed(self):
+        from commonUtils.runtime.operations import MutationIncomplete
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            old, new = root / 'old', root / 'new'
+            for name in ('original', 'newer'):
+                (root / name).mkdir()
+            old.symlink_to('original', target_is_directory=True)
+            symlink = Path.symlink_to
+            def publish(path, target, **options):
+                result = symlink(path, target, **options)
+                if path == new:
+                    old.unlink()
+                    symlink(old, 'newer', target_is_directory=True)
+                return result
+            with patch.object(Path, 'symlink_to', publish):
+                with self.assertRaises(MutationIncomplete) as caught:
+                    relocation.relocate_directory(old, new)
+            self.assertTrue(caught.exception.result.destination_published)
+            self.assertEqual(old.resolve(), (root / 'newer').resolve())
+            self.assertEqual(new.resolve(), (root / 'original').resolve())
+
     def test_overlapping_directories_are_rejected_before_creating_paths(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

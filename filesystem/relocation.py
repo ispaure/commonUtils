@@ -5,7 +5,7 @@ import shutil
 import stat
 from tempfile import mkdtemp
 from ..persistence.publication import rename_exclusive, serialize_mutation, save_transaction
-from .snapshots import verified_file_snapshot
+from .snapshots import verified_file_snapshot, file_revision
 from ..persistence.transfers import try_rename, verify_unchanged, cleanup_published
 
 
@@ -63,9 +63,15 @@ def relocate_directory(source, destination):
         raise ValueError(f'Both storage locations exist. Preserve their contents and resolve the conflict: {source} and {destination}')
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if source.is_symlink():
+        before = file_revision(source, follow_symlinks=False)
         target = _resolved(source)
         destination.symlink_to(target, target_is_directory=True)
-        source.unlink()
+        def remove_link():
+            verify_unchanged(before, lambda: file_revision(source, follow_symlinks=False),
+                             message='Storage link changed after publication; the source was preserved.')
+            source.unlink()
+        cleanup_published(remove_link, source_state=lambda: 'unchanged'
+                          if file_revision(source, follow_symlinks=False) == before else 'unknown')
         return
     if not source.is_dir():
         raise ValueError(f'Expected a storage directory: {source}')
@@ -97,7 +103,10 @@ def relocate_directory(source, destination):
                              message='Storage changed during relocation; the original was preserved.')
         save_transaction(stage=copy, verify=verify, validate=validate,
                          publish=lambda: rename_exclusive(copied, destination), cleanup=lambda: None)
-        cleanup_published(lambda: shutil.rmtree(source),
+        def remove():
+            validate()
+            shutil.rmtree(source)
+        cleanup_published(remove,
                           source_state=lambda: 'unchanged' if _manifest(source) == expected else 'partial')
     finally:
         shutil.rmtree(stage)
