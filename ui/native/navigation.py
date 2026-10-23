@@ -115,12 +115,23 @@ class AppleNavigation:
         self.keyboard_tab_visibility = None
         self.keyboard_layout_pending = False
         self.keyboard_live = True
+        self.keyboard_frame = None
         self.keyboard_block = Block(self.refresh_keyboard, None, objc_id)
         self.notification_center = ObjCClass('NSNotificationCenter').defaultCenter
         if callable(self.notification_center):
             self.notification_center = self.notification_center()
         self.keyboard_observer = self.notification_center.addObserverForName(
             'UIKeyboardDidChangeFrameNotification', object=None, queue=None, usingBlock=self.keyboard_block)
+        self.keyboard_focus_block = Block(self.keyboard_focus_changed, None, objc_id)
+        # Child windows acquire their UIWindowScene after adapter construction.
+        # Filter scene notifications at delivery time rather than binding nil.
+        self.keyboard_focus_observers = [self.notification_center.addObserverForName(
+            name, object=owner, queue=None, usingBlock=self.keyboard_focus_block)
+            for name, owner in (
+                ('UIWindowDidBecomeKeyNotification', self.window._impl.native),
+                ('UIWindowDidResignKeyNotification', self.window._impl.native),
+                ('UISceneDidActivateNotification', None),
+                ('UISceneWillDeactivateNotification', None))]
 
     def _install_controllers(self):
         from rubicon.objc import ObjCClass
@@ -207,13 +218,33 @@ class AppleNavigation:
         frame = value.CGRectValue
         if callable(frame):
             frame = frame()
+        self.keyboard_frame = frame
+        self.apply_keyboard_frame(frame)
+
+    def keyboard_focus_changed(self, notification):
+        if not self.keyboard_live:
+            return
+        from rubicon.objc import ObjCInstance
+        owner = ObjCInstance(notification).object
+        native = self.window._impl.native
+        if owner is not None and (owner == native or owner == native.windowScene):
+            # WillDeactivate can arrive before activationState changes.
+            self.window.app.loop.call_soon(self.refresh_keyboard_focus)
+
+    def refresh_keyboard_focus(self):
+        if self.keyboard_live and self.keyboard_frame is not None:
+            self.apply_keyboard_frame(self.keyboard_frame)
+
+    def apply_keyboard_frame(self, frame):
         # Convert from the owning window's screen, never UIScreen.main. Floating
         # iPad keyboards do not consume a full-width bottom inset.
         native = self.window._impl.native
+        scene = native.windowScene
         frame = native.convertRect(frame, fromCoordinateSpace=native.screen.coordinateSpace)
         frame = self.parent.view.convertRect(frame, fromView=native)
         bounds = self.parent.view.bounds.size
-        intersects = (bool(native.isKeyWindow()) and frame.size.height > 0
+        intersects = (bool(native.isKeyWindow()) and scene is not None and int(scene.activationState) == 0
+                      and frame.size.height > 0
                       and frame.origin.y < bounds.height and frame.origin.y + frame.size.height > 0
                       and frame.origin.x < bounds.width and frame.origin.x + frame.size.width > 0)
         self.keyboard_visible = intersects
@@ -344,6 +375,10 @@ class AppleNavigation:
         self.keyboard_live = False
         self.keyboard_visible = False
         self.notification_center.removeObserver(self.keyboard_observer)
+        for observer in self.keyboard_focus_observers:
+            self.notification_center.removeObserver(observer)
+        self.keyboard_focus_observers.clear()
+        self.keyboard_frame = None
         self.restore_keyboard_chrome()
         self.parent.additionalSafeAreaInsets = self.old_additional_insets
         if getattr(self, 'split', None):

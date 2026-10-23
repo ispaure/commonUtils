@@ -101,7 +101,7 @@ class KeyboardLayoutTests(unittest.TestCase):
 class AppleKeyboardLayoutTests(unittest.TestCase):
     def adapter(self, *, modern=True, hidden=False):
         from commonUtils.ui.native.navigation import AppleNavigation
-        state = NS(hidden=hidden, key=True, insets=NS(bottom=0))
+        state = NS(hidden=hidden, key=True, insets=NS(bottom=0), scene=NS(activationState=0))
         class View:
             bounds = NS(size=NS(width=400, height=800))
             def setNeedsLayout(self): pass
@@ -124,6 +124,7 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         adapter = AppleNavigation.__new__(AppleNavigation)
         adapter.controller, adapter.parent = controller, parent
         adapter.window = NS(_impl=NS(native=NS(isKeyWindow=lambda: state.key,
+            windowScene=state.scene,
             screen=NS(coordinateSpace=object()), convertRect=lambda rect, **kwargs: rect)))
         state.queued, state.resizes = [], 0
         adapter.window.app = NS(loop=NS(call_soon=state.queued.append))
@@ -135,7 +136,56 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         adapter.keyboard_tab_visibility = None
         adapter.keyboard_layout_pending = False
         adapter.keyboard_live = True
+        adapter.keyboard_frame = None
         return adapter, state
+
+    def test_inactive_scene_releases_keyboard_even_when_its_window_remains_key(self):
+        adapter, state = self.adapter()
+        self.frame(adapter)
+        self.assertEqual(adapter.keyboard_inset, 266)
+        state.scene.activationState = 1
+        with patch.dict(sys.modules, {'rubicon.objc': NS(SEL=lambda value: value)}):
+            adapter.refresh_keyboard_focus()
+            self.assertFalse(adapter.keyboard_visible)
+            self.assertEqual(adapter.keyboard_inset, 0)
+            self.assertFalse(state.hidden)
+            adapter.window._impl.native.windowScene = None
+            adapter.refresh_keyboard_focus()
+            self.assertFalse(adapter.keyboard_visible)
+            adapter.window._impl.native.windowScene = state.scene
+            state.scene.activationState = 0
+            adapter.refresh_keyboard_focus()
+        self.assertTrue(adapter.keyboard_visible)
+        self.assertEqual(adapter.keyboard_inset, 266)
+
+    def test_focus_notifications_ignore_other_scenes_and_retired_adapters(self):
+        adapter, state = self.adapter()
+        with patch.dict(sys.modules, {'rubicon.objc': NS(ObjCInstance=lambda value: value)}):
+            adapter.keyboard_focus_changed(NS(object=object()))
+            self.assertEqual(state.queued, [])
+            adapter.keyboard_focus_changed(NS(object=state.scene))
+            self.assertEqual(state.queued, [adapter.refresh_keyboard_focus])
+        adapter.keyboard_live = False
+        adapter.keyboard_focus_changed(object())
+        adapter.refresh_keyboard_focus()
+
+    def test_focus_reconciliation_keeps_the_original_screen_frame(self):
+        from unittest.mock import Mock
+        adapter, state = self.adapter()
+        convert = Mock(side_effect=lambda frame, **kwargs: NS(
+            origin=NS(x=frame.origin.x, y=frame.origin.y - 100), size=frame.size))
+        adapter.window._impl.native.convertRect = convert
+        self.frame(adapter)
+        raw = adapter.keyboard_frame
+        self.assertEqual(raw.origin.y, 500)
+        convert.reset_mock()
+        with patch.dict(sys.modules, {'rubicon.objc': NS(SEL=lambda value: value)}):
+            adapter.refresh_keyboard_focus()
+            adapter.refresh_keyboard_focus()
+        self.assertEqual(convert.call_count, 2)
+        for call in convert.call_args_list:
+            self.assertIs(call.args[0], raw)
+        self.assertEqual(raw.origin.y, 500)
 
     def frame(self, adapter, *, top=500, height=300, width=400):
         frame = NS(origin=NS(x=0, y=top), size=NS(width=width, height=height))

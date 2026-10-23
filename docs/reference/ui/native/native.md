@@ -106,8 +106,16 @@ allocation, listener/delegate retention and voice setup; runtime delivery and
 shutdown remain on `NativeSpeech`. AVFoundation loads before protocol lookup,
 and the module's existing delegate cache still prevents duplicate class registration.
 
-On iOS, a software keyboard in the owning key window temporarily hides destination
-tabs and restores their previous visibility on dismissal or host uninstallation.
+On iOS, a software keyboard in an active scene's owning key window temporarily
+hides destination tabs and restores their previous visibility on dismissal or
+host uninstallation.
+Each scene can retain its own key window while inactive. The adapter therefore
+reconciles scene activation and window key changes as well as keyboard-frame
+notifications. It retains the last raw screen-coordinate frame, converts it again
+for the owning window, and releases added insets/tabs while that scene is inactive
+or unbound. Scene notifications are filtered against the window's current scene,
+including child windows bound after adapter construction. Disposal unregisters
+every observer; queued focus reconciliation checks the retired-owner flag.
 UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on
 iOS 18 and later; older systems use native view visibility. Floating keyboards
 hide the tabs without claiming a full-width keyboard inset. Immersive reader
