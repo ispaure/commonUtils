@@ -205,6 +205,72 @@ class UpdateTests(unittest.TestCase):
             updates.prepare_archive(installed, snapshot, 'new', self.protected)
         self.assertEqual(outside.read_text(), 'private')
 
+    def test_archive_rejects_corrupt_recovery_copies_before_changing_the_file(self):
+        base = self.root
+        for name in (updates.MARKER, 'app.py', 'obsolete.py'):
+            with self.subTest(name=name):
+                self.root = base / name
+                self.root.mkdir()
+                installed, snapshot, workspace = self.archive()
+                before = {path.name: path.read_bytes() for path in installed.iterdir()}
+                plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+                original = shutil.copy2
+
+                def corrupt(source, destination, *args, **kwargs):
+                    result = original(source, destination, *args, **kwargs)
+                    if Path(destination) == workspace / 'rollback' / name:
+                        Path(destination).write_bytes(b'corrupted recovery copy')
+                    return result
+
+                with patch.object(updates.shutil, 'copy2', side_effect=corrupt):
+                    with self.assertRaisesRegex(ValueError, 'Recovery copy'):
+                        updates.apply_archive(plan, workspace)
+                self.assertEqual({path.name: path.read_bytes() for path in installed.iterdir()
+                                  if path.is_file()}, before)
+
+    def test_archive_preserves_edits_made_while_copying_recovery_or_payload(self):
+        base = self.root
+        for phase in ('recovery', 'payload'):
+            with self.subTest(phase=phase):
+                self.root = base / phase
+                self.root.mkdir()
+                installed, snapshot, workspace = self.archive()
+                marker = (installed / updates.MARKER).read_bytes()
+                plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+                original = shutil.copy2
+
+                def edit(source, destination, *args, **kwargs):
+                    result = original(source, destination, *args, **kwargs)
+                    if (phase == 'recovery' and Path(destination) == workspace / 'rollback/app.py'
+                            or phase == 'payload' and Path(source).resolve() == snapshot.resolve() / 'app.py'):
+                        (installed / 'app.py').write_text('newer local edits')
+                    return result
+
+                with patch.object(updates.shutil, 'copy2', side_effect=edit):
+                    with self.assertRaisesRegex(ValueError, 'Local file changed'):
+                        updates.apply_archive(plan, workspace)
+                self.assertEqual((installed / 'app.py').read_text(), 'newer local edits')
+                self.assertEqual((installed / 'obsolete.py').read_text(), 'obsolete')
+                self.assertEqual((installed / updates.MARKER).read_bytes(), marker)
+
+    def test_archive_preserves_new_unmanaged_file_created_during_payload_copy(self):
+        installed, snapshot, workspace = self.archive()
+        plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+        original = shutil.copy2
+        target = installed / 'nested/new.py'
+
+        def create(source, destination, *args, **kwargs):
+            result = original(source, destination, *args, **kwargs)
+            if Path(source).resolve() == snapshot.resolve() / 'nested/new.py':
+                target.write_text('new unmanaged file')
+            return result
+
+        with patch.object(updates.shutil, 'copy2', side_effect=create):
+            with self.assertRaisesRegex(ValueError, 'Local file changed'):
+                updates.apply_archive(plan, workspace)
+        self.assertEqual(target.read_text(), 'new unmanaged file')
+        self.assertEqual((installed / 'app.py').read_text(), 'old')
+
     def test_helper_does_not_restart_after_incomplete_rollback(self):
         workspace = self.root / 'failed-runner'; workspace.mkdir()
         status = workspace / 'status.json'

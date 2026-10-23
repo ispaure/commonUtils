@@ -212,6 +212,15 @@ def prepare_archive(root, snapshot, revision, protected):
             'previous': installed, 'files': files, 'protected': list(protected), 'marker_hash': digest(marker)}
 
 
+def _archive_target(root, name, expected):
+    """Recheck the installed bytes immediately before a planned mutation."""
+    target = contained(root, name)
+    if (expected is not None and (not target.is_file() or digest(target) != expected)
+            or expected is None and target.exists()):
+        raise ValueError(f'Local file changed during update: {name}')
+    return target
+
+
 def apply_archive(plan, workspace):
     root, snapshot = Path(plan['root']), Path(plan['snapshot'])
     # Recheck all local files after shutdown, including edits made during preparation.
@@ -225,33 +234,36 @@ def apply_archive(plan, workspace):
     changed = []
     try:
         for name in sorted(names):
-            target = contained(root, name)
+            expected = plan['marker_hash'] if name == MARKER else plan['previous']['files'].get(name)
+            target = _archive_target(root, name, expected)
             saved = backup / relative(name)
             existed[name] = target.is_file()
-            expected = plan['previous']['files'].get(name)
-            if name != MARKER and (expected is not None and (not existed[name] or digest(target) != expected)
-                                   or expected is None and target.exists()):
-                raise ValueError(f'Local file changed during update: {name}')
             if existed[name]:
                 saved.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(target, saved)
-            changed.append(name)
-            (workspace / 'rollback.json').write_text(json.dumps({'root': str(root), 'files': existed}), encoding='utf-8')
-            if name in plan['files']:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with NamedTemporaryFile(prefix='.' + target.name + '.update-', dir=target.parent, delete=False) as stream:
-                    temporary = Path(stream.name)
-                try:
+                if digest(saved) != expected:
+                    raise ValueError(f'Recovery copy failed verification: {name}')
+            temporary = None
+            try:
+                if name in plan['files']:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with NamedTemporaryFile(prefix='.' + target.name + '.update-', dir=target.parent, delete=False) as stream:
+                        temporary = Path(stream.name)
                     shutil.copy2(snapshot / relative(name), temporary)
                     if digest(temporary) != plan['files'][name]:
                         raise ValueError('Staged file changed during update')
+                target = _archive_target(root, name, expected)
+                (workspace / 'rollback.json').write_text(json.dumps({'root': str(root), 'files': existed}), encoding='utf-8')
+                changed.append(name)
+                if temporary is not None:
                     temporary.replace(target)
-                finally:
+                elif name == MARKER:
+                    target.write_text(json.dumps({'format': 1, 'revision': plan['revision'], 'files': plan['files']}, indent=2), encoding='utf-8')
+                else:
+                    target.unlink()
+            finally:
+                if temporary is not None:
                     temporary.unlink(missing_ok=True)
-            elif name == MARKER:
-                target.write_text(json.dumps({'format': 1, 'revision': plan['revision'], 'files': plan['files']}, indent=2), encoding='utf-8')
-            else:
-                target.unlink()
     except BaseException:
         try:
             for name in reversed(changed):

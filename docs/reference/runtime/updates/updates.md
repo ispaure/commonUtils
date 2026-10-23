@@ -35,6 +35,13 @@ copies and a recovery record outside the installation. This is a rollback
 transaction, not a crash-atomic whole-tree switch; interrupted updates require
 manual recovery from those records.
 
+Recovery copies are SHA-256 checked against the prepared installed bytes before
+their originals can be changed, including deleted files and the manifest itself.
+Targets are checked again after recovery/payload copying and before entering the
+rollback journal. Observed newer edits and newly occupied paths therefore abort
+without enrolling that untouched file for rollback. These checks do not lock out
+external writers between the final check and the filesystem mutation.
+
 Copy `transaction.py` to a private staging directory outside the installation.
 After the host has accepted close and stopped its workers, start it with a JSON
 request containing `pid`, `plan`, `restart` (argv list) and `status` (receipt path).
