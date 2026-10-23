@@ -95,6 +95,11 @@ and menu population do too. Their call order matches allocation/restoration orde
 callbacks and `dispose` remain on the existing adapters. Platform imports stay
 lazy inside the native construction path.
 
+Canvas construction separates Apple gesture wiring and magnifier/lens-control
+allocation from layout and gesture delivery, and Android page-listener binding
+from view setup. The backend classes remain in their lazy factories; cached
+Objective-C classes, native selectors and ownership links are unchanged.
+
 On iOS, a software keyboard in the owning key window temporarily hides destination
 tabs and restores their previous visibility on dismissal or host uninstallation.
 UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on
