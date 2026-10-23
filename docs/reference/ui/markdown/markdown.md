@@ -26,6 +26,12 @@ baseline or search/table state. Widget entry points such as `markdown_text()`,
 `set_edit_mode()`, saving and IDE callback hooks remain explicit methods. No
 dynamic attribute forwarding is installed.
 
+Viewer construction keeps navigation, text surfaces, document properties and
+reading controls in four private builders in `viewer.py`. The constructor retains
+wiki composition, signal/lifetime integration, provider action policy and initial
+document admission. Builders populate the existing widget fields in construction
+order; they introduce no additional state owner or embedding interface.
+
 Hosts which previously assigned `_loaded_path` or `_source_bytes` should assign
 `document_state.loaded_path` and `document_state.source_bytes`. A private-document
 host discarding its draft calls `document_state.new()` before clearing editor

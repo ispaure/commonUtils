@@ -39,6 +39,62 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(*READER_MARGINS)
         layout.setSpacing(READER_SPACING)
+        toolbar = self._build_navigation_toolbar(layout)
+        self._build_document_views(storage)
+        if directory is not None:
+            from .wiki import WikiPanel
+            self.wiki = WikiPanel(self, directory)
+            self.wiki_splitter = qt.QSplitter()
+            self.wiki_splitter.addWidget(self.wiki)
+            self.wiki_splitter.addWidget(self.document_panel)
+            self.wiki_splitter.setStretchFactor(1, 1)
+            self.wiki_splitter.setSizes([260, 740])
+            layout.addWidget(self.wiki_splitter, 1)
+            if path is None:
+                path = self.wiki.catalog.first_page
+        else:
+            self.wiki = None
+            layout.addWidget(self.document_panel, 1)
+        self._build_document_properties(layout, toolbar)
+        self._build_editor_actions(self.document_layout)
+        self._build_reading_controls(toolbar)
+        self.status = StatusLine()
+        layout.addWidget(self.status)
+        self.back_button.clicked.connect(self.back)
+        self.forward_button.clicked.connect(self.forward)
+        self.back_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Left'), self)
+        self.forward_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Right'), self)
+        for shortcut, callback in ((self.back_shortcut, self.back), (self.forward_shortcut, self.forward)):
+            shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(callback)
+        self.search_highlights = SearchHighlights(
+            self, (self.browser, self.editor, self.formatted_editor), self.pages,
+            self.find_text, self.find_bar, self.find_count,
+            library_query=lambda: self.wiki.search.text().strip() if self.wiki is not None else '',
+            path_changed=self.path_changed)
+        self._update_buttons()
+        self._diagram_renderer = None
+        self._reading_palette_timer = qt.QTimer(self)
+        self._reading_palette_timer.setSingleShot(True)
+        self._reading_palette_timer.setInterval(0)
+        self._reading_palette_timer.timeout.connect(lambda: self._render_source(self.editor.toPlainText()))
+        self.browser.installEventFilter(self)
+        from .hover import LinkPreview
+        self.link_preview = LinkPreview(self)
+        if storage is not None:
+            for action in (self.new_action, self.open_action, self.save_as_action):
+                action.setEnabled(False)
+            self.open_action.setEnabled(callable(getattr(storage, 'open_dialog', None)))
+            self.save_as_action.setEnabled(self.allow_edit and callable(getattr(storage, 'save_as', None)))
+        if path is not None:
+            self.open_document(path)
+        if self.allow_edit:
+            error = self.status.text()
+            self.set_editing(True)
+            if error:
+                self.status.setText(error)
+
+    def _build_navigation_toolbar(self, layout):
         toolbar = qt.QHBoxLayout()
         self.navigation_toolbar = toolbar
         self.workspace_controls = toolbar
@@ -77,6 +133,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.toc_button.clicked.connect(self.show_contents)
         toolbar.addWidget(self.toc_button)
         layout.addLayout(toolbar)
+        return toolbar
+
+    def _build_document_views(self, storage):
         self.browser = MarkdownBrowser()
         self.browser.animated_images = AnimatedImages(self.browser)
         self.browser.setOpenLinks(False)
@@ -117,20 +176,8 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.document_layout.setContentsMargins(0, 0, 0, 0)
         self.document_layout.setSpacing(READER_SPACING)
         self.document_layout.addWidget(self.pages, 1)
-        if directory is not None:
-            from .wiki import WikiPanel
-            self.wiki = WikiPanel(self, directory)
-            self.wiki_splitter = qt.QSplitter()
-            self.wiki_splitter.addWidget(self.wiki)
-            self.wiki_splitter.addWidget(self.document_panel)
-            self.wiki_splitter.setStretchFactor(1, 1)
-            self.wiki_splitter.setSizes([260, 740])
-            layout.addWidget(self.wiki_splitter, 1)
-            if path is None:
-                path = self.wiki.catalog.first_page
-        else:
-            self.wiki = None
-            layout.addWidget(self.document_panel, 1)
+
+    def _build_document_properties(self, layout, toolbar):
         self.properties = MarkdownProperties(self)
         self.properties.changed.connect(self._apply_properties)
         layout.insertWidget(1, self.properties)
@@ -155,7 +202,8 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self._properties_timer.setInterval(200)
         self._properties_timer.timeout.connect(lambda: self.properties.refresh(self.editor.toPlainText()))
         self.editor.textChanged.connect(lambda: self._properties_timer.start())
-        self._build_editor_actions(self.document_layout)
+
+    def _build_reading_controls(self, toolbar):
         self.diagrams_button = reader_button(self, 'Render Mermaid diagrams', text='Diagrams')
         self.diagrams_button.clicked.connect(self.render_diagrams)
         self.diagrams_button.hide()
@@ -174,41 +222,6 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.escape_shortcut = qt.QShortcut(qt.QKeySequence('Escape'), self)
         self.escape_shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.escape_shortcut.activated.connect(self._escape)
-        self.status = StatusLine()
-        layout.addWidget(self.status)
-        self.back_button.clicked.connect(self.back)
-        self.forward_button.clicked.connect(self.forward)
-        self.back_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Left'), self)
-        self.forward_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Right'), self)
-        for shortcut, callback in ((self.back_shortcut, self.back), (self.forward_shortcut, self.forward)):
-            shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            shortcut.activated.connect(callback)
-        self.search_highlights = SearchHighlights(
-            self, (self.browser, self.editor, self.formatted_editor), self.pages,
-            self.find_text, self.find_bar, self.find_count,
-            library_query=lambda: self.wiki.search.text().strip() if self.wiki is not None else '',
-            path_changed=self.path_changed)
-        self._update_buttons()
-        self._diagram_renderer = None
-        self._reading_palette_timer = qt.QTimer(self)
-        self._reading_palette_timer.setSingleShot(True)
-        self._reading_palette_timer.setInterval(0)
-        self._reading_palette_timer.timeout.connect(lambda: self._render_source(self.editor.toPlainText()))
-        self.browser.installEventFilter(self)
-        from .hover import LinkPreview
-        self.link_preview = LinkPreview(self)
-        if storage is not None:
-            for action in (self.new_action, self.open_action, self.save_as_action):
-                action.setEnabled(False)
-            self.open_action.setEnabled(callable(getattr(storage, 'open_dialog', None)))
-            self.save_as_action.setEnabled(self.allow_edit and callable(getattr(storage, 'save_as', None)))
-        if path is not None:
-            self.open_document(path)
-        if self.allow_edit:
-            error = self.status.text()
-            self.set_editing(True)
-            if error:
-                self.status.setText(error)
 
     def set_edit_mode(self, mode):
         """Choose 'formatted' (default) or 'source', preserving unsaved edits."""
