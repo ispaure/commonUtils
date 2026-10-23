@@ -18,3 +18,9 @@ Read [architecture](docs/developer/architecture.md),
   README/user_docs files remain short compatibility links, not duplicate guides.
 - Validate with isolated fixtures/caches and relevant shared/consumer tests. Report
   unavailable platform/consumer checks explicitly. See [testing](docs/reference/tests/tests.md).
+
+## Branch workflow
+
+Work on the current development branch by default. Create a separate branch only
+when there is a concrete reason, such as isolating concurrent work or a risky
+experiment; do not create `codex/*` branches automatically.
