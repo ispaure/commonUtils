@@ -74,6 +74,10 @@ awaiter cannot stop a blocking worker thread; retaining the task also keeps its
 concurrency slot occupied until the read retires. Queued obsolete requests skip
 loading when they acquire a slot.
 
+`spawn()` closes an unscheduled coroutine and returns None when its owner has
+stopped, its supplied loop has closed or no running loop is available. Publishing
+a prepared tree still explicitly reopens the browser/lifecycle for reuse.
+
 `stop()` invalidates work and clears caches immediately; `await close()` waits for
 retained tasks, including cooperative worker completion. Close explicitly drains
 completed tasks even before their queued retirement callbacks run. Do not release

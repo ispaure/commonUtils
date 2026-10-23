@@ -25,6 +25,9 @@ class BrowserLifecycle:
         return task
 
     def spawn(self, coroutine, *, loop=None):
+        if self.closed or (loop is not None and loop.is_closed()):
+            coroutine.close()
+            return None
         try:
             loop = loop or asyncio.get_running_loop()
         except RuntimeError:

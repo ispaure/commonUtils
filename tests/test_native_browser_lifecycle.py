@@ -10,6 +10,35 @@ HAS_TOGA = find_spec('toga') is not None
 
 
 class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stopped_owner_rejects_late_work_and_closes_the_coroutine(self):
+        import inspect
+        work = BrowserLifecycle()
+        work.stop()
+        calls = []
+        async def late_callback():
+            calls.append('ran')
+        coroutine = late_callback()
+        task = work.spawn(coroutine)
+        try:
+            self.assertIsNone(task)
+            self.assertEqual(inspect.getcoroutinestate(coroutine), inspect.CORO_CLOSED)
+            await asyncio.sleep(0)
+            self.assertEqual(calls, [])
+            self.assertFalse(work.tasks)
+        finally:
+            await work.close()
+
+    def test_closed_event_loop_rejects_work_without_leaving_an_open_coroutine(self):
+        import inspect
+        loop = asyncio.new_event_loop()
+        loop.close()
+        coroutine = asyncio.sleep(0)
+        try:
+            self.assertIsNone(BrowserLifecycle().spawn(coroutine, loop=loop))
+            self.assertEqual(inspect.getcoroutinestate(coroutine), inspect.CORO_CLOSED)
+        finally:
+            coroutine.close()
+
     async def test_late_cover_cannot_publish_after_generation_change(self):
         work = BrowserLifecycle()
         started, release = Event(), Event()
