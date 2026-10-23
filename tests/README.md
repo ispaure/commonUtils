@@ -8,6 +8,10 @@ followers; assertions still verify completion, totals and durable task ownership
 
 See [maintenance and documentation ownership](../docs/developer/maintenance.md).
 
+Command-failure fixtures instrument only the exact target argv. Windows cleanup
+launches `taskkill` through the same subprocess module; preserve those helper
+processes and check retirement of the command being tested.
+
 Run the suite before changing a consumer's pinned or vendored copy. Tests cover
 file preservation, archive validation, indexing, direct package imports and Qt
 worker ownership. External applications, native dialogs and drivers also need

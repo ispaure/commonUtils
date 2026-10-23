@@ -94,14 +94,18 @@ class CommandCaptureTests(unittest.TestCase):
     def test_input_writer_error_is_propagated_and_child_is_retired(self):
         from commonUtils.integrations.wrappers.cmdShellWrapper import capture
         spawned = []
+        source = 'import time; time.sleep(10)'
+        arguments = [sys.executable, '-c', source]
         start = capture.subprocess.Popen
         def record(*args, **kwargs):
             process = start(*args, **kwargs)
-            spawned.append(process)
+            # Windows cleanup launches taskkill through the same subprocess module.
+            if process.args == arguments:
+                spawned.append(process)
             return process
         with patch.object(capture.subprocess, 'Popen', side_effect=record):
             with self.assertRaises(TypeError):
-                self.command('import time; time.sleep(10)', input_data=object())
+                self.command(source, input_data=object())
         self.assertEqual(len(spawned), 1)
         self.assertIsNotNone(spawned[0].poll())
 
