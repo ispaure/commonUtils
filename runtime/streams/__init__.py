@@ -11,15 +11,26 @@ def iter_chunks(stream, *, cancelled=lambda: False):
     while True:
         check_cancelled(cancelled)
         chunk = stream.read(CHUNK_SIZE)
+        if chunk is None:
+            raise BlockingIOError('Source cannot provide stream data yet.')
         if not chunk:
             return
         yield chunk
 
 
 def copy_stream(source, destination, *, cancelled=lambda: False, progress=None):
-    """Copy bounded chunks; progress receives the bytes written for each chunk."""
+    """Copy complete chunks, retrying short writes; report each completed chunk."""
     for chunk in iter_chunks(source, cancelled=cancelled):
-        destination.write(chunk)
+        pending = chunk
+        while pending:
+            check_cancelled(cancelled)
+            written = destination.write(pending)
+            if written is None:
+                raise BlockingIOError('Destination cannot accept stream data yet.')
+            if (not isinstance(written, int) or isinstance(written, bool)
+                    or written <= 0 or written > len(pending)):
+                raise OSError('Destination returned an invalid stream write count.')
+            pending = memoryview(pending)[written:]
         if progress:
             progress(len(chunk))
 

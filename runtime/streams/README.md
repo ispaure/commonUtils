@@ -16,7 +16,7 @@ Public entry points: `iter_chunks`, `copy_stream`, `stream_signature`, `file_sha
 | Entry point | Purpose |
 | --- | --- |
 | `iter_chunks` | Check cancellation before each read, including the final EOF read. |
-| `copy_stream` | Copy bounded chunks; progress receives the bytes written for each chunk. |
+| `copy_stream` | Complete short writes; progress receives each completed read chunk’s byte count. |
 | `stream_signature` | Return (byte count, SHA-256); progress receives each chunk's byte count. |
 
 ## Copy and hash bounded streams
@@ -46,6 +46,14 @@ including the final EOF read. `file_sha256(path, cancelled=...)` hashes a file u
 the same rules. Cancellation raises `OperationCancelled`; a partial copy remains
 in the supplied output stream. These helpers do not delete files or publish staged
 outputs. Use a disposable destination and promote only after your own validation.
+
+Binary destinations must return the number of bytes accepted by `write`. Short
+writes are completed before reporting that read chunk; cancellation is checked
+between partial writes as well as reads. Zero, negative, oversized or non-integer
+counts raise `OSError` rather than losing data or spinning. A `None` read/write
+result signals would-block and raises `BlockingIOError`; these blocking helpers
+do not schedule asynchronous readiness or mistake it for EOF. Errors leave the
+already-written prefix for the caller’s staging/cleanup policy.
 
 ## Measured reads
 
