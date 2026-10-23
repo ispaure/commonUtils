@@ -33,6 +33,12 @@ Find supports previous/next matches, wrapping and optional case matching. Replac
 uses literal text, including backslashes, and Replace all updates every match.
 The application controls whether editing and saving are available.
 
+When an editor offers language selection, Automatic follows the filename and
+initial source line. A manual language remains selected through text and filename
+changes until Automatic is chosen again. Plain Text disables syntax colours.
+Changing the language does not edit source text; the application decides whether
+to remember the choice after closing the document.
+
 [Embedding and packaging](../../reference/ui/native/native.md)
 
 ## Documentation

@@ -182,3 +182,10 @@ shared with the native source input without importing Qt. The common Pygments
 Blade grammar lives in `formats.code_blade`; the existing nested desktop import
 continues to expose that same grammar. Qt's incremental block formatter remains
 in this package; native text views apply UTF-16 spans from `formats.code_spans`.
+
+
+`formats.code_language.LanguageSelection` supplies portable automatic/manual
+selection for hosts that expose language controls. It is also used by native
+CodeInput. The host owns choosing a language, applying it to SyntaxHighlighter,
+folding/comment behavior, display captions and saving the selection. See the
+[language API](../../formats/formats.md#editor-language-selection).

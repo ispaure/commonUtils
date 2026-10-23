@@ -418,7 +418,12 @@ IME extraction; Source mode keeps the application's toolbar and native editor.
 Call `set_filename` on rename, `set_language(alias)` for an override (None restores
 detection), and `dispose()` when retiring a view. Existing `.value`, `.readonly`
 and EditorSearch contracts remain available; `backend_name` identifies the host
-backend for native UTF-16 selection adapters.
+backend for native UTF-16 selection adapters. `language_selection` exposes the
+shared `formats.code_language.LanguageSelection` used internally; `language` is
+the effective ID and `language_override` exposes its selected ID. Filename and
+text changes refresh detection while retaining manual overrides. Hosts may bind
+their chooser to this same model; use `set_language` to apply a selection and
+schedule native highlighting without emitting a text-change callback.
 
 Hosts supply Pygments (Logistics pins 2.19.2). Language choices, filename detection
 and the Blade grammar are shared with desktop under `formats.code_syntax` and

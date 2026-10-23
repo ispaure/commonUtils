@@ -448,3 +448,27 @@ on failure.
 ## Portable Markdown and string tables
 
 [Markdown](markdown/markdown.md) groups properties, image-size syntax, file activation and local wiki catalogs. [String tables](tables.md) documents the lightweight CSV-backed Cell/Row/Spreadsheet API.
+
+
+## Editor language selection
+
+`code_language.LanguageSelection` owns toolkit-independent automatic/manual syntax
+selection. `selected_id=None` means Automatic; `text` means manual Plain Text.
+`update(path, text)` refreshes `detected_id` using the existing `code_syntax`
+detector and returns whether the effective `language_id` changed. Detection uses
+at most 256 source characters and caches unchanged path/prefix input, even while
+a manual override is active. `select(alias)` chooses a manual ID; `select(None)`
+resumes detection. Invalid non-string, empty or over-100-character IDs raise
+`ValueError`; extended aliases remain representable outside the curated catalogue.
+
+`LANGUAGE_CHOICES` is an ordered `runtime.choices.ChoiceSet` of `ChoiceOption`
+records, beginning with Automatic and Plain Text. `language_choices(extended=True)`
+lazily adds Pygments lexer aliases, retaining curated IDs/labels and sorting the
+additional presentation choices. The default catalogue imports neither Pygments
+nor a UI toolkit. `language_label(id)` supplies a curated name or the unchanged
+extended ID. Hosts choose their catalogue, labels/captions, storage representation
+and document lifetimes; the model owns no widgets, worker or persistence policy.
+
+Native CodeInput and desktop consumers share this model. `tests/formats/test_code_language.py`
+covers transitions, bounded detection and catalogue identities;
+`tests/runtime/test_choices.py` covers collection contracts.

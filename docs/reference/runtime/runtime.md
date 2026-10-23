@@ -110,3 +110,18 @@ Search mechanisms live in [search](../search/search.md); personal filesystem def
 - [operations](operations/operations.md)
 - [Operating system and architecture](platform/platform.md)
 - [streams](streams/streams.md)
+
+
+## Ordered choices
+
+`choices.ChoiceOption(id, label)` is an immutable option. `ChoiceSet(options)`
+snapshots an ordered collection with unique hashable IDs; duplicate IDs raise
+`ValueError`. `None` is an ordinary ID with no automatic/empty-selection meaning
+assigned by this collection. Selection and unknown-ID policy belong to callers.
+
+The collection supports iteration, indexing/slicing, `labels`, `by_id(id)` and
+`index_of(id)`. Missing identities raise `KeyError`. Labels can repeat, so a native
+control capable of retaining IDs should do so. String-only bindings can use
+`from_label(label)`: unknown labels raise `KeyError`, ambiguous labels raise
+`ValueError`. Renaming or reordering options does not change their identities.
+There are no callbacks, widgets, task runners or persistence in this contract.

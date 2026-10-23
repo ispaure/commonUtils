@@ -5,7 +5,7 @@ recovery and save policy. No document bytes enter a WebView or a disk cache.
 """
 import asyncio
 import toga
-from ...formats.code_syntax import detect_language
+from ...formats.code_language import LanguageSelection
 from ...formats.code_spans import line_offsets, syntax_spans
 
 _apple_class = None
@@ -151,8 +151,8 @@ class CodeInput(toga.MultilineTextInput):
         self.loop, self.filename = loop, filename
         self.changed_callback = on_change
         self.highlighting = highlighting
+        self.language_selection = LanguageSelection()
         self.language = 'text'
-        self.language_override = None
         self.line_starts = [0]
         self.pending = self.worker = None
         self.closed = self.applying = False
@@ -177,6 +177,14 @@ class CodeInput(toga.MultilineTextInput):
             return apple_backend(self)
         return super()._create()
 
+    @property
+    def language_override(self):
+        return self.language_selection.selected_id
+
+    @language_override.setter
+    def language_override(self, language):
+        self.language_selection.select(language)
+
     def set_filename(self, filename):
         self.filename = filename
         self.changed(notify=False)
@@ -189,7 +197,8 @@ class CodeInput(toga.MultilineTextInput):
         if self.closed or self.applying or getattr(self, '_impl', None) is None:
             return
         self.line_starts = line_offsets(self.value)
-        self.language = self.language_override or detect_language(self.filename, self.value)
+        self.language_selection.update(self.filename, self.value)
+        self.language = self.language_selection.language_id
         if hasattr(self._impl, 'native') and type(self._impl).__module__ == __name__:
             native = self._impl.native
             from rubicon.objc import UIEdgeInsets
