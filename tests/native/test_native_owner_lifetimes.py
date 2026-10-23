@@ -2,6 +2,9 @@
 import asyncio
 from importlib.util import find_spec
 import os
+import gc
+import sys
+import weakref
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -80,6 +83,93 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
                 page.assert_not_called()
                 toggle.assert_not_called()
                 magnify.assert_not_called()
+
+    def test_failed_navigation_install_can_be_retried(self):
+        host = navigation.NativeNavigationHost((('home', 'Home', 'house', 'home'),))
+        adapter = Mock()
+        with patch.object(type(host.root._impl), '__module__', 'toga_iOS.optioncontainer'), \
+                patch.object(navigation, 'AppleNavigation', side_effect=[ValueError('admission'), adapter]):
+            with self.assertRaisesRegex(ValueError, 'admission'):
+                host.install(object())
+            self.assertIsNone(host.window)
+            self.assertIsNone(host.adapter)
+            window = object()
+            host.install(window)
+            self.assertIs(host.window, window)
+            host.uninstall()
+
+    def test_retired_navigation_callbacks_do_not_touch_native_objects(self):
+        apple = object.__new__(navigation.AppleNavigation)
+        apple.keyboard_live = False
+        apple.layout_window(object())
+        android = object.__new__(navigation.AndroidNavigation)
+        android.active = False
+        android.window_resized(object())
+        android.resize_content()
+        android.content_refreshed()
+
+    def test_android_rejects_missing_window_before_mutating_controls(self):
+        host = SimpleNamespace(root=SimpleNamespace(_impl=Mock(), _MIN_HEIGHT=100))
+        modules = {'android': SimpleNamespace(R=object()),
+                   'com.google.android.material.navigation': SimpleNamespace(NavigationBarView=object()),
+                   'java': SimpleNamespace(dynamic_proxy=Mock())}
+        with patch.dict(sys.modules, modules), self.assertRaises(AttributeError):
+            navigation.AndroidNavigation(host, object())
+        self.assertEqual(host.root._MIN_HEIGHT, 100)
+        host.root._impl.rehint.assert_not_called()
+
+    def test_android_forwards_resize_to_the_already_bound_toga_handler(self):
+        from toga.handlers import wrapped_handler
+        window, handler = object(), Mock()
+        adapter = object.__new__(navigation.AndroidNavigation)
+        adapter.active, adapter.layout_events = True, 0
+        adapter.old_window_resize = wrapped_handler(window, handler)
+        adapter.update_keyboard_inset = Mock()
+        adapter.impl = SimpleNamespace(native=SimpleNamespace(getWidth=lambda: 400), scale_out=lambda value: value)
+        adapter.set_mode = Mock()
+        adapter.window_resized(window)
+        handler.assert_called_once_with(window)
+
+    def test_android_native_selection_is_programmatic_during_install_and_restoration(self):
+        adapter = object.__new__(navigation.AndroidNavigation)
+        adapter.host = SimpleNamespace(changing=False, destinations=('home', 'notes'),
+                                       state=SimpleNamespace(destination='notes'))
+        def select(index):
+            self.assertEqual(index, 1)
+            self.assertTrue(adapter.host.changing)
+        adapter.impl = SimpleNamespace(set_current_tab_index=select)
+        adapter.select_current_tab()
+        self.assertFalse(adapter.host.changing)
+        adapter.host.changing = True
+        adapter.select_current_tab()
+        self.assertTrue(adapter.host.changing)
+
+    def test_speech_close_releases_presentation_owners_even_when_native_stop_fails(self):
+        class Receiver:
+            def callback(self, *args):
+                pass
+
+        for broken_stop in (False, True):
+            with self.subTest(broken_stop=broken_stop):
+                loop = asyncio.new_event_loop()
+                try:
+                    engine = NativeSpeech(loop)
+                    receiver = Receiver()
+                    reference = weakref.ref(receiver)
+                    engine.completed = engine.failed = engine.progress = engine.started = receiver.callback
+                    engine.ready = True
+                    del receiver
+                    with patch.object(engine, 'stop', side_effect=RuntimeError('native') if broken_stop else None):
+                        if broken_stop:
+                            with self.assertRaisesRegex(RuntimeError, 'native'):
+                                engine.close()
+                        else:
+                            engine.close()
+                    gc.collect()
+                    self.assertIsNone(reference())
+                    self.assertFalse(engine.ready)
+                finally:
+                    loop.close()
 
     def test_speech_close_detaches_once_and_suppresses_already_queued_deliveries(self):
         for backend in ('toga_android.speech', 'toga_iOS.speech'):

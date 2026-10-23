@@ -58,16 +58,27 @@ Install/uninstall routes with their host to register/remove native Back delegate
 
 | Owner | Installation and retention | Retirement |
 | --- | --- | --- |
-| `NativeNavigationHost` | One installed window and adapter; adapter retains original containment/layout/listener bindings | `uninstall` restores chrome before disposing the adapter, then clears adapter/window. The host permits reinstall while retaining selected destination; a second simultaneous install is refused. `dispose` also clears the host selection callback. |
+| `NativeNavigationHost` | One installed window and adapter; adapter retains original containment/layout/listener bindings | `uninstall` restores chrome before disposing the adapter, then clears adapter/window. The host permits reinstall while retaining selected destination; a second simultaneous install is refused. Retired layout/selection callbacks do nothing. Android forwards the already-bound Toga resize handler without adding a window argument and restores that exact wrapper. `dispose` also clears the host selection callback. |
 | `ImageCanvas` | Backend retains gestures/listeners; Apple native delegate ownership is weak | `dispose` clears pixels and page/toggle/magnifier callbacks, disables magnification, then detaches the native delegate/listener. Retire permanently before releasing a page. |
-| `NativeSpeech` | Backend owns engine/delegate or Java progress listener; notifications marshal onto the supplied loop | `close` marks the engine closed before stopping it, detaches native callbacks and clears voices. Deliveries check closed state both before scheduling and when the loop executes them. `stop` alone permits reuse; `close` does not. |
+| `NativeSpeech` | Backend owns engine/delegate or Java progress listener; notifications marshal onto the supplied loop | `close` marks the engine closed/not ready and clears voices and presentation callbacks before stopping it, then detaches native callbacks. Deliveries check closed state both before scheduling and when the loop executes them. `stop` alone permits reuse; `close` does not. |
 
 The host pairs adapter installation with uninstallation; direct backend `dispose`
 methods are not an independent public idempotence contract. A draft owner that
 allocates controls before admission must retire rejected controls itself.
+Android checks the supplied window's resize interface before replacing controls;
+failed admission clears the host's window so it can retry. This is not a general
+rollback guarantee for failures partway through native construction.
 `test_native_owner_lifetimes` covers host reinstall/restoration, fake native canvas
-detachment and queued speech suppression. Keyboard/gesture fixtures cover existing
+detachment, retired layout dispatch, bound resize forwarding and queued speech
+suppression/presentation-owner release. Keyboard/gesture fixtures cover existing
 chrome restoration separately. These are dummy/fake contracts, not native proof.
+
+Logistics owns an isolated `native_lifecycle_probe` and external driver. Native
+simulator/emulator runs exercise repeated navigation install/uninstall, chrome
+restoration, canvas zoom and gesture retirement, speech stop/restart and close,
+plus background/resume with each owner live. They record loaded source or packaged
+bytecode fingerprints. Keep the consumer's exact target/build scope with its
+evidence; these runs do not replace the broader acceptance matrix below.
 
 Before moving embedded Apple/Android factories or upgrading their backend
 assumptions, validate rotation and independent windows, IME/chrome restoration,

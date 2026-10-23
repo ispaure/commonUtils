@@ -55,10 +55,14 @@ class NativeNavigationHost:
             raise RuntimeError('Navigation host is already installed.')
         self.window = window
         backend = type(self.root._impl).__module__
-        if backend.startswith('toga_iOS.'):
-            self.adapter = AppleNavigation(self, window)
-        elif backend.startswith('toga_android.'):
-            self.adapter = AndroidNavigation(self, window)
+        try:
+            if backend.startswith('toga_iOS.'):
+                self.adapter = AppleNavigation(self, window)
+            elif backend.startswith('toga_android.'):
+                self.adapter = AndroidNavigation(self, window)
+        except Exception:
+            self.window = None
+            raise
 
     def uninstall(self):
         self.chrome.restore()
@@ -176,6 +180,8 @@ class AppleNavigation:
             container.content.interface.refresh()
 
     def layout_window(self, container):
+        if not self.keyboard_live:
+            return
         # This root hosts native navigation controllers, which own safe areas.
         # Subtracting their bar insets here too repeatedly shrinks the tab/split
         # controller during show/hide transitions. Leaf containers apply them.
@@ -361,6 +367,9 @@ class AndroidNavigation:
         from java import dynamic_proxy
         import weakref
         self.host, self.window = host, window
+        self.active = True
+        # Admit the window before replacing any of Toga's native controls.
+        self.old_window_resize = window.on_resize
         self.impl = host.root._impl
         self.old_min_height = host.root._MIN_HEIGHT
         # OptionContainer's default 100-point floor can exceed the entire
@@ -394,7 +403,6 @@ class AndroidNavigation:
         self.rail = None
         self.old_resize = self.impl.resize_tab_content
         self.old_refreshed = self.impl.refreshed
-        self.old_window_resize = window.on_resize
         self.native_window = self.impl._native_activity.getWindow()
         self.old_soft_input = self.native_window.getAttributes().softInputMode
         from android.view import WindowManager
@@ -411,7 +419,7 @@ class AndroidNavigation:
 
             def onNavigationItemSelected(self, item):
                 owner = self.adapter()
-                if owner is None:
+                if owner is None or not owner.active:
                     return False
                 index = next((index for index, option in enumerate(owner.impl.options)
                               if option.menu_item == item), None)
@@ -444,8 +452,16 @@ class AndroidNavigation:
         for index, (option, resource) in enumerate(zip(self.impl.options, resources)):
             option.menu_item = self.bottom.getMenu().add(0, index + 1, index, option.text)
             option.menu_item.setIcon(resource if resource is not None else self.home_icon())
-        self.impl.set_current_tab_index(self.host.destinations.index(host.state.destination))
+        self.select_current_tab()
         self.window_resized(window)
+
+    def select_current_tab(self):
+        # Toga publishes on_select even for programmatic native selection.
+        changing, self.host.changing = self.host.changing, True
+        try:
+            self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
+        finally:
+            self.host.changing = changing
 
     @staticmethod
     def home_icon():
@@ -458,12 +474,15 @@ class AndroidNavigation:
         return drawable
 
     def window_resized(self, window, **kwargs):
+        if not self.active:
+            return
         self.layout_events += 1
         # Consumers must see the current IME state before laying out editors;
         # otherwise one frame still uses full-height controls in a short pane.
         self.update_keyboard_inset()
         if self.old_window_resize:
-            self.old_window_resize(window)
+            # Toga's getter returns a wrapper already bound to this window.
+            self.old_window_resize(**kwargs)
         width = self.impl.scale_out(self.impl.native.getWidth())
         if width > 0:
             self.set_mode('rail' if width >= 600 else 'bottom')
@@ -548,23 +567,21 @@ class AndroidNavigation:
         self.transfer_keyboard_chrome(view)
         for index, option in enumerate(self.impl.options):
             option.menu_item = view.getMenu().getItem(index)
-        # Toga emits on_select even for this programmatic layout update. A
-        # rotation must retain the current route rather than reselect its tab.
-        changing, self.host.changing = self.host.changing, True
-        try:
-            self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
-        finally:
-            self.host.changing = changing
+        self.select_current_tab()
         view.setOnItemSelectedListener(self.impl.onItemSelectedListener)
         self.impl.native.requestLayout()
 
     def resize_content(self):
+        if not self.active:
+            return
         native = self.impl.native_content
         width, height = native.getWidth(), native.getHeight()
         if width and height:
             self.impl.resize_content(width, height)
 
     def content_refreshed(self):
+        if not self.active:
+            return
         # Container.refreshed replaces MATCH_PARENT/weight dimensions with the
         # previous measured content size. In rail mode this freezes the height
         # before system bars disappear; its weighted width also keeps the old
@@ -590,6 +607,7 @@ class AndroidNavigation:
                     main_thread=Looper.myLooper() == Looper.getMainLooper())
 
     def dispose(self):
+        self.active = False
         self.restore_keyboard_chrome()
         self.set_mode('bottom')
         from android.widget import LinearLayout
@@ -604,10 +622,11 @@ class AndroidNavigation:
         self.original_bottom.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
         self.impl.onItemSelectedListener = self.old_listener
         self.original_bottom.setOnItemSelectedListener(self.old_listener)
-        self.impl.set_current_tab_index(self.host.destinations.index(self.host.state.destination))
+        self.select_current_tab()
         self.impl.resize_tab_content = self.old_resize
         self.impl.refreshed = self.old_refreshed
-        self.window.on_resize = self.old_window_resize
+        from toga.handlers import NativeHandler
+        self.window.on_resize = NativeHandler(self.old_window_resize)
         self.native_window.setSoftInputMode(self.old_soft_input)
         self.host.root._MIN_HEIGHT = self.old_min_height
         self.impl.rehint()

@@ -300,6 +300,10 @@ class NativeSpeech:
     def close(self):
         if not self.closed:
             self.closed = True
+            self.ready = False
+            self.voices = {}
+            # Retire presentation owners even if a native shutdown raises.
+            self.completed = self.failed = self.progress = self.started = lambda *args: None
             self.stop()
             if getattr(self, "native", None) is not None:
                 if self.backend.startswith("toga_android."):
@@ -307,4 +311,3 @@ class NativeSpeech:
                     self.native.shutdown()
                 else:
                     self.native.delegate = None
-            self.voices = {}
