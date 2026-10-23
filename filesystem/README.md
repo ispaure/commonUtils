@@ -49,6 +49,11 @@ keep their established behavior, and exact backend-record grants remain scoped.
 This routes host-managed storage through its provider; it is not an OS sandbox
 for arbitrary external filesystem calls.
 
+An unresolvable looping leaf symlink is checked by its resolved parent and name,
+so an unrelated provider does not prevent unlinking that ordinary link. Links
+inside a protected root remain denied; resolvable aliases retain target checks.
+The fallback does not resolve looping ancestors or grant access through a loop.
+
 ## Verified content snapshots
 
 `snapshots.file_revision(path, follow_symlinks=True)` returns

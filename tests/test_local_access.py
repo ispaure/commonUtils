@@ -100,6 +100,27 @@ class LocalAccessTests(unittest.TestCase):
             Directory(loop).delete()
             self.assertFalse(loop.is_symlink())
 
+    def test_unrelated_provider_does_not_block_deleting_an_external_cyclic_link(self):
+        from commonUtils.filesystem.directories import Directory
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            protected = root / 'managed'
+            protected.mkdir()
+            outside, inside = root / 'outside-loop', protected / 'inside-loop'
+            outside.symlink_to(outside.name, target_is_directory=True)
+            inside.symlink_to(inside.name, target_is_directory=True)
+            release = protect_local_root(self.id(), protected, 'Use the provider')
+            try:
+                Directory(outside).delete()
+                self.assertFalse(outside.is_symlink())
+                with self.assertRaises(PermissionError):
+                    check_local_path(inside, recursive=True)
+                with self.assertRaises(PermissionError):
+                    Directory(inside).delete()
+                self.assertTrue(inside.is_symlink())
+            finally:
+                release()
+
     def test_backend_record_grant_is_exact_and_scoped(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

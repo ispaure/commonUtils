@@ -28,7 +28,15 @@ def check_local_path(path, *, recursive=False):
         roots = tuple(_roots.values())
     if not roots:
         return
-    candidate = Path(path).resolve()
+    requested = Path(path)
+    try:
+        candidate = requested.resolve()
+    except RuntimeError:
+        if not requested.is_symlink():
+            raise
+        # A looping leaf has no reachable content; its parent still determines
+        # whether ordinary unlink/rename would mutate a provider-owned path.
+        candidate = requested.parent.resolve() / requested.name
     if not recursive and candidate in getattr(_local, 'records', ()):
         return
     for root, message in roots:
