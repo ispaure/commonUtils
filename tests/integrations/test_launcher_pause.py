@@ -7,7 +7,7 @@ import unittest
 
 class LauncherPauseTests(unittest.TestCase):
     def test_pause_flags_on_bundled_bash(self):
-        base = Path(__file__).resolve().parents[1] / 'launchers'
+        base = Path(__file__).resolve().parents[2] / 'launchers'
         bash = '/bin/bash' if Path('/bin/bash').is_file() else shutil.which('bash')
         if bash is None:
             self.skipTest('Unix launcher parsing requires Bash')

@@ -8,7 +8,7 @@ from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown.live_edit import FormattedMarkdownEdit
 from commonUtils.ui.markdown.images import prepare_wiki_images
 from commonUtils.ui.markdown import MarkdownViewer
-from commonUtils.tests.test_gif_headers import GIF
+from commonUtils.tests.formats.test_gif_headers import GIF
 
 
 class MarkdownImageSizeTests(QtTestCase):

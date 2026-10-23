@@ -135,7 +135,7 @@ class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
         import sys
         environment = os.environ.copy()
         environment['PYTHONPATH'] = os.pathsep.join(filter(None, (
-            str(Path(__file__).resolve().parents[2]), environment.get('PYTHONPATH'))))
+            str(Path(__file__).resolve().parents[3]), environment.get('PYTHONPATH'))))
         script = '''
 import asyncio
 from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle

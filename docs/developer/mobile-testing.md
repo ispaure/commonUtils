@@ -97,7 +97,7 @@ From the Logistics checkout:
 
 ```sh
 PYTHONPATH=Python .venv/bin/python -m commonUtils.tests.mobile_smoke --target host
-PYTHONPATH=Python .venv/bin/python -m unittest commonUtils.tests.test_mobile_ci -v
+PYTHONPATH=Python .venv/bin/python -m unittest commonUtils.tests.tooling.test_mobile_ci -v
 ```
 
 `--target host` deliberately emits `environment: desktop-harness`; the mobile

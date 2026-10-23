@@ -1,0 +1,1 @@
+"""Markdown regression contracts."""

@@ -127,3 +127,23 @@ confirms identical bytes, errors, allocation events and retained sources. Existi
 Logistics image and comic consumer checks pass; no user images are modified.
 The initial parity-fixture generator could not serialize a new nested EXIF IFD
 into TIFF; PNG retains nested-IFD coverage and TIFF covers CMYK/Lab profiles.
+
+## Regression owners and stable consumer harnesses
+
+All 184 shared test files now live in 15 subject folders, matching filesystem,
+index, formats, runtime, archives and UI responsibilities. The unchanged root Qt
+fixture helper and mobile smoke entry retain their consumer paths. Side-effect-free
+subfolder initializers support standard recursive unittest discovery. Explicit
+fixture imports and relative resource paths follow their actual owners.
+
+Complete isolated before/after runs match 1,250 case identities and 25 existing
+platform/optional skips, with zero failed files. The first grouped run found four
+relative documentation links to moved tests; correcting them and rerunning the
+full suite yields the matching successful result. A wrong initial runner working
+directory was corrected before executing that first grouped suite.
+
+Blue Hole's same 26 portable selectors retain their class/method suffixes under
+the new owner paths. Their host Python 3.11 run completes 156 cases with one
+filesystem skip; it is not Blender registration or native UI validation. No
+production module, public library import or Perforce build path changes in this
+organizational step. See the [test owner map](../reference/tests/tests.md).

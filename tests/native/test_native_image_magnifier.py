@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 # require Toga, which is intentionally absent from desktop regression installs.
 with patch.dict(sys.modules, {'toga': NS(ImageView=object)}):
     spec = importlib.util.spec_from_file_location('native_magnifier_under_test',
-        Path(__file__).resolve().parents[1] / 'ui/native/image_canvas.py')
+        Path(__file__).resolve().parents[2] / 'ui/native/image_canvas.py')
     canvas = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(canvas)
     apple_backend = canvas.apple_backend

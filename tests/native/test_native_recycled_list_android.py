@@ -20,7 +20,7 @@ class AndroidFileListAppearanceTests(unittest.TestCase):
             'java': NS(dynamic_proxy=lambda cls: object),
             'io.github.ispaure.commonutils': NS(FileListView=factory),
         }
-        path = Path(__file__).parents[1] / 'ui/native/recycled_list_android.py'
+        path = Path(__file__).parents[2] / 'ui/native/recycled_list_android.py'
         spec = importlib.util.spec_from_file_location('commonUtils.ui.native._android_generation_test', path)
         module = importlib.util.module_from_spec(spec)
         with patch.dict('sys.modules', modules):
@@ -57,7 +57,7 @@ class AndroidFileListAppearanceTests(unittest.TestCase):
             'io.github.ispaure.commonutils': NS(FileListView=object),
             'android.graphics': NS(Color=NS(parseColor=lambda value: value)),
         }
-        path = Path(__file__).parents[1] / 'ui/native/recycled_list_android.py'
+        path = Path(__file__).parents[2] / 'ui/native/recycled_list_android.py'
         spec = importlib.util.spec_from_file_location('commonUtils.ui.native._android_list_test', path)
         module = importlib.util.module_from_spec(spec)
         with patch.dict('sys.modules', modules):

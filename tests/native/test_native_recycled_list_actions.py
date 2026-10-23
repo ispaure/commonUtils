@@ -35,7 +35,7 @@ class FileRowActionTests(unittest.TestCase):
             'toga_iOS.libs': NS(UITableViewCell=Mock(), UITableViewCellStyleSubtitle=1, UIView=Mock()),
         }
         self.enterContext(patch.dict('sys.modules', modules))
-        path = Path(__file__).parents[1] / 'ui/native/recycled_list_ios.py'
+        path = Path(__file__).parents[2] / 'ui/native/recycled_list_ios.py'
         spec = importlib.util.spec_from_file_location('commonUtils.ui.native._row_action_test', path)
         self.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.module)

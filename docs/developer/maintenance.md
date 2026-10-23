@@ -24,7 +24,7 @@ Do not invent API stability or a supported dependency range from naming alone.
 From the checkout's parent with the project's interpreter:
 
 ```sh
-QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.test_file_registry commonUtils.tests.test_package_layout
+QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.filesystem.test_file_registry commonUtils.tests.tooling.test_package_layout
 ```
 
 The [test guide](../reference/tests/tests.md) gives suite commands and PowerShell setup.

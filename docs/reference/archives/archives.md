@@ -121,7 +121,7 @@ image display. It has no filesystem writes, password prompts, workers or
 application navigation. `set_state` controls interaction and whether removal is
 offered. `context_menu()` builds the selection menu without opening a popup.
 
-Regression coverage lives in `tests/test_archives.py`, `test_archive_types.py`,
+Regression coverage lives in `tests/archives/test_archives.py`, `test_archive_types.py`,
 `test_archive_view.py` and the existing ZIP tests. Consumer tests should focus on
 routing, credential policy, browser refresh, feature toggles and shutdown.
 
@@ -164,7 +164,7 @@ are not copied. `members.name_key` supplies normalized identity for callers'
 collision checks. Editing/access entry points retain their own validation,
 authentication, staging and finished-output verification. EPUB ordering and
 comic metadata rules remain consumer policy. Focused regressions live in
-`tests/test_archive_rebuilding.py` and archive operation tests.
+`tests/archives/test_archive_rebuilding.py` and archive operation tests.
 
 ## Callback-backed member views
 

@@ -61,7 +61,7 @@ class MarkdownTests(QtTestCase):
         self.assertTrue(viewer.speech.anchor.isVisible())
 
     def test_speech_reads_rendered_link_labels_and_selected_passages(self):
-        from commonUtils.tests.test_read_aloud import SilentEngine
+        from commonUtils.tests.appearance.test_read_aloud import SilentEngine
         viewer = self.viewer
         viewer.set_editing(True)
         viewer.editor.setPlainText('# Heading\n\n[Readable label](https://example.invalid/hidden) '

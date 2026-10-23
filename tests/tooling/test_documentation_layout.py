@@ -7,7 +7,7 @@ from urllib.parse import unquote, urlsplit
 from commonUtils.formats.markdown import split_frontmatter
 from commonUtils.formats.markdown.wiki import MarkdownWiki, documentation_root
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / 'docs'
 
 

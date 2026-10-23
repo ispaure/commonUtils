@@ -102,7 +102,7 @@ Only SQLite generations/checkpoints survive cancellation for resumption. No
 transient operation object is reused by a later request. Reader transactions and
 cache invalidations retain their existing independent lifetimes. Reconciliation
 still rolls back changes on cancellation; initial scans retain durable progress.
-The [operation-state tests](../../../../tests/test_index_operation_state.py) exercise
+The [operation-state tests](../../../../tests/index/test_index_operation_state.py) exercise
 these lifetime boundaries with disposable databases and retained readers.
 
 The default path is `directory_index_path()`:

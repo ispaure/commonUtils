@@ -31,4 +31,4 @@ Presentation remains in `ui.markdown` and `ui.native`. Shared query mechanics li
 
 Wiki traversal uses the shared portable junction query rather than requiring
 Python 3.12 pathlib methods. GUI-free catalog tests live in
-`tests/test_wiki_catalog.py`; Qt navigation tests remain in their viewer owner.
+`tests/markdown/test_wiki_catalog.py`; Qt navigation tests remain in their viewer owner.

@@ -9,7 +9,7 @@ import unittest
 
 from commonUtils.tests.mobile_smoke import TEST_NAMES
 
-spec = importlib.util.spec_from_file_location('mobile_ci', Path(__file__).resolve().parents[1] / 'tools/mobile_ci.py')
+spec = importlib.util.spec_from_file_location('mobile_ci', Path(__file__).resolve().parents[2] / 'tools/mobile_ci.py')
 ci = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ci)
 

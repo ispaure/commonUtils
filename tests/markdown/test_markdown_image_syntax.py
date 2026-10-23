@@ -2,7 +2,7 @@
 import unittest
 from commonUtils.formats.markdown.images import image_size
 from commonUtils.ui.native.markdown_preview import markdown_preview
-from commonUtils.tests.test_gif_headers import GIF
+from commonUtils.tests.formats.test_gif_headers import GIF
 
 
 class MarkdownImageSyntaxTests(unittest.TestCase):

@@ -17,6 +17,43 @@ file preservation, archive validation, indexing, direct package imports and Qt
 worker ownership. External applications, native dialogs and drivers also need
 platform checks.
 
+## Find a regression owner
+
+Test filenames stay unique, but the test directory is grouped by responsibility:
+
+| Owner | Tests |
+| --- | --- |
+| `archives/` | Members, rebuilds, extraction, ZIP safety and archive views |
+| `filesystem/` | File objects, traversal, links, moves, copies and rename operations |
+| `index/` | Persistent schema, scans, reconciliation, allocation and shared jobs |
+| `formats/` | Image/EXIF encoding, text formats, tables and syntax data |
+| `runtime/` | Streams, processes, cancellation, persistence, progress and transfers |
+| `configuration/` | INI/settings layers, monitors and subscriptions |
+| `integrations/` | Captured commands, launcher contracts and Perforce wrappers |
+| `browser/` | File/entry browsers, extensions, search and presentation |
+| `resources/` | Provider operations, selections and lifecycle |
+| `editors/` | Code editing, diff/merge views and transforms |
+| `markdown/` | Document synchronization, rendering, editing and wiki navigation |
+| `native/` | Native controls, layout, rendering and portable lifecycle |
+| `appearance/` | Shared controls, typography, reader chrome and display policy |
+| `workspaces/` | Tabs, placement, containers and workspace lifetime |
+| `tooling/` | Package boundaries, mobile staging, wiki layout and test harness contracts |
+
+For example, from the parent of the commonUtils checkout:
+
+```sh
+python -m unittest commonUtils.tests.runtime.test_streams
+QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.markdown.test_markdown
+```
+
+The isolated-module runner discovers matching filenames recursively, so existing
+`--pattern test_streams.py` selections remain valid. Subfolder initializers have no
+side effects; they support ordinary unittest discovery. Cross-folder test fixtures
+use explicit package imports. The reusable `tests/qt_test_case.py` and standalone
+`tests/mobile_smoke.py` remain at their established root paths for consumers and
+native testbed staging. Blue Hole's selected portable suite uses the same classes
+and methods through their new owner paths; it does not duplicate assertions.
+
 ## Development and validation
 
 `test_batch.py` owns portable batch outcomes with plain unittest and no toolkit
@@ -87,7 +124,7 @@ before updating their submodule references.
 From the consuming checkout root:
 
 ```sh
-PYTHONPATH=Python python -m unittest commonUtils.tests.test_mobile_platform commonUtils.tests.test_mobile_portability -v
+PYTHONPATH=Python python -m unittest commonUtils.tests.native.test_mobile_platform commonUtils.tests.tooling.test_mobile_portability -v
 ```
 
 These tests simulate five OS identities plus legacy mobile identifiers. Fresh

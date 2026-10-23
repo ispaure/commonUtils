@@ -147,7 +147,7 @@ assert not any(name.startswith('logisticsmobile') for name in sys.modules)
         self.run_isolated(script, dummy=True)
 
     def run_isolated(self, script, *, dummy=False):
-        root = Path(__file__).resolve().parents[2]
+        root = Path(__file__).resolve().parents[3]
         env = dict(os.environ, PYTHONPATH=str(root))
         if dummy:
             import toga

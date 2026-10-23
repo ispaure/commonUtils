@@ -16,7 +16,7 @@ class LauncherLayersTests(unittest.TestCase):
         self.personal = self.root / 'personal settings.ini'
         self.defaults.write_text('[Launch]\nsource_dir=Python\nensure_user_dir=Server\n')
         self.personal.write_text('[Launch]\nensure_user_dir=\n')
-        self.base = Path(__file__).resolve().parents[1] / 'launchers'
+        self.base = Path(__file__).resolve().parents[2] / 'launchers'
 
     def unix(self, launcher, key):
         bash = shutil.which('bash')

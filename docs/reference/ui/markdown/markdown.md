@@ -33,7 +33,7 @@ surfaces. The Notes and IDE consumers exercise these boundaries. Search marks do
 not dirty documents, unchanged rich imports do not normalize exact source, and
 actual rich synchronization remains one source undo operation.
 
-[Ownership tests](../../../../tests/test_markdown_ownership.py) construct rich editing
+[Ownership tests](../../../../tests/markdown/test_markdown_ownership.py) construct rich editing
 without a viewer. The existing Markdown/search/table/frontmatter suites exercise
 integrated navigation, mode changes, YAML preservation, save conflicts and undo.
 

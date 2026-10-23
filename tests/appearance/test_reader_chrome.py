@@ -23,7 +23,7 @@ class ReaderChromeTests(QtTestCase):
 
     def test_markdown_floating_controls_toggle_and_disable_click_replay(self):
         from commonUtils.ui.markdown import MarkdownViewer
-        from commonUtils.tests.test_read_aloud import SilentEngine
+        from commonUtils.tests.appearance.test_read_aloud import SilentEngine
         viewer = MarkdownViewer()
         self.addCleanup(viewer.close)
         viewer.resize(800, 600)

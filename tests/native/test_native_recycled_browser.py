@@ -82,7 +82,7 @@ finally:
 assert not browser.tasks and not browser.work.decoded and not browser.native_list.data
 '''
         import toga
-        root = str(Path(__file__).resolve().parents[2])
+        root = str(Path(__file__).resolve().parents[3])
         dependencies = str(Path(toga.__file__).resolve().parent.parent)
         env = dict(os.environ, PYTHONPATH=os.pathsep.join((root, dependencies)), TOGA_BACKEND='toga_dummy')
         result = subprocess.run([sys.executable, '-c', script], env=env,

@@ -50,4 +50,4 @@ Perforce for actual operations.
 Checkout preserves add/sync/edit ordering and verifies final readiness for every
 file. Failed phases stop subsequent commands; successful single-file commands
 retain their extension hooks. Hosts retain save/export policy. See the
-[workflow regression tests](../../../../../tests/test_perforce_workflows.py).
+[workflow regression tests](../../../../../tests/integrations/test_perforce_workflows.py).

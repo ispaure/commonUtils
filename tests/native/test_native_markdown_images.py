@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from commonUtils.runtime.resources.local import LocalFiles
-from commonUtils.tests.test_gif_headers import GIF
+from commonUtils.tests.formats.test_gif_headers import GIF
 from commonUtils.ui.native.markdown_images import folder_image_source
 from commonUtils.ui.native.markdown_preview import markdown_preview
 

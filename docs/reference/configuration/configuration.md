@@ -263,4 +263,4 @@ normalization after parsing; legacy calls retain their requested key case,
 duplicate handling and optional bypass fallback. Sharing precedence does not make
 all readers strict typed-schema consumers. Host path registration, migrations and
 malformed-override preservation remain unchanged. Focused tests are in
-`tests/test_layered_settings.py`.
+`tests/configuration/test_layered_settings.py`.

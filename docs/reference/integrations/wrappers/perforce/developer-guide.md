@@ -310,7 +310,7 @@ or revert methods in these models.
 `P4UserWorkspace` data holder with `computername`, `username` and `workspace`
 attributes. It does not create a server-side workspace.
 
-The focused [wrapper tests](../../../../../tests/test_perforce.py) use fixture output
+The focused [wrapper tests](../../../../../tests/integrations/test_perforce.py) use fixture output
 and mocked execution; they do not establish live-server or consumer compatibility.
 
 [Wrapper overview](perforce.md) · [Other wrappers](../wrappers.md)

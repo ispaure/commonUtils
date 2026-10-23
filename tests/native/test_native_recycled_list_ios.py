@@ -21,7 +21,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
     def setUp(self):
         # Run the production delegate methods; only the Objective-C bridge and
         # native cell objects are replaced for host-side lifecycle simulation.
-        path = Path(__file__).parents[1] / 'ui/native/recycled_list_ios.py'
+        path = Path(__file__).parents[2] / 'ui/native/recycled_list_ios.py'
         modules = {
             'rubicon.objc': SimpleNamespace(objc_method=lambda method: method, ObjCInstance=object, ObjCBlock=Mock(),
                                           UIEdgeInsets=lambda *values: values, CGRect=lambda *values: values),
@@ -182,7 +182,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         import ast
         import sys
         from unittest.mock import Mock
-        path = Path(__file__).parents[1] / 'ui/native/recycled_list_ios.py'
+        path = Path(__file__).parents[2] / 'ui/native/recycled_list_ios.py'
         source = ast.parse(path.read_text())
         owner = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'IOSFileList')
         method = next(node for node in owner.body if isinstance(node, ast.FunctionDef) and node.name == 'source_change')
