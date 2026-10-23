@@ -271,6 +271,51 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(target.read_text(), 'new unmanaged file')
         self.assertEqual((installed / 'app.py').read_text(), 'old')
 
+    def test_archive_does_not_advertise_new_manifest_before_file_publication(self):
+        installed, snapshot, workspace = self.archive()
+        marker = (installed / updates.MARKER).read_bytes()
+        plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+        original = shutil.copy2
+        observed = []
+
+        def copy(source, destination, *args, **kwargs):
+            if Path(source).resolve().is_relative_to(snapshot.resolve()):
+                observed.append((installed / updates.MARKER).read_bytes())
+            return original(source, destination, *args, **kwargs)
+
+        with patch.object(updates.shutil, 'copy2', side_effect=copy):
+            updates.apply_archive(plan, workspace)
+        self.assertEqual(observed, [marker, marker])
+        self.assertEqual(json.loads((installed / updates.MARKER).read_bytes())['revision'], 'new')
+
+    def test_archive_failed_recovery_copy_preserves_installed_bytes_and_reports_rollback_failure(self):
+        base = self.root
+        for failure in ('corrupt', 'partial'):
+            with self.subTest(failure=failure):
+                self.root = base / failure
+                self.root.mkdir()
+                installed, snapshot, workspace = self.archive()
+                plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+                original = shutil.copy2
+
+                def fail(source, destination, *args, **kwargs):
+                    if Path(source).resolve() == snapshot.resolve() / 'nested/new.py':
+                        raise OSError('payload failure')
+                    if Path(source) == workspace / 'rollback/app.py':
+                        Path(destination).write_bytes(b'bad recovery output')
+                        if failure == 'partial':
+                            raise OSError('recovery copy interrupted')
+                        return destination
+                    return original(source, destination, *args, **kwargs)
+
+                with patch.object(updates.shutil, 'copy2', side_effect=fail):
+                    with self.assertRaises(updates.RollbackError):
+                        updates.apply_archive(plan, workspace)
+                self.assertEqual((installed / 'app.py').read_text(), 'new')
+                self.assertEqual((workspace / 'rollback/app.py').read_text(), 'old')
+                self.assertEqual((installed / 'obsolete.py').read_text(), 'obsolete')
+                self.assertFalse(list(installed.glob('.*.update-*')))
+
     def test_helper_does_not_restart_after_incomplete_rollback(self):
         workspace = self.root / 'failed-runner'; workspace.mkdir()
         status = workspace / 'status.json'

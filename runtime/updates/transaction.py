@@ -4,6 +4,7 @@ Hosts own channels, repositories, protected paths, UI, and shutdown approval.
 This file is copied outside the installation before an application exits.
 """
 import argparse
+from contextlib import contextmanager, nullcontext
 import fnmatch
 import hashlib
 import json
@@ -221,6 +222,18 @@ def _archive_target(root, name, expected):
     return target
 
 
+@contextmanager
+def _staged_update(target):
+    """Own a private sibling until verified publication or failed-copy cleanup."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(prefix='.' + target.name + '.update-', dir=target.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+    try:
+        yield temporary
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def apply_archive(plan, workspace):
     root, snapshot = Path(plan['root']), Path(plan['snapshot'])
     # Recheck all local files after shutdown, including edits made during preparation.
@@ -233,7 +246,8 @@ def apply_archive(plan, workspace):
     existed = {}
     changed = []
     try:
-        for name in sorted(names):
+        # The manifest advertises the revision only after every managed file.
+        for name in [*sorted(names - {MARKER}), MARKER]:
             expected = plan['marker_hash'] if name == MARKER else plan['previous']['files'].get(name)
             target = _archive_target(root, name, expected)
             saved = backup / relative(name)
@@ -243,33 +257,33 @@ def apply_archive(plan, workspace):
                 shutil.copy2(target, saved)
                 if digest(saved) != expected:
                     raise ValueError(f'Recovery copy failed verification: {name}')
-            temporary = None
-            try:
+            staging = _staged_update(target) if name in plan['files'] or name == MARKER else nullcontext(None)
+            with staging as temporary:
                 if name in plan['files']:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    with NamedTemporaryFile(prefix='.' + target.name + '.update-', dir=target.parent, delete=False) as stream:
-                        temporary = Path(stream.name)
                     shutil.copy2(snapshot / relative(name), temporary)
                     if digest(temporary) != plan['files'][name]:
                         raise ValueError('Staged file changed during update')
+                elif name == MARKER:
+                    temporary.write_text(json.dumps({'format': 1, 'revision': plan['revision'], 'files': plan['files']}, indent=2), encoding='utf-8')
+                    shutil.copymode(target, temporary)
                 target = _archive_target(root, name, expected)
                 (workspace / 'rollback.json').write_text(json.dumps({'root': str(root), 'files': existed}), encoding='utf-8')
                 changed.append(name)
                 if temporary is not None:
                     temporary.replace(target)
-                elif name == MARKER:
-                    target.write_text(json.dumps({'format': 1, 'revision': plan['revision'], 'files': plan['files']}, indent=2), encoding='utf-8')
                 else:
                     target.unlink()
-            finally:
-                if temporary is not None:
-                    temporary.unlink(missing_ok=True)
     except BaseException:
         try:
             for name in reversed(changed):
                 target = contained(root, name)
                 if existed[name]:
-                    shutil.copy2(backup / relative(name), target)
+                    expected = plan['marker_hash'] if name == MARKER else plan['previous']['files'][name]
+                    with _staged_update(target) as temporary:
+                        shutil.copy2(backup / relative(name), temporary)
+                        if digest(temporary) != expected:
+                            raise ValueError(f'Restored file failed verification: {name}')
+                        temporary.replace(target)
                 elif target.exists():
                     target.unlink()
         except Exception as recovery:

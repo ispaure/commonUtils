@@ -42,6 +42,14 @@ rollback journal. Observed newer edits and newly occupied paths therefore abort
 without enrolling that untouched file for rollback. These checks do not lock out
 external writers between the final check and the filesystem mutation.
 
+Payloads, the final manifest and rollback output publish from private sibling
+files. Recovery output must match the prepared old hash before replacing the
+installed path; interrupted/corrupt recovery copies leave the current installed
+bytes and saved recovery file intact and report `RollbackError`. The manifest
+retains its existing permission mode and publishes after all managed files.
+This ordering avoids advertising a completed revision during normal copying;
+it does not make the multi-file update crash-atomic.
+
 Copy `transaction.py` to a private staging directory outside the installation.
 After the host has accepted close and stopped its workers, start it with a JSON
 request containing `pid`, `plan`, `restart` (argv list) and `status` (receipt path).
