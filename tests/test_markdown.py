@@ -73,7 +73,7 @@ class MarkdownTests(QtTestCase):
         viewer.speech.engine_factory = SilentEngine
         viewer.speech.show()
         viewer.speech.start()
-        spoken = viewer.speech._source_text
+        spoken = viewer.speech.session.text
         self.assertIn('Heading\nReadable label and bold.', spoken)
         self.assertIn('Reference', spoken)
         self.assertNotIn('https://example.invalid', spoken)

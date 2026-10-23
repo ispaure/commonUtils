@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
+from threading import RLock
+from commonUtils.filesystem.index.writer import WriterSession
 import unittest
 from unittest.mock import patch
 from commonUtils.filesystem.storage import cache_directory, temporary_directory, temporary_workspace
@@ -13,6 +15,9 @@ from commonUtils.runtime.operations import OperationCancelled
 
 class StorageTests(unittest.TestCase):
     def setUp(self):
+        environment = patch.dict(os.environ, {}, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
         self.temp = TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
         self.home_patch = patch.object(Path, 'home', return_value=self.home)
@@ -66,12 +71,12 @@ class StorageTests(unittest.TestCase):
     def test_cancelled_migration_leaves_no_destination_or_temporary(self):
         old=self.home/'old.sqlite3'; old.parent.mkdir(exist_ok=True)
         with closing(sqlite3.connect(old)) as db, db: db.execute('CREATE TABLE example(value)')
-        with DirectoryCache(database=self.home/'new.sqlite3') as new:
-            new._legacy_database=old
-            with self.assertRaises(OperationCancelled): new._migrate_legacy(lambda: True)
-            self.assertFalse(new.database.exists())
-            self.assertFalse(list(self.home.glob('.index-migration-*')))
-            self.assertTrue(old.exists())
+        writer = WriterSession(self.home / 'new.sqlite3', RLock(), old)
+        with self.assertRaises(OperationCancelled):
+            writer.migrate_legacy(lambda: True)
+        self.assertFalse(writer.database.exists())
+        self.assertFalse(list(self.home.glob('.index-migration-*')))
+        self.assertTrue(old.exists())
 
     def test_macos_migration_prefers_recent_caches_database(self):
         root=self.home/'files'; root.mkdir(); (root/'a.txt').write_text('content')
