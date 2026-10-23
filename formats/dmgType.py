@@ -19,6 +19,7 @@ import subprocess
 # Common utilities
 from ..filesystem import files as fileUtils
 from ..runtime.platform import *
+import os
 from ..runtime.diagnostics import *
 
 

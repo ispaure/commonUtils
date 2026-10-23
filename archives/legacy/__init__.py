@@ -21,6 +21,8 @@ import zipfile
 
 # Common utilities
 from ...filesystem import files as fileUtils
+import os
+import sys
 from ...runtime.diagnostics import *
 
 

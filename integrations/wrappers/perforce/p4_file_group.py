@@ -14,6 +14,7 @@ __status__ = 'Production'
 from typing import *
 
 # Blue Hole
+import os
 from ....runtime.diagnostics import *
 from .p4_messages import P4ErrorMessage, P4CriticalMessage
 from .p4_file_status import P4FileStatus

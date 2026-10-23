@@ -61,7 +61,7 @@ class MobileBoundaryTests(unittest.TestCase):
 
     def test_mobile_critical_logging_preserves_error_without_loading_gui(self):
         from commonUtils.runtime import diagnostics
-        with patch('sys.platform', 'ios'), patch.object(diagnostics.ui, 'display_msg_box_ok') as dialog:
+        with patch('sys.platform', 'ios'), patch('commonUtils.ui.display_msg_box_ok') as dialog:
             with self.assertRaises(diagnostics.DebugException):
                 diagnostics.log(diagnostics.Severity.CRITICAL, 'test', 'expected failure')
             dialog.assert_not_called()

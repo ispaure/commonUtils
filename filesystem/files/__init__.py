@@ -21,6 +21,7 @@ import csv
 
 # Common utilities
 from ...runtime.platform import *
+import os
 from ...runtime.diagnostics import *
 
 
