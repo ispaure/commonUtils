@@ -17,9 +17,14 @@ class ReadingStream:
         remaining = -1 if size is None else size
         chunks = []
         while remaining != 0:
-            chunk = self.stream.read(64 * 1024 if remaining < 0 else min(64 * 1024, remaining))
+            requested = 64 * 1024 if remaining < 0 else min(64 * 1024, remaining)
+            chunk = self.stream.read(requested)
+            if chunk is None:
+                raise BlockingIOError('Source cannot provide stream data yet.')
             if not chunk:
                 break
+            if len(chunk) > requested:
+                raise OSError('Source exceeded the requested stream read count.')
             chunks.append(chunk)
             self.completed += len(chunk)
             self.progress(self.completed, self.total)

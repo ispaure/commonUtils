@@ -11,6 +11,28 @@ from commonUtils.runtime.streams.progress import reading_stream, ReadingProvider
 
 
 class ReadProgressTests(unittest.TestCase):
+    def test_would_block_read_preserves_failure_and_retires_progress(self):
+        class WouldBlock(BytesIO):
+            def read(self, count):
+                return super().read(1) if self.tell() == 0 else None
+        source, updates = WouldBlock(b'complete'), []
+        with self.assertRaises(BlockingIOError):
+            with reading_stream(source, progress=lambda *values: updates.append(values)) as incoming:
+                incoming.read()
+        self.assertEqual(updates, [(0, None), (1, None), (None, None)])
+        self.assertFalse(source.closed)
+
+    def test_oversized_read_result_does_not_turn_a_bounded_read_into_read_all(self):
+        class Oversized(BytesIO):
+            def read(self, count):
+                return super().read(count + 1)
+        source = Oversized(b'complete payload')
+        with self.assertRaises(OSError):
+            with reading_stream(source, progress=lambda *_: None) as incoming:
+                incoming.read(1)
+        self.assertEqual(source.tell(), 2)
+        self.assertFalse(source.closed)
+
     def test_chunking_remaining_file_size_and_scope_completion(self):
         with TemporaryDirectory() as temporary:
             path = Path(temporary) / 'data'

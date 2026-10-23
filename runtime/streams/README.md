@@ -73,6 +73,9 @@ stream. Entry emits `(0, total)` and scope exit emits `(None, None)`, including 
 failure. It does not close the underlying stream. Other delegated stream methods
 are not measured. `ReadingProvider(provider, progress=...)` applies the same
 measurement to a provider's `open()` using its entry size.
+Measured reads retain short-read completion and reject `None` or oversized
+underlying results; observing progress cannot turn incomplete input into EOF or
+a bounded read into an unlimited read. Failure still retires the progress scope.
 
 `runtime.progress.CoalescedProgress(loop, changed, active=..., interval=.05)`
 accepts `publish(completed=None, total=None)` from workers and coalesces updates
