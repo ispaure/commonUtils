@@ -40,19 +40,24 @@ def iter_chunks(stream, *, cancelled=lambda: False):
         yield chunk
 
 
+def write_all(destination, data, *, cancelled=lambda: False):
+    """Write a complete byte buffer through short writes; reject nonprogress."""
+    pending = data
+    while pending:
+        check_cancelled(cancelled)
+        written = destination.write(pending)
+        if written is None:
+            raise BlockingIOError('Destination cannot accept stream data yet.')
+        if (not isinstance(written, int) or isinstance(written, bool)
+                or written <= 0 or written > len(pending)):
+            raise OSError('Destination returned an invalid stream write count.')
+        pending = memoryview(pending)[written:]
+
+
 def copy_stream(source, destination, *, cancelled=lambda: False, progress=None):
     """Copy complete chunks, retrying short writes; report each completed chunk."""
     for chunk in iter_chunks(source, cancelled=cancelled):
-        pending = chunk
-        while pending:
-            check_cancelled(cancelled)
-            written = destination.write(pending)
-            if written is None:
-                raise BlockingIOError('Destination cannot accept stream data yet.')
-            if (not isinstance(written, int) or isinstance(written, bool)
-                    or written <= 0 or written > len(pending)):
-                raise OSError('Destination returned an invalid stream write count.')
-            pending = memoryview(pending)[written:]
+        write_all(destination, chunk, cancelled=cancelled)
         if progress:
             progress(len(chunk))
 

@@ -1,5 +1,7 @@
 """Member replacement preserves unrelated content, attributes, order and comments."""
 from io import BytesIO
+from contextlib import contextmanager
+from unittest.mock import patch
 import unittest
 from zipfile import ZipFile, ZIP_STORED
 from commonUtils.archives.rebuilding import content_manifest, patched_manifest, rewrite_members
@@ -60,6 +62,40 @@ class ArchiveRebuildingTests(unittest.TestCase):
                     self.assertEqual(result.getinfo('untouched').compress_type, ZIP_DEFLATED)
                     self.assertEqual(result.getinfo('stored').compress_type, ZIP_STORED)
                     self.assertEqual(result.read('stored'), b'plain')
+
+    def test_retained_member_short_writes_preserve_full_content(self):
+        target = BytesIO()
+        with ZipFile(self.source()) as original, ZipFile(target, 'w') as output:
+            native_open = output.open
+            @contextmanager
+            def partial_open(*args, **kwargs):
+                with native_open(*args, **kwargs) as stream:
+                    class PartialWriter:
+                        def write(self, data):
+                            return stream.write(data[:3])
+                    yield PartialWriter()
+            with patch.object(output, 'open', side_effect=partial_open):
+                expected = rewrite_members(original, output, {})
+        target.seek(0)
+        with ZipFile(target) as result:
+            self.assertEqual(content_manifest(result), expected)
+            self.assertEqual(result.read('untouched'), b'payload')
+
+    def test_retained_member_nonprogress_write_does_not_report_a_manifest(self):
+        for count, error in ((None, BlockingIOError), (0, OSError)):
+            with self.subTest(count=count):
+                with ZipFile(self.source()) as original, ZipFile(BytesIO(), 'w') as output:
+                    native_open = output.open
+                    @contextmanager
+                    def blocked_open(*args, **kwargs):
+                        with native_open(*args, **kwargs):
+                            class BlockedWriter:
+                                def write(self, data):
+                                    return count
+                            yield BlockedWriter()
+                    with patch.object(output, 'open', side_effect=blocked_open):
+                        with self.assertRaises(error):
+                            rewrite_members(original, output, {})
 
     def test_cancellation_and_member_bounds(self):
         with ZipFile(self.source()) as original, ZipFile(BytesIO(), 'w') as output:

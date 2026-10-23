@@ -2,7 +2,7 @@
 from hashlib import sha256
 import zipfile
 from ..runtime.operations import check_cancelled
-from ..runtime.streams import iter_chunks, stream_signature
+from ..runtime.streams import iter_chunks, stream_signature, write_all
 from dataclasses import dataclass
 from .members import copy_member_info
 
@@ -93,7 +93,7 @@ def write_members(original, output, plan, *, max_member_bytes=None,
                     length += len(chunk)
                     if max_member_bytes is not None and length > max_member_bytes:
                         raise ValueError('Archive member exceeds the processing limit.')
-                    outgoing.write(chunk)
+                    write_all(outgoing, chunk, cancelled=cancelled)
                     digest.update(chunk)
             expected[name] = length, digest.hexdigest()
     return expected

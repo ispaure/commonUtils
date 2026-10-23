@@ -100,3 +100,8 @@ Pending records remain buffered at EOF. Limits apply to pending data plus the
 incoming chunk before consumption; overflow raises `SSERecordLimit`. Iterate each
 feed before feeding again. Application completion markers, JSON schemas, total
 response limits and tool semantics belong to the caller.
+
+`write_all(destination, data, cancelled=...)` completes one byte buffer using
+the same partial-write and cancellation contract as `copy_stream`. It returns
+only after the buffer is accepted; would-block and invalid/nonpositive counts
+raise instead of reporting success. Archive member streaming uses this owner.

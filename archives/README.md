@@ -184,3 +184,7 @@ rename. A racing file, directory or link is preserved; failed publication cleans
 only private staging. There is no public partial output to recursively remove on
 failure. Cancellation is checked immediately before publication. Unsupported
 atomic no-replace platforms fail closed rather than reverting to per-child moves.
+
+Retained-member streaming completes each output buffer before including its
+bytes in the returned content manifest. Short writes are retried; blocked or
+nonprogress writes raise through the shared stream contract.
