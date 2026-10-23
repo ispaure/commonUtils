@@ -19,12 +19,23 @@ class ResultWorker(qt.QThread):
         self.cancelled = False
 
     def run(self):
+        self.result = None
+        self.error = None
+        self.cancelled = False
         try:
             with noninteractive_logging():
                 self.result = self.callback()
         except Exception as error:
             self.cancelled = isinstance(error, self.cancellation_errors)
-            self.error = self.error_formatter(error)
+            fallback = type(error).__name__
+            try:
+                message = self.error_formatter(error)
+            except Exception:
+                # A policy formatter may redact secrets. Never fall back to the
+                # original exception text when that formatter fails.
+                self.error = f'{fallback} (error formatting failed).'
+            else:
+                self.error = message if isinstance(message, str) and message.strip() else fallback
 
     def cancel(self):
         self.requestInterruption()

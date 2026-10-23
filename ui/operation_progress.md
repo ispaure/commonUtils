@@ -95,3 +95,17 @@ ProcessRunner and open_process accept an optional `environment` mapping containi
 the complete child environment. Omitting it inherits the system environment; an
 empty mapping supplies none. Values are never added to command arguments or job
 context. The caller owns filtering and the lifetime of sensitive values.
+
+## Result-worker failure admission
+
+`ui.tasks.operations.ResultWorker` clears its result, error and cancellation flag
+at the start of each run, including a restarted worker. A failed callback always
+produces a nonempty error string: empty exception text and blank/non-string
+formatter output fall back to the exception type. If a host redaction formatter
+raises, the error reports the exception type and formatting failure without
+falling back to unredacted exception messages. The configured cancellation flag
+is retained for that failed run. Successful callbacks still expose `error=None`.
+
+`Operation` and `OperationProgress` share this behavior. An empty-message exception
+must never be displayed as a successful finished operation. Thread retention and
+`finished`-before-destruction requirements are unchanged.

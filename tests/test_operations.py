@@ -87,6 +87,17 @@ class OperationProgressTests(QtTestCase):
         self.assertTrue(self.progress.isVisible())
         self.wait()
 
+    def test_empty_exception_is_reported_as_failure_after_worker_shutdown(self):
+        results = []
+        def fail(report, cancelled):
+            raise TimeoutError()
+        self.progress.completed.connect(lambda value, error: results.append((value, error)))
+        self.progress.start(fail)
+        self.wait()
+        self.assertEqual(results, [(None, 'TimeoutError')])
+        self.assertEqual(self.progress.bar.value(), 0)
+        self.assertIn('Operation failed', self.progress.message.text())
+
     def test_worker_critical_log_reports_error_without_opening_a_dialog(self):
         result = []
         self.progress.completed.connect(lambda value, error: result.append((value, error)))
