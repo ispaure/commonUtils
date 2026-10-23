@@ -94,6 +94,16 @@ hosts must preserve close vetoes through [document-host routing](../workspaces.m
 
 ## Source and save guarantees
 
+Qt presentation first classifies each block's fragments into a named internal
+content record: callout title/separator, inline-code ranges and image presence.
+The existing traversal retains quote-depth scope and format precedence; code and
+image helpers apply native typography without becoming source-editing owners.
+`document.materialize_formats` separately traverses rich blocks, plans authored
+inline delimiters and code fences, then applies replacements in reverse position
+order. Code-fence planning also clears the original rich block flags before those
+replacements. UTF-16 positions, undo handling and source synchronization retain
+their existing contracts.
+
 Reading, callout folding and unchanged saves do not reserialize original bytes.
 Actual formatted edits use Qt's Markdown writer and can normalize or lose unsupported
 syntax. Source is the precise editing route; callout documents automatically select

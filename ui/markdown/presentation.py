@@ -7,6 +7,8 @@ from .. import pyside as qt
 from ..appearance.typography import point_size
 from .document import space_headings
 from functools import lru_cache
+from typing import NamedTuple
+from .extensions import Callout
 from weakref import ref
 from shiboken6 import isValid
 
@@ -44,6 +46,13 @@ def blend(first, second, amount):
                       zip(first.getRgb()[:3], second.getRgb()[:3])))
 
 
+class _BlockContent(NamedTuple):
+    title: Callout | None
+    separator: bool
+    inline_code: list[tuple[int, int]]
+    has_image: bool
+
+
 def style_document(document, palette, *, callouts=None):
     """Style imported Qt Markdown without changing any characters."""
     role = qt.QPalette.ColorRole
@@ -59,38 +68,8 @@ def style_document(document, palette, *, callouts=None):
         fmt = block.blockFormat()
         depth = int(fmt.property(qt.QTextFormat.Property.BlockQuoteLevel) or 0)
         active = {level: value for level, value in active.items() if level <= depth}
-        title = None
-        separator = False
-        iterator = block.begin()
-        inline_code = []
-        has_image = False
-        while not iterator.atEnd():
-            fragment = iterator.fragment()
-            if fragment.isValid() and fragment.charFormat().isImageFormat():
-                has_image = True
-            if fragment.isValid() and fragment.charFormat().fontFixedPitch():
-                inline_code.append((fragment.position(), fragment.length()))
-            if fragment.isValid() and fragment.text() == '\u200b' and fragment.charFormat().anchorHref() == 'callout-end:0':
-                separator = True
-            if fragment.isValid() and fragment.charFormat().anchorHref().startswith('callout:'):
-                try:
-                    key = int(fragment.charFormat().anchorHref().split(':')[1])
-                    title = (callouts or {}).get(key)
-                except ValueError:
-                    title = None
-                if title:
-                    active[depth] = title
-            iterator += 1
-        for position, length in inline_code:
-            code_cursor = qt.QTextCursor(document)
-            code_cursor.setPosition(position)
-            code_cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
-            chars = qt.QTextCharFormat()
-            chars.setFontFamilies([monospace_family()])
-            chars.setFontPointSize(code_point_size())
-            chars.setBackground(alternate)
-            chars.setForeground(text)
-            code_cursor.mergeCharFormat(chars)
+        title, separator, inline_code, has_image = _classify_block(block, callouts, active, depth)
+        _style_inline_code(document, inline_code, alternate, text)
         if not fmt.headingLevel():
             fmt.setTopMargin(5)
             fmt.setBottomMargin(9)
@@ -121,17 +100,7 @@ def style_document(document, palette, *, callouts=None):
                 fmt.setTopMargin(14)
                 fmt.setBottomMargin(7)
         if fmt.hasProperty(qt.QTextFormat.Property.BlockCodeLanguage) or fmt.nonBreakableLines():
-            fmt.setBackground(alternate)
-            fmt.setLeftMargin(14)
-            fmt.setRightMargin(14)
-            fmt.setLineHeight(135, qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
-            code_cursor = qt.QTextCursor(block)
-            code_cursor.movePosition(qt.QTextCursor.MoveOperation.EndOfBlock, qt.QTextCursor.MoveMode.KeepAnchor)
-            chars = qt.QTextCharFormat()
-            chars.setFontFamilies([monospace_family()])
-            chars.setFontPointSize(code_point_size())
-            chars.setForeground(text)
-            code_cursor.mergeCharFormat(chars)
+            _style_fenced_code(block, fmt, alternate, text)
         cursor.clearSelection()
         cursor.setPosition(block.position())
         if separator:
@@ -145,19 +114,7 @@ def style_document(document, palette, *, callouts=None):
             fmt.setBottomMargin(0)
             fmt.setLineHeight(125, qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
         if has_image and fmt.lineHeightType() == qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value:
-            # Proportional leading also multiplies the image's height, leaving
-            # a large blank area after tall images. Keep the prose line height
-            # as a minimum so inline and standalone images occupy their own size.
-            text_height = qt.QFontMetricsF(document.defaultFont()).height()
-            iterator = block.begin()
-            while not iterator.atEnd():
-                fragment = iterator.fragment()
-                if fragment.isValid() and not fragment.charFormat().isImageFormat():
-                    font = fragment.charFormat().font().resolve(document.defaultFont())
-                    text_height = max(text_height, qt.QFontMetricsF(font).height())
-                iterator += 1
-            fmt.setLineHeight(text_height * fmt.lineHeight() / 100,
-                              qt.QTextBlockFormat.LineHeightTypes.MinimumHeight.value)
+            _style_image_leading(block, fmt, document)
         cursor.setBlockFormat(fmt)
         block = block.next()
     for table in tables(document.rootFrame()):
@@ -167,6 +124,79 @@ def style_document(document, palette, *, callouts=None):
         frame_quotes(document)
         frame_code(document, alternate)
         clean_frame_boundaries(document)
+
+
+def _classify_block(block, callouts, active, depth):
+    """Inspect fragments and update the active reading-only callout scope."""
+    title = None
+    separator = False
+    iterator = block.begin()
+    inline_code = []
+    has_image = False
+    while not iterator.atEnd():
+        fragment = iterator.fragment()
+        if fragment.isValid() and fragment.charFormat().isImageFormat():
+            has_image = True
+        if fragment.isValid() and fragment.charFormat().fontFixedPitch():
+            inline_code.append((fragment.position(), fragment.length()))
+        if fragment.isValid() and fragment.text() == '\u200b' and fragment.charFormat().anchorHref() == 'callout-end:0':
+            separator = True
+        if fragment.isValid() and fragment.charFormat().anchorHref().startswith('callout:'):
+            try:
+                key = int(fragment.charFormat().anchorHref().split(':')[1])
+                title = (callouts or {}).get(key)
+            except ValueError:
+                title = None
+            if title:
+                active[depth] = title
+        iterator += 1
+    return _BlockContent(title, separator, inline_code, has_image)
+
+
+def _style_inline_code(document, inline_code, alternate, text):
+    """Apply native inline-code formatting without changing source characters."""
+    for position, length in inline_code:
+        code_cursor = qt.QTextCursor(document)
+        code_cursor.setPosition(position)
+        code_cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
+        chars = qt.QTextCharFormat()
+        chars.setFontFamilies([monospace_family()])
+        chars.setFontPointSize(code_point_size())
+        chars.setBackground(alternate)
+        chars.setForeground(text)
+        code_cursor.mergeCharFormat(chars)
+
+
+def _style_fenced_code(block, fmt, alternate, text):
+    """Apply fenced-code typography after quote and ordinary block spacing."""
+    fmt.setBackground(alternate)
+    fmt.setLeftMargin(14)
+    fmt.setRightMargin(14)
+    fmt.setLineHeight(135, qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
+    code_cursor = qt.QTextCursor(block)
+    code_cursor.movePosition(qt.QTextCursor.MoveOperation.EndOfBlock, qt.QTextCursor.MoveMode.KeepAnchor)
+    chars = qt.QTextCharFormat()
+    chars.setFontFamilies([monospace_family()])
+    chars.setFontPointSize(code_point_size())
+    chars.setForeground(text)
+    code_cursor.mergeCharFormat(chars)
+
+
+def _style_image_leading(block, fmt, document):
+    """Keep image height independent of proportional prose leading."""
+    # Proportional leading also multiplies the image's height, leaving
+    # a large blank area after tall images. Keep the prose line height
+    # as a minimum so inline and standalone images occupy their own size.
+    text_height = qt.QFontMetricsF(document.defaultFont()).height()
+    iterator = block.begin()
+    while not iterator.atEnd():
+        fragment = iterator.fragment()
+        if fragment.isValid() and not fragment.charFormat().isImageFormat():
+            font = fragment.charFormat().font().resolve(document.defaultFont())
+            text_height = max(text_height, qt.QFontMetricsF(font).height())
+        iterator += 1
+    fmt.setLineHeight(text_height * fmt.lineHeight() / 100,
+                      qt.QTextBlockFormat.LineHeightTypes.MinimumHeight.value)
 
 
 def style_table(table, palette):

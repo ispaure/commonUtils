@@ -132,31 +132,46 @@ def materialize_formats(editor):
             code_groups.append((code_start, last))
             code_start = None
         if not code:
-            heading = block.blockFormat().headingLevel()
-            if heading and not HEADING.match(block.text()):
-                changes.append((block.position(), 0, '#' * heading + ' ', qt.QTextCharFormat()))
-            iterator = block.begin()
-            while not iterator.atEnd():
-                fragment = iterator.fragment()
-                fmt = fragment.charFormat()
-                is_code = fmt.fontFixedPitch() or any('mono' in family.lower() for family in (fmt.fontFamilies() or ()))
-                bold = fmt.fontWeight() >= qt.QFont.Weight.Bold and not heading
-                italic = fmt.fontItalic()
-                marker = '`' if is_code else '**' if bold else ''
-                if italic and not is_code:
-                    marker += '*'
-                if marker:
-                    text = fragment.text()
-                    if is_code and '`' in text:
-                        marker = '`' * (max(len(run) for run in re.findall(r'`+', text)) + 1)
-                    base = qt.QTextCharFormat(fmt)
-                    base.setFontWeight(qt.QFont.Weight.Bold if heading else qt.QFont.Weight.Normal)
-                    base.setFontItalic(False)
-                    base.setFontFixedPitch(False)
-                    base.setFontFamilies(editor.font().families())
-                    changes.append((fragment.position(), fragment.length(), marker + text + marker, base))
-                iterator += 1
+            _plan_inline_source(editor, block, changes)
         block = block.next()
+    _materialize_code_fences(document, code_groups, changes)
+    for position, length, text, fmt in sorted(changes, key=lambda change: change[0], reverse=True):
+        cursor = qt.QTextCursor(document)
+        cursor.setPosition(position)
+        cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(text, fmt)
+
+
+def _plan_inline_source(editor, block, changes):
+    """Plan authored heading/inline delimiters separately from block traversal."""
+    heading = block.blockFormat().headingLevel()
+    if heading and not HEADING.match(block.text()):
+        changes.append((block.position(), 0, '#' * heading + ' ', qt.QTextCharFormat()))
+    iterator = block.begin()
+    while not iterator.atEnd():
+        fragment = iterator.fragment()
+        fmt = fragment.charFormat()
+        is_code = fmt.fontFixedPitch() or any('mono' in family.lower() for family in (fmt.fontFamilies() or ()))
+        bold = fmt.fontWeight() >= qt.QFont.Weight.Bold and not heading
+        italic = fmt.fontItalic()
+        marker = '`' if is_code else '**' if bold else ''
+        if italic and not is_code:
+            marker += '*'
+        if marker:
+            text = fragment.text()
+            if is_code and '`' in text:
+                marker = '`' * (max(len(run) for run in re.findall(r'`+', text)) + 1)
+            base = qt.QTextCharFormat(fmt)
+            base.setFontWeight(qt.QFont.Weight.Bold if heading else qt.QFont.Weight.Normal)
+            base.setFontItalic(False)
+            base.setFontFixedPitch(False)
+            base.setFontFamilies(editor.font().families())
+            changes.append((fragment.position(), fragment.length(), marker + text + marker, base))
+        iterator += 1
+
+
+def _materialize_code_fences(document, code_groups, changes):
+    """Plan code-fence text and clear rich block flags before applying replacements."""
     for first, last in code_groups:
         language = first.blockFormat().property(qt.QTextFormat.Property.BlockCodeLanguage) or ''
         cursor = qt.QTextCursor(document)
@@ -175,11 +190,6 @@ def materialize_formats(editor):
             fmt.clearProperty(qt.QTextFormat.Property.BlockCodeFence)
             qt.QTextCursor(member).setBlockFormat(fmt)
             member = member.next()
-    for position, length, text, fmt in sorted(changes, key=lambda change: change[0], reverse=True):
-        cursor = qt.QTextCursor(document)
-        cursor.setPosition(position)
-        cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
-        cursor.insertText(text, fmt)
 
 
 def protect_escapes(markdown):
