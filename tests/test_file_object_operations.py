@@ -80,6 +80,21 @@ class FileObjectOperationTests(unittest.TestCase):
         finally:
             release()
 
+    def test_invalid_text_encoding_does_not_truncate_output_or_change_permissions(self):
+        from commonUtils.formats.txtType import TXTFile
+        for alternate in (False, True):
+            with self.subTest(alternate=alternate):
+                target = self.root / 'export.txt' if alternate else self.source
+                target.write_bytes(b'original output')
+                target.chmod(0o400)
+                mode = stat.S_IMODE(target.stat().st_mode)
+                document = TXTFile(self.source)
+                document.line_lst = ['valid prefix', '\ud800']
+                with self.assertRaises(UnicodeEncodeError):
+                    document.write_lines(target if alternate else None)
+                self.assertEqual(target.read_bytes(), b'original output')
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), mode)
+
     def test_executable_permissions_use_literal_arguments_instead_of_a_shell(self):
         from commonUtils.integrations.wrappers import cmdShellWrapper
         result = cmdShellWrapper.CommandResult(0)

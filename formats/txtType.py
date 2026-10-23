@@ -44,6 +44,8 @@ class TXTFile(File):
         """
         # Ensures there is no \n in lines (exporter already takes care of that). Critical error if that's the case.
         for i, line in enumerate(self.line_lst):
+            # Validate before an in-place write can truncate the destination.
+            line.encode('utf-8')
             if "\n" in line:
                 log(Severity.CRITICAL,
                     "TXTFile.export",
