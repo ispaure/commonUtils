@@ -164,21 +164,18 @@ class BrowseHistory:
 
 def query_entries(entries, text='', *, sort='name', descending=False):
     """Filter a supplied folder snapshot; sort groups while retaining folders first."""
-    import re
-    from ..search.names import search_terms, matches_name
+    from ..search.names import search_terms, matches_name, natural_name_key
     terms = search_terms(text)
     rows = [entry for entry in entries if matches_name(entry.label, terms)]
-    def name_key(entry):
-        return tuple((1, int(part)) if part.isdigit() else (0, part.casefold())
-                     for part in re.split(r'(\d+)', entry.label))
     def key(entry):
+        name_key = natural_name_key(entry.label)
         if sort == 'size':
             value = entry.properties.get('size')
-            return (value if isinstance(value, (float, int)) else -1, name_key(entry))
+            return (value if isinstance(value, (float, int)) else -1, name_key)
         if sort == 'modified':
-            return str(entry.properties.get('modified') or ''), name_key(entry)
+            return str(entry.properties.get('modified') or ''), name_key
         if sort != 'name':
             raise ValueError('Unknown sort field.')
-        return name_key(entry)
+        return name_key
     return sorted((entry for entry in rows if entry.container), key=key, reverse=descending) + sorted(
         (entry for entry in rows if not entry.container), key=key, reverse=descending)

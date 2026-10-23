@@ -35,6 +35,10 @@ traversal. It raises filesystem errors, invalid-regex errors and
 is enabled. [Filesystem operations](../../filesystem/README.md) also cover removal,
 transfers and rename plans.
 
+Use `search.names.natural_name_parts` for raw filename/path ordering parts and
+`natural_name_key` for tagged portable label keys. Decimal digit runs sort as
+integers; other numeric symbols remain text. See [search](../../search/README.md).
+
 `filesystem.index.Snapshot.folder_stats()` exposes logical `size`, known allocated
 `disk_size`, and `disk_unknown` counts. `Entry.disk_size` uses -1 for unknown allocation.
 `storage_children(..., metric='size'|'disk_size')` selects the ranking measure while

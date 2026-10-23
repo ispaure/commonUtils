@@ -31,6 +31,12 @@ class TraversalTests(unittest.TestCase):
             scan_directory(self.root, cancelled=lambda: True)
 
 
+    def test_unicode_numeric_symbols_remain_text_in_natural_folder_order(self):
+        for name in ('Set10', 'Set1²', 'Set٢', 'Set1②2', 'Set1³'):
+            (self.root / name).mkdir()
+        self.assertEqual([path.name for path in scan_directory(self.root, files=False, folders=True)],
+                         ['Set1²', 'Set1³', 'Set1②2', 'Set٢', 'Set10'])
+
     def test_folder_selection_and_natural_order(self):
         self.file('Folder/page10.txt')
         self.file('Folder/page2.txt')

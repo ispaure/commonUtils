@@ -1,4 +1,4 @@
-"""Shared filename-query rules for SQLite snapshots and in-memory snapshots.
+"""Shared filename query and ordering rules for SQLite and in-memory snapshots.
 
 Bare terms are case-insensitive substrings joined with AND. Quoted phrases keep
 adjacent word order, treating whitespace, underscores and hyphens as separators.
@@ -9,6 +9,18 @@ import re
 
 _TOKENS = re.compile(r'"([^"]*)(?:"|$)|([^\s"]+)')
 _SEPARATORS = re.compile(r'[\s_-]+')
+
+
+def natural_name_parts(name):
+    """Return casefolded text and Unicode decimal integers for filename ordering."""
+    return tuple(int(part) if part.isdecimal() else part.casefold()
+                 for part in re.split(r'(\d+)', name))
+
+
+def natural_name_key(name):
+    """Return tagged (0, text)/(1, integer) parts for portable label ordering."""
+    return tuple((1, part) if isinstance(part, int) else (0, part)
+                 for part in natural_name_parts(name))
 
 
 def search_words(name):

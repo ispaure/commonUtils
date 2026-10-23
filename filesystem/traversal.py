@@ -10,11 +10,11 @@ import os
 import re
 import stat
 from ..runtime.operations import OperationCancelled
+from ..search.names import natural_name_parts
 
 
 def natural_path_key(path):
-    return tuple(int(part) if part.isdigit() else part.casefold()
-                 for part in re.split(r'(\d+)', str(path)))
+    return natural_name_parts(str(path))
 
 
 def scan_directory(directory, *, mask='*', files=True, folders=False, hidden=False,

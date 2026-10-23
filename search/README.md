@@ -6,7 +6,7 @@ Consumers choose roots, exclusions, private-storage policy and buffer snapshots.
 
 | Module | Responsibility | Dependencies |
 | --- | --- | --- |
-| `names` | Filename keyword/quoted-phrase rules, in-memory matching and SQLite predicates | Standard library |
+| `names` | Filename query rules, natural ordering, in-memory matching and SQLite predicates | Standard library |
 | `text` | Literal editor patterns and casefolded catalog substring matching | Standard library |
 | `providers` | Bounded, cancellable recursive name search over rooted providers | Portable runtime |
 | `indexed` | Explicitly admitted local providers backed by the filesystem metadata index | Filesystem/runtime |
@@ -34,6 +34,13 @@ cap. Its offsets are UTF-16 units for Qt; native Python text operations use code
 points. Native rendered Markdown uses DOM ranges and retains its own matching
 adapter. These engines deliberately keep their established semantics.
 
+`names.natural_name_parts(name)` returns alternating casefolded text and integer
+parts for decimal runs, preserving the raw key shape used by path/index sorting.
+`natural_name_key(name)` tags those parts as `(0, text)` or `(1, integer)` for
+portable browser/comic label sorting. Both accept strings. Unicode decimal digits
+are numeric; superscripts and circled numerals remain text. Existing supported
+keys and SQLite sort encodings are unchanged.
+
 ## Presentation owners
 
 - [Code editor](../ui/code_editor/README.md): desktop Find/Replace and highlights.
@@ -50,8 +57,8 @@ owns the reusable traversal and matching.
 
 ## Import migration
 
-Use direct imports from this package. Removed paths are `search.names`,
-`search.providers`, `search.indexed` and the
+Use direct imports from this package. Removed paths are `runtime.name_search`,
+`runtime.resources.search`, `runtime.resources.indexed_search` and the
 `filesystem.index.search` forwarding module. Import `find_matches` from
 `search.qt_text`, not the editor widget module. Logistics' former
 `features.ide.ui.project_search` implementation now lives in `search.files`.

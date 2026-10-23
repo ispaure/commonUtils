@@ -124,6 +124,14 @@ class NavigationTests(unittest.TestCase):
         self.assertIsNone(history.current)
 
 
+class NaturalLabelTests(unittest.TestCase):
+    def test_nondecimal_numeric_symbols_do_not_break_folder_queries(self):
+        from commonUtils.runtime.browsing import query_entries
+        rows = [BrowseEntry(name, name) for name in ('Page10', 'Page1²', 'Page٢')]
+        self.assertEqual([entry.label for entry in query_entries(rows)],
+                         ['Page1²', 'Page٢', 'Page10'])
+
+
 class ResourceSearchTests(unittest.TestCase):
     def test_keywords_and_phrases_match_the_folder_projection_and_recursive_scan(self):
         from types import SimpleNamespace
