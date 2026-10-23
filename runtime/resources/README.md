@@ -62,3 +62,17 @@ incomplete. Provider guards run before scanning and before results return. Cache
 metadata never grants access to a file. Close `search.cache` after retiring its
 workers. Query rules, symlink exclusion and stale-name behavior match directory
 index search; applications own refresh scheduling and provider eligibility.
+
+## Leases and worker cancellation
+
+`lifetime.ResourceLeases(validate=..., close=...)` provides idempotent release
+callbacks for multiple browser/document owners. Acquisition validates under a
+reentrant lock; the last release calls `close` under that lock. Explicit closure,
+credential revocation and cache clearing remain with the provider. A release
+which raises during cleanup is still consumed and will not call cleanup twice.
+
+`lifetime.WorkerCancellation` composes nested predicates in `scope(cancelled)`
+and restores the outer predicate on every exit. Other threads remain independent.
+Capture `current` to pass the current predicate to downstream work; reading it
+on another thread selects that thread's scope. Neither class imports a UI toolkit
+or establishes an application session policy.
