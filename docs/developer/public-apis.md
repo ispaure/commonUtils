@@ -67,7 +67,8 @@ checks the link object itself; its default remains unchanged. See the
 | Preference changes | `configuration.monitor.SettingsMonitor`; explicit paths, weak subscriptions, publication notifications and external polling; Qt adapter under `ui.settings.monitor` |
 | Raw atomic saves | `persistence.atomic_write_bytes/atomic_write_json`; caller supplies policy, directory and validation |
 | Editable text snapshots | `persistence.text`; strict encoding, bounds, conflict checks and exact unchanged-byte preservation |
-| Recovery / merge | `SessionStore` and `merge_text`/`MergeSession`; callers own schema, locking and apply/save policy |
+| Recovery checkpoints | `SessionStore`; bounded version-1 documents envelope; callers own document fields, locking and restore policy |
+| Text merge | `merge_text`/`MergeSession`; callers own apply/save policy |
 
 See [formats](../../formats/README.md), [configuration](../../configuration/README.md)
 and [persistence](../../persistence/README.md). Conflict checks are not locks;

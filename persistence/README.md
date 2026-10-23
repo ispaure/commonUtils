@@ -65,6 +65,15 @@ platforms fail closed. Callers supply installation validation and decide when
 recovery copies can be removed. This is not a cross-process lock or a multi-path
 crash-recovery journal.
 
+## Recovery checkpoint envelope
+
+`session.SessionStore` reads and writes the existing version-1 object containing a
+`documents` list of at most 100 entries, within 64 MiB. Both directions validate
+that envelope; an unreadable envelope is rejected before creating directories or
+replacing a checkpoint. Document fields, locking and restoration policy remain
+with the host. JSON serialization, escaping, size limits and publication policy
+are unchanged; this does not add nested document-schema validation.
+
 ## Verified publication and text sessions
 
 [publication.py](publication.py) owns the shared staging/verification/publication

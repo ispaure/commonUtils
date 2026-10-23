@@ -21,6 +21,30 @@ class SessionStoreTests(unittest.TestCase):
             self.assertEqual(store.read(), payload)
             self.assertEqual(list(Path(directory).iterdir()), [store.path])
 
+    def test_unreadable_envelope_never_replaces_a_recoverable_checkpoint(self):
+        invalid = ([], {}, {'version': 2, 'documents': []},
+                   {'version': 1, 'documents': {}},
+                   {'version': 1, 'documents': [{}] * 101})
+        with TemporaryDirectory() as directory:
+            store = SessionStore(Path(directory) / 'session.json')
+            payload = {'version': 1, 'documents': [{'text': 'recoverable'}]}
+            store.write(payload)
+            before = store.path.read_bytes()
+            for index, candidate in enumerate(invalid):
+                with self.subTest(case=index):
+                    with self.assertRaises(ValueError):
+                        store.write(candidate)
+                    self.assertEqual(store.path.read_bytes(), before)
+                    self.assertEqual(store.read(), payload)
+                    self.assertEqual(list(Path(directory).iterdir()), [store.path])
+
+    def test_invalid_envelope_does_not_create_a_new_checkpoint_directory(self):
+        with TemporaryDirectory() as directory:
+            store = SessionStore(Path(directory) / 'absent' / 'session.json')
+            with self.assertRaises(ValueError):
+                store.write({'version': 1, 'documents': [{}] * 101})
+            self.assertFalse(store.path.parent.exists())
+
     def test_corrupt_and_future_schema_are_preserved(self):
         with TemporaryDirectory() as directory:
             store = SessionStore(Path(directory) / "session.json")
