@@ -1,11 +1,15 @@
 """Renderer-independent generation, cache-tier and worker retirement checks."""
 import asyncio
+from importlib.util import find_spec
 from threading import Event
 from types import SimpleNamespace
 import unittest
-from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
+HAS_TOGA = find_spec('toga') is not None
+if HAS_TOGA:
+    from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
 
 
+@unittest.skipUnless(HAS_TOGA, 'Optional Toga browser backend is not installed')
 class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_late_cover_cannot_publish_after_generation_change(self):
         work = BrowserLifecycle()
