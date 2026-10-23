@@ -65,7 +65,10 @@ retained; ownership and setuid bits are not restored.
 
 Creation verifies staged payload hashes before exclusive publication. ZIP edits
 preserve the original until a rebuilt archive passes decrypted manifest checks
-and its source identity is unchanged. Additions do not silently replace names;
+and its source identity is unchanged immediately before replacement, after staged
+flush/permission work and the final cancellation callback. These checks are
+optimistic samples rather than locks against arbitrary concurrent writers.
+Additions do not silently replace names;
 removing a directory removes its descendants. Mixed encrypted/plain ZIPs cannot
 be rewritten. Source files are never deleted. Cancellation raises
 `commonUtils.runtime.operations.OperationCancelled` and discards staged work; publication

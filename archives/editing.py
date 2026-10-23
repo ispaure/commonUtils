@@ -49,11 +49,11 @@ def update_zip(path, *, sources=(), remove=(), password=None,
                                     cancelled=cancelled, progress=progress)
         if archive_manifest(staged, password=password, progress=progress, cancelled=cancelled) != expected:
             raise ValueError('Archive verification failed; original archive was kept')
-        if path.is_symlink() or identity(path.stat()) != identity(before):
-            raise ValueError('The archive changed during editing; original archive was kept')
         with staged.open('r+b') as stream:
             os.fsync(stream.fileno())
         os.chmod(staged, before.st_mode & 0o777)
         check_cancelled(cancelled)
+        if path.is_symlink() or identity(path.stat()) != identity(before):
+            raise ValueError('The archive changed during editing; original archive was kept')
         os.replace(staged, path)
     return path

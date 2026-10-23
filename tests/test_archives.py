@@ -1,5 +1,6 @@
 """Verified creation/editing and transactional, traversal-safe extraction."""
 from io import BytesIO
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import tarfile
@@ -291,6 +292,36 @@ class ArchiveWorkspaceTests(unittest.TestCase):
             backend.extract(path, out, progress=report)
         self.assertEqual((out / 'keep').read_text(), 'concurrent')
         self.assertFalse((out / 'source').exists())
+
+    def test_late_archive_changes_are_preserved(self):
+        from commonUtils.archives import editing
+        for stage in ('permissions', 'cancellation'):
+            with self.subTest(stage=stage), TemporaryDirectory() as temporary:
+                path = Path(temporary) / 'sample.zip'
+                with zipfile.ZipFile(path, 'w') as archive:
+                    archive.writestr('original.txt', 'original')
+                changed, ready = [], False
+                chmod = os.chmod
+                def change_archive():
+                    with zipfile.ZipFile(path, 'w') as archive:
+                        archive.writestr('newer.txt', 'newer writer data')
+                    changed.append(path.read_bytes())
+                def permissions(candidate, mode):
+                    nonlocal ready
+                    chmod(candidate, mode)
+                    if Path(candidate).name == 'result.zip':
+                        ready = True
+                        if stage == 'permissions':
+                            change_archive()
+                def cancelled():
+                    if ready and stage == 'cancellation' and not changed:
+                        change_archive()
+                    return False
+                with patch.object(editing.os, 'chmod', side_effect=permissions):
+                    with self.assertRaisesRegex(ValueError, 'changed during editing'):
+                        editing.update_zip(path, remove=['original.txt'], cancelled=cancelled)
+                self.assertEqual(path.read_bytes(), changed[0])
+                self.assertFalse(list(path.parent.glob('.logistics-edit-*')))
 
     def test_edit_detects_archive_changed_before_publication(self):
         path = self.make_zip()
