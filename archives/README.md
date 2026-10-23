@@ -73,7 +73,10 @@ is the success boundary.
 
 ZIP integrity checks read all entries and validate CRCs or AES authentication.
 TAR checks readable data and member paths, but TAR has no per-entry payload
-checksum. Text previews read at most 256 KiB of UTF-8. Image previews accept up
+checksum. Text previews display at most 256 KiB of UTF-8. A multibyte character
+split by the preview ceiling is omitted while the complete prefix and truncation
+notice remain visible. Malformed UTF-8 inside that prefix, or an incomplete final
+character in a complete file, retains the unsupported-text fallback. Image previews accept up
 to 16 MiB and 25 megapixels, return a PNG thumbnail up to 1000 pixels, and show
 only the first image frame. Decoding never runs or opens an archive member.
 

@@ -210,6 +210,36 @@ class ArchiveWorkspaceTests(unittest.TestCase):
         self.assertIn('limited to 256 KiB', backend.preview(path, 'large.txt'))
         self.assertIn('Binary file', backend.preview(path, 'binary'))
 
+    def test_utf8_preview_limit_can_split_a_multibyte_character(self):
+        path = self.root / 'utf8-preview.zip'
+        limit = 256 * 1024
+        cases = []
+        with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            for character in ('é', '€', '😀'):
+                encoded = character.encode('utf-8')
+                for prefix_bytes in range(1, len(encoded)):
+                    name = f'case-{len(cases)}.txt'
+                    prefix = b'x' * (limit - prefix_bytes)
+                    archive.writestr(name, prefix + encoded + b' tail')
+                    cases.append((name, len(prefix)))
+            archive.writestr('bom.txt', b'\xef\xbb\xbf' + b'x' * (limit - 4) + '😀 tail'.encode())
+            cases.append(('bom.txt', limit - 4))
+        suffix = '\n\n[Preview limited to 256 KiB]'
+        for name, prefix_length in cases:
+            with self.subTest(name=name):
+                result = backend.preview(path, name)
+                self.assertTrue(result.endswith(suffix))
+                self.assertEqual(len(result), prefix_length + len(suffix))
+
+    def test_preview_still_rejects_malformed_and_incomplete_utf8_files(self):
+        path = self.root / 'invalid-preview.zip'
+        with zipfile.ZipFile(path, 'w') as archive:
+            archive.writestr('incomplete.txt', b'valid text\xe2')
+            archive.writestr('invalid.txt', b'prefix\xff' + b'x' * (256 * 1024))
+        for name in ('incomplete.txt', 'invalid.txt'):
+            with self.subTest(name=name):
+                self.assertIn('UTF-8 text', backend.preview(path, name))
+
     def test_tar_creation_rejects_collisions_and_output_inside_source(self):
         other = self.root / 'other'
         other.mkdir()

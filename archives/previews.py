@@ -1,4 +1,5 @@
 """Bounded archive text/image decoding; no launching, prompts or GUI objects."""
+from codecs import getincrementaldecoder
 from ..runtime.operations import check_cancelled
 from .reading import reader, _members, _name, _stream
 
@@ -15,7 +16,7 @@ def preview(path, name, *, password=None, progress=lambda *args: None, cancelled
     if b'\x00' in data:
         return 'Binary file. Extract this entry to open it in another application.'
     try:
-        text = data.decode('utf-8-sig')
+        text = getincrementaldecoder('utf-8-sig')().decode(data, final=not truncated)
     except UnicodeDecodeError:
         return 'Preview is available for UTF-8 text. Extract this entry to open it.'
     return text + ('\n\n[Preview limited to 256 KiB]' if truncated else '')
