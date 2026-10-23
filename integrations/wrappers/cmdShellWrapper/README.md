@@ -156,7 +156,10 @@ Supply `environment`, `cwd`, `input_data`, `timeout`, `cancelled` and a raw-byte
 `progress` callback as needed. Timeouts and cooperative cancellation terminate the
 process tree. On platforms without `os.pread`, progress is left to the caller using
 the final stderr tail. `discard_output=True` routes both streams to DEVNULL.
-Callers own input-size limits, environment filtering, tool options and diagnostics.
+Input stays in a pipe rather than a disk spool. A supervised writer keeps a
+non-reading child from blocking timeout/cancellation; the writer retires before
+return. Already-cancelled requests do not launch a process. Callers own input-size
+limits, environment filtering, tool options and diagnostics.
 Process creation raises `CommandStartError`, elapsed deadlines raise
 `CommandTimeout`, and cooperative cancellation raises `OperationCancelled`.
 

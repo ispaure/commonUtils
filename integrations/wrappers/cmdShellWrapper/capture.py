@@ -6,9 +6,11 @@ and retains a stderr tail. Memory reads are bounded; spool disk usage is not.
 
 from dataclasses import dataclass
 import os
+import errno
 import subprocess
 from tempfile import TemporaryFile
 from time import monotonic
+from threading import Thread
 from .process import get_process_group_kwargs, terminate_process_tree
 from ....runtime.operations import check_cancelled
 
@@ -48,6 +50,7 @@ def run_captured(
     discard_output routes both outputs to DEVNULL and publishes no progress.
     Hosts own argument/environment policy and validation of input size.
     """
+    check_cancelled(cancelled)
     started = monotonic()
     with TemporaryFile() as output, TemporaryFile() as errors:
         try:
@@ -63,15 +66,31 @@ def run_captured(
         except OSError as exc:
             raise CommandStartError(str(exc)) from exc
         position = 0
+        writer = None
+        write_errors = []
         try:
             if input_data is not None:
-                try:
-                    process.stdin.write(input_data)
-                    process.stdin.close()
-                except BrokenPipeError:
-                    pass
+                # Keep credential input off disk, but never let a full stdin pipe
+                # prevent the supervising thread from enforcing cancellation.
+                def write_input():
+                    try:
+                        with process.stdin:
+                            process.stdin.write(input_data)
+                    except BrokenPipeError:
+                        pass
+                    except OSError as error:
+                        # Match subprocess.communicate: Windows may report a
+                        # child closing stdin as EINVAL rather than EPIPE.
+                        if error.errno != errno.EINVAL:
+                            write_errors.append(error)
+                    except BaseException as error:
+                        write_errors.append(error)
+                writer = Thread(target=write_input, name='command-capture-stdin', daemon=True)
+                writer.start()
             while True:
                 check_cancelled(cancelled)
+                if write_errors:
+                    raise write_errors[0]
                 if timeout and monotonic() - started > timeout:
                     raise CommandTimeout("Command timed out.")
                 try:
@@ -93,10 +112,19 @@ def run_captured(
                     if chunk and not discard_output:
                         progress(chunk)
                 if code is not None:
-                    break
+                    if writer is None or not writer.is_alive():
+                        if write_errors:
+                            raise write_errors[0]
+                        break
+                    # A descendant may still hold stdin after its parent exits.
+                    # Continue supervision until the writer retires or is stopped.
+                    writer.join(timeout=0.05)
         except BaseException:
             terminate_process_tree(process)
             raise
+        finally:
+            if writer is not None and writer.ident is not None:
+                writer.join()
         output.seek(0)
         data = output.read(limit + 1)
         errors.seek(max(0, os.fstat(errors.fileno()).st_size - 65536))
