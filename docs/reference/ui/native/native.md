@@ -100,6 +100,12 @@ allocation from layout and gesture delivery, and Android page-listener binding
 from view setup. The backend classes remain in their lazy factories; cached
 Objective-C classes, native selectors and ownership links are unchanged.
 
+Speech uses private lazy factories for Android weak listener proxies and the
+cached Apple delegate class. `NativeSpeech.android`/`apple` still own engine
+allocation, listener/delegate retention and voice setup; runtime delivery and
+shutdown remain on `NativeSpeech`. AVFoundation loads before protocol lookup,
+and the module's existing delegate cache still prevents duplicate class registration.
+
 On iOS, a software keyboard in the owning key window temporarily hides destination
 tabs and restores their previous visibility on dismissal or host uninstallation.
 UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on
