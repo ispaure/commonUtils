@@ -203,7 +203,10 @@ factories. Closing waits for worker cancellation before releasing storage.
 resource jobs retire. Mobile hosts can render the same model with native widgets.
 
 `ResourceTextSession` reads bounded text with revision checks, preserves encoding
-and line endings, and saves through verified resource transactions. Save returns
+and line endings, and saves through verified resource transactions. Opening collects
+a complete bounded draft even when a provider supplies short reads: it reads
+through EOF or one byte beyond the editing ceiling, then enforces that ceiling.
+Cancellation is checked between reads; `None` is would-block, not EOF. Save returns
 a new baseline only after reopening unchanged; reopening failure after publication
 raises `MutationIncomplete`. `ui.resources.editor.ResourceTextWindow` is an optional
 session-only plain editor; hosts supply Open/Save As selection and window routing.

@@ -1,9 +1,31 @@
 """Bounded stream reading, copying and hashing with cooperative cancellation."""
 from hashlib import sha256
 from pathlib import Path
+from operator import index
 from ..operations import check_cancelled
 
 CHUNK_SIZE = 1024 * 1024
+
+
+def read_up_to(stream, limit, *, cancelled=lambda: False):
+    """Read a bounded prefix through short reads, stopping at EOF or limit."""
+    remaining = index(limit)
+    if remaining < 0:
+        raise ValueError('Read limit cannot be negative.')
+    result = bytearray()
+    while remaining:
+        check_cancelled(cancelled)
+        requested = min(CHUNK_SIZE, remaining)
+        chunk = stream.read(requested)
+        if chunk is None:
+            raise BlockingIOError('Source cannot provide stream data yet.')
+        if not chunk:
+            break
+        if len(chunk) > requested:
+            raise OSError('Source exceeded the requested stream read count.')
+        result.extend(chunk)
+        remaining -= len(chunk)
+    return bytes(result)
 
 
 def iter_chunks(stream, *, cancelled=lambda: False):

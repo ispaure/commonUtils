@@ -8,6 +8,30 @@ from commonUtils.runtime.operations import MutationIncomplete
 
 
 class ResourceSelectionTests(unittest.TestCase):
+    def test_short_provider_reads_load_complete_text_and_enforce_total_limit(self):
+        from contextlib import contextmanager
+        from io import BytesIO
+        class ShortReads(BytesIO):
+            def read(self, size=-1):
+                return super().read(min(2, size) if size >= 0 else 2)
+        with TemporaryDirectory() as directory:
+            provider = LocalFiles(directory)
+            data = b'first\nsecond\n'
+            (Path(directory) / 'note.txt').write_bytes(data)
+            @contextmanager
+            def open_short(path):
+                with ShortReads(data) as stream:
+                    yield stream
+            for limit in (100, 4):
+                with self.subTest(limit=limit), patch.object(provider, 'open', side_effect=open_short):
+                    if limit < len(data):
+                        with self.assertRaisesRegex(ValueError, 'memory limit'):
+                            ResourceTextSession.open(provider, 'note.txt', max_bytes=limit)
+                    else:
+                        session = ResourceTextSession.open(provider, 'note.txt', max_bytes=limit)
+                        self.assertEqual(session.text.data, data)
+                        self.assertEqual(session.text.text, 'first\nsecond\n')
+
     def test_navigation_validation_and_private_baseline(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

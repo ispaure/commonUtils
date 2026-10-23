@@ -5,6 +5,7 @@ from pathlib import Path
 from .paths import resource_path
 from .provider import require_capability
 from ..operations import check_cancelled
+from ..streams import read_up_to
 from .mutations import save_resource_and_reopen
 from ...persistence.text import TextSession
 
@@ -89,7 +90,7 @@ class ResourceTextSession:
         scope = getattr(provider, 'operation', None)
         with scope(cancelled) if scope else nullcontext():
             with provider.open(path) as stream:
-                data = stream.read(max_bytes + 1)
+                data = read_up_to(stream, max_bytes + 1, cancelled=cancelled)
         check_cancelled(cancelled)
         if provider.entry(path)['revision'] != before:
             raise ValueError('The document changed while opening; reopen it.')

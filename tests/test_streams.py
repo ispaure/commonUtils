@@ -5,10 +5,49 @@ from threading import Event
 import unittest
 
 from commonUtils.runtime.operations import OperationCancelled
-from commonUtils.runtime.streams import CHUNK_SIZE, copy_stream, stream_signature
+from commonUtils.runtime.streams import CHUNK_SIZE, copy_stream, read_up_to, stream_signature
 
 
 class StreamTests(unittest.TestCase):
+    def test_bounded_prefix_completes_short_reads_without_consuming_the_tail(self):
+        class ShortReads(BytesIO):
+            def read(self, count):
+                return super().read(min(2, count))
+        source = ShortReads(b'complete')
+        self.assertEqual(read_up_to(source, 5), b'compl')
+        self.assertEqual(source.tell(), 5)
+        self.assertEqual(read_up_to(source, 100), b'ete')
+        self.assertFalse(source.closed)
+
+    def test_bounded_prefix_rejects_would_block_and_checks_cancellation_between_reads(self):
+        cancel = Event()
+        class Interrupted(BytesIO):
+            def read(self, count):
+                cancel.set()
+                return super().read(1)
+        source = Interrupted(b'complete')
+        with self.assertRaises(OperationCancelled):
+            read_up_to(source, 5, cancelled=cancel.is_set)
+        self.assertEqual(source.tell(), 1)
+        class WouldBlock:
+            def read(self, count):
+                return None
+        with self.assertRaises(BlockingIOError):
+            read_up_to(WouldBlock(), 5)
+
+    def test_bounded_prefix_validates_limits_and_oversized_read_results(self):
+        from unittest.mock import Mock
+        source = Mock()
+        self.assertEqual(read_up_to(source, 0), b'')
+        source.read.assert_not_called()
+        with self.assertRaises(ValueError):
+            read_up_to(source, -1)
+        with self.assertRaises(TypeError):
+            read_up_to(source, 1.5)
+        source.read.return_value = b'too much'
+        with self.assertRaises(OSError):
+            read_up_to(source, 1)
+
     def test_signature_and_copy_report_all_bytes_across_chunk_boundaries(self):
         data = b'payload' * (CHUNK_SIZE // 7 + 9)
         counts = []
