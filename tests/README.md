@@ -15,6 +15,11 @@ platform checks.
 
 ## Development and validation
 
+`test_batch.py` owns portable batch outcomes with plain unittest and no toolkit
+imports. `test_operations.py` retains Qt worker/progress ownership checks. Native
+or mobile runtimes can reuse the batch suite without installing Qt or duplicating
+its assertions in a consumer.
+
 GUI tests inherit `QtTestCase`. Use `self.temporary_directory()` instead of a raw
 `TemporaryDirectory` for files referenced by Qt widgets. It supports both `with`
 scopes and `.name`/`.cleanup()` fixtures, registers cleanup automatically, and
