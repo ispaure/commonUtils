@@ -52,7 +52,7 @@ info = P4Info()  # Applies the supplied settings, then queries login and info.
 Only `P4USER`, `P4PORT` and `P4CLIENT` are accepted. Despite its name, the
 `environment` callback is applied through `p4 set KEY=VALUE`, not as a per-command
 subprocess environment. Those settings can persist according to the platform's
-`p4 set` behavior. Constructing `P4Info` applies them; `info.update_fields()` only
+`p4 set` behavior. Constructing `P4Info` applies them and marks the connection unavailable if applying them fails; `info.update_fields()` only
 refreshes login/info. Low-level commands and file status refreshes do not apply
 the callback themselves. To apply it explicitly, call
 `set_p4_env_settings()` from `.p4_utils`.
@@ -100,8 +100,7 @@ raw `p4 info` example below if you need the complete response.
 `is_server_accessible(silent=True)` checks cached status and logs a message; it
 does not probe the server again. `dialog_box_p4_info()` presents a short summary
 through commonUtils diagnostics. The parser expects English CLI labels and
-specific keys. Recognized connection failures set `status=False`, but unexpected
-or empty output can raise parsing exceptions. A failed refresh may leave earlier
+specific keys. Failed commands and incomplete or empty connection output set `status=False`. A failed refresh may leave earlier
 field values in place, so always check the refreshed status.
 
 ## Inspect a file without checking it out
@@ -136,9 +135,7 @@ not a complete representation of all Perforce states. Inspect `action`,
 For example, an `edit` action takes precedence over another user's checkout in
 the simplified status.
 
-Although the constructor accepts `depot_file`, a no-argument `update_fields()`
-queries `clientFile`. For depot-only lookups, use `p4_fstat_dict()` or refresh a
-group first to resolve local paths. Parsed model records must contain `clientFile`.
+A no-argument `update_fields()` queries the client path, or the depot path when no client path is known. Empty or malformed records return `False` and clear the simplified status without replacing the original path. Parsed model records must contain `clientFile`.
 
 ## Check out one file
 
@@ -157,7 +154,7 @@ print("Ready to edit:", item.clientFile)
 other checkouts and delete status using the wrapper's existing checks. It then
 adds, syncs or opens the file as required and refreshes its state. A `True` result
 means the final simplified status is `CHECKOUT_BY_ME` or `MARKED_FOR_ADD`.
-Known failures and declined prompts return `False`; exceptions can also propagate.
+Known command failures, incomplete status and declined prompts return `False`; unexpected exceptions can still propagate. Failed add/sync/edit phases stop the remaining checkout commands.
 
 - `silent=False` (default) asks for confirmation before add, sync and edit through
   commonUtils UI dialogs. Use this from an application with the UI configured.
@@ -168,11 +165,7 @@ Known failures and declined prompts return `False`; exceptions can also propagat
 - `allow_sync=True` (default) permits `p4 sync -f` before checkout when needed.
   Review local changes before allowing a forced sync.
 
-Single-file mutation commands interpolate paths without shell quoting. The
-single-file examples therefore use simple paths without spaces or shell special
-characters. Group operations quote each path and are preferable for ordinary
-workspace paths containing spaces. Neither API is a general shell-escaping layer
-for arbitrary input.
+Single-file and group model operations pass paths as separate subprocess arguments without a shell. Spaces and shell characters retain their argument boundaries. Perforce filespec syntax still applies; these methods do not escape Perforce wildcards or revision selectors.
 
 ## Add a new file
 
@@ -230,9 +223,7 @@ files for edit without confirmation prompts. It has no `silent` or `allow_sync`
 parameter. Use it only when those actions are intended. It is not transactional:
 earlier commands may already have changed files if a later command fails.
 
-Unlike single-file checkout, its `True` return means its checks and refreshes
-completed; it does not assert the final checkout status of every member. The
-example checks those statuses explicitly.
+A `True` return means all commands succeeded, all requested status records were refreshed, and every member ended in `CHECKOUT_BY_ME` or `MARKED_FOR_ADD`. A failed command stops later batches/phases and returns `False`; failures can leave earlier files changed. Failed readiness checks log the affected paths. The example also shows how to inspect individual results.
 
 For a read-only batch refresh, call `group.update_fields_client_n_depot()` instead
 of `group.open_for_edit()`. You can add depot paths with
@@ -254,9 +245,7 @@ for item in group.get_p4_file_lst():
     print(item.clientFile, item.status.value)
 ```
 
-`force_get_latest()` returns `None`, performs no checkout preflight checks and
-does not refresh model fields itself. Use it only after deciding a forced sync
-is appropriate; its return value is not a success indicator.
+`force_get_latest()` returns a boolean command outcome, performs no checkout preflight checks and does not refresh model fields itself. Use it only after deciding a forced sync is appropriate; refresh afterward to inspect the resulting state.
 
 ## Read raw command output and fstat records
 
@@ -291,24 +280,30 @@ a mutation succeeded. Do not interpolate untrusted strings into commands.
 trailing blank line, and preserves spaces in field values. It converts “no such
 file(s)” to a record containing `clientFile`, and “not in client view” to one with
 `notInClientView=True`. A recognized expired-session message returns `None`.
-Other unexpected diagnostics are not comprehensively validated by this parser.
-Similarly, `P4File.update_fields()` can raise on empty or malformed records rather
-than returning `False` for every failure. Handle exceptions at your application's
-operation boundary as well as checking boolean results.
+Unknown diagnostic lines and empty results return `None` with an error report. The helper also accepts a sequence of paths; this form uses shell-free execution and rejects failed/timed-out partial output except recognized missing-file/client-view diagnostics. Model operations use this form. Handle unexpected exceptions at the application operation boundary as well as checking boolean results.
+
+## Structured command outcomes
+
+`p4_utils.exec_p4_arguments(["edit", path])` returns the shared `CommandResult`
+(`success`, `returncode`, `stdout`, `stderr`, `timed_out`, `cancelled`, `lines`).
+It resolves the configured executable and runs without a shell, retaining the
+15-second idle timeout and executable-permission handling. Launch errors and
+unsuccessful outcomes are logged with the command, arguments and diagnostics;
+ordinary command failures return to the caller rather than imposing save policy.
+`set_p4_env_settings()` returns a boolean and retains the existing `p4 set`
+persistence behavior. The legacy `exec_p4_command(string)` output-list entry point
+remains available with its existing shell and critical-error behavior.
 
 ## Extension hooks and other entry points
 
 Subclasses of `P4File` can override `_callback_pre_add`, `_callback_post_add`,
 `_callback_pre_sync`, `_callback_post_sync`, `_callback_pre_edit` and
 `_callback_post_edit` to save or reload application state. They take only `self`.
-These hooks wrap the corresponding single-file command helpers; a post hook does
-not independently verify command success. Batch operations do not invoke these
+These hooks wrap the corresponding single-file command helpers. Post hooks run only after a successful command exit; failed or skipped commands do not invoke them. They do not independently re-query the resulting file state. In Blue Hole the post-sync hook reloads the scene before the existing checkout flow continues. Batch operations do not invoke these
 per-file hooks. BlueHole keeps its `BlendP4File` and scene-specific behavior in
 its own adapter; the shared wrapper does not import Blender or add-on preferences.
 
-`P4File.run_p4_move(destination)` issues `p4 move` without checkout preflight,
-path quoting or a subsequent refresh, and returns `None`. The caller must satisfy
-Perforce's move requirements and verify the result. There are no high-level submit
+`P4File.run_p4_move(destination)` issues `p4 move` with separate path arguments and returns a boolean command outcome. It performs no checkout preflight or subsequent refresh. The caller must satisfy Perforce's move requirements and refresh if it needs resulting metadata. There are no high-level submit
 or revert methods in these models.
 
 `create_p4_user_workspace_cls(computer_name, username, workspace)` returns a

@@ -15,7 +15,7 @@ __status__ = 'Production'
 from ....runtime.diagnostics import *
 from ....runtime.platform import *
 from .p4_messages import P4LogMessage, P4ErrorMessage
-from .p4_utils import exec_p4_command, set_p4_env_settings
+from .p4_utils import exec_p4_arguments, set_p4_env_settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 # USER DEFINED VARIABLES
@@ -54,32 +54,32 @@ class P4Info:
         self.case_handling = ''
 
         # Set p4 env settings
-        set_p4_env_settings()  # Sets P4 Environment Settings so they are set for later use. Don't know if I need this anywhere else.
+        if not set_p4_env_settings():
+            self.status = False
+            return
 
         # Update keys
         self.update_fields()
 
     def update_fields(self):
+        # A failed refresh must never leave a previous successful status in place.
+        self.status = False
+        login = exec_p4_arguments(['login', '-s'])
+        login_array = login.lines
 
-        # !!! KEPT THIS UNTIL NEW METHOD IS TESTED TO WORK FINE. BUT IT'S COMPUTATIONALLY EXPENSIVE !!!
-        # # Check P4 status
-        # status_array = exec_p4_command('p4 status')
-        # if 'password' in status_array[0] and 'invalid or unset' in status_array[0]:
-        #     self.status = False
-        #     P4ErrorMessage().login_token_expired()
-        #     return
-
-        # NEW METHOD (CHEAP TO RUN)
-        # Check login token
-        login_array = exec_p4_command('p4 login -s')
-
-        if 'password' in login_array[0].lower() and 'invalid or unset' in login_array[0].lower():
+        if any('password' in line.lower() and 'invalid or unset' in line.lower() for line in login_array):
             self.status = False
             P4ErrorMessage().login_token_expired()
             return
+        if not login.success:
+            return
 
         # Get the information from p4 info
-        info_array = exec_p4_command('p4 info')
+        info = exec_p4_arguments(['info'])
+        info_array = info.lines
+        if not info_array:
+            log(Severity.ERROR, tool_name, 'Perforce returned no connection information.')
+            return
 
         # If could not get info, set status to False
         if "Perforce client error" in info_array[0]:
@@ -113,8 +113,15 @@ class P4Info:
                         P4ErrorMessage().info_linux_p4_cmd_missing()
                 return
 
-            item_split = item.split(": ")
-            p4_info_dict[item_split[0]] = item_split[1]
+            key, separator, value = item.partition(': ')
+            if separator:
+                p4_info_dict[key] = value
+
+        required = ('User name', 'Client name', 'Client host', 'Client root', 'Current directory',
+                    'Peer address', 'Client address', 'Server address', 'Server root', 'Server date', 'Server uptime')
+        if not info.success or any(key not in p4_info_dict for key in required):
+            log(Severity.ERROR, tool_name, 'Cannot read complete Perforce connection information.')
+            return
 
         # Assign the dictionary keys to the values
         self.status = True
@@ -132,7 +139,7 @@ class P4Info:
 
     def is_server_accessible(self, silent=False) -> bool:
         # Check if Perforce server is accessible.
-        if self.status is False:
+        if self.status is not True:
             P4ErrorMessage(silent).info_server_cannot_connect()
             return False
         else:

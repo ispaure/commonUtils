@@ -290,3 +290,16 @@ to `markdown_preview` or a formatted editor using `embedded_image`. See the
 ## Search ownership
 
 Use [the search API map](../../search/README.md) for filename, provider, document and multi-file content queries. UI owners retain debounce, workers, highlighting and document navigation. The optional PCRE engine imports QtCore without QtWidgets.
+
+## Perforce checkout and command outcomes
+
+`integrations.wrappers.perforce.P4File` and `P4FileGroup` preserve the existing
+file fields, status precedence, prompts, placeholders and add/sync/edit workflow.
+Checkout returns `False` on command failure or incomplete final readiness.
+`P4File.run_p4_move()` and `P4FileGroup.force_get_latest()` now return boolean
+command outcomes; neither refreshes model fields. Single-file post hooks run only
+following successful command exits. Host save/export policy remains caller-owned.
+
+`integrations.wrappers.perforce.p4_utils.exec_p4_arguments()` accepts an argument
+sequence and returns `CommandResult` without a shell. The legacy string API
+remains available. See [Perforce contracts and examples](../../integrations/wrappers/perforce/developer-guide.md).

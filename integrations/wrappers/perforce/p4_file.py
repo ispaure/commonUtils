@@ -25,7 +25,7 @@ from ....runtime.platform import OS, get_os
 from .p4_messages import P4LogMessage, P4ErrorMessage, P4CriticalMessage
 from .p4_file_status import P4FileStatus
 from .p4_info import P4Info
-from .p4_utils import p4_fstat_dict, create_empty_binary_file, exec_p4_command
+from .p4_utils import p4_fstat_dict, create_empty_binary_file, exec_p4_arguments
 
 # ----------------------------------------------------------------------------------------------------------------------
 # USER DEFINED VARIABLES
@@ -71,11 +71,17 @@ class P4File:
     def update_fields(self, f_stat_dict=None) -> bool:
         # If no dict is given for the refresh, fetch info.
         if f_stat_dict is None:
-            f_stat_dict = p4_fstat_dict(self.clientFile)
-            if f_stat_dict is not None:
+            f_stat_dict = p4_fstat_dict([self.get_display_name()])
+            if f_stat_dict:
                 f_stat_dict = f_stat_dict[0]  # There was no error, get the first (only) item to process.
             else:
+                self.status = None
                 return False  # There was an error, return False as could not process properly.
+
+        if not f_stat_dict.get('clientFile'):
+            self.status = None
+            log(Severity.ERROR, tool_name, f'Incomplete Perforce status for {self.get_display_name()}')
+            return False
 
         self.depotFile = self.key_else_default(f_stat_dict, 'depotFile')
         self.clientFile = self.key_else_default(f_stat_dict, 'clientFile')
@@ -96,7 +102,7 @@ class P4File:
         self.actionOwner = self.key_else_default(f_stat_dict, 'actionOwner')
         self.workRev = self.key_else_default(f_stat_dict, 'workRev')
 
-        self.file_name = self.clientFile.split('\\')[-1]
+        self.file_name = self.clientFile.replace('\\', '/').rsplit('/', 1)[-1]
 
         # Give label on if it's mapped or not
         if 'isMapped' in f_stat_dict.keys():
@@ -233,7 +239,7 @@ class P4File:
             P4LogMessage().not_marked_for_delete(self.get_display_name())
             return True
 
-    def __run_p4_cmd(self, command: str,
+    def __run_p4_cmd(self, command,
                      incl_status_lst: Union[List[P4FileStatus], None] = None,
                      excl_status_lst: Union[List[P4FileStatus], None] = None,
                      move_to: Optional[str] = None):
@@ -247,35 +253,37 @@ class P4File:
                 return False
 
         # If add command, create file before checkout if doesn't exist (may be created later)
-        if 'p4 add' in command and self.clientFile is not None:
+        if command[0] == 'add' and self.clientFile is not None:
             create_empty_binary_file(self.clientFile)
 
         # Run command for p4_file
         display_name = self.get_display_name()
         if move_to is None:
-            exec_p4_command(f'{command} {display_name}')
+            return exec_p4_arguments([*command, display_name]).success
         else:
-            exec_p4_command(f'{command} {display_name} {move_to}')
+            return exec_p4_arguments([*command, display_name, move_to]).success
 
     def _run_p4_add(self):
         self._callback_pre_add()
-        self.__run_p4_cmd(command='p4 add', incl_status_lst=[P4FileStatus.NOT_ADDED])
+        if not self.__run_p4_cmd(command=['add'], incl_status_lst=[P4FileStatus.NOT_ADDED]):
+            return False
         self._callback_post_add()
+        return True
 
     def _run_p4_sync(self):
         self._callback_pre_sync()
-        # progress_bar = ui.pyside.display_progress_bar(f'{tool_name}: Getting Latest...')
-        # progress_bar.update_progress(10)
-        self.__run_p4_cmd(command='p4 sync -f', incl_status_lst=[P4FileStatus.NOT_LATEST_REVISION])
-        # progress_bar.update_progress(100)
-        # progress_bar.dlg.close()
+        if not self.__run_p4_cmd(command=['sync', '-f'], incl_status_lst=[P4FileStatus.NOT_LATEST_REVISION]):
+            return False
         self._callback_post_sync()
+        return True
 
     def _run_p4_edit(self):
         self._callback_pre_edit()
-        self.__run_p4_cmd(command='p4 edit', excl_status_lst=[P4FileStatus.NOT_ADDED, P4FileStatus.MARKED_FOR_ADD,
-                                                              P4FileStatus.CHECKOUT_BY_ME])
+        if not self.__run_p4_cmd(command=['edit'], excl_status_lst=[P4FileStatus.NOT_ADDED, P4FileStatus.MARKED_FOR_ADD,
+                                                                 P4FileStatus.CHECKOUT_BY_ME]):
+            return False
         self._callback_post_edit()
+        return True
 
     def _callback_pre_add(self):
         pass
@@ -330,12 +338,14 @@ class P4File:
         # Mark not added for add
         if self.status in [P4FileStatus.NOT_ADDED]:
             if silent:
-                self._run_p4_add()
+                if not self._run_p4_add():
+                    return False
             else:
                 msg = f'File "{self.file_name}" is not marked for add. Do you want to mark for add?'
                 msg_box_result = ui.display_msg_box_ok_cancel(tool_name, msg)
                 if msg_box_result:
-                    self._run_p4_add()
+                    if not self._run_p4_add():
+                        return False
                 else:
                     return False
 
@@ -345,24 +355,28 @@ class P4File:
                 P4ErrorMessage(silent).not_latest_and_not_allow_sync(self.get_display_name())
                 return False
             if silent:
-                self._run_p4_sync()
+                if not self._run_p4_sync():
+                    return False
             else:
                 msg = f'File "{self.file_name}" is not synced to the latest revision. Sync to the latest revision?'
                 msg_box_result = ui.display_msg_box_ok_cancel(tool_name, msg)
                 if msg_box_result:
-                    self._run_p4_sync()
+                    if not self._run_p4_sync():
+                        return False
                 else:
                     return False
 
         # Checkout files that re not checked out yet
         if self.status not in [P4FileStatus.NOT_ADDED, P4FileStatus.MARKED_FOR_ADD, P4FileStatus.CHECKOUT_BY_ME]:
             if silent:
-                self._run_p4_edit()
+                if not self._run_p4_edit():
+                    return False
             else:
                 msg = f'File "{self.file_name}" is not checked out. Check out?'
                 msg_box_result = ui.display_msg_box_ok_cancel(tool_name, msg)
                 if msg_box_result:
-                    self._run_p4_edit()
+                    if not self._run_p4_edit():
+                        return False
                 else:
                     return False
 
@@ -380,4 +394,4 @@ class P4File:
         return True
 
     def run_p4_move(self, move_to_path_str):
-        self.__run_p4_cmd(command='p4 move', move_to=move_to_path_str)
+        return self.__run_p4_cmd(command=['move'], move_to=move_to_path_str)

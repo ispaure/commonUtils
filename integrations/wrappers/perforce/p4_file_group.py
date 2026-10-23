@@ -20,7 +20,7 @@ from .p4_messages import P4ErrorMessage, P4CriticalMessage
 from .p4_file_status import P4FileStatus
 from .p4_info import P4Info
 from .p4_file import P4File
-from .p4_utils import p4_fstat_dict, create_empty_binary_file, exec_p4_command
+from .p4_utils import p4_fstat_dict, create_empty_binary_file, exec_p4_arguments
 
 # ----------------------------------------------------------------------------------------------------------------------
 # USER DEFINED VARIABLES
@@ -96,7 +96,8 @@ class P4FileGroup:
             log(Severity.CRITICAL, tool_name, 'Update fields by matching key: fstat_key is invalid')
             return False
 
-        file_path_string_lst = self.append_lst_to_string_max_length(p4_file_dict.keys(), ' ', 1000, quotation_marks=True)
+        file_path_string_lst = list(_path_batches(p4_file_dict))
+        matched = set()
         call_counter = 0
         for file_path_string in file_path_string_lst:
             # Print number of call executed, to give progress feedback...
@@ -109,7 +110,10 @@ class P4FileGroup:
                 return False  # There was an error fetching the dict
 
             for result_dict in result_dicts_lst:
-                result_match_key = result_dict[fstat_key]
+                result_match_key = result_dict.get(fstat_key)
+                if not result_match_key:
+                    log(Severity.ERROR, tool_name, f'Incomplete Perforce status: missing {fstat_key}')
+                    return False
                 match_p4_file: Optional[P4File] = None
 
                 # If on Windows and cannot find key, attempt by ignoring case. Other platform YOLO it that way too.
@@ -124,72 +128,39 @@ class P4FileGroup:
                     match_p4_file = p4_file_dict[result_match_key]
 
                 if match_p4_file is not None:
-                    match_p4_file.update_fields(result_dict)
+                    if not match_p4_file.update_fields(result_dict):
+                        return False
+                    matched.add(id(match_p4_file))
                 else:
                     msg = f'Could not match key {fstat_key} {result_match_key} to a P4File!'
                     log(Severity.ERROR, tool_name, msg)
                     return False
 
+        missing = [item.get_display_name() for item in p4_file_dict.values() if id(item) not in matched]
+        if missing:
+            log(Severity.ERROR, tool_name, f'Perforce returned no status for: {missing}')
+            return False
         return True  # Worked properly for all
 
     def force_get_latest(self):
-        self.__run_p4_cmd_on_p4_file_lst(command='p4 sync -f')
+        return self.__run_p4_cmd_on_p4_file_lst(command=['sync', '-f'])
 
-    def __run_p4_cmd_on_p4_file_lst(self, command: str,
-                                    incl_status_lst: Union[List[P4FileStatus], None] = None,
-                                    excl_status_lst: Union[List[P4FileStatus], None] = None):
-        # Run command for p4_file with clientFile
-        file_path_with_client_file_dict = self.get_p4_file_with_client_file_dict()
-        # Filter
-        filtered_file_path_with_client_file_dict = {}
-        for key, p4_file in file_path_with_client_file_dict.items():
-            include = True
-            if incl_status_lst is not None:
-                if p4_file.status not in incl_status_lst:
-                    include = False
-            if excl_status_lst is not None:
-                if p4_file.status in excl_status_lst:
-                    include = False
-            if include:
-                filtered_file_path_with_client_file_dict[key] = p4_file
-        # If command is to add a file, and it's not present on disk already, a dummy file must be created. This only applies to clientFile (disk path), not depotPath (server path)
-        if 'p4 add' in command:
-            for p4_file in filtered_file_path_with_client_file_dict.values():
-                if not os.path.isfile(p4_file.clientFile):
-                    create_empty_binary_file(p4_file.clientFile)
-        # Create string
-        file_path_string_lst = self.append_lst_to_string_max_length(filtered_file_path_with_client_file_dict.keys(), ' ', 1000, quotation_marks=True)
-        call_counter = 0
-        for file_path_string in file_path_string_lst:
-            # Print number of call executed, to give progress feedback...
-            call_counter += 1
-            log(Severity.DEBUG, tool_name,
-                'Issuing Call (from clientFile) #' + str(call_counter) + ' of ' + str(len(file_path_string_lst)))
-            exec_p4_command(f'{command} {file_path_string}')
-
-        # Run command for p4_file with depotFile (and no clientFile)
-        file_path_with_depot_file_dict = self.get_p4_file_with_depot_file_and_no_client_file()
-        # Filter
-        filtered_file_path_with_depot_file_dict = {}
-        for key, p4_file in file_path_with_depot_file_dict.items():
-            include = True
-            if incl_status_lst is not None:
-                if p4_file.status not in incl_status_lst:
-                    include = False
-            if excl_status_lst is not None:
-                if p4_file.status in excl_status_lst:
-                    include = False
-            if include:
-                filtered_file_path_with_depot_file_dict[key] = p4_file
-        # Create string
-        file_path_string_lst = self.append_lst_to_string_max_length(filtered_file_path_with_depot_file_dict.keys(), ' ', 1000, quotation_marks=True)
-        call_counter = 0
-        for file_path_string in file_path_string_lst:
-            # Print number of call executed, to give progress feedback...
-            call_counter += 1
-            log(Severity.DEBUG, tool_name,
-                'Issuing Call (from depotFile) #' + str(call_counter) + ' of ' + str(len(file_path_string_lst)))
-            exec_p4_command(f'{command} {file_path_string}')
+    def __run_p4_cmd_on_p4_file_lst(self, command,
+                                    incl_status_lst=None, excl_status_lst=None):
+        # Keep client/depot batches separate; only local add targets need a
+        # placeholder. Group operations deliberately do not invoke scene hooks.
+        for paths, local in ((self.get_p4_file_with_client_file_dict(), True),
+                             (self.get_p4_file_with_depot_file_and_no_client_file(), False)):
+            selected = {path: item for path, item in paths.items()
+                        if (incl_status_lst is None or item.status in incl_status_lst)
+                        and (excl_status_lst is None or item.status not in excl_status_lst)}
+            if local and command[0] == 'add':
+                for path in selected:
+                    create_empty_binary_file(path)
+            for batch in _path_batches(selected):
+                if not exec_p4_arguments([*command, *batch]).success:
+                    return False
+        return True
 
     def open_for_edit(self):
         """
@@ -217,23 +188,30 @@ class P4FileGroup:
             return False
 
         # Mark not added for add
-        self.__run_p4_cmd_on_p4_file_lst(command='p4 add', incl_status_lst=[P4FileStatus.NOT_ADDED])
+        if not self.__run_p4_cmd_on_p4_file_lst(command=['add'], incl_status_lst=[P4FileStatus.NOT_ADDED]):
+            return False
 
         # Get latest on files that are not at latest
-        self.__run_p4_cmd_on_p4_file_lst(command='p4 sync -f', incl_status_lst=[P4FileStatus.NOT_LATEST_REVISION])
+        if not self.__run_p4_cmd_on_p4_file_lst(command=['sync', '-f'], incl_status_lst=[P4FileStatus.NOT_LATEST_REVISION]):
+            return False
 
         # Checkout files that re not checked out yet
-        self.__run_p4_cmd_on_p4_file_lst(command='p4 edit',
+        if not self.__run_p4_cmd_on_p4_file_lst(command=['edit'],
                                          excl_status_lst=[P4FileStatus.NOT_ADDED,
                                                           P4FileStatus.MARKED_FOR_ADD,
-                                                          P4FileStatus.CHECKOUT_BY_ME])
+                                                          P4FileStatus.CHECKOUT_BY_ME]):
+            return False
 
         # Update fields
         result = self.update_fields_client_n_depot()
         if not result:  # Fields didn't properly get set
             return False
 
-        # If got here with no issue, completed successfully
+        ready = (P4FileStatus.MARKED_FOR_ADD, P4FileStatus.CHECKOUT_BY_ME)
+        failed = [item.get_display_name() for item in self.__p4_file_lst if item.status not in ready]
+        if failed:
+            log(Severity.ERROR, tool_name, f'Files could not be prepared for editing: {failed}')
+            return False
         return True
 
     def is_client_file_under_workspace_root(self, p4_info_cls: P4Info) -> bool:
@@ -334,3 +312,17 @@ class P4FileGroup:
 
         # Return array of strings
         return file_str_lst
+
+
+def _path_batches(paths, max_length=1000):
+    """Conservative command batches without serializing or splitting any path."""
+    batch, length = [], 0
+    for path in paths:
+        cost = len(path) + 3  # Retain the existing conservative batching budget.
+        if batch and length + cost > max_length:
+            yield batch
+            batch, length = [], 0
+        batch.append(path)
+        length += cost
+    if batch:
+        yield batch

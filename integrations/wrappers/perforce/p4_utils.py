@@ -22,8 +22,8 @@ from ....filesystem import files as fileUtils
 from ....runtime.platform import *
 from .runtime import runtime
 import os
-import shlex
 import subprocess
+import stat
 
 # ----------------------------------------------------------------------------------------------------------------------
 # USER DEFINED VARIABLES
@@ -40,12 +40,26 @@ def p4_fstat_dict(file_path_string, silent_mode=False) -> Optional[List[Dict[str
     Get p4 fstat results, cleaned as an array of dicts (1 dict per item)
     """
 
-    # If file_path isn't enclosed in quotation marks, enclose.
-    if '"' not in file_path_string[0]:
-        file_path_string = '"' + file_path_string + '"'
-
-    # Get status of files
-    result_array = exec_p4_command("p4 fstat {}".format(file_path_string))
+    # Keep the legacy preformatted-string entry point. Models pass path lists so
+    # spaces and shell characters never need quoting or reparsing.
+    if isinstance(file_path_string, str):
+        if not file_path_string:
+            return None
+        if not file_path_string.startswith('"'):
+            file_path_string = '"' + file_path_string + '"'
+        result_array = exec_p4_command(f'p4 fstat {file_path_string}')
+    else:
+        paths = list(file_path_string)
+        if not paths:
+            return []
+        outcome = exec_p4_arguments(['fstat', *paths], allow_fstat_diagnostics=True)
+        if outcome.timed_out or outcome.cancelled:
+            return None
+        result_array = outcome.lines
+        known_diagnostics = (' - no such file(s).', ' - file(s) not in client view.')
+        if not outcome.success and not any(line.endswith(known_diagnostics) for line in result_array):
+            log(Severity.ERROR, tool_name, f'Cannot read Perforce file status: {result_array}', popup=not silent_mode)
+            return None
 
     result_dicts_lst = []
     result_dict = {}
@@ -58,33 +72,35 @@ def p4_fstat_dict(file_path_string, silent_mode=False) -> Optional[List[Dict[str
                 log(Severity.ERROR, tool_name, msg, popup=True)
             return None
         elif ' - no such file(s).' in i:
+            if result_dict:
+                result_dicts_lst.append(result_dict)
             result_dict = {'clientFile': i.replace(' - no such file(s).', '')}
             result_dicts_lst.append(result_dict)
             result_dict = {}
         elif ' - file(s) not in client view.' in i:
+            if result_dict:
+                result_dicts_lst.append(result_dict)
             result_dict = {'clientFile': i.replace(' - file(s) not in client view.', ''), 'notInClientView': True}
             result_dicts_lst.append(result_dict)
             result_dict = {}
+        elif i.startswith('... '):
+            key, separator, value = i[4:].partition(' ')
+            if not key:
+                return None
+            result_dict[key] = value if separator else ''
+        elif not i.strip():
+            if result_dict:
+                result_dicts_lst.append(result_dict)
+            result_dict = {}
         else:
-            i = i.replace('... ', '')
-            if len(i) > 0:
-                split_i = i.split(' ')
-                split_i_up_to_last = ''
-                split_i_length = len(split_i)
-                for idx, value in enumerate(split_i):
-                    if idx > 0:
-                        if idx < split_i_length - 1:
-                            split_i_up_to_last += value + ' '
-                        else:
-                            split_i_up_to_last += value
-                result_dict[split_i[0]] = split_i_up_to_last
-            else:
-                if result_dict:
-                    result_dicts_lst.append(result_dict)
-                result_dict = {}
+            log(Severity.ERROR, tool_name, f'Cannot read Perforce file status: {i}', popup=not silent_mode)
+            return None
 
     if result_dict:
         result_dicts_lst.append(result_dict)
+    if not result_dicts_lst:
+        log(Severity.ERROR, tool_name, 'Perforce returned no file status records.', popup=not silent_mode)
+        return None
     return result_dicts_lst
 
 
@@ -93,9 +109,9 @@ def set_p4_env_settings():
     for key, value in runtime().environment().items():
         if key not in ('P4USER', 'P4PORT', 'P4CLIENT'):
             raise ValueError(f'Unsupported Perforce environment key: {key}')
-        setting = f'{key}={value}'
-        quoted = subprocess.list2cmdline([setting]) if get_os() is OS.WIN else shlex.quote(setting)
-        exec_p4_command('p4 set ' + quoted)
+        if not exec_p4_arguments(['set', f'{key}={value}']).success:
+            return False
+    return True
 
 
 class P4UserWorkspace:
@@ -134,6 +150,38 @@ def get_p4_macos_path() -> str:
 
 def get_p4_linux_path() -> str:
     return str(runtime().executable(OS.LINUX))
+
+
+def exec_p4_arguments(arguments, *, allow_fstat_diagnostics=False):
+    """Run separate CLI arguments and return a CommandResult, without a shell.
+
+    Ordinary command failures are logged and returned so the host retains its
+    save/export policy. Only fstat callers opt into parsing nonzero diagnostics.
+    Timeout/cancellation never turns partial output into a completed operation.
+    """
+    if isinstance(arguments, (str, bytes)):
+        raise TypeError('Supply Perforce arguments as a non-empty sequence')
+    arguments = [os.fspath(argument) for argument in arguments]
+    if not arguments:
+        raise TypeError('Supply Perforce arguments as a non-empty sequence')
+    executable = str(runtime().executable(get_os()))
+    try:
+        if get_os() in (OS.MAC, OS.LINUX):
+            if not os.path.isfile(executable):
+                raise FileNotFoundError(f'Perforce executable not found: {executable}')
+            mode = os.stat(executable).st_mode
+            if not mode & stat.S_IXUSR:
+                os.chmod(executable, mode | stat.S_IXUSR)
+        result = cmdShellWrapper.run_command([executable, *arguments], idle_timeout=15)
+    except OSError as error:
+        result = cmdShellWrapper.CommandResult(None, stderr=(str(error),))
+    if not result.success and (not allow_fstat_diagnostics or result.timed_out or result.cancelled):
+        reason = ('timed out' if result.timed_out else 'was cancelled' if result.cancelled
+                  else f'failed (exit status {result.returncode})')
+        details = '\n'.join(result.lines)
+        log(Severity.ERROR, tool_name,
+            f'Perforce {arguments[0]} {reason}.\nArguments: {arguments[1:]!r}\n{details}')
+    return result
 
 
 def exec_p4_command(command: str):

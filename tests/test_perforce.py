@@ -28,9 +28,9 @@ class PerforceTests(unittest.TestCase):
     def test_lazy_environment_and_allowed_keys(self):
         environment = {'P4USER': 'a b'}
         configure_runtime(PerforceRuntime(environment=lambda: environment))
-        with patch.object(p4_utils, 'exec_p4_command') as run:
-            p4_utils.set_p4_env_settings()
-            self.assertIn('a b', run.call_args.args[0])
+        with patch.object(p4_utils, 'exec_p4_arguments', return_value=cmdShellWrapper.CommandResult(0)) as run:
+            self.assertTrue(p4_utils.set_p4_env_settings())
+            self.assertEqual(run.call_args.args[0], ['set', 'P4USER=a b'])
             environment['UNSUPPORTED'] = 'value'
             with self.assertRaises(ValueError):
                 p4_utils.set_p4_env_settings()

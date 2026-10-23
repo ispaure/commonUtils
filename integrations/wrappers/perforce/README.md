@@ -32,7 +32,9 @@ P4CLIENT overrides), and binary_template() callbacks. Providers are evaluated
 when used so settings changes remain visible. configure_runtime(None) resets
 these callbacks. This is a per-imported-library runtime, not per-repository state.
 
-Execution retains the existing output-line contract and 15-second idle timeout;
+The legacy string execution API retains its output-line contract. Model operations
+use separate arguments without a shell and return reliable boolean outcomes. Both
+execution paths retain the 15-second idle timeout;
 fstat diagnostics may use nonzero command exits. Failed/empty command outcomes,
 timeouts and cancellation do not masquerade as success. Binary placeholders
 preserve existing files. Tagged records include the last entry without requiring
@@ -44,3 +46,8 @@ Tests use fixture outputs and no live server; consumers still configure/install
 Perforce for actual operations.
 
 [Other wrappers](../README.md)
+
+Checkout preserves add/sync/edit ordering and verifies final readiness for every
+file. Failed phases stop subsequent commands; successful single-file commands
+retain their extension hooks. Hosts retain save/export policy. See the
+[workflow regression tests](../../../tests/test_perforce_workflows.py).
