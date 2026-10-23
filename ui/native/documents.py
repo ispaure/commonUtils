@@ -2,6 +2,7 @@
 import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from ...filesystem.local_access import check_local_path
 from ...runtime.platform import get_os, OS
 from ...runtime.resources.documents import AndroidDocuments, IOSDocuments, LocalDocuments
 
@@ -138,6 +139,7 @@ def _copy_export(open_source, path):
     from ...runtime.streams import copy_stream
     from tempfile import NamedTemporaryFile
     path = Path(path)
+    check_local_path(path)
     temporary = None
     try:
         with open_source() as source, NamedTemporaryFile(dir=path.parent, prefix='.export-', delete=False) as output:
@@ -145,6 +147,7 @@ def _copy_export(open_source, path):
             copy_stream(source, output)
             output.flush()
             os.fsync(output.fileno())
+        check_local_path(path)
         os.replace(temporary, path)
     finally:
         if temporary is not None:

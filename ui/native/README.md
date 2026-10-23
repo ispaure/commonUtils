@@ -188,7 +188,9 @@ destination and streams from a context-manager factory. Names must be single fil
 names. The host supplies MIME type, limits and content policy. Android output
 closes on failure; iOS stages in app data and removes staging after picker completion
 or cancellation. Local exports stage before replacement and retain the old file on
-copy failure. Native providers determine their own publication guarantees.
+copy failure. Local destinations respect the host's registered provider boundaries
+before source access and again before publication; denied exports remove their
+own staging file. Native providers determine their own publication guarantees.
 
 ## Menus and presentation
 

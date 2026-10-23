@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from commonUtils.ui.native.documents import _copy_export, export_stream
+from commonUtils.filesystem.local_access import protect_local_root
 
 
 class NativeDocumentsTests(unittest.IsolatedAsyncioTestCase):
@@ -38,3 +39,44 @@ class NativeDocumentsTests(unittest.IsolatedAsyncioTestCase):
                 _copy_export(lambda: Failing(b'partial'), path)
             self.assertEqual(path.read_bytes(), b'original')
             self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_local_export_replaces_selected_file_and_cleans_stage(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'target'
+            path.write_bytes(b'original')
+            _copy_export(lambda: BytesIO(b'exported'), path)
+            self.assertEqual(path.read_bytes(), b'exported')
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_export_rejects_protected_destination_before_opening_source(self):
+        from unittest.mock import Mock
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'target'
+            path.write_bytes(b'opaque')
+            source = Mock(return_value=BytesIO(b'plaintext'))
+            release = protect_local_root(self.id(), directory, 'Use the provider')
+            try:
+                with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                    _copy_export(source, path)
+                source.assert_not_called()
+                self.assertEqual(path.read_bytes(), b'opaque')
+                self.assertEqual(list(path.parent.iterdir()), [path])
+            finally:
+                release()
+
+    def test_export_rechecks_boundary_before_publication(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'target'
+            path.write_bytes(b'opaque')
+            releases = []
+            def open_source():
+                releases.append(protect_local_root(self.id(), directory, 'Use the provider'))
+                return BytesIO(b'plaintext')
+            try:
+                with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                    _copy_export(open_source, path)
+                self.assertEqual(path.read_bytes(), b'opaque')
+                self.assertEqual(list(path.parent.iterdir()), [path])
+            finally:
+                for release in releases:
+                    release()
