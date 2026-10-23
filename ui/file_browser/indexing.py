@@ -2,7 +2,7 @@
 from datetime import datetime
 from pathlib import Path
 from ...filesystem.directories import Directory
-from .index_worker import FolderOperation
+from .index_worker import FolderOperation, _FolderScan
 from .. import pyside as qt
 
 
@@ -121,7 +121,6 @@ class BrowserIndexing:
         if root is None or self.stopping:
             return
         from ...filesystem.index import directory_cache
-        from ...runtime.operations import OperationCancelled
         full = self._full_index_refresh
         paused = self._index_paused
         changes = tuple(sorted(self._changed_paths))
@@ -145,35 +144,8 @@ class BrowserIndexing:
         self._update_index_controls()
         if not cached_only or not same_root:
             self.index_status.setText('Loading saved sizes…' if cached_only else 'Checking saved index…')
-        def scanner(path, cancelled, *, report, reuse_for):
-            try:
-                coordinator = directory_cache.coordinator
-                active = coordinator.active_job(path) if coordinator and read_cache and not paused else None
-                if active is not None:
-                    snapshot = coordinator.follow(active, path, cancelled=cancelled, report=report)
-                    if snapshot is None:
-                        return None
-                    with snapshot:
-                        return snapshot.folder_stats(children_of=path, cancelled=cancelled)
-                if read_cache:
-                    if not paused:
-                        directory_cache.repair_cached_exclusions(path, cancelled=cancelled, report=report)
-                    snapshot = directory_cache.peek(path, cancelled=cancelled)
-                else:
-                    snapshot = None
-                if not read_cache or snapshot is None and not paused and policy.scan_on_open:
-                    indexer = directory_cache.coordinator or directory_cache
-                    snapshot = indexer.reconcile_folder(path, changes=changes, full=full, once=True,
-                                                               cancelled=cancelled, report=report,
-                                                               recursive_initial=policy.recursive_on_open,
-                                                               **({'background_priority': policy.background_priority}
-                                                                  if directory_cache.coordinator else {}))
-                if snapshot is None:
-                    return None
-                with snapshot:
-                    return snapshot.folder_stats(children_of=path, cancelled=cancelled)
-            except OperationCancelled:
-                return None
+        scanner = _FolderScan(directory_cache, policy, read_cache=read_cache,
+                              paused=paused, full=full, changes=changes)
         self.folder_operation = FolderOperation(root, scanner, self,
             request_key=('cached' if read_cache else 'full' if full else 'reconcile', changes),
             background_priority=policy.background_priority)
