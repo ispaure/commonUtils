@@ -89,9 +89,12 @@ must include them. See [workspaces](../../ui/workspaces.md) and
 
 Atomic publication protects one destination; it is not a cross-process lock or a
 multi-file transaction. Text/INI/Markdown layers add conflict and encoding rules.
-Batch cancellation normally finishes the current item and records the remainder;
-archive extraction stages individual members rather than promising all-or-nothing
-extraction. UI progress reaching its end does not prove every item succeeded.
+Batch cancellation normally finishes the current item and records the remainder.
+The [archive workspace extractor](../../archives/README.md#extraction-publication)
+stages the complete selected tree and publishes a new destination with an atomic
+no-replace rename. The lower-level [ZIP extractor](../../archives/zip_access.md)
+stages individual files and requires a disposable workspace for whole-operation
+isolation. UI progress reaching its end does not prove every item succeeded.
 
 New result-based APIs expose explicit errors/outcomes. Legacy diagnostics may raise
 `DebugException` and display dialogs; worker owners use `noninteractive_logging`

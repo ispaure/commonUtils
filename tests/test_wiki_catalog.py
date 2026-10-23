@@ -63,4 +63,3 @@ class WikiCatalogTests(unittest.TestCase):
                      '    # Indented code'):
             with self.subTest(text=text):
                 self.assertEqual(MarkdownWiki.title(text, 'fallback'), 'fallback')
-
