@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Filesystem and formats | Paths, file snapshots, type resolution, traversal, metadata and index data | Domain file subclasses, overwrite/selection policy |
 | Archives | Archive models, reading, validation, extraction and publication | Password prompts, workflow, software selection |
+| Search | Filename queries, provider traversal, document matching and text-file search | Roots, exclusions, buffers, backend choice and result presentation |
 | Runtime and integrations | Cancellation, progress, diagnostics, streams, processes and OS adapters | Scheduling, error presentation, external tool installation |
 | Configuration and persistence | INI/schema parsing, atomic writes, text snapshots and recovery storage | Domain validation, save timing, schemas and writer coordination |
 | UI | Qt presentation, browser bindings, reusable editors and workspace lifecycle | Feature discovery, application navigation and document policy |
@@ -13,9 +14,10 @@
 The intended flow is application policy → reusable UI/operations → data and runtime
 mechanisms. Core registry declarations do not require Qt; filesystem information
 hooks return data and image bytes rather than widgets. UI modules consume this
-data and schedule work. There are legacy exceptions: diagnostics imports the UI
-facade, and some file activation hooks lazily open a UI. Do not mistake the intended
-boundary for a completely GUI-free transitive dependency graph.
+data and schedule work. Diagnostics emits events to explicitly configured sinks
+and presenters without importing UI. Some file activation hooks still lazily open
+a UI. The optional PCRE search backend imports QtCore without widgets; portable
+name/provider/literal queries need no toolkit. See [search owners](../../search/README.md).
 
 commonUtils does not own Logistics' feature registry, Obsidian vault workflows,
 comic/book application features or full text-editor workspace. Its Markdown reader
