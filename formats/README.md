@@ -380,8 +380,12 @@ assert notes.read_lines() == notes.line_lst
 
 These formats create parent directories on write. Only JSON's writer promises
 atomic staging/replacement; text/CSV helpers retain their existing write semantics.
-TXT entries must not contain embedded newlines. JSON rejects non-finite numbers;
-use `compact=True` to omit formatting whitespace. Missing/malformed reads should be
+TXT entries must not contain embedded newlines. Text exports with an alternate path
+adjust only the destination's write permission,
+leaving the source's permissions unchanged. TXT/CSV destinations respect host
+provider guards before parent creation or write preparation.
+JSON rejects non-finite numbers; use `compact=True` to omit formatting whitespace.
+Missing/malformed reads should be
 handled at the application boundary. See [file-type details](README.md).
 
 

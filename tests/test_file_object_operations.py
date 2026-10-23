@@ -45,6 +45,41 @@ class FileObjectOperationTests(unittest.TestCase):
         self.assertEqual(result.path,target); self.assertFalse(self.source.exists())
         self.assertEqual(self.file.path,self.source)
 
+    def test_text_export_preserves_source_permissions_and_makes_the_destination_writable(self):
+        from commonUtils.formats.txtType import TXTFile
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                self.source.chmod(0o400)
+                source_mode = stat.S_IMODE(self.source.stat().st_mode)
+                target = self.root / f'export-{existing}.txt'
+                if existing:
+                    target.write_text('old destination')
+                    target.chmod(0o400)
+                document = TXTFile(self.source)
+                document.line_lst = ['export', 'lines']
+                document.write_lines(target)
+                self.assertEqual(target.read_bytes(), 'export\nlines'.replace('\n', os.linesep).encode())
+                self.assertEqual(self.source.read_text(), 'contents')
+                self.assertEqual(stat.S_IMODE(self.source.stat().st_mode), source_mode)
+                self.assertEqual(document.path, self.source)
+
+    def test_text_export_protects_destination_before_creating_parents(self):
+        from commonUtils.formats.txtType import TXTFile
+        from commonUtils.filesystem.local_access import protect_local_root
+        target = self.root / 'managed/nested/export.txt'
+        protected = self.root / 'managed'
+        protected.mkdir()
+        document = TXTFile(self.source)
+        document.line_lst = ['export']
+        release = protect_local_root(self.id(), protected, 'Use the provider')
+        try:
+            with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                document.write_lines(target)
+            self.assertEqual(list(protected.iterdir()), [])
+            self.assertEqual(self.source.read_text(), 'contents')
+        finally:
+            release()
+
     def test_executable_permissions_use_literal_arguments_instead_of_a_shell(self):
         from commonUtils.integrations.wrappers import cmdShellWrapper
         result = cmdShellWrapper.CommandResult(0)

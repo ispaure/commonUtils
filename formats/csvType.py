@@ -15,6 +15,7 @@ from typing import *
 from pathlib import Path
 import csv
 from ..filesystem.files import File
+from ..filesystem.local_access import check_local_path
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -43,6 +44,7 @@ class CSVFile(File):
         """
         Writes a list of rows to the CSV file using standard CSV formatting.
         """
+        check_local_path(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.make_writable()
 

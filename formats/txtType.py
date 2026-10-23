@@ -17,6 +17,7 @@ from typing import *
 from pathlib import Path
 from ..runtime.platform import *
 from ..filesystem.files import File
+from ..filesystem.local_access import check_local_path
 from ..runtime.diagnostics import *
 
 
@@ -51,13 +52,15 @@ class TXTFile(File):
 
         # Get export path
         export_path = path or self.path
+        check_local_path(export_path)
 
         # Make export dir (if missing)
         export_dir = export_path.parent
         export_dir.mkdir(parents=True, exist_ok=True)
 
         # Ensure file writable if exists
-        self.make_writable()
+        destination = self if export_path == self.path else File(export_path)
+        destination.make_writable()
 
         # Write file
         with open(export_path, "w", encoding="utf-8") as f:

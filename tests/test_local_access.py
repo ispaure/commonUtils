@@ -9,6 +9,7 @@ from commonUtils.runtime.resources.local import LocalFiles
 
 class LocalAccessTests(unittest.TestCase):
     def test_raw_saves_transfers_deletion_and_rename_are_blocked(self):
+        from commonUtils.formats.csvType import CSVFile
         from commonUtils.filesystem.transfers import transfer_paths
         from commonUtils.filesystem.removal import removal_plan, remove_items
         from commonUtils.filesystem.rename import rename_path, plan_named_renames, apply_renames
@@ -28,6 +29,8 @@ class LocalAccessTests(unittest.TestCase):
                 self.assertTrue(remove_items(removal_plan([protected]), permanent=True).failures)
                 with self.assertRaises(PermissionError): check_local_path(root, recursive=True)
                 with self.assertRaises(PermissionError): LocalFiles(protected).mkdir('raw')
+                with self.assertRaises(PermissionError):
+                    CSVFile(protected / 'nested/table.csv').write_csv([['private']])
                 alias = outside / 'alias'
                 alias.symlink_to(protected, target_is_directory=True)
                 with self.assertRaises(PermissionError): atomic_write_bytes(alias / 'new', b'plaintext')
