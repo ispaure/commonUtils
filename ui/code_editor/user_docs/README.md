@@ -63,8 +63,9 @@ the host's normal workflow.
 
 Blue marks modifications, green additions, gray deletions and red unresolved conflicts;
 colors adapt to the palette. Large comparisons are bounded: diff and merge limits are
-1,048,576 Python characters and 5,000 lines per side/input/result. The diff UI calls
-its character limit “1 MiB”; it is not an encoded-byte measurement. These limits do not establish the host's ordinary file-opening limit.
+1,048,576 Python characters and 5,000 lines per side/input/result. The character
+limit is not an encoded-byte measurement. These limits do not establish the host's
+ordinary file-opening limit.
 
 ## Troubleshooting
 
