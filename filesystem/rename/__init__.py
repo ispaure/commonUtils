@@ -124,6 +124,21 @@ class RenameRules:
                 name = complete[:-len(extension)] if extension else complete
             else:
                 name = re.sub(self.regex_pattern, self.regex_replacement, name)
+        name = self._transform_stem(name)
+        name = self._add_context_affixes(name, path, index, metadata, now)
+        if not folder:
+            if self.extension_mode == 'lower':
+                extension = extension.lower()
+            elif self.extension_mode == 'upper':
+                extension = extension.upper()
+            elif self.extension_mode == 'fixed':
+                extension = '.' + self.extension.lstrip('.') if self.extension else ''
+            elif self.extension_mode == 'remove':
+                extension = ''
+        return name + extension
+
+    def _transform_stem(self, name):
+        """Apply textual stem rules in their persisted pipeline order."""
         if self.name_mode != 'keep':
             name = self.fixed_name if self.name_mode == 'fixed' else ''
         if self.replace_from:
@@ -157,6 +172,10 @@ class RenameRules:
             name = name[:self.part_position] + part + name[self.part_position:]
         name = name[:self.insert_position] + self.insert + name[self.insert_position:]
         name = self.prefix + name + self.suffix
+        return name
+
+    def _add_context_affixes(self, name, path, index, metadata, now):
+        """Apply date, parent-folder and sequence facts after textual edits."""
         if self.date_mode != 'none':
             if self.date_source == 'today':
                 date = now or datetime.now()
@@ -176,16 +195,7 @@ class RenameRules:
                 name = name[:self.number_position] + text + name[self.number_position:]
             else:
                 name = _affix(name, text, self.number_mode, self.number_separator)
-        if not folder:
-            if self.extension_mode == 'lower':
-                extension = extension.lower()
-            elif self.extension_mode == 'upper':
-                extension = extension.upper()
-            elif self.extension_mode == 'fixed':
-                extension = '.' + self.extension.lstrip('.') if self.extension else ''
-            elif self.extension_mode == 'remove':
-                extension = ''
-        return name + extension
+        return name
 
 
 def _affix(name, text, mode, separator):

@@ -27,7 +27,7 @@ Public entry points: `RenameMetadata`, `RenameRules`, `RenameEntry`, `RenamePlan
 `commonUtils.filesystem.rename` provides Qt-independent filename transformations,
 rename planning, no-overwrite batch execution, rollback and in-memory undo receipts.
 Applications own selection, previews, presets and windows. Logistics owns its
-bulk rename UI in `ui_new.bulk_rename`.
+bulk rename UI in `desktop.bulk_rename`.
 
 ```python
 from pathlib import Path
@@ -48,6 +48,13 @@ represents a file; supply `RenameMetadata(is_directory=True)` for a directory.
 Modified/created date rules require their respective datetime metadata; Today
 uses `now` or the current time. `RenameMetadata.from_stat(info)` adapts an existing
 stat result. Transform returns a basename; planning validates it before use.
+
+`transform` retains extension-aware regex handling first, then textual stem rules
+in `_transform_stem`, followed by date/parent-folder/number facts in
+`_add_context_affixes`, and finally extension policy. These helpers preserve rule
+order and operate on the supplied path/metadata/time without disk access. The
+public dataclass fields and persisted preset format are unchanged. Planning and
+transactional publication remain separate from transformation.
 
 Plans preserve each item's parent directory, reject collisions and parent/child
 selections, and default to conservative case/Unicode collision checks.

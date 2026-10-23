@@ -341,6 +341,13 @@ since `read()`. Callers should serialize writes to the same file; the conflict
 check is not a cross-process lock. Standard I/O and ConfigParser errors propagate.
 INI parsing is independent of `configuration.legacy` and `TXTFile`.
 
+Internally, `_expected_update` validates requests using the class's parser;
+`_locate_option` returns a named option/insertion-boundary record from the current
+lines, and `_replace_option` preserves delimiters, continuation comments and final
+newlines. `updated_text` retains ordered application of all edits and the final
+independent semantic comparison. These phases do not write files or replace the
+ambiguity guard.
+
 The optional [typed-key schema and visual editor](../configuration/configuration.md)
 are separate layers; INIFile itself never interprets suffixes.
 

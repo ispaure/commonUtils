@@ -7,11 +7,17 @@ follows ConfigParser. The legacy configUtils API is independent and unchanged.
 """
 from configparser import ConfigParser
 from pathlib import Path
+from typing import NamedTuple
 import re
 
 from .txtType import TXTFile
 from ..filesystem.local_access import check_local_path
 from ..persistence import atomic_write_bytes
+
+
+class _IniLocation(NamedTuple):
+    found: tuple[int, re.Match[str]] | None
+    section_end: int
 
 
 class INIFile(TXTFile):
@@ -54,62 +60,14 @@ class INIFile(TXTFile):
         happen before returning any text; unsupported ambiguous formatting fails
         safely instead of silently changing unrelated settings.
         """
-        expected = cls.parse(text)
-        for (section, key), value in changes.items():
-            if not isinstance(value, str):
-                raise TypeError('INI values must be strings')
-            if any(c in key for c in '\r\n=:') or not key.strip() or key.startswith(('#', ';', '[')):
-                raise ValueError('Invalid INI key')
-            if any(c in section for c in '\r\n[]') or not section:
-                raise ValueError('Invalid INI section')
-            if section != 'DEFAULT' and not expected.has_section(section):
-                expected.add_section(section)
-            expected[section][key] = value
+        expected = cls._expected_update(text, changes)
         newline = '\r\n' if '\r\n' in text else '\n'
         lines = text.splitlines(keepends=True)
         for (section, key), value in changes.items():
-            current = 'DEFAULT'
-            found = None
-            section_end = len(lines)
-            in_section = section == 'DEFAULT'
-            for index, line in enumerate(lines):
-                stripped = line.strip()
-                if not stripped or stripped.startswith(('#', ';')):
-                    continue
-                header = re.match(r'^\s*\[([^]]+)\]', line)
-                if header:
-                    if in_section:
-                        section_end = index
-                        in_section = False
-                    current = header[1]
-                    if current == section:
-                        in_section = True
-                        section_end = len(lines)
-                    continue
-                option = re.match(r'^([ \t]*)([^=:\r\n]+?)([ \t]*[=:][ \t]*)(.*?)(?:\r?\n)?$', line)
-                if current == section and option and option[2].strip() == key:
-                    found = (index, option)
-                    break
+            found, section_end = cls._locate_option(lines, section, key)
             parts = value.split('\n')
             if found:
-                index, option = found
-                indent = len(option[1])
-                end = index + 1
-                comments = []
-                while end < len(lines):
-                    candidate = lines[end]
-                    if not candidate.strip() or candidate.lstrip().startswith(('#', ';')):
-                        comments.append(candidate)
-                    elif len(candidate) - len(candidate.lstrip()) > indent:
-                        pass  # Old multiline continuation.
-                    else:
-                        break
-                    end += 1
-                ending = newline if lines[index].endswith('\n') or end < len(lines) else ''
-                replacement = [option[1] + option[2] + option[3] + parts[0] + (newline if len(parts) > 1 else ending)]
-                replacement += ['    ' + part + (newline if n < len(parts) - 1 else ending)
-                                for n, part in enumerate(parts[1:], 1)]
-                lines[index:end] = replacement + comments
+                cls._replace_option(lines, found, parts, newline)
             else:
                 if lines and not lines[-1].endswith('\n'):
                     lines[-1] += newline
@@ -127,6 +85,71 @@ class INIFile(TXTFile):
                 dict(actual[section]) != dict(expected[section]) for section in expected.sections()):
             raise ValueError('Cannot safely preserve this INI layout; use the source editor')
         return updated
+
+    @classmethod
+    def _expected_update(cls, text, changes):
+        """Validate requested keys/values and retain the independent semantic oracle."""
+        expected = cls.parse(text)
+        for (section, key), value in changes.items():
+            if not isinstance(value, str):
+                raise TypeError('INI values must be strings')
+            if any(c in key for c in '\r\n=:') or not key.strip() or key.startswith(('#', ';', '[')):
+                raise ValueError('Invalid INI key')
+            if any(c in section for c in '\r\n[]') or not section:
+                raise ValueError('Invalid INI section')
+            if section != 'DEFAULT' and not expected.has_section(section):
+                expected.add_section(section)
+            expected[section][key] = value
+        return expected
+
+    @staticmethod
+    def _locate_option(lines, section, key):
+        """Find the explicit option and insertion boundary in the current text."""
+        current = 'DEFAULT'
+        found = None
+        section_end = len(lines)
+        in_section = section == 'DEFAULT'
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith(('#', ';')):
+                continue
+            header = re.match(r'^\s*\[([^]]+)\]', line)
+            if header:
+                if in_section:
+                    section_end = index
+                    in_section = False
+                current = header[1]
+                if current == section:
+                    in_section = True
+                    section_end = len(lines)
+                continue
+            option = re.match(r'^([ \t]*)([^=:\r\n]+?)([ \t]*[=:][ \t]*)(.*?)(?:\r?\n)?$', line)
+            if current == section and option and option[2].strip() == key:
+                found = (index, option)
+                break
+        return _IniLocation(found, section_end)
+
+    @staticmethod
+    def _replace_option(lines, found, parts, newline):
+        """Replace continuations while preserving comments, delimiters and final newlines."""
+        index, option = found
+        indent = len(option[1])
+        end = index + 1
+        comments = []
+        while end < len(lines):
+            candidate = lines[end]
+            if not candidate.strip() or candidate.lstrip().startswith(('#', ';')):
+                comments.append(candidate)
+            elif len(candidate) - len(candidate.lstrip()) > indent:
+                pass  # Old multiline continuation.
+            else:
+                break
+            end += 1
+        ending = newline if lines[index].endswith('\n') or end < len(lines) else ''
+        replacement = [option[1] + option[2] + option[3] + parts[0] + (newline if len(parts) > 1 else ending)]
+        replacement += ['    ' + part + (newline if n < len(parts) - 1 else ending)
+                        for n, part in enumerate(parts[1:], 1)]
+        lines[index:end] = replacement + comments
 
     def set(self, section, key, value):
         self.text = self.updated_text(self.text, {(section, key): value})
