@@ -17,6 +17,10 @@ class WorkspaceHeaderPresentation:
         self.pending = False
         if workspace._closing:
             return
+        self._refresh_dock_headers(workspace)
+        self._refresh_tab_bars(workspace)
+
+    def _refresh_dock_headers(self, workspace):
         for dock in workspace.docks:
             grouped = not dock.isFloating() and bool(workspace.tabifiedDockWidgets(dock))
             visible = workspace.policy is None or header_visible(workspace.policy, len(workspace.docks), workspace.is_detached)
@@ -32,6 +36,8 @@ class WorkspaceHeaderPresentation:
             dock.tab_header.title.setVisible(height > 0)
             dock.tab_header.close_button.setVisible(height > 0 and workspace.can_close_tab(dock))
             dock.tab_header.close_button.setEnabled(workspace.can_close_tab(dock))
+
+    def _refresh_tab_bars(self, workspace):
         for bar in workspace.findChildren(qt.QTabBar):
             # Limit styling to Qt's dock bars, leaving views' own tab widgets alone.
             if bar.parent() is not workspace:

@@ -32,3 +32,11 @@ modules have been removed; update imports and mock patch targets to this package
 revalidates eligibility before committing adoption. Both drag transports use this
 same boundary; `headers.DockTabHeader` owns single-tab header controls and painting.
 See [drop and retirement contracts](../workspaces.md#drop-resolution-and-pane-retirement).
+
+Cross-workspace adoption captures source order/selection, both saved layouts and
+floating geometry in an immutable `_DockTransferSnapshot` before changing Qt
+ownership. The existing workspace names acceptance and rollback phases; `adopt`
+retains guards, transfer flags, final signal publication and source cleanup.
+Failed arrangement or destination registration restores the source without an
+owner-change signal. Header refresh separately reconciles dock title controls
+and native tab bars after checking the workspace's lifetime.

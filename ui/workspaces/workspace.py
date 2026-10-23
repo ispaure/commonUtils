@@ -1,5 +1,6 @@
 """Reusable Qt dock-backed document tabs with cooperative view shutdown."""
 from .. import pyside as qt
+from dataclasses import dataclass
 from weakref import WeakSet
 from shiboken6 import isValid
 from .workspace_policy import WorkspacePolicy, header_visible
@@ -101,6 +102,16 @@ class WorkspaceDock(qt.QDockWidget):
             return
         self.workspace.remove_view(self)
         event.accept()
+
+
+@dataclass(frozen=True)
+class _DockTransferSnapshot:
+    source_index: int
+    source_active: WorkspaceDock | None
+    source_state: qt.QByteArray
+    destination_state: qt.QByteArray
+    floating: bool
+    geometry: qt.QRect
 
 
 class Workspace(WorkspaceDragMixin, qt.QMainWindow):
@@ -476,52 +487,22 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
                 return False
             self._update_drop_target()
             return True
-        index, active = source.docks.index(dock), source.active_dock
-        state = source.saveState()
-        destination_state = self.saveState()
-        floating, geometry = dock.isFloating(), dock.geometry()
+        snapshot = _DockTransferSnapshot(source.docks.index(dock), source.active_dock,
+                                         source.saveState(), self.saveState(),
+                                         dock.isFloating(), dock.geometry())
         previous = self._docked_anchor()
         source._transferring = self._transferring = True
         try:
-            # Suppress Qt's transient visibility changes while ownership changes.
-            with qt.QSignalBlocker(dock):
-                source.removeDockWidget(dock)
-                source.docks.remove(dock)
-                dock.removeEventFilter(source)
-                dock.setParent(self)
-                dock.workspace = self
-                dock.installEventFilter(self)
-                self.docks.append(dock)
-                self._hide_drop_target()
-                self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
-                qt.QDockWidget.setFloating(dock, False)
-                self.arrange(dock, placement, anchor=anchor or previous)
-                if dock.parentWidget() is not self or dock not in self.docks:
-                    raise RuntimeError('Destination did not retain the tab')
+            self._accept_dock_transfer(source, dock, placement, anchor, previous)
         except Exception:
-            if dock in self.docks:
-                self.docks.remove(dock)
-            self.removeDockWidget(dock)
-            self.restoreState(destination_state)
-            dock.removeEventFilter(self)
-            dock.setParent(source)
-            dock.workspace = source
-            dock.installEventFilter(source)
-            if dock not in source.docks:
-                source.docks.insert(index, dock)
-            source.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
-            source.restoreState(state)
-            qt.QDockWidget.setFloating(dock, floating)
-            dock.setGeometry(geometry)
-            source.active_dock = active
-            dock.show()
+            self._rollback_dock_transfer(source, dock, snapshot)
             return False
         finally:
             source._transferring = self._transferring = False
             source._update_drop_target()
             self._update_drop_target()
         if source.active_dock is dock:
-            source.active_dock = source.docks[min(index, len(source.docks)-1)] if source.docks else None
+            source.active_dock = source.docks[min(snapshot.source_index, len(source.docks)-1)] if source.docks else None
             if source.active_dock:
                 source.active_dock.raise_()
             source.active_changed.emit(source.active_view)
@@ -533,6 +514,41 @@ class Workspace(WorkspaceDragMixin, qt.QMainWindow):
         self.tabs_changed.emit()
         source._cleanup_empty_container()
         return True
+
+    def _accept_dock_transfer(self, source, dock, placement, anchor, previous):
+        # Suppress Qt's transient visibility changes while ownership changes.
+        with qt.QSignalBlocker(dock):
+            source.removeDockWidget(dock)
+            source.docks.remove(dock)
+            dock.removeEventFilter(source)
+            dock.setParent(self)
+            dock.workspace = self
+            dock.installEventFilter(self)
+            self.docks.append(dock)
+            self._hide_drop_target()
+            self.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+            qt.QDockWidget.setFloating(dock, False)
+            self.arrange(dock, placement, anchor=anchor or previous)
+            if dock.parentWidget() is not self or dock not in self.docks:
+                raise RuntimeError('Destination did not retain the tab')
+
+    def _rollback_dock_transfer(self, source, dock, snapshot):
+        if dock in self.docks:
+            self.docks.remove(dock)
+        self.removeDockWidget(dock)
+        self.restoreState(snapshot.destination_state)
+        dock.removeEventFilter(self)
+        dock.setParent(source)
+        dock.workspace = source
+        dock.installEventFilter(source)
+        if dock not in source.docks:
+            source.docks.insert(snapshot.source_index, dock)
+        source.addDockWidget(qt.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+        source.restoreState(snapshot.source_state)
+        qt.QDockWidget.setFloating(dock, snapshot.floating)
+        dock.setGeometry(snapshot.geometry)
+        source.active_dock = snapshot.source_active
+        dock.show()
 
     def return_to_main(self, dock):
         main = self.main_workspace

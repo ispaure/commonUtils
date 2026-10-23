@@ -307,6 +307,44 @@ class ContainerTests(QtTestCase):
             self.assertEqual(main.detached_windows, [])
             self.assertTrue(isValid(view))
 
+    def test_failed_transfer_after_arrangement_preserves_order_selection_and_owner_signals(self):
+        for failure in ('arrange', 'registration'):
+            with self.subTest(failure=failure):
+                source = self.create()
+                for name in ('first', 'moving', 'last'):
+                    source.add_view(name)
+                dock = source.docks[1]
+                target = self.create()
+                target.add_view('target first')
+                target.add_view('target last')
+                self.settle()
+                source._activate(dock)
+                source_order, target_order = list(source.docks), list(target.docks)
+                source_active, target_active = source.active_dock, target.active_dock
+                owners = []
+                dock.owner_changed.connect(owners.append)
+                arrange = target.arrange
+
+                def reject(*args, **kwargs):
+                    arrange(*args, **kwargs)
+                    if failure == 'registration':
+                        target.docks.remove(dock)
+                    else:
+                        raise RuntimeError('Rejected after arrangement')
+
+                with patch.object(target, 'arrange', side_effect=reject):
+                    self.assertFalse(target.adopt(dock))
+                self.settle()
+                self.assertEqual(source.docks, source_order)
+                self.assertEqual(target.docks, target_order)
+                self.assertIs(source.active_dock, source_active)
+                self.assertIs(target.active_dock, target_active)
+                self.assert_owner(dock, source)
+                self.assertTrue(isValid(dock.widget()))
+                self.assertEqual(owners, [])
+                self.assertFalse(source._transferring)
+                self.assertFalse(target._transferring)
+
     def test_direct_mainwindow_views_keep_menus_in_detached_container(self):
         for platform in ('darwin', 'win32', 'linux'):
             with self.subTest(platform=platform), patch('commonUtils.ui.workspaces.workspace_menus.sys.platform', platform):
