@@ -279,6 +279,12 @@ adapts the existing directory contract without inspecting virtual paths on disk;
 `ResourceBrowser` owns its cancellable listing queue and provider mutations.
 The picker uses these same views and keeps storage selection at the top.
 
+Its constructor composes navigation, search, provider views, optional preview and
+operation controls through private builders in `ui/resources/browser.py`. Provider
+binding, keyboard/navigation wiring and cooperative owner registration remain in
+the constructor before the first listing starts. Builders populate the existing
+widget fields; they create no separate lifecycle controller or cached provider state.
+
 `ResourceBrowser(..., details=loader, preview=True)` uses the established preview
 widgets and `DetailsPanel`. Generic file fields appear immediately; the optional
 worker callback `loader(row, cancelled)` returns `(tab_title, BrowserDetails)`

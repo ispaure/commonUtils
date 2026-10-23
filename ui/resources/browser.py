@@ -58,6 +58,27 @@ class ResourceBrowser(qt.QWidget):
             QWidget#resourceBrowser QTreeView::item:selected { padding: 2px 4px; }
             QWidget#resourceBrowser QHeaderView::section { padding: 2px 4px; }
         """)
+        row = self._build_navigation_controls(layout, provider)
+        self._build_search_controls(row)
+        self._build_provider_views(layout, provider)
+        self._build_preview(row, details, preview)
+        self._build_operation_controls(layout)
+        self.back.clicked.connect(lambda: self._history(-1))
+        self.forward.clicked.connect(lambda: self._history(1))
+        self.up.clicked.connect(lambda: self.navigate(self.navigation.directory.parent))
+        self.refresh_button.clicked.connect(self.refresh)
+        from ..file_browser.keyboard import BrowserKeyboard
+        self.keyboard = BrowserKeyboard(self, execute=self._view_command)
+        self.operations.own(self.operation)
+        self.operations.own(self.search_operation)
+        self.operations.own(self.views, busy=lambda: self.views.cover_busy, cancel=self.views.stop)
+        if self.preview:
+            self.operations.own(self.preview, cancel=self.preview.stop)
+        self.operations.own(self._queued_listings, busy=lambda: bool(self._queued_listings) or self.search_pending,
+                            cancel=lambda: None)
+        self.navigate(directory or provider.root)
+
+    def _build_navigation_controls(self, layout, provider):
         self.workspace_controls = row = qt.QHBoxLayout()
         row.setSpacing(5)
         self.back = navigation_button(self, 'Back', qt.QStyle.StandardPixmap.SP_ArrowBack)
@@ -81,6 +102,9 @@ class ResourceBrowser(qt.QWidget):
         row.addWidget(self.folder_size_button)
         row.addWidget(self.view_selector)
         layout.addLayout(row)
+        return row
+
+    def _build_search_controls(self, row):
         self.filter = qt.QLineEdit()
         self.filter.setPlaceholderText('Search this folder and its subfolders')
         self.filter.setClearButtonEnabled(False)
@@ -97,6 +121,8 @@ class ResourceBrowser(qt.QWidget):
         self.clear_search.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.clear_search.setEnabled(False)
         self.clear_search.activated.connect(self.close_search)
+
+    def _build_provider_views(self, layout, provider):
         self.model = ProviderEntryModel(provider, self, thumbnail=self._thumbnail)
         self.sort_model = ByteSortModel(self.model, self)
         self.tree = ProviderTree()
@@ -128,6 +154,8 @@ class ResourceBrowser(qt.QWidget):
         files_layout.addWidget(self.views, 1)
         self.splitter.addWidget(self.files_panel)
         layout.addWidget(self.splitter, 1)
+
+    def _build_preview(self, row, details, preview):
         self.preview = None
         if preview:
             from ..file_browser.controls import ViewIcon
@@ -141,6 +169,8 @@ class ResourceBrowser(qt.QWidget):
             row.addWidget(self.preview_toggle)
             from ..file_browser.resource_preview import ResourcePreview
             self.preview = ResourcePreview(self, details)
+
+    def _build_operation_controls(self, layout):
         self.notice = qt.QLabel('Session-only browsing · Thumbnails stay in memory')
         self.notice.setToolTip('Folder contents stay in memory. Persistent indexing and disk caches are disabled.')
         self.notice.setWordWrap(True)
@@ -157,20 +187,6 @@ class ResourceBrowser(qt.QWidget):
         self.search_timer.timeout.connect(self._start_search)
         self.search_pending = False
         self._normal_tree = None
-        self.back.clicked.connect(lambda: self._history(-1))
-        self.forward.clicked.connect(lambda: self._history(1))
-        self.up.clicked.connect(lambda: self.navigate(self.navigation.directory.parent))
-        self.refresh_button.clicked.connect(self.refresh)
-        from ..file_browser.keyboard import BrowserKeyboard
-        self.keyboard = BrowserKeyboard(self, execute=self._view_command)
-        self.operations.own(self.operation)
-        self.operations.own(self.search_operation)
-        self.operations.own(self.views, busy=lambda: self.views.cover_busy, cancel=self.views.stop)
-        if self.preview:
-            self.operations.own(self.preview, cancel=self.preview.stop)
-        self.operations.own(self._queued_listings, busy=lambda: bool(self._queued_listings) or self.search_pending,
-                            cancel=lambda: None)
-        self.navigate(directory or provider.root)
 
     def _controls(self, enabled=True):
         self.views.setEnabled(enabled)
