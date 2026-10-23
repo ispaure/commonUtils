@@ -244,7 +244,7 @@ def apply_archive(plan, workspace):
     backup = workspace / 'rollback'
     backup.mkdir()
     existed = {}
-    changed = []
+    changed = {}
     try:
         # The manifest advertises the revision only after every managed file.
         for name in [*sorted(names - {MARKER}), MARKER]:
@@ -266,23 +266,25 @@ def apply_archive(plan, workspace):
                 elif name == MARKER:
                     temporary.write_text(json.dumps({'format': 1, 'revision': plan['revision'], 'files': plan['files']}, indent=2), encoding='utf-8')
                     shutil.copymode(target, temporary)
+                published = digest(temporary) if name == MARKER else plan['files'].get(name)
                 target = _archive_target(root, name, expected)
                 (workspace / 'rollback.json').write_text(json.dumps({'root': str(root), 'files': existed}), encoding='utf-8')
-                changed.append(name)
                 if temporary is not None:
                     temporary.replace(target)
                 else:
                     target.unlink()
+                changed[name] = published
     except BaseException:
         try:
             for name in reversed(changed):
-                target = contained(root, name)
+                target = _archive_target(root, name, changed[name])
                 if existed[name]:
                     expected = plan['marker_hash'] if name == MARKER else plan['previous']['files'][name]
                     with _staged_update(target) as temporary:
                         shutil.copy2(backup / relative(name), temporary)
                         if digest(temporary) != expected:
                             raise ValueError(f'Restored file failed verification: {name}')
+                        target = _archive_target(root, name, changed[name])
                         temporary.replace(target)
                 elif target.exists():
                     target.unlink()

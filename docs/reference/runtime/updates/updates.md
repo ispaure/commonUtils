@@ -50,6 +50,12 @@ retains its existing permission mode and publishes after all managed files.
 This ordering avoids advertising a completed revision during normal copying;
 it does not make the multi-file update crash-atomic.
 
+Rollback tracks only completed mutations. Before restoring/deleting each path it
+checks the content this transaction published (or the absence it created), then
+checks again after copying recovery output. An observed external change aborts
+rollback with its recovery files retained, so the detached runner does not
+automatically restart a partially restored installation.
+
 Copy `transaction.py` to a private staging directory outside the installation.
 After the host has accepted close and stopped its workers, start it with a JSON
 request containing `pid`, `plan`, `restart` (argv list) and `status` (receipt path).

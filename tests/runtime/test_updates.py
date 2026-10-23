@@ -316,6 +316,45 @@ class UpdateTests(unittest.TestCase):
                 self.assertEqual((installed / 'obsolete.py').read_text(), 'obsolete')
                 self.assertFalse(list(installed.glob('.*.update-*')))
 
+    def test_archive_rollback_preserves_external_changes_to_already_published_paths(self):
+        base = self.root
+        for name in ('app.py', 'nested/new.py', 'obsolete.py'):
+            with self.subTest(name=name):
+                self.root = base / name.replace('/', '-')
+                self.root.mkdir()
+                installed, snapshot, workspace = self.archive()
+                plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+                original = shutil.copy2
+                target = installed / name
+
+                def edit(source, destination, *args, **kwargs):
+                    if Path(destination) == workspace / 'rollback' / updates.MARKER:
+                        target.write_text('external change after publication')
+                        raise OSError('later update failure')
+                    return original(source, destination, *args, **kwargs)
+
+                with patch.object(updates.shutil, 'copy2', side_effect=edit):
+                    with self.assertRaises(updates.RollbackError):
+                        updates.apply_archive(plan, workspace)
+                self.assertEqual(target.read_text(), 'external change after publication')
+                self.assertEqual((workspace / 'rollback/app.py').read_text(), 'old')
+
+    def test_archive_failed_atomic_replace_does_not_restore_an_untouched_path(self):
+        installed, snapshot, workspace = self.archive()
+        plan = updates.prepare_archive(installed, snapshot, 'new', self.protected)
+        original = Path.replace
+
+        def fail(path, target):
+            if Path(target) == installed.resolve() / 'app.py':
+                Path(target).write_text('external edit before failed replace')
+                raise OSError('replace denied')
+            return original(path, target)
+
+        with patch.object(Path, 'replace', new=fail):
+            with self.assertRaisesRegex(OSError, 'replace denied'):
+                updates.apply_archive(plan, workspace)
+        self.assertEqual((installed / 'app.py').read_text(), 'external edit before failed replace')
+
     def test_helper_does_not_restart_after_incomplete_rollback(self):
         workspace = self.root / 'failed-runner'; workspace.mkdir()
         status = workspace / 'status.json'
