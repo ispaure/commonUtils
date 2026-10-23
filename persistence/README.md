@@ -55,9 +55,15 @@ if previous is not None:
     print('Recovery copy:', previous)
 ```
 
-If promotion fails, the helper restores the old path before raising. It refuses
-symbolic links and junctions. Callers supply installation validation and decide
-when recovery copies can be removed.
+Every move uses atomic no-replace publication, including backup and restoration.
+If promotion fails, the helper restores the old path before raising. If another
+writer occupies that path or restoration fails, it retains the recovery copy and
+reports its location in the error; it never overwrites the conflicting file.
+The staged installation is retained on failed publication. Symbolic links,
+junctions and overlapping resolved paths are refused. Unsupported no-replace
+platforms fail closed. Callers supply installation validation and decide when
+recovery copies can be removed. This is not a cross-process lock or a multi-path
+crash-recovery journal.
 
 ## Verified publication and text sessions
 

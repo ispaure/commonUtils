@@ -10,11 +10,14 @@ def promote_path(staged, destination):
     """Publish a staged file/tree, keeping the old path as a recovery copy.
 
     Stage on the destination filesystem. If promotion fails, restore the old
-    path before raising. Return its recovery path, or None for a new install.
+    path before raising unless another writer occupies it. In that case retain
+    the recovery copy and report its path. Return the recovery path on success,
+    or None for a new install. Every move rejects an occupied target.
     Callers validate the staged contents before invoking this function.
     """
     staged, destination = Path(staged), Path(destination)
-    source, target = staged.absolute(), destination.absolute()
+    from .publication import rename_exclusive
+    source, target = staged.resolve(), destination.resolve()
     if source == target or source in target.parents or target in source.parents:
         raise ValueError('Staged and destination paths cannot overlap')
     if staged.is_symlink() or destination.is_symlink():
@@ -27,12 +30,16 @@ def promote_path(staged, destination):
     backup = None
     if destination.exists():
         backup = destination.with_name(f'{destination.name}.previous-{uuid4().hex}')
-        destination.rename(backup)
+        rename_exclusive(destination, backup)
     try:
-        staged.rename(destination)
+        rename_exclusive(staged, destination)
     except BaseException:
         if backup is not None:
-            backup.rename(destination)
+            try:
+                rename_exclusive(backup, destination)
+            except OSError as error:
+                raise OSError(f'Installation promotion failed and the original could not be restored. '
+                              f'Recovery copy retained at {backup}') from error
         raise
     return backup
 

@@ -1,10 +1,12 @@
 """Publication races and staging cleanup, independent of text format policy."""
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from commonUtils.persistence import atomic_write_bytes
 from commonUtils.persistence import promote_path
 from unittest.mock import patch
+from commonUtils.persistence import publication
 
 
 class PersistenceTests(unittest.TestCase):
@@ -24,16 +26,91 @@ class PersistenceTests(unittest.TestCase):
             root = Path(directory)
             old, staged = root / 'app', root / 'staged'
             old.write_bytes(b'original'); staged.write_bytes(b'new')
-            rename = Path.rename
-            def fail_new(path, target):
-                if path == staged:
-                    raise OSError('promotion failed')
-                return rename(path, target)
-            with patch.object(Path, 'rename', fail_new):
+            with self.intercept_moves(lambda source, target: self.fail_stage(source, staged)):
                 with self.assertRaisesRegex(OSError, 'promotion failed'):
                     promote_path(staged, old)
             self.assertEqual(old.read_bytes(), b'original')
             self.assertEqual(staged.read_bytes(), b'new')
+
+    @contextmanager
+    def intercept_moves(self, before):
+        # Exercise the same race against both legacy rename and no-replace moves.
+        rename, exclusive = Path.rename, publication.rename_exclusive
+        def ordinary(source, target):
+            before(Path(source), Path(target))
+            return rename(source, target)
+        def no_replace(source, target):
+            before(Path(source), Path(target))
+            return exclusive(source, target)
+        with ExitStack() as patches:
+            patches.enter_context(patch.object(Path, 'rename', ordinary))
+            patches.enter_context(patch.object(publication, 'rename_exclusive', no_replace))
+            yield
+
+    @staticmethod
+    def fail_stage(source, staged):
+        if source == staged:
+            raise OSError('promotion failed')
+
+    def test_new_destination_appearing_at_publication_is_preserved(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            staged, target = root / 'stage', root / 'app'
+            staged.write_bytes(b'new')
+            def race(source, destination):
+                if source == staged:
+                    target.write_bytes(b'external')
+            with self.intercept_moves(race), self.assertRaises(FileExistsError):
+                promote_path(staged, target)
+            self.assertEqual(target.read_bytes(), b'external')
+            self.assertEqual(staged.read_bytes(), b'new')
+
+    def test_conflicting_rollback_retains_original_stage_and_external_file(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            staged, target = root / 'stage', root / 'app'
+            staged.write_bytes(b'new')
+            target.write_bytes(b'original')
+            def race(source, destination):
+                if source == staged:
+                    target.write_bytes(b'external')
+                    raise OSError('promotion failed')
+            with self.intercept_moves(race), self.assertRaises(OSError) as caught:
+                promote_path(staged, target)
+            self.assertEqual(target.read_bytes(), b'external')
+            self.assertEqual(staged.read_bytes(), b'new')
+            backups = list(root.glob('app.previous-*'))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), b'original')
+            self.assertIn(str(backups[0]), str(caught.exception))
+
+    def test_backup_collision_does_not_replace_existing_recovery(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            staged, target = root / 'stage', root / 'app'
+            staged.write_bytes(b'new')
+            target.write_bytes(b'original')
+            recovery = []
+            def race(source, destination):
+                if source == target:
+                    destination.write_bytes(b'existing recovery')
+                    recovery.append(destination)
+            with self.intercept_moves(race), self.assertRaises(FileExistsError):
+                promote_path(staged, target)
+            self.assertEqual(target.read_bytes(), b'original')
+            self.assertEqual(staged.read_bytes(), b'new')
+            self.assertEqual(recovery[0].read_bytes(), b'existing recovery')
+
+    def test_parent_alias_cannot_move_an_installation_inside_itself(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            staged = root / 'stage'
+            staged.mkdir()
+            (staged / 'original').write_bytes(b'keep')
+            target = staged / '..' / 'stage' / 'child'
+            with self.assertRaises(ValueError):
+                promote_path(staged, target)
+            self.assertEqual((staged / 'original').read_bytes(), b'keep')
 
     def test_second_validation_preserves_external_write_and_removes_staging(self):
         with TemporaryDirectory() as directory:
