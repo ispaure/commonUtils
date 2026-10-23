@@ -2,7 +2,7 @@
 import unittest
 from importlib.util import find_spec
 if find_spec("toga"):
-    from ..ui.native.password_input import PasswordInput
+    from commonUtils.ui.native.password_input import PasswordInput
 
 
 @unittest.skipUnless(find_spec("toga"), "Optional Toga backend is not installed")

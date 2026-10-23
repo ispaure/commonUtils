@@ -150,6 +150,11 @@ assert not any(name.startswith('logisticsmobile') for name in sys.modules)
         root = Path(__file__).resolve().parents[2]
         env = dict(os.environ, PYTHONPATH=str(root))
         if dummy:
+            import toga
+            # Keep the optional backend visible when supplied through a separate
+            # existing environment; still import shared source from this checkout.
+            dependencies = str(Path(toga.__file__).resolve().parent.parent)
+            env['PYTHONPATH'] = os.pathsep.join((str(root), dependencies))
             env['TOGA_BACKEND'] = 'toga_dummy'
         result = subprocess.run([sys.executable, '-c', script], env=env,
                                 capture_output=True, text=True, timeout=30)

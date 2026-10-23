@@ -92,3 +92,10 @@ records policy, integration prerequisites and remaining deployment blockers.
 Unlike the mocked compatibility tests above it does not replace OS identifiers.
 Use `--target host` only to check the harness locally. The manual Android/iOS
 workflow and first-run instructions are in the [mobile test guide](../docs/developer/mobile-testing.md).
+
+Default-storage fixtures clear host storage overrides while checking OS defaults;
+all paths remain inside their temporary homes. Speech tests inspect the owned
+session or published highlights instead of retired facade fields. Optional Toga
+consumer subprocesses retain the discovered dependency directory when the backend
+comes from another existing environment, while continuing to import shared source
+from this checkout and rejecting consumer/application imports.

@@ -81,7 +81,10 @@ finally:
     app.loop.close()
 assert not browser.tasks and not browser.work.decoded and not browser.native_list.data
 '''
-        env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2]), TOGA_BACKEND='toga_dummy')
+        import toga
+        root = str(Path(__file__).resolve().parents[2])
+        dependencies = str(Path(toga.__file__).resolve().parent.parent)
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join((root, dependencies)), TOGA_BACKEND='toga_dummy')
         result = subprocess.run([sys.executable, '-c', script], env=env,
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

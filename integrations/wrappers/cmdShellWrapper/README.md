@@ -157,6 +157,8 @@ Supply `environment`, `cwd`, `input_data`, `timeout`, `cancelled` and a raw-byte
 process tree. On platforms without `os.pread`, progress is left to the caller using
 the final stderr tail. `discard_output=True` routes both streams to DEVNULL.
 Callers own input-size limits, environment filtering, tool options and diagnostics.
+Process creation raises `CommandStartError`, elapsed deadlines raise
+`CommandTimeout`, and cooperative cancellation raises `OperationCancelled`.
 
 `runtime.diagnostics.redaction.redact(text)` filters URL userinfo/query strings and
 common authorization/password/token assignments in complete diagnostic text. It is
