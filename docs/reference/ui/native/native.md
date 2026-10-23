@@ -53,6 +53,28 @@ callbacks. `activate(identity)` selects a destination without rebuilding views.
 `Routes(host, guard, changed, intent=None)` retains a separate stack per destination.
 The guard controls navigation, and the consumer decides document-close behavior.
 Install/uninstall routes with their host to register/remove native Back delegates.
+
+### Lifetime ownership before backend changes
+
+| Owner | Installation and retention | Retirement |
+| --- | --- | --- |
+| `NativeNavigationHost` | One installed window and adapter; adapter retains original containment/layout/listener bindings | `uninstall` restores chrome before disposing the adapter, then clears adapter/window. The host permits reinstall while retaining selected destination; a second simultaneous install is refused. `dispose` also clears the host selection callback. |
+| `ImageCanvas` | Backend retains gestures/listeners; Apple native delegate ownership is weak | `dispose` clears pixels and page/toggle/magnifier callbacks, disables magnification, then detaches the native delegate/listener. Retire permanently before releasing a page. |
+| `NativeSpeech` | Backend owns engine/delegate or Java progress listener; notifications marshal onto the supplied loop | `close` marks the engine closed before stopping it, detaches native callbacks and clears voices. Deliveries check closed state both before scheduling and when the loop executes them. `stop` alone permits reuse; `close` does not. |
+
+The host pairs adapter installation with uninstallation; direct backend `dispose`
+methods are not an independent public idempotence contract. A draft owner that
+allocates controls before admission must retire rejected controls itself.
+`test_native_owner_lifetimes` covers host reinstall/restoration, fake native canvas
+detachment and queued speech suppression. Keyboard/gesture fixtures cover existing
+chrome restoration separately. These are dummy/fake contracts, not native proof.
+
+Before moving embedded Apple/Android factories or upgrading their backend
+assumptions, validate rotation and independent windows, IME/chrome restoration,
+pinch/pan/edge paging and magnifier gestures, voice interruption and repeated
+install/dispose with late notifications on supported native hosts. Preserve paired
+allocation/restoration and callback ownership throughout such a change.
+
 On iOS, a software keyboard in the owning key window temporarily hides destination
 tabs and restores their previous visibility on dismissal or host uninstallation.
 UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on
