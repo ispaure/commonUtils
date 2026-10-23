@@ -1,6 +1,7 @@
 """Root-bounded folder breadcrumbs and back/forward history."""
 
 from pathlib import Path
+from shiboken6 import isValid
 from .. import pyside as qt
 from .controls import navigation_button
 
@@ -94,7 +95,7 @@ class BreadcrumbBar(qt.QWidget):
             self.setToolTip('')
         self.crumbs.addStretch()
         self.scroll.setFixedHeight(max(30, self.root_button.sizeHint().height() + 4))
-        qt.QTimer.singleShot(0, self._show_current)
+        qt.QTimer.singleShot(0, self, self._show_current)
 
     def enable_drive_menu(self, open_location):
         """Put local/mapped drives and network navigation on the root breadcrumb."""
@@ -123,7 +124,7 @@ class BreadcrumbBar(qt.QWidget):
         button.setIconSize(qt.QSize(18, 18))
 
     def _show_current(self):
-        if len(self.buttons) > 1:
+        if len(self.buttons) > 1 and isValid(self.scroll):
             self.scroll.horizontalScrollBar().setValue(self.scroll.horizontalScrollBar().maximum())
 
     def resizeEvent(self, event):

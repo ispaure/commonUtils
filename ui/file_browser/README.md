@@ -5,6 +5,10 @@ previews, indexed search and size maps. Applications supply domain actions and
 host navigation. Start with the [runnable browser example](../features/README.md#runnable-example-add-a-menu-action-to-a-browser).
 For workflows and settings, see the [user guide](user_docs/README.md).
 
+Deferred breadcrumb reveals are bound to the bar's Qt lifetime and ignore an
+already-retired native scroll area. Range/layout callbacks during teardown must
+not access deleted child widgets.
+
 ## Construction and navigation
 
 The column view installs its preview before its model. On Qt 6.11+ it applies

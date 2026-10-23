@@ -60,6 +60,20 @@ class BrowserPolishTests(QtTestCase):
         bar.grab()  # Exercise palette-aware backdrop and chevron paint paths.
         bar.close()
 
+    def test_queued_breadcrumb_refresh_ignores_retired_native_scroll_area(self):
+        import sys
+        bar = BreadcrumbBar()
+        bar.set_paths([Path('/'), Path('/tmp')])
+        errors = []
+        with patch.object(sys, 'excepthook', lambda kind, error, tb: errors.append(str(error))):
+            bar.scroll.deleteLater()
+            self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+            bar.deleteLater()
+            self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+        self.assertEqual(errors, [])
+
     def chart(self):
         chart = RadialMap()
         self.addCleanup(chart.deleteLater)
