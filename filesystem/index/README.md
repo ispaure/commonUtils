@@ -80,6 +80,31 @@ excluded mount covers nested mounts, avoiding redundant parent-path checks per e
 
 ## Storage and concurrency
 
+### State ownership
+
+`DirectoryCache` owns the database location, writer/session locks, invalidations,
+visible-folder priorities and open reader snapshots. It composes a fresh
+`DirectoryScan` controller for each `get()` call; it no longer inherits scan
+orchestration. The controller names the ancestor-reuse, branch-seeding,
+completed-generation reuse, work-generation preparation, discovery and final
+publication phases.
+
+Each writer operation gets a new [ScanState](operation.py), shared by its scan,
+validation and aggregation helpers. This declares exclusions, blocked folders,
+dirty totals, progress counters and checkpoint/aggregation timings in one place.
+Scans, reconciliation and exclusion repair initialize it through the same writer
+scope. `active_operation` is available for instrumentation while that scope is
+active and is cleared even on cancellation or failure. `last_metrics` retains the
+finished attempt's metrics. Internal instrumentation should read counters from
+`active_operation`, rather than the former accidental cache attributes.
+
+Only SQLite generations/checkpoints survive cancellation for resumption. No
+transient operation object is reused by a later request. Reader transactions and
+cache invalidations retain their existing independent lifetimes. Reconciliation
+still rolls back changes on cancellation; initial scans retain durable progress.
+The [operation-state tests](../../tests/test_index_operation_state.py) exercise
+these lifetime boundaries with disposable databases and retained readers.
+
 The default path is `directory_index_path()`:
 
 - macOS: `~/Library/Application Support/commonUtils/Cache/directory-index.sqlite3`

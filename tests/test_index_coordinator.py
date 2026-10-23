@@ -25,7 +25,7 @@ from commonUtils.filesystem.index.coordinator import IndexCoordinator
 database, stop, marker, release, journal = map(Path,sys.argv[1:])
 class InstrumentedCache(DirectoryCache):
     def _checkpoint(self, db, cancelled, *, force=False):
-        partial = marker.name.startswith('mid') and self._checkpoint_entries >= 512 and not marker.exists()
+        partial = marker.name.startswith('mid') and self.active_operation.checkpoint_entries >= 512 and not marker.exists()
         super()._checkpoint(db,cancelled,force=force or partial)
         if partial:
             marker.touch()

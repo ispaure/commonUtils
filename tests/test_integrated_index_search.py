@@ -207,7 +207,7 @@ class IntegratedSearchTests(QtTestCase):
             # Commit real bounded batches without depending on elapsed sleep
             # time (short sleeps have coarse granularity on Windows runners).
             checkpoint(db, cancelled, force=True)
-            if self.cache._discovered_entries >= 512:
+            if self.cache.active_operation.discovered_entries >= 512:
                 committed.set()
         class IndexFilesystem:
             # Scope the stalled iterator to the indexer. Patching os.scandir

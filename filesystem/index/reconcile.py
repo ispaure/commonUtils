@@ -26,8 +26,8 @@ def _changed(cache, db, generation, folder, source_root, cancelled, report):
         for path, identity in db.execute('SELECT path,identity FROM entries WHERE generation=? AND parent=?',
                                         (generation, str(folder))):
             check_cancelled(cancelled)
-            cache._checked_entries += 1
-            report(cache._checked_entries, 0, 'Checking indexed files')
+            cache._scan_state.checked_entries += 1
+            report(cache._scan_state.checked_entries, 0, 'Checking indexed files')
             if json.dumps(entry_fingerprint(path, Path(path).lstat())) != identity:
                 return True
     except OSError:
@@ -44,7 +44,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
     if not cache.database.is_file() or not root.is_dir():
         return None
     report(0, 0, 'Waiting for index writer')
-    with cache._writer(cancelled, report) as db:
+    with cache._operation_writer(cancelled, report) as db:
         ancestors = (str(root),) + tuple(str(path) for path in root.parents)
         row = db.execute('SELECT root,completed,building FROM roots WHERE recursive=1 AND root IN ('
                          + ','.join('?' for _ in ancestors) + ') AND (completed IS NOT NULL OR building IS NOT NULL) '
@@ -56,13 +56,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
         exclusions = scan_exclusions(source_root, cache.database)
         if is_excluded(root, exclusions):
             return None  # An explicit Data view needs its own independently scoped index.
-        cache._blocked_scan_folders = set()
-        cache._discovered_entries = cache._checked_entries = 0
-        cache._dirty_totals = set()
-        cache._checkpoint_entries = 0
-        cache.last_metrics = dict(metadata_seconds=0., database_write_seconds=0., aggregation_seconds=0.,
-                                  validation_seconds=0., checkpoint_seconds=0., checkpoints=0)
-        cache._excluded_paths = exclusions
+        cache._scan_state.excluded_paths = exclusions
         targets = {root}
         if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
                           (generation, str(root))).fetchone():
@@ -80,7 +74,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                 continue
             directory = db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
                                    (generation, str(path))).fetchone()
-            if any(path == excluded or excluded in path.parents for excluded in cache._excluded_paths):
+            if any(path == excluded or excluded in path.parents for excluded in cache._scan_state.excluded_paths):
                 continue
             targets.add(path if directory and path.is_dir() else path.parent)
         try:
@@ -154,7 +148,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                     cache._scan_folder(db, generation, source_root, True, folder, cancelled, report, checkpoint=False)
                     checked.add(folder)
                     db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (str(folder),))
-            if cache._dirty_totals:
+            if cache._scan_state.dirty_totals:
                 report(0, 0, 'Saving folder sizes')
                 cache._publish_totals(db, generation, source_root, cancelled)
             # Prune only records touched by this update, preserving references
