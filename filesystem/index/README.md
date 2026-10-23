@@ -249,3 +249,7 @@ and verify entry counts plus SQLite integrity/foreign-key checks afterward.
 Coordinator receipt reads inspect an existing queue schema without requesting a
 DDL write lock, so readers can follow work while another connection holds the
 queue writer reservation. Initial schema creation retains normal SQL retries.
+
+Metadata scanning and Windows index checks use the existing portable junction
+query, including its reparse-tag fallback on Python versions before 3.12.
+Directory links remain excluded from recursive payload totals.

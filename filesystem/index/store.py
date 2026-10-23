@@ -22,6 +22,7 @@ from .reader import SqlEntries, SqlDirectories, _entry
 from ...runtime.operations import check_cancelled
 from .order import _sort_key, _encode_sort_parts
 from ..storage import cache_directory
+from ..links import is_junction
 from .totals import store_folder_stats
 from .exclusions import scan_exclusions, is_excluded
 from .schema import ensure_folder, write_entries, delete_children, delete_entries, retire_generation
@@ -158,7 +159,7 @@ class DirectoryCache(DirectoryScan):
     @staticmethod
     def _folder_identity(folder, root):
         info = folder.stat() if folder == root else folder.lstat()
-        if stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and folder!=root and folder.is_junction()):
+        if stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and folder!=root and is_junction(folder)):
             raise OSError('Directory became a link during scanning')
         if not stat.S_ISDIR(info.st_mode):
             raise NotADirectoryError(folder)
@@ -371,7 +372,7 @@ class DirectoryCache(DirectoryScan):
                         # lstat supplies during later checkpoint validation.
                         info = path.lstat() if os.name == 'nt' else child.stat(follow_symlinks=False)
                         self.last_metrics['metadata_seconds'] += perf_counter()-started
-                        link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and path.is_junction())
+                        link = stat.S_ISLNK(info.st_mode) or (sys.platform=='win32' and is_junction(path))
                         directory = not link and stat.S_ISDIR(info.st_mode)
                         disk = 0 if directory or link else allocated_size(path, info)
                         identity = json.dumps(entry_fingerprint(path, info, disk))

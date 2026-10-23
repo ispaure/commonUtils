@@ -28,3 +28,7 @@ Public entry points: `Frontmatter`, `RawYAML`, `split_frontmatter`, `parse_prope
 - `file.py`: registered MarkdownFile type with lazy reader activation.
 
 Presentation remains in `ui.markdown` and `ui.native`. Shared query mechanics live in [search](../../search/README.md).
+
+Wiki traversal uses the shared portable junction query rather than requiring
+Python 3.12 pathlib methods. GUI-free catalog tests live in
+`tests/test_wiki_catalog.py`; Qt navigation tests remain in their viewer owner.

@@ -8,6 +8,7 @@ from .allocation import allocated_size
 from time import time
 from ...runtime.operations import check_cancelled
 from ..traversal import natural_path_key
+from ..links import is_junction
 from ...search.names import search_terms, matches_name
 
 
@@ -144,7 +145,7 @@ def scan_metadata(root, recursive=True, *, cancelled=lambda: False,
                     path = Path(child.path)
                     try:
                         info = child.stat(follow_symlinks=False)
-                        link = child.is_symlink() or path.is_junction()
+                        link = child.is_symlink() or is_junction(path)
                         directory = not link and child.is_dir(follow_symlinks=False)
                         disk = 0 if directory or link else allocated_size(path, info)
                         entries.append(Entry(path, directory, 0 if directory or link else info.st_size,

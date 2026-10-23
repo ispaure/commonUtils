@@ -5,6 +5,7 @@ import re
 
 from .properties import split_frontmatter
 from ...search.text import contains_text
+from ...filesystem.links import is_junction
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ class MarkdownWiki:
 
     def _folder(self, folder):
         try:
-            children = sorted((p for p in folder.iterdir() if not p.is_symlink() and not p.is_junction() and not p.name.startswith('.')),
+            children = sorted((p for p in folder.iterdir() if not p.is_symlink() and not is_junction(p) and not p.name.startswith('.')),
                               key=lambda p: (not p.is_dir(), p.name.casefold()))
         except OSError as error:
             self.errors.append(str(error))

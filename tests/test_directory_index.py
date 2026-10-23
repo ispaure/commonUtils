@@ -78,7 +78,7 @@ class DirectoryIndexTests(unittest.TestCase):
             junction = root / 'junction'
             junction.mkdir()
             (junction / 'outside.txt').write_text('excluded')
-            with patch.object(Path, 'is_junction', lambda path: path == junction):
+            with patch('commonUtils.filesystem.index.metadata.is_junction', lambda path: path == junction):
                 snapshot = scan_metadata(root)
             self.assertEqual(len(snapshot.entries), 1)
             self.assertTrue(snapshot.entries[0].symlink)
