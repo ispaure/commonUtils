@@ -1,6 +1,6 @@
 # Running the mobile foundation checks
 
-The [manual workflow](../../.github/workflows/mobile-smoke.yml) builds embedded
+The [manual workflow](https://github.com/ispaure/commonUtils/blob/main/.github/workflows/mobile-smoke.yml) builds embedded
 CPython test applications for Android and the iOS Simulator. It has **only** a
 `workflow_dispatch` trigger: pushes and pull requests do not start mobile builds.
 The existing desktop workflow is unchanged and can still run on pushes.

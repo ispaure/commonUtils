@@ -32,7 +32,7 @@ For many Qt modules, run separate processes to isolate QApplication and native
 ownership. Use temporary cache databases, fixtures and output directories; never
 point test browsers at a live user index. Keep worker owners until they stop.
 
-The checked-in [.github workflow](../../.github/workflows/shared-checks.yml) uses the
+The checked-in [.github workflow](https://github.com/ispaure/commonUtils/blob/main/.github/workflows/shared-checks.yml) uses the
 Logistics locked environment and its isolated-module regression runner on Linux,
 macOS and Windows. Read the actual workflow before reproducing CI: a local test
 pass is not evidence that hosted CI or another consumer passed.
