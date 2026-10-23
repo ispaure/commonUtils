@@ -32,6 +32,35 @@ class ArchiveRebuildingTests(unittest.TestCase):
             self.assertEqual(result.read('untouched'), b'payload')
             self.assertEqual(content_manifest(result), expected)
 
+    def test_one_pass_include_selection_retains_every_selected_member(self):
+        for factory in (tuple, list, iter):
+            with self.subTest(factory=factory.__name__):
+                target = BytesIO()
+                with ZipFile(self.source()) as original, ZipFile(target, 'w') as output:
+                    rewrite_members(original, output, {}, include=factory(('metadata', 'first')))
+                target.seek(0)
+                with ZipFile(target) as result:
+                    self.assertEqual(result.namelist(), ['metadata', 'first'])
+                    self.assertEqual(result.read('metadata'), b'before')
+                    self.assertEqual(result.read('first'), b'kind')
+
+    def test_one_pass_stored_selection_applies_after_unselected_members(self):
+        from zipfile import ZIP_DEFLATED
+        for factory in (tuple, list, iter):
+            with self.subTest(factory=factory.__name__):
+                source, target = BytesIO(), BytesIO()
+                with ZipFile(source, 'w', compression=ZIP_DEFLATED) as archive:
+                    archive.writestr('untouched', b'compressed')
+                    archive.writestr('stored', b'plain')
+                source.seek(0)
+                with ZipFile(source) as original, ZipFile(target, 'w', compression=ZIP_DEFLATED) as output:
+                    rewrite_members(original, output, {}, stored=factory(('stored',)))
+                target.seek(0)
+                with ZipFile(target) as result:
+                    self.assertEqual(result.getinfo('untouched').compress_type, ZIP_DEFLATED)
+                    self.assertEqual(result.getinfo('stored').compress_type, ZIP_STORED)
+                    self.assertEqual(result.read('stored'), b'plain')
+
     def test_cancellation_and_member_bounds(self):
         with ZipFile(self.source()) as original, ZipFile(BytesIO(), 'w') as output:
             with self.assertRaises(OperationCancelled): rewrite_members(original, output, {}, cancelled=lambda: True)

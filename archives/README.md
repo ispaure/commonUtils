@@ -147,8 +147,10 @@ names; this layer contains no EPUB/comic rules.
 yields `MemberOperation` records for retained/replaced members followed by new
 replacements. `include` filters existing members; replacements not retained by
 that filter are still appended. `first` ranks existing members and `stored`
-selects uncompressed output names. It is an operation iterator, not input/path
-validation or a publication transaction.
+selects uncompressed output names. Name-selection iterables are captured once
+when plan iteration begins, so a one-pass input applies to every member. The
+plan remains an operation iterator, not input/path validation or a publication
+transaction.
 
 `write_members` consumes that plan, streams unchanged files, checks cancellation
 between members/chunks and returns an expected name-to-length/SHA-256 manifest

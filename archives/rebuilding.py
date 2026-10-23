@@ -47,6 +47,8 @@ class MemberOperation:
 
 def member_plan(original, replacements, *, include=None, first=(), stored=()):
     """Capture ordered retain/replace/add operations; excluded members are removed."""
+    include = frozenset(include) if include is not None else None
+    stored = frozenset(stored)
     ranks = {name: index for index, name in enumerate(first)}
     members = sorted(original.infolist(), key=lambda info: ranks.get(info.filename, len(ranks)))
     planned = set()
