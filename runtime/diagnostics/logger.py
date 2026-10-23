@@ -75,7 +75,7 @@ def noninteractive_logging():
 
 class DebugLogger:
     def __init__(self, log_file='debug.log', *, options=None, sinks=None, presenter=None, raise_critical=True):
-        self.options = options or LoggingOptions()
+        self.options = replace(options) if options is not None else LoggingOptions()
         self.sinks = tuple(sinks) if sinks is not None else (ConsoleSink(),)
         self.file_sink = FileSink(log_file)
         self.presenter = presenter

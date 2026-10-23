@@ -40,3 +40,11 @@ class DiagnosticLoggingTests(unittest.TestCase):
             self.assertEqual(events[0].text, expected)
             self.assertEqual(events[0].colored, '\033[31m' + expected + '\033[0m')
             self.assertEqual(path.read_text(), expected + '\n')
+
+    def test_instances_copy_supplied_options(self):
+        options = LoggingOptions(project_prefix='Original')
+        first, second = DebugLogger(options=options), DebugLogger(options=options)
+        options.project_prefix = 'External edit'
+        first.configure(project_prefix='First')
+        self.assertEqual(first.options.project_prefix, 'First')
+        self.assertEqual(second.options.project_prefix, 'Original')
