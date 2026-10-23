@@ -3,9 +3,9 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import os
-import shutil
 
 from ..runtime.operations import check_cancelled
+from ..persistence.publication import rename_exclusive
 from ..runtime.streams import copy_stream
 from .reading import reader, _members, _name, _directory, _stream
 
@@ -14,8 +14,8 @@ def extract(path, destination, *, selected=None, password=None,
             progress=lambda *args: None, cancelled=lambda: False):
     """Extract into a NEW folder; never overwrite existing user files.
 
-    Validate every member, stage the complete selection, then reserve the output
-    with exclusive mkdir. Cancellation or bad passwords leave no partial output.
+    Validate every member and stage the complete selection before atomic
+    no-replace publication. Cancellation or bad passwords leave no partial output.
     """
     destination = Path(destination).absolute()
     if destination.exists() or destination.is_symlink():
@@ -59,11 +59,7 @@ def extract(path, destination, *, selected=None, password=None,
                     except (ValueError, OSError, OverflowError):
                         pass
         check_cancelled(cancelled)
-        destination.mkdir()  # exclusive reservation, even against concurrent creation
-        try:
-            for child in stage.iterdir():
-                os.replace(child, destination / child.name)
-        except BaseException:
-            shutil.rmtree(destination)
-            raise
+        # Publish the whole directory at once. A per-child move would expose
+        # partial output and make failure cleanup race with other writers.
+        rename_exclusive(stage, destination)
     return destination

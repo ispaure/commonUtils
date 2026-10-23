@@ -86,6 +86,47 @@ class ArchiveWorkspaceTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             backend.extract(path, link)
 
+    def test_extraction_publishes_complete_tree_without_a_partially_visible_folder(self):
+        from commonUtils.archives import extraction
+        path = self.make_zip()
+        out = self.root / 'out'
+        observed = []
+        replace = extraction.os.replace
+        def observe(source, destination):
+            observed.append(out.exists())
+            return replace(source, destination)
+        with patch.object(extraction.os, 'replace', side_effect=observe):
+            backend.extract(path, out)
+        self.assertFalse(any(observed), 'A partial extraction was publicly visible')
+        self.assertEqual((out / 'source/hello.txt').read_text(), 'Hello, archive!')
+        self.assertFalse(list(self.root.glob('.logistics-extract-*')))
+
+    def test_racing_destination_at_extraction_publication_is_preserved(self):
+        from commonUtils.archives import extraction
+        from commonUtils.persistence import publication
+        path = self.make_zip()
+        out = self.root / 'out'
+        original_mkdir = Path.mkdir
+        original_rename = publication.rename_exclusive
+        def reserve(folder, *args, **kwargs):
+            if folder == out:
+                original_mkdir(out)
+                (out / 'external').write_bytes(b'keep')
+            return original_mkdir(folder, *args, **kwargs)
+        def publish(source, target):
+            if Path(target) == out:
+                original_mkdir(out)
+                (out / 'external').write_bytes(b'keep')
+            return original_rename(source, target)
+        # Inject at the old reservation and at the new atomic publication seam.
+        with patch.object(Path, 'mkdir', reserve), \
+                patch.object(extraction, 'rename_exclusive', publish, create=True), \
+                self.assertRaises(FileExistsError):
+            backend.extract(path, out)
+        self.assertEqual((out / 'external').read_bytes(), b'keep')
+        self.assertFalse((out / 'source').exists())
+        self.assertFalse(list(self.root.glob('.logistics-extract-*')))
+
     def test_zip_and_tar_reject_traversal_links_and_collisions(self):
         for name in ('../escape', '/absolute', 'C:/escape', 'folder/../../escape'):
             for kind in ('zip', 'tar'):

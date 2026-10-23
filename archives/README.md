@@ -164,3 +164,12 @@ callback. An optional manifest callback returns member signatures; cancellation
 is checked before and after it runs. No file, credential or password is opened by
 the facade. The backend owns authentication, size limits, revision checks, caching
 and retirement. `open` wraps a complete member in RAM; it is not a streaming API.
+
+## Extraction publication
+
+`extract` validates the archive and stages the entire selection beside the new
+output directory. The complete tree is published using an atomic no-replace
+rename. A racing file, directory or link is preserved; failed publication cleans
+only private staging. There is no public partial output to recursively remove on
+failure. Cancellation is checked immediately before publication. Unsupported
+atomic no-replace platforms fail closed rather than reverting to per-child moves.
