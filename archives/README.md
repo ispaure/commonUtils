@@ -72,6 +72,8 @@ be rewritten. Source files are never deleted. Cancellation raises
 is the success boundary.
 
 ZIP integrity checks read all entries and validate CRCs or AES authentication.
+Complete-tree extraction checks host provider boundaries before parent creation
+and before publication; denial removes only its own private extraction stage.
 TAR checks readable data and member paths, but TAR has no per-entry payload
 checksum. Text previews display at most 256 KiB of UTF-8. A multibyte character
 split by the preview ceiling is omitted while the complete prefix and truncation

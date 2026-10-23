@@ -210,6 +210,37 @@ class ArchiveWorkspaceTests(unittest.TestCase):
         self.assertIn('limited to 256 KiB', backend.preview(path, 'large.txt'))
         self.assertIn('Binary file', backend.preview(path, 'binary'))
 
+    def test_extract_rejects_managed_destination_before_creating_parent_folders(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        path = self.make_zip()
+        managed = self.root / 'managed'
+        managed.mkdir()
+        release = protect_local_root(self.id(), managed, 'Use the provider')
+        try:
+            with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                backend.extract(path, managed / 'nested/output')
+            self.assertEqual(list(managed.iterdir()), [])
+        finally:
+            release()
+
+    def test_extract_rechecks_provider_boundary_before_complete_tree_publication(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        path = self.make_zip()
+        managed = self.root / 'managed'
+        managed.mkdir()
+        releases = []
+        def protect_at_last_copy(done, total, message):
+            if total and done == total and not releases:
+                releases.append(protect_local_root(self.id(), managed, 'Use the provider'))
+        try:
+            with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                backend.extract(path, managed / 'output', progress=protect_at_last_copy)
+            self.assertTrue(releases)
+            self.assertEqual(list(managed.iterdir()), [])
+        finally:
+            for release in releases:
+                release()
+
     def test_utf8_preview_limit_can_split_a_multibyte_character(self):
         path = self.root / 'utf8-preview.zip'
         limit = 256 * 1024

@@ -7,6 +7,7 @@ import os
 from ..runtime.operations import check_cancelled
 from ..persistence.publication import rename_exclusive
 from ..runtime.streams import copy_stream
+from ..filesystem.local_access import check_local_path
 from .reading import reader, _members, _name, _directory, _stream
 
 
@@ -18,6 +19,7 @@ def extract(path, destination, *, selected=None, password=None,
     no-replace publication. Cancellation or bad passwords leave no partial output.
     """
     destination = Path(destination).absolute()
+    check_local_path(destination, recursive=True)
     if destination.exists() or destination.is_symlink():
         raise FileExistsError('Choose a new destination folder; existing folders are never overwritten.')
     selection = tuple(selected) if selected is not None else None
@@ -59,6 +61,7 @@ def extract(path, destination, *, selected=None, password=None,
                     except (ValueError, OSError, OverflowError):
                         pass
         check_cancelled(cancelled)
+        check_local_path(destination, recursive=True)
         # Publish the whole directory at once. A per-child move would expose
         # partial output and make failure cleanup race with other writers.
         rename_exclusive(stage, destination)
