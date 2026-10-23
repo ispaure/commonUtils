@@ -83,6 +83,51 @@ class FileMoveTests(unittest.TestCase):
         self.assertEqual(self.dest.read_text(), 'old')
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), ['destination.txt', 'source.txt'])
 
+    def test_corrupt_cross_volume_copy_preserves_source_and_existing_destination(self):
+        original_replace = fileUtils.os.replace
+        def rename(source, target):
+            if Path(source) == self.src:
+                raise OSError(errno.EXDEV, 'different device')
+            return original_replace(source, target)
+        def corrupt(source, target, **kwargs):
+            target.write_bytes(b'corrupt copy')
+        with patch.object(fileUtils.os, 'replace', side_effect=rename), patch.object(fileUtils, 'copy2', side_effect=corrupt):
+            with self.assertRaises(OSError):
+                fileUtils.File(self.src).move_file(self.dest)
+        self.assertEqual(self.src.read_text(), 'new')
+        self.assertEqual(self.dest.read_text(), 'old')
+
+    def test_changed_cross_volume_source_is_not_published_or_deleted(self):
+        original_replace, original_copy = fileUtils.os.replace, fileUtils.copy2
+        def rename(source, target):
+            if Path(source) == self.src:
+                raise OSError(errno.EXDEV, 'different device')
+            return original_replace(source, target)
+        def copy(source, target, **kwargs):
+            original_copy(source, target, **kwargs)
+            self.src.write_text('newer source edit')
+        with patch.object(fileUtils.os, 'replace', side_effect=rename), patch.object(fileUtils, 'copy2', side_effect=copy):
+            with self.assertRaises(OSError):
+                fileUtils.File(self.src).move_file(self.dest)
+        self.assertEqual(self.src.read_text(), 'newer source edit')
+        self.assertEqual(self.dest.read_text(), 'old')
+
+    def test_source_edit_after_publication_preserves_both_and_reports_published_state(self):
+        from commonUtils.runtime.operations import MutationIncomplete
+        original_replace = fileUtils.os.replace
+        def rename(source, target):
+            if Path(source) == self.src:
+                raise OSError(errno.EXDEV, 'different device')
+            original_replace(source, target)
+            self.src.write_text('new edit after publication')
+        with patch.object(fileUtils.os, 'replace', side_effect=rename):
+            with self.assertRaises(MutationIncomplete) as caught:
+                fileUtils.File(self.src).move_file(self.dest)
+        self.assertTrue(caught.exception.result.destination_published)
+        self.assertEqual(caught.exception.result.source_state, 'unknown')
+        self.assertEqual(self.src.read_text(), 'new edit after publication')
+        self.assertEqual(self.dest.read_text(), 'new')
+
     def test_new_destination_parent_is_created(self):
         destination = self.root / 'nested' / 'destination.txt'
         self.assertEqual(fileUtils.File(self.src).move_file(destination).path, destination)

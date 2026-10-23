@@ -124,6 +124,72 @@ class FileTransferTests(unittest.TestCase):
         self.assertEqual(self.file.read_text(), 'edited during copy')
         self.assertEqual(list(self.destination.iterdir()), [])
 
+    def test_corrupt_cross_volume_copy_never_removes_the_source(self):
+        original = operations.rename_path
+        def rename(source, target):
+            if source == self.file.resolve():
+                raise OSError(errno.EXDEV, 'different device')
+            return original(source, target)
+        def corrupt(source, target):
+            target.write_bytes(b'corrupt copy')
+        with patch.object(operations, 'rename_path', rename), patch.object(operations, '_copy', corrupt):
+            result = operations.transfer_paths([self.file], self.destination, move=True)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(self.file.read_text(), 'original')
+        self.assertEqual(list(self.destination.iterdir()), [])
+
+    def test_edit_after_cross_volume_publication_is_kept_alongside_published_copy(self):
+        original = operations.rename_path
+        def rename(source, target):
+            if source == self.file.resolve():
+                raise OSError(errno.EXDEV, 'different device')
+            original(source, target)
+            self.file.write_text('new edit after publication')
+        with patch.object(operations, 'rename_path', rename):
+            result = operations.transfer_paths([self.file], self.destination, move=True)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(self.file.read_text(), 'new edit after publication')
+        self.assertEqual((self.destination / self.file.name).read_text(), 'original')
+        self.assertIn('destination was saved', result.failures[0][1])
+
+    def test_cross_volume_directory_preserves_empty_folders_and_raw_link_targets(self):
+        tree = self.source / 'tree'
+        tree.mkdir()
+        (tree / 'empty').mkdir()
+        (tree / 'child').write_bytes(b'child bytes')
+        (tree / 'link').symlink_to('missing')
+        original = operations.rename_path
+        def rename(source, target):
+            if source == tree.resolve():
+                raise OSError(errno.EXDEV, 'different device')
+            return original(source, target)
+        with patch.object(operations, 'rename_path', rename):
+            result = operations.transfer_paths([tree], self.destination, move=True)
+        self.assertFalse(result.failures)
+        self.assertFalse(tree.exists())
+        copied = self.destination / 'tree'
+        self.assertEqual((copied / 'child').read_bytes(), b'child bytes')
+        self.assertTrue((copied / 'empty').is_dir())
+        self.assertEqual((copied / 'link').readlink(), Path('missing'))
+
+    def test_corrupt_child_in_cross_volume_directory_keeps_the_whole_source(self):
+        tree = self.source / 'tree'
+        tree.mkdir()
+        (tree / 'child').write_bytes(b'child bytes')
+        original, copy = operations.rename_path, operations._copy
+        def rename(source, target):
+            if source == tree.resolve():
+                raise OSError(errno.EXDEV, 'different device')
+            return original(source, target)
+        def corrupt(source, target):
+            copy(source, target)
+            (target / 'child').write_bytes(b'bad copy')
+        with patch.object(operations, 'rename_path', rename), patch.object(operations, '_copy', corrupt):
+            result = operations.transfer_paths([tree], self.destination, move=True)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual((tree / 'child').read_bytes(), b'child bytes')
+        self.assertEqual(list(self.destination.iterdir()), [])
+
     def test_cancel_stops_between_items_and_reports_completed_moves(self):
         second = self.source / 'second'; second.write_text('second')
         def cancelled():

@@ -43,13 +43,23 @@ for registration, internal record grants and the scope of this safeguard.
 
 ## Verified content snapshots
 
-`snapshots.file_revision(path)` returns device/inode/size/mtime-ns/ctime-ns.
+`snapshots.file_revision(path, follow_symlinks=True)` returns
+device/inode/size/mtime-ns/ctime-ns. Pass `follow_symlinks=False` for the link
+object’s own revision; the default continues to follow it.
 `verified_file_snapshot(path, cancelled=...)` returns that revision and SHA-256
 bytes, checking both descriptor and pathname before/after hashing. Callers choose
 link policy. `tree_content_state(root, cancelled=..., max_entries=10000)` rejects
 links/junctions, special files and hard-linked files and returns relative names
 with SHA-256 hex (None for directories). Each file is verified independently;
 the tree inventory is not a writer lock or atomic whole-tree snapshot.
+
+`copy_content_state(root)` compares a staged file/tree using SHA-256 bytes,
+object kinds and raw symbolic-link targets. Its mapping includes `.` for the
+root and uses POSIX relative names with `('file', digest_bytes)`, `('directory',)`
+or `('link', raw_target)` values. It deliberately permits ordinary hard-linked
+files and does not rebase links; relocation and private tree inventories retain
+their different policies. Special objects are rejected. Callers own source
+revision checks, limits, staging and publication; this inventory is not a lock.
 
 ## Directory relocation
 
@@ -78,3 +88,20 @@ publication/source state before deciding whether a retry is safe.
 ## Local operations and resource adapters
 
 This package owns physical local paths, snapshots and the persistent metadata index. `runtime.resources` owns provider identifiers, capabilities and lifetimes for local/archive/platform storage. Providers adapt local operations and revalidate access; an index hit never grants file access. Shared transfer phases and publication live in `persistence.transfers` and `persistence.publication`, so the two interfaces do not need duplicate transaction engines. Reusable queries live in [search](../search/README.md); UI owns workers and presentation.
+
+## Cross-volume move integrity
+
+Clipboard `transfer_paths(..., move=True)` and `File.move_file` verify staged
+content before cross-volume publication, then recheck source revisions immediately
+before removal. Clipboard revisions include ctime as well as metadata identity.
+A corrupt copy leaves the source and existing destination untouched; an observed
+source edit after publication retains both copies and reports incomplete cleanup.
+No-replace clipboard destinations and the low-level File method's existing
+replacement policy remain distinct. Files, directories, empty folders and raw
+symbolic links retain their established transfer meanings.
+
+The verification requires a hash read of the source and staged copy; same-volume
+renames and ordinary clipboard copies keep their prior path. Cancellation remains
+between clipboard items. Source checks are not an external writer lock: another
+process can still edit after the last check, so callers must coordinate writers
+when strict exclusion is required.

@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
-from commonUtils.filesystem.snapshots import tree_content_state, verified_file_snapshot
+from commonUtils.filesystem.snapshots import tree_content_state, verified_file_snapshot, copy_content_state
 from commonUtils.runtime.operations import OperationCancelled
 
 
@@ -53,6 +53,8 @@ class ContentSnapshots(unittest.TestCase):
             try: os.link(root/'file', root/'link')
             except OSError as error: self.skipTest(str(error))
             with self.assertRaises(ValueError): tree_content_state(root)
+            state = copy_content_state(root)
+            self.assertEqual(state['file'], state['link'])
 
     def test_symbolic_links_are_rejected(self):
         with TemporaryDirectory() as directory:
@@ -61,3 +63,23 @@ class ContentSnapshots(unittest.TestCase):
             try: (root/'link').symlink_to(root/'file')
             except OSError as error: self.skipTest(str(error))
             with self.assertRaises(ValueError): tree_content_state(root)
+
+    def test_copy_content_state_compares_bytes_kinds_and_raw_links(self):
+        import shutil
+        from commonUtils.filesystem.snapshots import copy_content_state, file_revision
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, copied = root / 'source', root / 'copied'
+            source.mkdir()
+            (source / 'empty').mkdir()
+            (source / 'file').write_bytes(b'payload')
+            (source / 'link').symlink_to('missing')
+            shutil.copytree(source, copied, symlinks=True)
+            self.assertEqual(copy_content_state(source), copy_content_state(copied))
+            self.assertEqual(copy_content_state(source)['link'], ('link', 'missing'))
+            self.assertEqual(copy_content_state(source)['empty'], ('directory',))
+            self.assertNotEqual(file_revision(source / 'file'), file_revision(copied / 'file'))
+            self.assertEqual(file_revision(source / 'link', follow_symlinks=False)[2],
+                             (source / 'link').lstat().st_size)
+            (copied / 'file').write_bytes(b'corrupt')
+            self.assertNotEqual(copy_content_state(source), copy_content_state(copied))

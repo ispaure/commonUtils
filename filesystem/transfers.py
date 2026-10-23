@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 import os
 import shutil
 from .rename import rename_path
+from .snapshots import copy_content_state
 from ..persistence.publication import save_transaction
 from ..persistence.transfers import try_rename, verify_unchanged, cleanup_published
 
@@ -63,7 +64,7 @@ def _copy(source, target):
 def _snapshot(source):
     def stamp(path):
         info = path.lstat()
-        return info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns
+        return info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns
     def unreadable(error):
         raise error
     result = {'.': stamp(source)}
@@ -109,17 +110,23 @@ def transfer_paths(paths, directory, *, move=False, cancelled=lambda: False, rep
                 completed.append((source, target))
                 continue
             before = _snapshot(source) if move else None
+            expected = copy_content_state(source) if move else None
             with TemporaryDirectory(dir=directory, prefix='.file-transfer-') as temporary:
                 staged = Path(temporary) / 'item'
                 def validate():
                     if move:
                         verify_unchanged(before, lambda: _snapshot(source), error=RuntimeError,
                                          message='The source changed during copying; it has been kept in place.')
-                save_transaction(stage=lambda: _copy(source, staged), verify=lambda: None,
+                def verify():
+                    if move:
+                        verify_unchanged(expected, lambda: copy_content_state(staged), error=RuntimeError,
+                                         message='Copied content verification failed; source preserved.')
+                save_transaction(stage=lambda: _copy(source, staged), verify=verify,
                                  validate=validate, publish=lambda: rename_path(staged, target),
                                  cleanup=lambda: None)
             if move:
                 def remove():
+                    validate()
                     if source.is_dir() and not source.is_symlink():
                         shutil.rmtree(source)
                     else:

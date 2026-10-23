@@ -199,9 +199,26 @@ class File(FilesystemObject):
             # its previous contents. Failed copies leave both files intact.
             with TemporaryDirectory(dir=dest.parent, prefix='.move_') as staging_dir:
                 staged_file = Path(staging_dir) / 'file'
-                copy2(src, staged_file, follow_symlinks=False)
+                from ..snapshots import copy_content_state, file_revision
+                from ...persistence.transfers import verify_unchanged, cleanup_published
+                before = file_revision(src, follow_symlinks=False)
+                def validate():
+                    verify_unchanged(before, lambda: file_revision(src, follow_symlinks=False), error=OSError,
+                                     message='Source changed during moving; it has been preserved.')
+                try:
+                    expected = copy_content_state(src)
+                    copy2(src, staged_file, follow_symlinks=False)
+                    verify_unchanged(expected, lambda: copy_content_state(staged_file), error=OSError,
+                                     message='Copied content verification failed; source preserved.')
+                except ValueError as error:
+                    raise OSError('Could not verify file contents; source preserved.') from error
+                validate()
                 os.replace(staged_file, dest)
-            src.unlink()
+            def remove():
+                validate()
+                src.unlink()
+            cleanup_published(remove, source_state=lambda: 'unchanged'
+                              if file_revision(src, follow_symlinks=False) == before else 'unknown')
 
         return File(dest)
 

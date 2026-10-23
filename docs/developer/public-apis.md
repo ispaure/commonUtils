@@ -45,6 +45,12 @@ content inventories. `filesystem.relocation.relocate_directory` supplies verifie
 non-overwriting relocation with link rebasing. Persisted schemas, migration timing
 and conflict policy belong to callers. See [filesystem](../../filesystem/README.md).
 
+Cross-volume copy verification uses `filesystem.snapshots.copy_content_state`,
+which includes object kinds, byte hashes and raw link targets while ignoring
+copy-specific inode/timestamp changes. `file_revision(..., follow_symlinks=False)`
+checks the link object itself; its default remains unchanged. See the
+[filesystem contract](../../filesystem/README.md#cross-volume-move-integrity).
+
 ## Formats, settings and persistence
 
 | Need | Entry point / contract |

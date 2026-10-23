@@ -1,12 +1,14 @@
 """Verified file hashes and bounded content inventories, without host schemas."""
 import os
 from pathlib import Path
+import stat
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import stream_signature
 
 
-def file_revision(path):
-    return _revision(Path(path).stat())
+def file_revision(path, *, follow_symlinks=True):
+    path = Path(path)
+    return _revision(path.stat() if follow_symlinks else path.lstat())
 
 
 def _revision(info):
@@ -63,4 +65,29 @@ def tree_content_state(root, *, cancelled=lambda: False, max_entries=10000):
                 result[key] = verified_file_snapshot(path, cancelled=cancelled)[1].hex()
             if len(result) > max_entries:
                 raise ValueError(f'Snapshot exceeds {max_entries} entries.')
+    return result
+
+
+def copy_content_state(root):
+    """Snapshot copied bytes, kinds and raw link targets without mutation.
+
+    Inodes and timestamps differ between copies, so they are deliberately absent.
+    Caller owns source revision checks, collision policy and staged publication.
+    Links are inventoried as links; ordinary hard-linked files retain byte meaning.
+    """
+    root = Path(root)
+    result, pending = {}, [root]
+    while pending:
+        path = pending.pop()
+        key = path.relative_to(root).as_posix()
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            result[key] = ('link', os.readlink(path))
+        elif stat.S_ISREG(mode):
+            result[key] = ('file', verified_file_snapshot(path)[1])
+        elif stat.S_ISDIR(mode):
+            result[key] = ('directory',)
+            pending.extend(path.iterdir())
+        else:
+            raise ValueError(f'Cannot inventory a special filesystem object: {path}')
     return result
