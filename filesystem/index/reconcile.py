@@ -57,26 +57,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
         if is_excluded(root, exclusions):
             return None  # An explicit Data view needs its own independently scoped index.
         cache._scan_state.excluded_paths = exclusions
-        targets = {root}
-        if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
-                          (generation, str(root))).fetchone():
-            # A newly visited directory may not have existed at the last scan.
-            # Check its nearest indexed ancestor to add the missing branch and
-            # its parent membership before publishing recursive totals.
-            for ancestor in root.parents:
-                if db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
-                              (generation, str(ancestor))).fetchone():
-                    targets.add(ancestor)
-                    break
-        for changed in changes:
-            path = Path(changed).absolute()
-            if path != source_root and source_root not in path.parents:
-                continue
-            directory = db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
-                                   (generation, str(path))).fetchone()
-            if any(path == excluded or excluded in path.parents for excluded in cache._scan_state.excluded_paths):
-                continue
-            targets.add(path if directory and path.is_dir() else path.parent)
+        targets = _reconciliation_targets(cache, db, generation, root, source_root, changes)
         try:
             db.execute('BEGIN IMMEDIATE')
             db.execute('CREATE TEMP TABLE reconciled_folders(path TEXT PRIMARY KEY)')
@@ -105,31 +86,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                 checked.add(folder)
                 db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (str(folder),))
             if full:
-                # Explicit Refresh validates descendants in the same generation,
-                # retaining ancestor totals and avoiding a duplicate subtree root.
-                # Read fixed-size batches: do not materialize a disk-sized queue.
-                prefix = str(root).rstrip(os.sep) + os.sep
-                upper = prefix[:-1] + chr(ord(os.sep) + 1)
-                cursor = ''
-                while True:
-                    rows = db.execute('SELECT path FROM folders WHERE generation=? '
-                                      'AND (path=? OR (path>=? AND path<?)) '
-                                      'AND path>? AND path NOT IN (SELECT path FROM reconciled_folders) '
-                                      'ORDER BY path LIMIT 256', (generation,str(root),prefix,upper,cursor)).fetchall()
-                    if not rows:
-                        break
-                    cursor = rows[-1][0]
-                    for (text,) in rows:
-                        check_cancelled(cancelled)
-                        if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
-                                          (generation,text)).fetchone():
-                            continue  # A checked parent removed this cached branch.
-                        folder = Path(text)
-                        if _changed(cache, db, generation, folder, source_root, cancelled, report):
-                            cache.invalidate(folder)
-                            cache._scan_folder(db, generation, source_root, True, folder, cancelled, report, checkpoint=False)
-                        checked.add(folder)
-                        db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (text,))
+                _validate_descendants(cache, db, generation, root, source_root, cancelled, report, checked)
             # Scanning changed parents adds only new/changed child folders to the
             # pending queue. Existing unchanged descendant folders remain done.
             while True:
@@ -151,15 +108,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
             if cache._scan_state.dirty_totals:
                 report(0, 0, 'Saving folder sizes')
                 cache._publish_totals(db, generation, source_root, cancelled)
-            # Prune only records touched by this update, preserving references
-            # from overlapping roots/generations and old SQLite read snapshots.
-            db.execute('CREATE TEMP TABLE reconcile_nodes(id INTEGER PRIMARY KEY)')
-            db.execute('INSERT OR IGNORE INTO reconcile_nodes SELECT node_id FROM entry_records '
-                       'WHERE id IN (SELECT id FROM reconcile_records)')
-            db.execute('DELETE FROM entry_records WHERE id IN (SELECT id FROM reconcile_records) '
-                       'AND NOT EXISTS (SELECT 1 FROM generation_entries WHERE record_id=entry_records.id)')
-            db.execute('DELETE FROM entry_nodes WHERE id IN (SELECT id FROM reconcile_nodes) '
-                       'AND NOT EXISTS (SELECT 1 FROM entry_records WHERE node_id=entry_nodes.id)')
+            _retire_replaced_records(db)
             stamp = time()
             db.executemany('INSERT OR REPLACE INTO folder_checks VALUES(?,?,?)',
                            [(generation, str(folder), stamp) for folder in checked])
@@ -171,3 +120,67 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
             raise
         return cache._snapshot(db, generation, root, True, reused=True, metadata_checked=full, complete=not partial,
                                scope=root if root != source_root else None, cancelled=cancelled)
+
+
+def _reconciliation_targets(cache, db, generation, root, source_root, changes):
+    targets = {root}
+    if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
+                      (generation, str(root))).fetchone():
+        # A newly visited directory may not have existed at the last scan.
+        # Check its nearest indexed ancestor to add the missing branch and
+        # its parent membership before publishing recursive totals.
+        for ancestor in root.parents:
+            if db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
+                          (generation, str(ancestor))).fetchone():
+                targets.add(ancestor)
+                break
+    for changed in changes:
+        path = Path(changed).absolute()
+        if path != source_root and source_root not in path.parents:
+            continue
+        directory = db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
+                               (generation, str(path))).fetchone()
+        if any(path == excluded or excluded in path.parents for excluded in cache._scan_state.excluded_paths):
+            continue
+        targets.add(path if directory and path.is_dir() else path.parent)
+    return targets
+
+
+def _validate_descendants(cache, db, generation, root, source_root, cancelled, report, checked):
+    # Explicit Refresh validates descendants in the same generation,
+    # retaining ancestor totals and avoiding a duplicate subtree root.
+    # Read fixed-size batches: do not materialize a disk-sized queue.
+    prefix = str(root).rstrip(os.sep) + os.sep
+    upper = prefix[:-1] + chr(ord(os.sep) + 1)
+    cursor = ''
+    while True:
+        rows = db.execute('SELECT path FROM folders WHERE generation=? '
+                          'AND (path=? OR (path>=? AND path<?)) '
+                          'AND path>? AND path NOT IN (SELECT path FROM reconciled_folders) '
+                          'ORDER BY path LIMIT 256', (generation,str(root),prefix,upper,cursor)).fetchall()
+        if not rows:
+            break
+        cursor = rows[-1][0]
+        for (text,) in rows:
+            check_cancelled(cancelled)
+            if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
+                              (generation,text)).fetchone():
+                continue  # A checked parent removed this cached branch.
+            folder = Path(text)
+            if _changed(cache, db, generation, folder, source_root, cancelled, report):
+                cache.invalidate(folder)
+                cache._scan_folder(db, generation, source_root, True, folder, cancelled, report, checkpoint=False)
+            checked.add(folder)
+            db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (text,))
+
+
+def _retire_replaced_records(db):
+    # Prune only records touched by this update, preserving references
+    # from overlapping roots/generations and old SQLite read snapshots.
+    db.execute('CREATE TEMP TABLE reconcile_nodes(id INTEGER PRIMARY KEY)')
+    db.execute('INSERT OR IGNORE INTO reconcile_nodes SELECT node_id FROM entry_records '
+               'WHERE id IN (SELECT id FROM reconcile_records)')
+    db.execute('DELETE FROM entry_records WHERE id IN (SELECT id FROM reconcile_records) '
+               'AND NOT EXISTS (SELECT 1 FROM generation_entries WHERE record_id=entry_records.id)')
+    db.execute('DELETE FROM entry_nodes WHERE id IN (SELECT id FROM reconcile_nodes) '
+               'AND NOT EXISTS (SELECT 1 FROM entry_records WHERE node_id=entry_nodes.id)')

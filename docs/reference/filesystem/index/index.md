@@ -82,6 +82,12 @@ excluded mount covers nested mounts, avoiding redundant parent-path checks per e
 
 ### State ownership
 
+Reconciliation keeps generation admission, the writer transaction, commit/rollback
+and snapshot publication in `reconcile_existing`. Same-module phases identify
+notification targets, validate descendants in bounded batches and retire replaced
+records. They share the captured database/generation and existing active operation;
+they do not own independent transactions, checkpoints or reader lifetimes.
+
 `DirectoryCache` owns the database location, writer/session locks, invalidations,
 visible-folder priorities and open reader snapshots. It composes a fresh
 `DirectoryScan` controller for each `get()` call; it no longer inherits scan
