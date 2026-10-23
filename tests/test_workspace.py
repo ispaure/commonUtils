@@ -24,7 +24,7 @@ class WorkspaceTests(QtTestCase):
         from shiboken6 import isValid
         workspace = Workspace(View)
         callback = Mock()
-        with patch.object(workspace, '_refresh_tab_headers', callback):
+        with patch.object(workspace.header_presentation, 'refresh', callback):
             workspace._headers_pending = False
             workspace._schedule_tab_headers()
             workspace.deleteLater()

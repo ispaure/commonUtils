@@ -14,6 +14,8 @@ Detailed API examples remain beside their owners and are linked from these guide
 For interactive workflows, use the [component user guides](../../README.md#shared-component-user-guides).
 The [audit record](audit.md) explains the restructuring and remaining uncertainties.
 
+[Process, diagnostics and presentation owners](lifecycle-owners.md) describes lifecycle boundaries.
+
 [Library overview](../../README.md)
 
 ## Platform support

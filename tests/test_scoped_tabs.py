@@ -154,7 +154,7 @@ class ScopedTabsTests(QtTestCase):
         workspace.show()
         window = workspace.detach_dock(workspace.active_dock)
         self.app.processEvents()
-        window.workspace._refresh_tab_headers()
+        window.workspace.header_presentation.refresh()
         dock = window.workspace.active_dock
         self.assertGreater(dock.tab_header.height(), 0)
         self.assertTrue(dock.tab_header.new_button.isVisible())
