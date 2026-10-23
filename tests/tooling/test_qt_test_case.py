@@ -6,6 +6,8 @@ from threading import Event
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
+import gc
+from weakref import finalize
 
 from shiboken6 import isValid
 from commonUtils.ui import pyside as qt
@@ -16,6 +18,28 @@ class QtFixtureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])
+
+    def test_retired_widget_cycles_are_collected_on_gui_thread_after_destruction(self):
+        case = QtTestCase()
+        existing = set(self.app.topLevelWidgets())
+        window = qt.QWidget()
+        events = []
+        enabled = gc.isenabled()
+        gc.disable()
+        try:
+            child = qt.QWidget(window)
+            child.loop = child
+            finalize(child, lambda: events.append((qt.QThread.currentThread(), isValid(window))))
+            del child
+            case._release_windows(existing)
+            self.assertEqual(events, [(self.app.thread(), False)])
+        finally:
+            gc.collect()
+            if enabled:
+                gc.enable()
+            if isValid(window):
+                window.deleteLater()
+                self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
 
     def test_directory_scope_destroys_watchers_before_removing_files(self):
         case = QtTestCase()

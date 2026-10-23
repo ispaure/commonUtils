@@ -8,6 +8,7 @@ from unittest.mock import patch
 import unittest
 import os
 import sys
+import gc
 from pathlib import Path
 
 from commonUtils.ui import pyside as qt
@@ -174,3 +175,7 @@ class QtTestCase(unittest.TestCase):
         app.processEvents()
         self.wait_until(lambda: all(future.done() for future in futures),
                         message='Executor tasks did not finish after Qt owner destruction')
+        # Signal/callback cycles can retain wrappers after their C++ widgets die.
+        # Collect them here on the GUI thread, after all owned workers retire,
+        # rather than leaving the next worker allocation to run their finalizers.
+        gc.collect()

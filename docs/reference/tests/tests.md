@@ -96,6 +96,15 @@ destruction, allowing cancellation callbacks to release process/file handles.
 Cleanup errors remain test failures. The base class also releases unscoped windows
 between tests.
 
+After widget destruction and owned worker/future retirement, cleanup explicitly
+collects eligible Python cycles on the GUI thread. Signal/callback cycles can
+retain wrappers whose C++ widgets are already gone; leaving them for a later
+worker allocation can run their finalizers on that worker. A real widget-cycle
+regression checks collection after native destruction on the application thread.
+Production application GC policy remains application-owned. Native crashes still
+require their captured trace and affected-suite rechecks; a fixture contract does
+not establish every possible crash cause.
+
 Raw SQLite fixture connections need explicit closure (for example,
 `contextlib.closing(sqlite3.connect(...))`). A connection's own context manager
 only commits or rolls back; it does not release Windows database file handles
