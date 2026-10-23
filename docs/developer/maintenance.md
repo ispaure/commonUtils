@@ -8,10 +8,10 @@ its tests belong here. Avoid restructuring Python packages to fit documentation.
 
 | Change | Update |
 | --- | --- |
-| Public import, return value or failure contract | [API map](public-apis.md), owning package reference, integration contracts when needed |
+| Public import, return value or failure contract | [API map](public-apis.md), owning `docs/reference/` guide, integration contracts when needed |
 | Registration, controller or provider protocol | [Extension points](extension-points.md), feature examples and focused tests |
 | Worker, index or persistence lifecycle | [Architecture](architecture.md) and owning technical guide |
-| Shared interactive behavior or settings | Component-local `user_docs/` and relevant embedding guide |
+| Shared interactive behavior or settings | `docs/user/` and relevant embedding guide |
 | Consumer-specific workflow | Consumer documentation; link shared guides instead of copying them |
 | Setup or dependency requirements | [Getting started](getting-started.md) and relevant module reference |
 
@@ -27,7 +27,7 @@ From the checkout's parent with the project's interpreter:
 QT_QPA_PLATFORM=offscreen python -m unittest commonUtils.tests.test_file_registry commonUtils.tests.test_package_layout
 ```
 
-The [test guide](../../tests/README.md) gives suite commands and PowerShell setup.
+The [test guide](../reference/tests/tests.md) gives suite commands and PowerShell setup.
 For many Qt modules, run separate processes to isolate QApplication and native
 ownership. Use temporary cache databases, fixtures and output directories; never
 point test browsers at a live user index. Keep worker owners until they stop.
@@ -55,4 +55,4 @@ Native dialogs, speech voices, terminal windows, trash and external applications
 also need manual platform checks. Blue Hole adapter regressions require its checkout
 and environment; absence should be reported, not treated as a pass.
 
-[Developer hub](README.md)
+[Developer hub](developer.md)

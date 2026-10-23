@@ -9,9 +9,12 @@ Read [architecture](docs/developer/architecture.md),
   persisted formats and cooperative UI shutdown. Do not infer stability from names.
 - Flat UI forwarding modules have been removed. Use the grouped UI packages for imports
   and patch targets; do not recreate legacy aliases.
-- Update the owning API guide for contract changes and component `user_docs/` for
+- Update the owning API guide for contract changes and `docs/user/` for
   shared interactive behavior. Follow [documentation ownership](docs/developer/maintenance.md).
 - Keep README concise; cross-cutting developer guidance lives in `docs/developer/`,
-  detailed references beside their implementations, and user guides beside components.
+  API references in `docs/reference/`, and user guides in `docs/user/`.
+- Every wiki page starts with an H1 title. Every folder has a same-named landing
+  linked by its parent; `docs/docs.md` is the shared wiki root. Source-local
+  README/user_docs files remain short compatibility links, not duplicate guides.
 - Validate with isolated fixtures/caches and relevant shared/consumer tests. Report
-  unavailable platform/consumer checks explicitly. See [testing](tests/README.md).
+  unavailable platform/consumer checks explicitly. See [testing](docs/reference/tests/tests.md).

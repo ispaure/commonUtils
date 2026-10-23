@@ -97,4 +97,18 @@ be understood and tested without reconstructing the former inheritance contract.
 All completion criteria above are met; further structural work is deferred rather
 than required to justify the 7/10 assessment.
 
-[Developer hub](README.md)
+[Developer hub](developer.md)
+
+## Central documentation wiki follow-up
+
+The shared documentation now has a `docs/docs.md` entry and one sidebar scope.
+Sixty-five existing guides (including the former root overview) move into the
+root wiki, with API references grouped by source owner and component workflows
+in `docs/user/`. Every folder has a same-named landing and every page starts with
+an H1. Relative document, source and asset links are rebased; source-local
+README/user_docs entry points remain short links for older callers.
+
+All 14 documentation-layout, portable catalog and real offscreen viewer cases
+pass. Every local link in all 79 wiki pages resolves. No runtime/Perforce API,
+consumer build architecture, dependency or data schema changes. Work is local
+only; no remote was pushed.

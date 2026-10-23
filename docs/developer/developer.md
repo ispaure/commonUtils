@@ -10,15 +10,15 @@ domain policy, dependency installation and user-facing destinations.
 5. [Integration contracts](contracts.md): imports, persistent formats and consumer upgrades.
 6. [Maintenance](maintenance.md): validation and documentation responsibilities.
 
-Detailed API examples remain beside their owners and are linked from these guides.
-For interactive workflows, use the [component user guides](../../README.md#shared-component-user-guides).
+Detailed API examples live in the [API reference](../reference/reference.md), grouped by source owner.
+For interactive workflows, use the [component user guides](../user/user.md).
 The [audit record](audit.md) explains the restructuring and remaining uncertainties.
 The [indexing and Markdown readability record](readability.md) defines the active
 maintenance pass, completion criteria and validation scope.
 
 [Process, diagnostics and presentation owners](lifecycle-owners.md) describes lifecycle boundaries.
 
-[Library overview](../../README.md)
+[Library overview](../overview.md)
 
 ## Platform support
 
@@ -31,8 +31,8 @@ smoke harness, inspect evidence and distinguish host checks from mobile results.
 
 ## Resource integration
 
-Use the [resource runtime map](../../runtime/resources/README.md) for storage
-contracts and virtual paths, and [Qt resource windows](../../ui/resources/README.md)
+Use the [resource runtime map](../reference/runtime/resources/resources.md) for storage
+contracts and virtual paths, and [Qt resource windows](../reference/ui/resources/resources.md)
 for picker/editor operation ownership. Shared native browsing and speech lifetimes
-are covered in the [native browser](../../ui/native_browser/README.md) and
-[reader controls](../../ui/readers/README.md) guides.
+are covered in the [native browser](../reference/ui/native_browser/native_browser.md) and
+[reader controls](../reference/ui/readers/readers.md) guides.

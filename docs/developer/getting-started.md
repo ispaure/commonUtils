@@ -6,7 +6,7 @@ Clone or vendor the repository as `commonUtils` beside your application code, or
 put its parent on `PYTHONPATH`. For a consumer with a submodule, initialize that
 consumer's submodules with `git submodule update --init --recursive`. Do not run
 `pip install commonUtils` expecting this checkout: there is no distribution
-manifest here. [Launchers](../../launchers/README.md) cover supported consumer layouts.
+manifest here. [Launchers](../reference/launchers/launchers.md) cover supported consumer layouts.
 
 Create a virtual environment using your project's Python interpreter. The source
 uses Python 3.10-era syntax; repository CI selects 3.12.2. Windows, macOS and Linux
@@ -30,7 +30,7 @@ module paths. The root import does not initialize a GUI or install optional soft
 | Markdown diagrams | Optional local `mmdc` executable, invoked only on request |
 | Read aloud | QtTextToSpeech plus an available native speech engine/voice |
 | EXIF wrapper | piexif |
-| Platform/application adapters | Their target applications or system commands; consult [integrations](../../integrations/README.md) |
+| Platform/application adapters | Their target applications or system commands; consult [integrations](../reference/integrations/integrations.md) |
 
 This is a capability map, not an exhaustive dependency lock. Import and exercise
 the modules your application actually uses. CI obtains its dependency environment
@@ -62,7 +62,7 @@ for the other without considering that difference.
 
 ## Embed a browser
 
-The [runnable feature example](../../ui/features/README.md#runnable-example-add-a-menu-action-to-a-browser)
+The [runnable feature example](../reference/ui/features/features.md#runnable-example-add-a-menu-action-to-a-browser)
 creates QApplication, registers a feature, installs it in a FileBrowser and defers
 closing until browser workers stop. Save the example beside the `commonUtils`
 checkout, install PySide6 and run it with a local folder argument.
@@ -74,6 +74,6 @@ wait for their completion as well as browser workers. See
 
 To embed Markdown, use `MarkdownViewer`; to open a retained standalone or hosted
 window, use `open_markdown`. Editing is opt-in. See the
-[Markdown developer guide](../../ui/markdown/README.md).
+[Markdown developer guide](../reference/ui/markdown/markdown.md).
 
-[Developer hub](README.md)
+[Developer hub](developer.md)

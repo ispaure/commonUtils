@@ -50,12 +50,12 @@ Use `override_file_type(Base, Subclass, priority=...)` or
 The replacement must be a strict subclass. Only an **exact resolved class** is
 replaced; replacing TXTFile does not erase CSV/Markdown specialization. Chains of
 subclass replacements are supported. Direct constructors and old instances are
-unchanged. See the [complete override example](../../formats/README.md#replace-an-existing-type-with-your-subclass).
+unchanged. See the [complete override example](../reference/formats/formats.md#replace-an-existing-type-with-your-subclass).
 
 ## Declare browser behavior
 
 A `Feature` groups owned `FileType`/`FileTypeOverride` declarations with a
-`BrowserExtension`. The [runnable guide](../../ui/features/README.md) includes a
+`BrowserExtension`. The [runnable guide](../reference/ui/features/features.md) includes a
 full window plus realistic panel/action/activation examples.
 
 The host retains the declaration, calls `register_types()` before listing and
@@ -121,16 +121,16 @@ Feature declarations to keep ownership coherent.
 
 - A Workspace factory returns a QWidget and may expose title, close and idle
   protocols. `dock_group` restricts compatible transfers; `WorkspacePolicy` opts
-  into richer detached-window behavior. See [workspace contracts](../../ui/workspaces.md).
+  into richer detached-window behavior. See [workspace contracts](../reference/ui/workspaces.md).
 - INI typed keys are an opt-in convention. Subclass INISettingsEditor for extra
   validation before saving; applications own domain rules and post-save reload.
-  See [configuration](../../configuration/README.md).
+  See [configuration](../reference/configuration/configuration.md).
 - ArchiveContents accepts entries/previews and emits requests. Supply workers and
-  credential/error policy in the host; see [archive integration](../../archives/README.md).
+  credential/error policy in the host; see [archive integration](../reference/archives/archives.md).
 - Code diff/merge Apply callbacks change host-owned buffers. The host owns stale
-  checks, undo, offset conversion and persistence; see [code editing](../../ui/code_editor/README.md).
+  checks, undo, offset conversion and persistence; see [code editing](../reference/ui/code_editor/code_editor.md).
 
-[Developer hub](README.md)
+[Developer hub](developer.md)
 
 File types can supply `browser_thumbnail_badge()` for a short live thumbnail
 label. This is a GUI-thread painting hook: do not parse archives, block or open

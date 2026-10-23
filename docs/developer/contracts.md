@@ -24,13 +24,13 @@ Markdown embeds retain the widget's explicit navigation/edit/save entry points.
 Document identity and byte/rich-import baselines now live in
 `viewer.document_state`; hosts migrate direct private `_loaded_path` and
 `_source_bytes` assignments to that declared owner. Source editor text and undo
-history remain editor-owned. See [Markdown ownership](../../ui/markdown/README.md#internal-ownership-and-embedding-contracts).
+history remain editor-owned. See [Markdown ownership](../reference/ui/markdown/markdown.md#internal-ownership-and-embedding-contracts).
 
 Index scan instrumentation reads transient counters from `cache.active_operation`
 inside the writer operation. That object is detached on success/failure;
 `last_metrics` remains available afterward. Saved database formats and scan,
 reconciliation and snapshot-lifetime contracts are unchanged. See
-[index state ownership](../../filesystem/index/README.md#state-ownership).
+[index state ownership](../reference/filesystem/index/index.md#state-ownership).
 
 File instances retain their original path and cached metadata. Registration changes
 affect future resolutions. Feature bindings filter captured selections by accepted
@@ -39,12 +39,12 @@ types; handlers still validate current state before mutation. Read
 
 Shared settings live at `ui/settings.ini`. Readers use defaults for invalid/missing
 values and do not rewrite configuration. INI key changes require updating consumers
-and a deliberate migration of saved values. See [configuration](../../configuration/README.md).
+and a deliberate migration of saved values. See [configuration](../reference/configuration/configuration.md).
 
 Cache/data locations and launcher lookup are observable behavior. SQLite schema
 changes need writer locking, rollback, old-reader consistency and preservation of
 resumable checkpoints. Consumers use Entry/Snapshot rather than database IDs. See
-[storage](../../filesystem/storage/README.md) and [indexing](../../filesystem/index/README.md).
+[storage](../reference/filesystem/storage/storage.md) and [indexing](../reference/filesystem/index/index.md).
 
 Text encodings, BOMs, line endings, conflict checks and unchanged-byte preservation
 are format-specific contracts. Atomic replacement is not a writer lock. Preserve
@@ -64,7 +64,7 @@ then creates no dock or tab.
 hosts opt in through `install_window_dpi_scale_fixer()`. The helper observes native
 messages without consuming them and only repairs normal-window client QSize
 drift. Keep Qt's DPI awareness and display scaling enabled. See the
-[backend guide](../../ui/pyside/README.md) for lifecycle and validation limits.
+[backend guide](../reference/ui/pyside/pyside.md) for lifecycle and validation limits.
 Browser `stop()` returns true while busy; controller `prepare_close()` returns
 false while not ready. See [architecture](architecture.md#initialization-and-shutdown).
 
@@ -75,7 +75,7 @@ Run shared regressions and each affected consumer's tests, update their imports
 and documentation, and then update the pinned or vendored source. Keep domain
 workflows in the consuming application.
 
-[Developer hub](README.md)
+[Developer hub](developer.md)
 
 ## Layered configuration and typography
 
@@ -92,7 +92,7 @@ the platform-adjusted QFont point size or disable Qt's native display scaling.
 
 ## Grouped UI imports
 
-See [UI module organization](../../ui/README.md#module-organization) for canonical
+See [UI module organization](../reference/ui/ui.md#module-organization) for canonical
 package paths. Flat forwarding modules for workspace, task, reader, settings and
 appearance implementations have been removed. Update imports, deferred dotted
 references and mock patch targets to their owning package, for example
@@ -121,7 +121,7 @@ and native proxy adapters; mocked platform tests reject networking imports too.
 
 ## Virtual resources
 
-[Provider contracts](../../ui/resource-providers.md) describe the generic directory,
+[Provider contracts](../reference/ui/resource-providers.md) describe the generic directory,
 archive and Markdown storage boundaries. Virtual paths are identifiers, not an
 invitation to open local files. Consumers own backend selection, credentials,
 provider lifetime and private-content policy.
@@ -140,7 +140,7 @@ filesystem imports. Qt models expose these entries through shared roles; regular
 and provider browsers use the same `BrowserViews` for list, tiles and columns.
 Filesystem watching, indexing and local actions remain in the local adapter/host.
 Providers retain workers through cancellation and use RAM thumbnail caches. See
-[shared item presentation](../../ui/resource-providers.md#shared-item-presentation).
+[shared item presentation](../reference/ui/resource-providers.md#shared-item-presentation).
 Native mobile list/tile views consume the same snapshots, with shared query/sort
 projection, bounded recursive provider search and navigation history. Consumer adapters own local, crypt and remote I/O.
 
@@ -160,6 +160,6 @@ when source cleanup fails; an exception does not imply destination rollback.
 
 ## Search and format owner migration
 
-Search imports moved to `search.names`, `search.providers`, `search.indexed`, `search.qt_text` and `search.files`; see [search contracts](../../search/README.md). Desktop matcher offsets and regex syntax are unchanged. Markdown imports use `formats.markdown.{properties,images,wiki,file}`; the package still exports property helpers. String tables use `formats.tables`, preserving Cell/Row/Spreadsheet methods.
+Search imports moved to `search.names`, `search.providers`, `search.indexed`, `search.qt_text` and `search.files`; see [search contracts](../reference/search/search.md). Desktop matcher offsets and regex syntax are unchanged. Markdown imports use `formats.markdown.{properties,images,wiki,file}`; the package still exports property helpers. String tables use `formats.tables`, preserving Cell/Row/Spreadsheet methods.
 
 Atomic persistence, filesystem information and feature declarations retain their package exports; implementation and mock targets now live in `persistence.atomic`, `filesystem.objects` and `ui.features.declarations`. Legacy print logging callers use `runtime.diagnostics`; UI helpers raise ordinary errors rather than exiting the host process. Personal Dropbox discovery belongs to Logistics, retaining its existing paths.

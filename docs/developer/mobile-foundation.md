@@ -66,7 +66,7 @@ storage. IMPLEMENTED means an existing desktop adapter, not a successful runtime
 probe. Mobile adapters are UNAVAILABLE; local filesystem access is UNVERIFIED on
 all platforms until an operation is attempted. `probe_filesystem` reports VERIFIED
 only for the actual path/read or temporary-file write it performed. See the
-[API contract](../../runtime/platform/README.md#capability-policy).
+[API contract](../reference/runtime/platform/platform.md#capability-policy).
 
 Command entry points, application/URI launchers, directory opening and default
 text editing reject mobile requests with `UnsupportedCapabilityError` before

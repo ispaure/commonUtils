@@ -17,7 +17,7 @@ hooks return data and image bytes rather than widgets. UI modules consume this
 data and schedule work. Diagnostics emits events to explicitly configured sinks
 and presenters without importing UI. Some file activation hooks still lazily open
 a UI. The optional PCRE search backend imports QtCore without widgets; portable
-name/provider/literal queries need no toolkit. See [search owners](../../search/README.md).
+name/provider/literal queries need no toolkit. See [search owners](../reference/search/search.md).
 
 commonUtils does not own Logistics' feature registry, Obsidian vault workflows,
 comic/book application features or full text-editor workspace. Its Markdown reader
@@ -55,11 +55,11 @@ storage. Network browsing disables automatic indexing and rich metadata work.
 The index retains logical content size and allocated file size separately. Unknown
 allocations stay explicit; folder totals roll up known allocations and unknown counts.
 Files are counted by path, excluding links and filesystem metadata. See the
-[index size contracts](../../filesystem/index/README.md#compact-cache-schema-4).
+[index size contracts](../reference/filesystem/index/index.md#compact-cache-schema-4).
 Hosts may opt into the durable process-shared coordinator: one OS-elected runner
 handles queued requests, other processes follow progress and take over after exit.
 The host retains/stops its runner independently of browser widgets; see
-[index lifecycle](../../filesystem/index/README.md).
+[index lifecycle](../reference/filesystem/index/index.md).
 
 ## Initialization and shutdown
 
@@ -82,17 +82,17 @@ retry only after the appropriate idle/completion notification.
 A widget's destruction is not a cancellation mechanism. Disabling/removing a
 feature does not stop existing controller jobs. Workspace tabs may disappear while
 workers retire, but the workspace retains hidden owners; whole-window shutdown
-must include them. See [workspaces](../../ui/workspaces.md) and
-[operation progress](../../ui/operation_progress.md).
+must include them. See [workspaces](../reference/ui/workspaces.md) and
+[operation progress](../reference/ui/operation_progress.md).
 
 ## Persistence and failure boundaries
 
 Atomic publication protects one destination; it is not a cross-process lock or a
 multi-file transaction. Text/INI/Markdown layers add conflict and encoding rules.
 Batch cancellation normally finishes the current item and records the remainder.
-The [archive workspace extractor](../../archives/README.md#extraction-publication)
+The [archive workspace extractor](../reference/archives/archives.md#extraction-publication)
 stages the complete selected tree and publishes a new destination with an atomic
-no-replace rename. The lower-level [ZIP extractor](../../archives/zip_access.md)
+no-replace rename. The lower-level [ZIP extractor](../reference/archives/zip_access.md)
 stages individual files and requires a disposable workspace for whole-operation
 isolation. UI progress reaching its end does not prove every item succeeded.
 
@@ -101,7 +101,7 @@ New result-based APIs expose explicit errors/outcomes. Legacy diagnostics may ra
 and present errors after returning to the GUI thread. Do not silently swallow
 failure or generalize one operation's policy to every helper.
 
-[Developer hub](README.md)
+[Developer hub](developer.md)
 
 ## Consolidated internal owners
 
@@ -119,6 +119,6 @@ thumbnail caches shared by paginated and recycled presentation.
 Layer composition, transfer phases, ZIP member plans, directory-index writer
 phases and workspace drops also have explicit internal owners. Their contracts
 and caller policy boundaries are documented in the [API map](public-apis.md),
-[configuration](../../configuration/README.md), [persistence](../../persistence/README.md),
-[archives](../../archives/README.md), [index](../../filesystem/index/README.md)
-and [workspace](../../ui/workspaces.md) guides.
+[configuration](../reference/configuration/configuration.md), [persistence](../reference/persistence/persistence.md),
+[archives](../reference/archives/archives.md), [index](../reference/filesystem/index/index.md)
+and [workspace](../reference/ui/workspaces.md) guides.
