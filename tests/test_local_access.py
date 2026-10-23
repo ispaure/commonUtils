@@ -37,6 +37,58 @@ class LocalAccessTests(unittest.TestCase):
             finally:
                 release()
 
+    def test_file_object_mutations_respect_source_and_destination_boundaries(self):
+        from commonUtils.filesystem.files import File
+        for action in ('copy_out', 'copy_in', 'move_out', 'delete', 'writable', 'rename'):
+            with self.subTest(action=action), TemporaryDirectory() as directory:
+                root = Path(directory)
+                protected = root / 'managed'
+                protected.mkdir()
+                source, outside = protected / 'document', root / 'ordinary'
+                source.write_bytes(b'opaque')
+                outside.write_bytes(b'ordinary')
+                release = protect_local_root(self.id(), protected, 'Use the provider')
+                try:
+                    operations = {
+                        'copy_out': lambda: File(source).copy_file(root / 'copied'),
+                        'copy_in': lambda: File(outside).copy_file(source),
+                        'move_out': lambda: File(source).move_file(root / 'moved'),
+                        'delete': lambda: File(source).delete_file(),
+                        'writable': lambda: File(source).make_writable(),
+                        'rename': lambda: File(source).rename_file(root / 'nested/renamed'),
+                    }
+                    with self.assertRaises(PermissionError):
+                        operations[action]()
+                    self.assertEqual(source.read_bytes(), b'opaque')
+                    self.assertEqual(outside.read_bytes(), b'ordinary')
+                    self.assertFalse((root / 'nested').exists())
+                finally:
+                    release()
+
+    def test_directory_object_deletion_preflights_protected_descendants(self):
+        from commonUtils.filesystem.directories import Directory
+        for action in ('root', 'contents', 'ancestor_contents'):
+            with self.subTest(action=action), TemporaryDirectory() as directory:
+                root = Path(directory)
+                protected = root / 'managed'
+                protected.mkdir()
+                source, ordinary = protected / 'document', root / 'ordinary'
+                source.write_bytes(b'opaque')
+                ordinary.write_bytes(b'keep sibling')
+                release = protect_local_root(self.id(), protected, 'Use the provider')
+                try:
+                    with self.assertRaises(PermissionError):
+                        if action == 'root':
+                            Directory(protected).delete()
+                        elif action == 'contents':
+                            Directory(protected).delete_contents()
+                        else:
+                            Directory(root).delete_contents()
+                    self.assertEqual(source.read_bytes(), b'opaque')
+                    self.assertEqual(ordinary.read_bytes(), b'keep sibling')
+                finally:
+                    release()
+
     def test_backend_record_grant_is_exact_and_scoped(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

@@ -41,6 +41,14 @@ ordinary file operations reject raw access to registered roots, including aliase
 and recursive ancestor operations. See the [provider contract](../ui/resource-providers.md)
 for registration, internal record grants and the scope of this safeguard.
 
+The same guard applies before legacy File copy/move/rename/deletion and permission
+changes, and before Directory deletion/content deletion. Ancestor directory
+operations preflight registered descendants before touching ordinary siblings;
+denied renames do not create destination parents. Ordinary unregistered paths
+keep their established behavior, and exact backend-record grants remain scoped.
+This routes host-managed storage through its provider; it is not an OS sandbox
+for arbitrary external filesystem calls.
+
 ## Verified content snapshots
 
 `snapshots.file_revision(path, follow_symlinks=True)` returns

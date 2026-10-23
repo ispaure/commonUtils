@@ -29,6 +29,7 @@ delete_debug_prompt: bool = False
 
 
 from .. import FilesystemObject
+from ..local_access import check_local_path
 
 
 class File(FilesystemObject):
@@ -75,6 +76,7 @@ class File(FilesystemObject):
         macOS AppleDouble files starting with "._" are treated as successfully deleted
         if they disappear before the delete operation completes.
         """
+        check_local_path(self.path)
         if delete_debug_prompt:
             log(Severity.WARNING, 'Delete File', f'Deleting "{self.path}", proceed?', popup=True)
 
@@ -110,10 +112,11 @@ class File(FilesystemObject):
         Ensures the file is writable by the owner, without removing any
         existing permissions.
 
-        Returns False if the file does not exist.
+        Returns True when no existing regular file needs a permission change.
         Raises PermissionError / OSError on failure.
         """
         p = Path(self.path)
+        check_local_path(p)
 
         if not p.exists() or not p.is_file():
             return True
@@ -139,6 +142,7 @@ class File(FilesystemObject):
         """
         For macOS / Linux, gets permission of a file to be an executable. Helpful if a file won't run or open
         """
+        check_local_path(self.path)
         from ...integrations.wrappers import cmdShellWrapper
         tool_name = 'MacOS Permission'
         # App Run permissions
@@ -153,6 +157,8 @@ class File(FilesystemObject):
         """
         source = self.path
         destination = Path(destination)
+        check_local_path(source)
+        check_local_path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
 
         log(Severity.DEBUG, 'fileUtils.copy_file', f'Copying file from "{source}" to "{destination}"')
@@ -167,6 +173,8 @@ class File(FilesystemObject):
         """
         original_name = self.path
         new_name = Path(destination)
+        check_local_path(original_name, recursive=True)
+        check_local_path(new_name, recursive=True)
         from ..rename import rename_path
         new_name.parent.mkdir(parents=True, exist_ok=True)
         log(Severity.DEBUG, 'fileUtils.rename_file', f'Renaming file from "{original_name}" to "{new_name}"')
@@ -180,6 +188,8 @@ class File(FilesystemObject):
         """
         src = self.path
         dest = Path(destination)
+        check_local_path(src)
+        check_local_path(dest)
         if not src.is_file():
             raise FileNotFoundError(f'Source is not an existing file: "{src}"')
 

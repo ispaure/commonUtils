@@ -22,6 +22,7 @@ from typing import List, Optional, Set, Union
 
 
 from .. import FilesystemObject
+from ..local_access import check_local_path
 
 
 class Directory(FilesystemObject):
@@ -119,6 +120,7 @@ class Directory(FilesystemObject):
         By default, file permissions are not modified during deletion.
         If make_writable is True, files that cannot be deleted due to permissions may be made writable and retried.
         """
+        check_local_path(self.path, recursive=True)
         if fileUtils.delete_debug_prompt:
             log(Severity.WARNING, 'Directory.delete', f'Deleting "{self.path}", proceed?', popup=True)
         else:
@@ -158,6 +160,7 @@ class Directory(FilesystemObject):
         By default, file permissions are not modified during deletion.
         If make_writable is True, files that cannot be deleted due to permissions may be made writable and retried.
         """
+        check_local_path(self.path, recursive=True)
         # Do not follow a linked root for destructive operations unless explicitly requested
         if self.path.is_symlink() or linkUtils.is_junction(self.path):
             if not follow_root_link:
