@@ -109,3 +109,10 @@ is retained for that failed run. Successful callbacks still expose `error=None`.
 `Operation` and `OperationProgress` share this behavior. An empty-message exception
 must never be displayed as a successful finished operation. Thread retention and
 `finished`-before-destruction requirements are unchanged.
+
+`OperationProgress` also reports worker construction/start exceptions through
+its ordinary `completed(None, error)` signal on the next GUI event turn. It keeps
+the job busy until that completion, so callers finish their start-time state
+updates before handling failure. No callback runs on failed admission; controls
+retire and the same progress owner can start a later job. Calling `start()` on an
+already busy owner still raises `RuntimeError` immediately.

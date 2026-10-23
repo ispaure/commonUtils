@@ -3,6 +3,16 @@ from .. import pyside as qt
 from ...runtime.diagnostics import noninteractive_logging
 
 
+def _format_error(error, formatter=str):
+    """Keep failures visible without bypassing a host's redaction policy."""
+    fallback = type(error).__name__
+    try:
+        message = formatter(error)
+    except Exception:
+        return f'{fallback} (error formatting failed).'
+    return message if isinstance(message, str) and message.strip() else fallback
+
+
 class ResultWorker(qt.QThread):
     """Owners consume result/error after finished, retaining the worker until then.
 
@@ -27,15 +37,7 @@ class ResultWorker(qt.QThread):
                 self.result = self.callback()
         except Exception as error:
             self.cancelled = isinstance(error, self.cancellation_errors)
-            fallback = type(error).__name__
-            try:
-                message = self.error_formatter(error)
-            except Exception:
-                # A policy formatter may redact secrets. Never fall back to the
-                # original exception text when that formatter fails.
-                self.error = f'{fallback} (error formatting failed).'
-            else:
-                self.error = message if isinstance(message, str) and message.strip() else fallback
+            self.error = _format_error(error, self.error_formatter)
 
     def cancel(self):
         self.requestInterruption()

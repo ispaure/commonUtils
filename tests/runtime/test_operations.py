@@ -75,6 +75,50 @@ class OperationProgressTests(QtTestCase):
         self.assertEqual(self.progress.bar.value(), 0)
         self.assertIn('Operation failed', self.progress.message.text())
 
+    def test_worker_admission_failure_completes_after_start_returns_and_allows_retry(self):
+        results = []
+        self.progress.completed.connect(lambda value, error: results.append((value, error)))
+        for target in ('Operation', 'Operation.start'):
+            with self.subTest(target=target):
+                results.clear()
+                try:
+                    with patch('commonUtils.ui.tasks.operation_progress.' + target,
+                               side_effect=RuntimeError('worker admission denied')):
+                        self.progress.start(lambda report, cancelled: self.fail('Job must not run'),
+                                            show_progress=False)
+                    self.assertEqual(results, [])
+                    self.assertTrue(self.progress.busy)
+                    self.wait()
+                    self.assertEqual(results, [(None, 'worker admission denied')])
+                    self.assertFalse(self.progress.cancel_button.isEnabled())
+                    self.assertIsNone(self.progress.operation)
+                    self.assertTrue(self.progress.isHidden())
+                    self.assertIn('Operation failed', self.progress.message.text())
+                    self.progress.start(lambda report, cancelled: 'retry')
+                    self.wait()
+                    self.assertEqual(results[-1], ('retry', ''))
+                finally:
+                    # Baseline admission errors leave a non-running retained worker.
+                    worker = self.progress.operation
+                    if worker is None or not worker.isRunning():
+                        self.progress.busy = False
+                        self.progress.operation = None
+                        if worker is not None:
+                            worker.deleteLater()
+
+    def test_empty_admission_exception_still_reports_failure(self):
+        results = []
+        self.progress.completed.connect(lambda value, error: results.append((value, error)))
+        try:
+            with patch('commonUtils.ui.tasks.operation_progress.Operation', side_effect=TimeoutError()):
+                self.progress.start(lambda report, cancelled: None)
+            self.wait()
+            self.assertEqual(results, [(None, 'TimeoutError')])
+            self.assertEqual(self.progress.bar.value(), 0)
+        finally:
+            if self.progress.operation is None:
+                self.progress.busy = False
+
     def test_worker_critical_log_reports_error_without_opening_a_dialog(self):
         result = []
         self.progress.completed.connect(lambda value, error: result.append((value, error)))

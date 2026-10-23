@@ -7,7 +7,7 @@ on the GUI thread only after the worker has stopped, so owners can close safely.
 from threading import Event
 from time import monotonic
 from .. import pyside as qt
-from .operations import Operation
+from .operations import Operation, _format_error
 
 
 class OperationProgress(qt.QWidget):
@@ -55,17 +55,23 @@ class OperationProgress(qt.QWidget):
             if now - last_report >= .05 or (total and done >= total):
                 last_report = now
                 self.progress_changed.emit(done, total, message)
-        self.operation = Operation(lambda: work(report, self.cancelled.is_set), self)
-        self.operation.completed.connect(self._remember_result)
-        self.operation.finished.connect(self._finished)
-        self.operation.start()
+        try:
+            self.operation = Operation(lambda: work(report, self.cancelled.is_set), self)
+            self.operation.completed.connect(self._remember_result)
+            self.operation.finished.connect(self._finished)
+            self.operation.start()
+        except Exception as error:
+            self._remember_result(None, _format_error(error))
+            # Preserve asynchronous completion even when no worker could start.
+            qt.QTimer.singleShot(0, self, self._finished)
 
     def _remember_result(self, result, error):
         self._result = result, error
 
     def _finished(self):
         operation = self.operation
-        operation.wait()
+        if operation is not None:
+            operation.wait()
         self.operation = None
         self.busy = False
         self.cancel_button.setEnabled(False)
@@ -75,7 +81,8 @@ class OperationProgress(qt.QWidget):
         self.bar.setValue(0 if error or cancelled else 1000)
         self.message.setText(f'Operation failed: {error}' if error else
                              'Cancelled.' if cancelled else 'Finished.')
-        operation.deleteLater()
+        if operation is not None:
+            operation.deleteLater()
         self.completed.emit(*self._result)
 
     def _progress(self, done, total, message):
