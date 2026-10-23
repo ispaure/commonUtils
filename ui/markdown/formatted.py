@@ -28,10 +28,6 @@ class FormattedEditing:
     def pending(self):
         return self.document.rich_snapshot is not None and self.editor.document().toMarkdown() != self.document.rich_snapshot
 
-    def changed(self):
-        if self.document.rich_snapshot is not None:
-            self.modified(self.source.document().isModified() or self.pending())
-
     def load(self):
         source = self.source.toPlainText()
         self.editor.document().setBaseUrl(

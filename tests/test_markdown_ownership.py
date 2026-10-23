@@ -7,6 +7,7 @@ from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.markdown.formatted import FormattedEditing
 from commonUtils.ui.markdown.live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
+from commonUtils.ui.markdown import MarkdownViewer
 
 
 class DocumentOwnershipTests(unittest.TestCase):
@@ -42,6 +43,19 @@ class DocumentOwnershipTests(unittest.TestCase):
 
 
 class FormattedOwnershipTests(QtTestCase):
+    def test_widget_modified_signal_respects_host_dirty_state_override(self):
+        class HostOwnedDirtyState(MarkdownViewer):
+            @property
+            def is_modified(self):
+                return False
+        viewer = HostOwnedDirtyState(allow_edit=True)
+        self.addCleanup(viewer.deleteLater)
+        changes = []
+        viewer.modified_changed.connect(changes.append)
+        viewer.formatted_editor.insertPlainText('edited')
+        self.assertTrue(changes)
+        self.assertFalse(changes[-1])
+
     def component(self, text):
         # Construct just the synchronization component. It must not require a
         # viewer, a wiki, toolbar fields, reading state or a storage provider.

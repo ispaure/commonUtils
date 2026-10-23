@@ -265,7 +265,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         return self.formatted.format_link(url)
 
     def _formatted_changed(self):
-        self.formatted.changed()
+        # Keep the widget's overridable dirty-state contract at the UI boundary.
+        if self.document_state.rich_snapshot is not None:
+            self._modified_changed(self.is_modified)
 
     def _refresh_search_highlights(self):
         return self.search_highlights.refresh()
