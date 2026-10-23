@@ -86,10 +86,12 @@ class RadialMap(Treemap):
                 bounds = qt.QRectF(center.x()-outer, center.y()-outer, outer*2, outer*2)
                 inside = qt.QRectF(center.x()-inner, center.y()-inner, inner*2, inner*2)
                 shape = qt.QPainterPath()
-                shape.arcMoveTo(bounds, angle); shape.arcTo(bounds, angle, sweep)
+                shape.arcMoveTo(bounds, angle)
+                shape.arcTo(bounds, angle, sweep)
                 radians = math.radians(angle+sweep)
                 shape.lineTo(center.x()+inner*math.cos(radians), center.y()-inner*math.sin(radians))
-                shape.arcTo(inside, angle+sweep, -sweep); shape.closeSubpath()
+                shape.arcTo(inside, angle+sweep, -sweep)
+                shape.closeSubpath()
                 color = (index*47)%360 if depth == 1 else hue
                 painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.Base), 1))
                 painter.setBrush(qt.QColor.fromHsv(color, 150-depth*15, 155+depth*15))
@@ -248,9 +250,12 @@ class StorageView(qt.QWidget):
         self.splitter = qt.QSplitter(qt.Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self.results.setMinimumWidth(220)
-        self.splitter.addWidget(self.charts); self.splitter.addWidget(self.results)
-        self.splitter.setStretchFactor(0,7); self.splitter.setStretchFactor(1,3)
-        self.splitter.setSizes([700,300]); layout.addWidget(self.splitter,1)
+        self.splitter.addWidget(self.charts)
+        self.splitter.addWidget(self.results)
+        self.splitter.setStretchFactor(0,7)
+        self.splitter.setStretchFactor(1,3)
+        self.splitter.setSizes([700,300])
+        layout.addWidget(self.splitter,1)
         browser.index_updated.connect(self._index_changed)
         self.metric_selector.currentIndexChanged.connect(self._metric_changed)
 
@@ -317,7 +322,8 @@ class StorageView(qt.QWidget):
     def _chart_context(self, chart, point):
         item = chart.hit(qt.QPointF(point))
         if item:
-            self.select_path(item[0]); self.context_requested.emit(item[0],chart.mapToGlobal(point))
+            self.select_path(item[0])
+            self.context_requested.emit(item[0],chart.mapToGlobal(point))
 
     def _list_context(self, point):
         item = self.results.itemAt(point)
@@ -343,9 +349,13 @@ class StorageView(qt.QWidget):
             self._navigation_zoom = (1 if previous is not None and previous in path.parents else
                                      -1 if previous is not None and path in previous.parents else 0)
             self.radial.animate_navigation(0)
-            self.root = path; self.selected_path = None
-            self.results.clear(); self._rows = {}; self.map.set_items([])
-            self.radial.nodes = {}; self.radial.set_items([])
+            self.root = path
+            self.selected_path = None
+            self.results.clear()
+            self._rows = {}
+            self.map.set_items([])
+            self.radial.nodes = {}
+            self.radial.set_items([])
             self.summary.clear()
             self._set_loading(True)
         self.refresh()
@@ -383,12 +393,14 @@ class StorageView(qt.QWidget):
                                cancelled=cancelled or self.operation.isInterruptionRequested)
 
     def _loaded(self, root, result, error, *, key=None):
-        if self.closing or root != self.root: return
+        if self.closing or root != self.root:
+            return
         if key is not None and key != (self.root, self.charts.currentIndex(), self._revision, self.metric_selector.currentData()):
             return
         self._set_loading(False)
         if error:
-            self.summary.setText(f'Saved sizes unavailable: {error}'); return
+            self.summary.setText(f'Saved sizes unavailable: {error}')
+            return
         self._results_cache[key] = result
         while len(self._results_cache) > 8:
             del self._results_cache[next(iter(self._results_cache))]
@@ -402,7 +414,10 @@ class StorageView(qt.QWidget):
         self.results.headerItem().setText(1, label)
         self.results.headerItem().setToolTip(1, self.metric_selector.currentText())
         self.map.set_items(self.entries)
-        self.radial.root = root; self.radial.nodes = self.nodes; self.radial.totals = node_totals; self.radial.set_items(self.entries)
+        self.radial.root = root
+        self.radial.nodes = self.nodes
+        self.radial.totals = node_totals
+        self.radial.set_items(self.entries)
         self.radial.animate_navigation(self._navigation_zoom)
         self._navigation_zoom = 0
         blocker = qt.QSignalBlocker(self.results)
@@ -412,11 +427,14 @@ class StorageView(qt.QWidget):
         def add_rows(items, parent=None):
             for path,size in items:
                 item = qt.QTreeWidgetItem([path.name,format_size(size),f'{100*size/total:.1f}%' if total else '0%'])
-                item.setData(0,qt.Qt.ItemDataRole.UserRole,path); item.setToolTip(0,str(path))
+                item.setData(0,qt.Qt.ItemDataRole.UserRole,path)
+                item.setToolTip(0,str(path))
                 item.setToolTip(1, f'{label}: {format_size(size)}')
                 item.setToolTip(2, f'Share of the current folder total ({label.lower()})')
-                if parent is None: self.results.addTopLevelItem(item)
-                else: parent.addChild(item)
+                if parent is None:
+                    self.results.addTopLevelItem(item)
+                else:
+                    parent.addChild(item)
                 self._rows[path] = item
                 add_rows(self.nodes.get(path, ()), item)
         add_rows(self.entries)
@@ -430,16 +448,21 @@ class StorageView(qt.QWidget):
         self.select_path(self.selected_path) if self.selected_path else None
 
     def _finished(self):
-        self.busy = False; self.operation.deleteLater()
+        self.busy = False
+        self.operation.deleteLater()
         self.operation = None
-        if self.closing: self.idle.emit()
+        if self.closing:
+            self.idle.emit()
         elif self.pending:
-            self.pending = False; self.refresh()
+            self.pending = False
+            self.refresh()
 
     def stop(self):
         self.closing = True
-        if self.busy: self.operation.requestInterruption()
+        if self.busy:
+            self.operation.requestInterruption()
         return self.busy
 
     def wait(self):
-        if self.busy: self.operation.wait()
+        if self.busy:
+            self.operation.wait()

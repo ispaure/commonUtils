@@ -11,6 +11,22 @@ from commonUtils.ui.file_browser.storage_data import collect_storage
 
 
 class BrowserIndexPolicyTests(QtTestCase):
+    def test_shared_scan_views_follow_the_same_source_without_marking_early_completion(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).absolute()
+            parent, child, descendant = root / 'parent', root / 'parent/child', root / 'parent/child/nested'
+            with DirectoryCache(database=root / 'index.sqlite3') as cache:
+                self.assertEqual(cache.shared_source(child), child)
+                cache.follow_shared_source(child, parent)
+                cache.follow_shared_source(descendant, child)
+                self.assertEqual(cache.shared_source(descendant), parent)
+                self.assertFalse(cache.was_checked_this_session(child))
+                cache.shared_scan_completed(child, parent)
+                self.assertTrue(cache.was_checked_this_session(child))
+                self.assertFalse(cache.was_checked_this_session(descendant))
+                self.assertEqual(cache.shared_source(child), parent)
+                self.assertFalse(cache.database.exists())
+
     def test_application_defaults_are_cache_first_and_legacy_defaults_unchanged(self):
         with TemporaryDirectory() as temporary:
             path = Path(temporary)/'app.ini'

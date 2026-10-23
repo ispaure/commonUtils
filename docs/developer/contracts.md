@@ -26,6 +26,11 @@ Document identity and byte/rich-import baselines now live in
 `_source_bytes` assignments to that declared owner. Source editor text and undo
 history remain editor-owned. See [Markdown ownership](../reference/ui/markdown/markdown.md#internal-ownership-and-embedding-contracts).
 
+Browser adapters use `DirectoryCache.shared_source()`, `follow_shared_source()`
+and `shared_scan_completed()` for shared scan bookkeeping. The cache owns its
+lock, source mapping and session completion markers; these calls do no SQLite I/O.
+Following a scan does not mark it complete.
+
 Index scan instrumentation reads transient counters from `cache.active_operation`
 inside the writer operation. That object is detached on success/failure;
 `last_metrics` remains available afterward. Saved database formats and scan,

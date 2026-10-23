@@ -48,15 +48,18 @@ class IndexSearch(qt.QWidget):
         self.previous = qt.QPushButton('Previous')
         self.next = qt.QPushButton('Next')
         self.locate_button = qt.QPushButton('Show in browser')
-        self.previous.setEnabled(False); self.next.setEnabled(False)
+        self.previous.setEnabled(False)
+        self.next.setEnabled(False)
         self.previous.clicked.connect(lambda: self._page(-1))
         self.next.clicked.connect(lambda: self._page(1))
         self.locate_button.clicked.connect(self._locate_selected)
-        for button in (self.previous, self.next, self.locate_button): controls.addWidget(button)
+        for button in (self.previous, self.next, self.locate_button):
+            controls.addWidget(button)
         controls.addStretch()
         layout.addLayout(controls)
         self.debounce = qt.QTimer(self)
-        self.debounce.setSingleShot(True); self.debounce.setInterval(400)
+        self.debounce.setSingleShot(True)
+        self.debounce.setInterval(400)
         self.debounce.timeout.connect(self.refresh)
         self.progress_poll = qt.QTimer(self)
         self.progress_poll.setInterval(1200)
@@ -82,7 +85,8 @@ class IndexSearch(qt.QWidget):
         self._revision += 1
         self.offset = 0
         self.pending = self.active
-        if self.busy: self.operation.requestInterruption()
+        if self.busy:
+            self.operation.requestInterruption()
         switched = (self.browser.list_stack.currentWidget() is self) != self.active
         self.browser.list_stack.setCurrentWidget(self if self.active else self.browser.views)
         if self.active:
@@ -106,10 +110,12 @@ class IndexSearch(qt.QWidget):
             self.pending = True
             return
         root = self.browser.navigation.directory
-        if root is None: return
+        if root is None:
+            return
         query = self.browser.search_bar.text().strip()
         offset, sort, descending, revision = self.offset, self.sort, self.descending, self._revision
-        self.busy = True; self.pending = False
+        self.busy = True
+        self.pending = False
         self.operation = Operation(lambda: self._query(root, query, offset, sort, descending), self)
         self.operation.completed.connect(lambda result, error: self._loaded(result, error, revision))
         self.operation.finished.connect(self._finished)
@@ -118,15 +124,18 @@ class IndexSearch(qt.QWidget):
     def _query(self, root, query, offset, sort, descending):
         cancelled = self.operation.isInterruptionRequested
         snapshot = directory_cache.peek(root, cancelled=cancelled)
-        if snapshot is None: return (), 0, False, 0
+        if snapshot is None:
+            return (), 0, False, 0
         matches, total = snapshot.search_page(query, offset, self.page_size, sort=sort,
                                               descending=descending, cancelled=cancelled)
         return matches, total, snapshot.complete, snapshot.scanned_at
 
     def _loaded(self, result, error, revision):
-        if self.closing or revision != self._revision or not self.active: return
+        if self.closing or revision != self._revision or not self.active:
+            return
         if error:
-            self.summary.setText(f'Cached search unavailable: {error}'); return
+            self.summary.setText(f'Cached search unavailable: {error}')
+            return
         matches, self.total, complete, stamp = result
         selected = set(self.selected_paths())
         self._loading = True
@@ -139,7 +148,8 @@ class IndexSearch(qt.QWidget):
                 row.setData(0, qt.Qt.ItemDataRole.UserRole, entry.path)
                 describe_search_row(row, self.results)
                 self.results.addTopLevelItem(row)
-                if entry.path in selected: row.setSelected(True)
+                if entry.path in selected:
+                    row.setSelected(True)
         self._loading = False
         begin = self.offset + 1 if matches else 0
         end = self.offset + len(matches)
@@ -149,11 +159,13 @@ class IndexSearch(qt.QWidget):
         self.summary.setText(f'{begin:,}–{end:,} of {self.total:,} matching files and folders{state}')
         self.previous.setEnabled(self.offset > 0)
         self.next.setEnabled(end < self.total)
-        if selected != set(self.selected_paths()): self.browser._selection_changed()
+        if selected != set(self.selected_paths()):
+            self.browser._selection_changed()
 
     def _finished(self):
         self.busy = False
-        self.operation.deleteLater(); self.operation = None
+        self.operation.deleteLater()
+        self.operation = None
         if self.closing:
             self.idle.emit()
         elif self.pending and not self.debounce.isActive():
@@ -162,20 +174,25 @@ class IndexSearch(qt.QWidget):
     def _sort_changed(self, column):
         sort = ('name', 'type', 'size', 'path')[column]
         self.descending = not self.descending if self.sort == sort else False
-        self.sort = sort; self.offset = 0; self._revision += 1
+        self.sort = sort
+        self.offset = 0
+        self._revision += 1
         self.results.header().setSortIndicator(column, qt.Qt.SortOrder.DescendingOrder if self.descending else qt.Qt.SortOrder.AscendingOrder)
         self.results.header().setSortIndicatorShown(True)
-        if self.busy: self.operation.requestInterruption()
+        if self.busy:
+            self.operation.requestInterruption()
         self.refresh()
 
     def _page(self, direction):
         self.offset = max(0, self.offset + direction * self.page_size)
         self._revision += 1
-        if self.busy: self.operation.requestInterruption()
+        if self.busy:
+            self.operation.requestInterruption()
         self.refresh()
 
     def _selection_changed(self):
-        if not self._loading: self.browser._selection_changed()
+        if not self._loading:
+            self.browser._selection_changed()
 
     def show_in_browser(self, path):
         path = Path(path)
@@ -185,34 +202,45 @@ class IndexSearch(qt.QWidget):
         directory = path if path.is_dir() else path.parent
         self.browser.close_search()
         self.browser.navigate(directory)
-        if directory != path: self.browser.views.select_source(self.browser.model.index(str(path)))
+        if directory != path:
+            self.browser.views.select_source(self.browser.model.index(str(path)))
         return True
 
     def _locate_selected(self):
         paths = self.selected_paths()
-        if paths: self.show_in_browser(paths[0])
+        if paths:
+            self.show_in_browser(paths[0])
 
     def _activate(self, row, column):
         path = row.data(0, qt.Qt.ItemDataRole.UserRole)
-        if path.is_dir(): self.browser.navigate(path)
-        elif path.exists(): self.browser._activate(self.browser.model.index(str(path)))
-        else: self.summary.setText('This cached result is currently unavailable.')
+        if path.is_dir():
+            self.browser.navigate(path)
+        elif path.exists():
+            self.browser._activate(self.browser.model.index(str(path)))
+        else:
+            self.summary.setText('This cached result is currently unavailable.')
 
     def _context_menu(self, point):
         row = self.results.itemAt(point)
-        if row is None: return
+        if row is None:
+            return
         path = row.data(0, qt.Qt.ItemDataRole.UserRole)
         menu = self.browser.context_menu_for(self.browser.model.index(str(path)))
         if menu is not None:
             menu.insertAction(menu.actions()[0] if menu.actions() else None,
                               qt.QAction('Show in browser', menu, triggered=lambda: self.show_in_browser(path)))
-            menu.exec(self.results.viewport().mapToGlobal(point)); menu.deleteLater()
+            menu.exec(self.results.viewport().mapToGlobal(point))
+            menu.deleteLater()
 
     def stop(self):
-        self.closing = True; self.pending = False
-        self.debounce.stop(); self.progress_poll.stop()
-        if self.busy: self.operation.requestInterruption()
+        self.closing = True
+        self.pending = False
+        self.debounce.stop()
+        self.progress_poll.stop()
+        if self.busy:
+            self.operation.requestInterruption()
         return self.busy
 
     def wait(self):
-        if self.operation is not None: self.operation.wait()
+        if self.operation is not None:
+            self.operation.wait()

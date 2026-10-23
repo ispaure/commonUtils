@@ -140,7 +140,9 @@ class PaneSplitter(qt.QSplitter):
         bridges = []
         for i in range(1, len(editors)):
             handle = self.handle(i)
-            layout = qt.QVBoxLayout(handle); layout.setContentsMargins(2, 0, 2, 0); layout.setSpacing(0)
+            layout = qt.QVBoxLayout(handle)
+            layout.setContentsMargins(2, 0, 2, 0)
+            layout.setSpacing(0)
             bridge = ChangeBridge(editors[i-1], editors[i], handle)
             layout.addWidget(bridge)
             bridges.append(bridge)
@@ -196,9 +198,11 @@ class ResultEdit(CodeEdit):
 
     def keyPressEvent(self, event):
         if event.matches(qt.QKeySequence.StandardKey.Undo):
-            self.undo(); return
+            self.undo()
+            return
         if event.matches(qt.QKeySequence.StandardKey.Redo):
-            self.redo(); return
+            self.redo()
+            return
         super().keyPressEvent(event)
 
     def contextMenuEvent(self, event):
@@ -209,8 +213,10 @@ class ResultEdit(CodeEdit):
         anchor = menu.actions()[0]
         undo = menu.addAction('Undo merge edit', self.undo)
         redo = menu.addAction('Redo merge edit', self.redo)
-        undo.setEnabled(self.can_undo); redo.setEnabled(self.can_redo)
-        menu.insertAction(anchor, undo); menu.insertAction(anchor, redo)
+        undo.setEnabled(self.can_undo)
+        redo.setEnabled(self.can_redo)
+        menu.insertAction(anchor, undo)
+        menu.insertAction(anchor, redo)
         menu.exec(event.globalPos())
         menu.deleteLater()
 
@@ -227,24 +233,35 @@ class MergeWidget(qt.QWidget):
         toolbar = qt.QHBoxLayout()
         self.status = qt.QLabel()
         toolbar.addWidget(self.status, 1)
-        self.search = qt.QLineEdit(); self.search.setPlaceholderText("Find in focused pane")
-        self.search.setAccessibleName("Find in merge pane"); self.search.setClearButtonEnabled(True)
-        self.search.returnPressed.connect(self.find_next); toolbar.addWidget(self.search)
+        self.search = qt.QLineEdit()
+        self.search.setPlaceholderText("Find in focused pane")
+        self.search.setAccessibleName("Find in merge pane")
+        self.search.setClearButtonEnabled(True)
+        self.search.returnPressed.connect(self.find_next)
+        toolbar.addWidget(self.search)
         self.buttons = []
         for label, action in [('Previous', lambda: self.navigate(-1)), ('Next', lambda: self.navigate(1)),
                               ('Apply non-conflicting', self.apply_nonconflicting), ('Undo', self.undo), ('Redo', self.redo)]:
-            button = qt.QPushButton(label); button.clicked.connect(action)
-            toolbar.addWidget(button); self.buttons.append(button)
+            button = qt.QPushButton(label)
+            button.clicked.connect(action)
+            toolbar.addWidget(button)
+            self.buttons.append(button)
         layout.addLayout(toolbar)
         self.splitter = PaneSplitter()
         self.editors = []
         self.highlighters = []
         for label, text, editable in [(left_name, model.left, False), ('Result', model.base, True), (right_name, model.right, False)]:
-            host = qt.QWidget(); column = qt.QVBoxLayout(host); column.setContentsMargins(0, 0, 0, 0)
-            title = qt.QLabel(label); title.setTextFormat(qt.Qt.TextFormat.PlainText); column.addWidget(title)
+            host = qt.QWidget()
+            column = qt.QVBoxLayout(host)
+            column.setContentsMargins(0, 0, 0, 0)
+            title = qt.QLabel(label)
+            title.setTextFormat(qt.Qt.TextFormat.PlainText)
+            column.addWidget(title)
             editor = ResultEdit() if editable else CodeEdit()
-            editor.setReadOnly(not editable); editor.setPlainText(text)
-            editor.setAccessibleName(label); editor.indent_guides = False
+            editor.setReadOnly(not editable)
+            editor.setPlainText(text)
+            editor.setAccessibleName(label)
+            editor.indent_guides = False
             column.addWidget(editor, 1)
             self.editors.append(editor)
             editor.focused.connect(lambda editor=editor: setattr(self, "active_editor", editor))
@@ -260,14 +277,16 @@ class MergeWidget(qt.QWidget):
         self.find_shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.find_shortcut.activated.connect(lambda: (self.search.setFocus(), self.search.selectAll()))
         self.result.document().setUndoRedoEnabled(False)
-        self.result.undo_requested.connect(self.undo); self.result.redo_requested.connect(self.redo)
+        self.result.undo_requested.connect(self.undo)
+        self.result.redo_requested.connect(self.redo)
         self.history_actions = []
         for key, callback in ((qt.QKeySequence.StandardKey.Undo, self.undo),
                               (qt.QKeySequence.StandardKey.Redo, self.redo)):
             action = qt.QAction(self)
             action.setShortcuts(qt.QKeySequence.keyBindings(key))
             action.setShortcutContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            action.triggered.connect(callback); self.addAction(action)
+            action.triggered.connect(callback)
+            self.addAction(action)
             self.history_actions.append(action)
         self.result.textChanged.connect(self._edited)
         self.scroll = LinkedScroll(self.editors)
@@ -275,19 +294,28 @@ class MergeWidget(qt.QWidget):
         for label, side in [('Use left', 'left'), ('Use right', 'right'), ('Use both (left then right)', 'both'), ('Keep base', 'base')]:
             button = qt.QPushButton(label)
             button.clicked.connect(lambda checked=False, side=side: self.choose(self.index, side))
-            button.setEnabled(bool(model.regions)); actions.addWidget(button)
+            button.setEnabled(bool(model.regions))
+            actions.addWidget(button)
         manual = qt.QPushButton('Mark selected change resolved')
-        manual.clicked.connect(self.mark_manual); manual.setEnabled(bool(model.regions)); actions.addWidget(manual)
+        manual.clicked.connect(self.mark_manual)
+        manual.setEnabled(bool(model.regions))
+        actions.addWidget(manual)
         manual.setToolTip('Confirm the selected result after editing it by hand. Undo also reverses this decision.')
-        self.base_toggle = qt.QCheckBox('Show common ancestor'); actions.addWidget(self.base_toggle)
+        self.base_toggle = qt.QCheckBox('Show common ancestor')
+        actions.addWidget(self.base_toggle)
         layout.addLayout(actions)
-        self.base_view = CodeEdit(); self.base_view.setReadOnly(True); self.base_view.setPlainText(model.base)
-        self.base_view.setAccessibleName('Common ancestor'); self.base_view.hide()
-        self.base_toggle.toggled.connect(self.base_view.setVisible); layout.addWidget(self.base_view)
+        self.base_view = CodeEdit()
+        self.base_view.setReadOnly(True)
+        self.base_view.setPlainText(model.base)
+        self.base_view.setAccessibleName('Common ancestor')
+        self.base_view.hide()
+        self.base_toggle.toggled.connect(self.base_view.setVisible)
+        layout.addWidget(self.base_view)
         legend = qt.QLabel("Blue: modified · Green: added · Gray: deleted · Red: unresolved conflict")
         layout.addWidget(legend)
         self.refresh_timer = qt.QTimer(self)
-        self.refresh_timer.setSingleShot(True); self.refresh_timer.setInterval(180)
+        self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.setInterval(180)
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh()
 
@@ -300,7 +328,8 @@ class MergeWidget(qt.QWidget):
         if not self.search.text():
             return
         if not self.active_editor.find(self.search.text()):
-            cursor = self.active_editor.textCursor(); cursor.movePosition(qt.QTextCursor.MoveOperation.Start)
+            cursor = self.active_editor.textCursor()
+            cursor.movePosition(qt.QTextCursor.MoveOperation.Start)
             self.active_editor.setTextCursor(cursor)
             self.active_editor.find(self.search.text())
 
@@ -310,7 +339,9 @@ class MergeWidget(qt.QWidget):
         try:
             self.session.edit(self.result.toPlainText())
         except ValueError as error:
-            self.render(); self.status.setText(str(error)); return
+            self.render()
+            self.status.setText(str(error))
+            return
         self.changed.emit()
         self._history_availability()
         self.refresh_timer.start()
@@ -320,7 +351,8 @@ class MergeWidget(qt.QWidget):
         self.updating = True
         try:
             self.result.setPlainText(self.session.text)
-            target = self.result.textCursor(); target.setPosition(min(cursor, self.result.document().characterCount()-1))
+            target = self.result.textCursor()
+            target.setPosition(min(cursor, self.result.document().characterCount()-1))
             self.result.setTextCursor(target)
         finally:
             self.updating = False
@@ -336,8 +368,11 @@ class MergeWidget(qt.QWidget):
             a = tuple(left_offsets[n] for n in region.left_lines)
             b = self.session.ranges[i]
             c = tuple(right_offsets[n] for n in region.right_lines)
-            left.append((*a, kind)); middle.append((*b, kind)); right.append((*c, kind))
-            lb.append((a, b, kind, '›')); rb.append((b, c, kind, '‹'))
+            left.append((*a, kind))
+            middle.append((*b, kind))
+            right.append((*c, kind))
+            lb.append((a, b, kind, '›'))
+            rb.append((b, c, kind, '‹'))
         for editor, ranges in zip(self.editors, (left, middle, right)):
             decorate(editor, ranges)
         for i, region in enumerate(model.regions):
@@ -345,10 +380,12 @@ class MergeWidget(qt.QWidget):
             emphasize(self.editors[2], rb[i][1][0], region.left, region.right)
         self.left_bridge.active = self.right_bridge.active = self.index
         self.left_bridge.rows, self.right_bridge.rows = lb, rb
-        self.left_bridge.update(); self.right_bridge.update()
+        self.left_bridge.update()
+        self.right_bridge.update()
         self.scroll.rebuild()
         self.status.setText(f'{self.session.unresolved} unresolved · Change {self.index+1} of {len(model.regions)}')
-        self.buttons[0].setEnabled(bool(model.regions)); self.buttons[1].setEnabled(bool(model.regions))
+        self.buttons[0].setEnabled(bool(model.regions))
+        self.buttons[1].setEnabled(bool(model.regions))
         self._history_availability()
         self.changed.emit()
 
@@ -356,7 +393,8 @@ class MergeWidget(qt.QWidget):
         self.result.can_undo = bool(self.session.history)
         self.result.can_redo = bool(self.session.future)
         for available, button, action in zip((self.result.can_undo, self.result.can_redo), self.buttons[3:5], self.history_actions):
-            button.setEnabled(available); action.setEnabled(available)
+            button.setEnabled(available)
+            action.setEnabled(available)
 
     def choose(self, index, side):
         if index < 0:
@@ -364,25 +402,31 @@ class MergeWidget(qt.QWidget):
         try:
             self.session.choose(index, side)
         except ValueError as error:
-            self.status.setText(str(error)); return
-        self.index = index; self.render()
+            self.status.setText(str(error))
+            return
+        self.index = index
+        self.render()
 
     def apply_nonconflicting(self):
         try:
             self.session.apply_nonconflicting()
         except ValueError as error:
-            self.status.setText(str(error)); return
+            self.status.setText(str(error))
+            return
         self.render()
 
     def mark_manual(self):
         if self.index >= 0:
-            self.session.mark_manual(self.index); self.refresh()
+            self.session.mark_manual(self.index)
+            self.refresh()
 
     def undo(self):
-        self.session.undo(); self.render()
+        self.session.undo()
+        self.render()
 
     def redo(self):
-        self.session.redo(); self.render()
+        self.session.redo()
+        self.render()
 
     def navigate(self, step):
         if not self.session.model.regions:
@@ -394,8 +438,10 @@ class MergeWidget(qt.QWidget):
         self.scroll.busy = True
         try:
             for editor, offset in zip(self.editors, offsets):
-                cursor = qt.QTextCursor(editor.document()); cursor.setPosition(position(editor.toPlainText(), offset))
-                editor.setTextCursor(cursor); editor.centerCursor()
+                cursor = qt.QTextCursor(editor.document())
+                cursor.setPosition(position(editor.toPlainText(), offset))
+                editor.setTextCursor(cursor)
+                editor.centerCursor()
         finally:
             self.scroll.busy = False
         self.refresh()
@@ -410,12 +456,19 @@ class MergeDialog(qt.QDialog):
         self.widget = MergeWidget(model, self, left_name=left_name, right_name=right_name, path=path)
         self.apply_callback = apply
         self.applying = False
-        layout = qt.QVBoxLayout(self); layout.addWidget(self.widget)
-        row = qt.QHBoxLayout(); row.addStretch()
-        cancel = qt.QPushButton('Cancel'); cancel.clicked.connect(self.reject); row.addWidget(cancel)
-        self.apply_button = qt.QPushButton('Apply result'); self.apply_button.clicked.connect(self.apply_result)
-        row.addWidget(self.apply_button); layout.addLayout(row)
-        self.widget.changed.connect(self._ready); self._ready()
+        layout = qt.QVBoxLayout(self)
+        layout.addWidget(self.widget)
+        row = qt.QHBoxLayout()
+        row.addStretch()
+        cancel = qt.QPushButton('Cancel')
+        cancel.clicked.connect(self.reject)
+        row.addWidget(cancel)
+        self.apply_button = qt.QPushButton('Apply result')
+        self.apply_button.clicked.connect(self.apply_result)
+        row.addWidget(self.apply_button)
+        layout.addLayout(row)
+        self.widget.changed.connect(self._ready)
+        self._ready()
 
     def reject(self):
         if not self.applying:
@@ -436,6 +489,7 @@ class MergeDialog(qt.QDialog):
         try:
             accepted = self.apply_callback(self.widget.session.text)
         except (OSError, ValueError, RuntimeError) as error:
-            self.widget.status.setText(str(error)); return
+            self.widget.status.setText(str(error))
+            return
         if accepted is not False:
             self.accept()

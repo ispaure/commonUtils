@@ -92,8 +92,7 @@ class _IndexJob(Operation):
             return
         with self._view_lock:
             roots = tuple(dict.fromkeys((self.root,) + tuple(self._view_roots.values())))
-        with directory_cache._state_lock:
-            source_root = directory_cache._shared_sources.get(self.root, self.root)
+        source_root = directory_cache.shared_source(self.root)
         with ExitStack() as snapshots:
             source = directory_cache.peek(source_root, cancelled=self.isInterruptionRequested)
             if source is not None:
@@ -227,8 +226,7 @@ class FolderOperation(qt.QObject):
             return False
         self.visible_root = root
         if directory_cache.coordinator is not None:
-            with directory_cache._state_lock:
-                directory_cache._shared_sources[root] = directory_cache._shared_sources.get(job.root, job.root)
+            directory_cache.follow_shared_source(root, job.root)
         job.set_view_root(self, root)
         if root in job.totals_by_root:
             self.updated.emit(root, job.totals_by_root[root])

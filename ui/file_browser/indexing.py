@@ -35,9 +35,7 @@ class BrowserIndexing:
             return
         if job['state'] == 'error':
             return
-        with directory_cache._state_lock:
-            directory_cache._shared_sources[root] = source
-            directory_cache._session_checked.add((directory_cache.database, root))
+        directory_cache.shared_scan_completed(root, source)
         # Read/subscribe without enqueueing another check in response to our own
         # completion notification, even if automatic refresh is enabled.
         self.refresh_folder_totals()
@@ -302,18 +300,24 @@ class BrowserIndexing:
             else 'Show or hide search (Ctrl/Cmd+F)')
         if network:
             self.reconcile_debounce.stop()
-            self._changed_paths.clear(); self._full_index_refresh = False
-            self.folder_pending = False; self._reconcile_pending = False
-            if self.folder_busy: self.folder_operation.requestInterruption()
+            self._changed_paths.clear()
+            self._full_index_refresh = False
+            self.folder_pending = False
+            self._reconcile_pending = False
+            if self.folder_busy:
+                self.folder_operation.requestInterruption()
             watches = self.index_watcher.directories() + self.index_watcher.files()
-            if watches: self.index_watcher.removePaths(watches)
+            if watches:
+                self.index_watcher.removePaths(watches)
             self.close_search()
             self.model.set_folder_totals({})
             self.index_incomplete = False
-            self.index_activity.hide(); self.index_details_button.hide()
+            self.index_activity.hide()
+            self.index_details_button.hide()
             self.index_status.setText('Indexing and scans disabled for network drives')
             self.index_progress.emit(self.index_status.text())
-            if self.views.currentIndex() == 3: self.view_selector.setCurrentIndex(0)
+            if self.views.currentIndex() == 3:
+                self.view_selector.setCurrentIndex(0)
         elif changed:
             self.index_status.setText('Loading saved sizes…')
         self._update_index_controls()
@@ -337,13 +341,17 @@ class BrowserIndexing:
         exclusions = scan_exclusions(root, directory_cache.database)
         expected = {str(path) for path in paths if not is_excluded(path, exclusions)}
         previous = set(self.index_watcher.directories()) | set(self.index_watcher.files())
-        if previous - expected: self.index_watcher.removePaths(list(previous - expected))
-        if expected - previous: self.index_watcher.addPaths(list(expected - previous))
+        if previous - expected:
+            self.index_watcher.removePaths(list(previous - expected))
+        if expected - previous:
+            self.index_watcher.addPaths(list(expected - previous))
 
     def _indexed_path_changed(self, path):
-        if self.stopping or self.network_location or not self.calculate_folder_sizes: return
+        if self.stopping or self.network_location or not self.calculate_folder_sizes:
+            return
         from .index_policy import index_policy
-        if not index_policy(path=self.index_settings_path).watch_changes: return
+        if not index_policy(path=self.index_settings_path).watch_changes:
+            return
         root = self.navigation.directory
         path = Path(path)
         if root is None or (path != root and root not in path.parents):
@@ -358,6 +366,7 @@ class BrowserIndexing:
         self.reconcile_debounce.start()
 
     def _reconcile_index(self):
-        if self.stopping or self.network_location or not self.calculate_folder_sizes or self._index_paused or self.folder_busy: return
+        if self.stopping or self.network_location or not self.calculate_folder_sizes or self._index_paused or self.folder_busy:
+            return
         self._reconcile_pending = False
         self.refresh_folder_totals()

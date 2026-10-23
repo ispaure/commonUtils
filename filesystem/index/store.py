@@ -98,6 +98,22 @@ class DirectoryCache:
         with self._state_lock:
             return (self.database, Path(root).absolute()) in self._session_checked
 
+    def shared_source(self, root):
+        """Return the scan root followed by this view without touching SQLite."""
+        with self._state_lock:
+            return self._shared_sources.get(root, root)
+
+    def follow_shared_source(self, root, source):
+        """Retarget a view to the same generation as an existing shared scan."""
+        with self._state_lock:
+            self._shared_sources[root] = self._shared_sources.get(source, source)
+
+    def shared_scan_completed(self, root, source):
+        """Remember a completed shared scan before a browser reads its totals."""
+        with self._state_lock:
+            self._shared_sources[root] = source
+            self._session_checked.add((self.database, root))
+
     def set_priority_folders(self, owner, paths=()):
         """Register open views without touching SQLite or waiting for its writer.
 
