@@ -201,11 +201,11 @@ class XMLTests(unittest.TestCase):
             document = XMLFile(path)
             document.read_xml()
             document.set_text('Title', 'New')
-            with patch('commonUtils.formats.xmlType.os.replace', side_effect=OSError('replace failed')):
+            with patch('commonUtils.persistence.atomic.os.replace', side_effect=OSError('replace failed')):
                 with self.assertRaises(OSError):
                     document.write_xml()
             self.assertEqual(path.read_bytes(), original)
-            self.assertEqual(list(path.parent.glob('.record.xml-*.tmp')), [])
+            self.assertEqual(list(path.parent.iterdir()), [path])
             exported = path.parent/'nested'/'export.xml'
             old_size = document.size
             document.write_xml(exported)
@@ -232,3 +232,41 @@ class XMLTests(unittest.TestCase):
                 document.write_xml(link)
             self.assertTrue(link.is_symlink())
             self.assertEqual(target.read_bytes(), b'<Original/>')
+
+    @unittest.skipUnless(os.name == 'posix', 'Symlink fixture requires POSIX')
+    def test_writer_rechecks_a_symlink_created_during_staging(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target, destination = root / 'target.xml', root / 'export.xml'
+            target.write_bytes(b'<Original/>')
+            fsync = os.fsync
+            def create_link_after_flush(descriptor):
+                fsync(descriptor)
+                destination.symlink_to(target)
+            document = XMLFile.from_bytes(b'<New/>')
+            with patch('os.fsync', side_effect=create_link_after_flush):
+                with self.assertRaisesRegex(ValueError, 'symlink'):
+                    document.write_xml(destination)
+            self.assertTrue(destination.is_symlink())
+            self.assertEqual(target.read_bytes(), b'<Original/>')
+            self.assertEqual(set(root.iterdir()), {target, destination})
+
+    def test_writer_protects_existing_exports_and_missing_parent_directories(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        for existing in (False, True):
+            with self.subTest(existing=existing), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                destination = root / 'nested/export.xml'
+                if existing:
+                    destination.parent.mkdir()
+                    destination.write_bytes(b'<Original/>')
+                release = protect_local_root(self.id(), root, 'Use the provider')
+                try:
+                    with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                        XMLFile.from_bytes(b'<New/>').write_xml(destination)
+                    if existing:
+                        self.assertEqual(destination.read_bytes(), b'<Original/>')
+                    else:
+                        self.assertFalse(destination.parent.exists())
+                finally:
+                    release()

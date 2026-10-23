@@ -16,13 +16,12 @@ from pathlib import Path
 from xml.dom import minidom, Node
 from xml.etree import ElementTree
 from html import escape as _escape_text
-import os
 import re
-import stat
-from tempfile import NamedTemporaryFile
 
 # Common utilities
 from .txtType import TXTFile
+from ..filesystem.local_access import check_local_path
+from ..persistence import atomic_write_bytes
 
 
 def escape(value, entities=None):
@@ -346,27 +345,13 @@ class XMLFile(TXTFile):
         """
         data = self.to_bytes()
         destination = Path(path) if path is not None else self.path
-        if destination.is_symlink():
-            raise ValueError('Refusing to replace an XML destination symlink')
-        try:
-            permissions = stat.S_IMODE(destination.stat().st_mode)
-        except FileNotFoundError:
-            permissions = None
+        def validate():
+            if destination.is_symlink():
+                raise ValueError('Refusing to replace an XML destination symlink')
+        validate()
+        check_local_path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        staged = None
-        try:
-            with NamedTemporaryFile(dir=destination.parent, prefix=f'.{destination.name}-',
-                                    suffix='.tmp', delete=False) as output:
-                staged = Path(output.name)
-                output.write(data)
-                output.flush()
-                os.fsync(output.fileno())
-            if permissions is not None:
-                staged.chmod(permissions)
-            os.replace(staged, destination)
-        finally:
-            if staged is not None:
-                staged.unlink(missing_ok=True)
+        atomic_write_bytes(destination, data, validate=validate)
         if destination.absolute() == self.path.absolute():
             self.size = len(data)
 

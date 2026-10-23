@@ -125,11 +125,13 @@ loaded.write_xml()
 ```
 
 Serialization/validation happens before touching the destination. The writer
-creates parent directories, stages beside the target, flushes it, preserves an
+delegates publication to `persistence.atomic_write_bytes`: it creates parent
+directories, stages and verifies bytes beside the target, flushes it, preserves an
 existing file's ordinary mode bits, and replaces it atomically. New files use the
 temporary file's private mode. Failed serialization, staging or replacement leaves
 an existing destination intact and cleans temporary output. Symlink destinations
-are refused. An alternate export path leaves the object's path and size unchanged;
+are refused before staging and rechecked before replacement. Host provider
+boundaries are checked before parent creation and publication. An alternate export path leaves the object's path and size unchanged;
 saving its own path refreshes size. The writer does not serialize `line_lst`.
 
 This is a per-file atomic replacement, without source-change detection or a

@@ -110,7 +110,10 @@ raise errors rather than selecting an ambiguous value. Unknown extensions,
 comments, processing instructions and namespace declarations survive other edits.
 
 `to_bytes()` validates serialization and returns bytes; `write_xml(path=None)`
-adds atomic file saving. Nested/repeated elements, namespace-aware attributes and
+adds atomic file saving through `persistence.atomic_write_bytes`, retaining XML
+validation and destination policy. Provider guards run before parent creation;
+symlink refusal is rechecked before publication. Nested/repeated elements,
+namespace-aware attributes and
 explicit element creation/removal use the methods in the [XML guide](xmlType.md).
 Attribute whitespace survives round-trips. Structured edits can change formatting;
 unchanged serialization returns the original bytes. Inherited `read_lines()` and
