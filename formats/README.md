@@ -77,10 +77,12 @@ settings = file.read_json()
 ```
 
 Writes serialize before touching the destination, create parent directories,
-stage UTF-8 text next to the target, flush it, and replace atomically. Existing
+encode UTF-8 with native text newlines, and delegate staging, content verification,
+flushing and atomic replacement to `persistence.atomic_write_bytes`. Existing
 permissions are preserved; temporary files are cleaned up on failure. Non-finite
 numbers are rejected. Formatting is indented by default; `compact=True` removes
 extra whitespace. `ensure_ascii` and `sort_keys` are optional serialization settings.
+Host provider boundaries are checked before parent creation and publication.
 
 ### 📄 `xmlType.py`
 

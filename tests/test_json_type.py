@@ -1,6 +1,7 @@
 """Reusable JSON files preserve originals when serialization or replacement fails."""
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -38,11 +39,11 @@ class JSONFileTests(unittest.TestCase):
             file.write_json({'invalid': object()})
         with self.assertRaises(ValueError):
             file.write_json(float('nan'))
-        with patch('commonUtils.formats.jsonType.os.replace', side_effect=OSError('failed')):
+        with patch('commonUtils.persistence.atomic.os.replace', side_effect=OSError('failed')):
             with self.assertRaises(OSError):
                 file.write_json({'new': True})
         self.assertEqual(self.path.read_bytes(), before)
-        self.assertFalse(list(self.path.parent.glob('*.tmp')))
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
         file.write_json({'new': True})
         self.assertEqual(self.path.stat().st_mode & 0o777, expected_mode)
 
@@ -53,3 +54,27 @@ class JSONFileTests(unittest.TestCase):
         self.path.write_text('invalid JSON')
         with self.assertRaises(json.JSONDecodeError):
             JSONFile(self.path).read_json()
+
+    def test_pretty_output_retains_native_text_newlines(self):
+        JSONFile(self.path).write_json({'title': 'Été'}, ensure_ascii=True)
+        expected = '{\n  "title": "\\u00c9t\\u00e9"\n}'.replace('\n', os.linesep).encode()
+        self.assertEqual(self.path.read_bytes(), expected)
+
+    def test_protected_destinations_are_rejected_before_creating_parents(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                path = self.root / str(existing) / 'nested/data.json'
+                if existing:
+                    path.parent.mkdir(parents=True)
+                    path.write_bytes(b'{"old":true}')
+                release = protect_local_root(self.id(), self.root, 'Use the provider')
+                try:
+                    with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                        JSONFile(path).write_json({'new': True})
+                    if existing:
+                        self.assertEqual(path.read_bytes(), b'{"old":true}')
+                    else:
+                        self.assertFalse(path.parent.exists())
+                finally:
+                    release()

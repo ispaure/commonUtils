@@ -3,10 +3,10 @@
 import json
 import os
 from pathlib import Path
-import stat
-from tempfile import NamedTemporaryFile
 
 from ..filesystem.files import File
+from ..filesystem.local_access import check_local_path
+from ..persistence import atomic_write_bytes
 
 
 class JSONFile(File):
@@ -29,26 +29,11 @@ class JSONFile(File):
         text = json.dumps(value, ensure_ascii=ensure_ascii, sort_keys=sort_keys,
                           allow_nan=False, separators=(',', ':') if compact else None,
                           indent=None if compact else 2)
-        try:
-            permissions = stat.S_IMODE(self.path.stat().st_mode)
-        except FileNotFoundError:
-            permissions = None
+        content = text.replace('\n', os.linesep).encode('utf-8')
+        check_local_path(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        staged = None
-        try:
-            with NamedTemporaryFile(mode='w', encoding='utf-8', dir=self.path.parent,
-                                    prefix=f'.{self.path.name}-', suffix='.tmp', delete=False) as stream:
-                staged = Path(stream.name)
-                stream.write(text)
-                stream.flush()
-                os.fsync(stream.fileno())
-            if permissions is not None:
-                staged.chmod(permissions)
-            os.replace(staged, self.path)
-        finally:
-            if staged is not None:
-                staged.unlink(missing_ok=True)
-        self.size = self.path.stat().st_size
+        atomic_write_bytes(self.path, content)
+        self.size = len(content)
 
 
 from .registry import register_file_type
