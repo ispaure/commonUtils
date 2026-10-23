@@ -5,7 +5,7 @@ Bounded stream reading, copying and hashing with cooperative cancellation.
 Import from `commonUtils.runtime.streams`. Implementation and public exports live in
 [`__init__.py`](__init__.py).
 
-Public entry points: `read_up_to`, `iter_chunks`, `copy_stream`, `stream_signature`, `file_sha256`
+Public entry points: `read_up_to`, `iter_chunks`, `write_all`, `copy_stream`, `stream_signature`, `file_sha256`
 
 [Library overview](../../README.md).
 
@@ -17,6 +17,7 @@ Public entry points: `read_up_to`, `iter_chunks`, `copy_stream`, `stream_signatu
 | --- | --- |
 | `read_up_to` | Read through short reads until EOF or a nonnegative byte ceiling; leave the remaining stream unread. |
 | `iter_chunks` | Check cancellation before each read, including the final EOF read. |
+| `write_all` | Complete one byte buffer, checking cancellation between short writes; invalid counts raise. |
 | `copy_stream` | Complete short writes; progress receives each completed read chunk’s byte count. |
 | `stream_signature` | Return (byte count, SHA-256); progress receives each chunk's byte count; optional `max_bytes` rejects oversized input. |
 
