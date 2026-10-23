@@ -147,7 +147,13 @@ class File(FilesystemObject):
         tool_name = 'MacOS Permission'
         # App Run permissions
         log(Severity.DEBUG, tool_name, f'Getting CHMOD+X Permission for "{self.path}"')
-        cmdShellWrapper.exec_cmd(f'chmod +x "{self.path}"')
+        # Absolute argv keeps names literal and prevents option-like filenames
+        # from becoming chmod flags; the native tool retains its umask policy.
+        result = cmdShellWrapper.run_command(['chmod', '+x', str(self.path.absolute())],
+                                            idle_timeout=15, shell=False)
+        if not result.success:
+            detail = '\n'.join(result.lines) or f'exit status {result.returncode}'
+            raise OSError(f'Could not make "{self.path}" executable: {detail}')
 
 
     def copy_file(self, destination: Union[str, Path]) -> "File":

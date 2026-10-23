@@ -120,3 +120,11 @@ retains the source and new location and raises `MutationIncomplete` with
 `destination_published=True`. Relative/internal link rebasing and no-overwrite
 migration policy are unchanged; callers must resolve both-location conflicts
 rather than blindly retrying a completed publication.
+
+## Executable permissions
+
+`File.set_executable_permission()` retains native `chmod +x` and its umask
+semantics, passing an absolute filename as a literal argument with `shell=False`.
+Quotes, substitutions and option-like relative filenames are never shell syntax.
+Command failures raise OSError instead of silently continuing; the existing
+15-second idle-output timeout remains. The host provider guard runs first.

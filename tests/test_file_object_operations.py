@@ -1,5 +1,8 @@
 """File operation results preserve snapshot identity and propagate I/O errors."""
 from pathlib import Path
+import os
+import shutil
+import stat
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
@@ -41,3 +44,38 @@ class FileObjectOperationTests(unittest.TestCase):
         target=self.root/'other'/'moved.txt'; result=self.file.move_file(target)
         self.assertEqual(result.path,target); self.assertFalse(self.source.exists())
         self.assertEqual(self.file.path,self.source)
+
+    def test_executable_permissions_use_literal_arguments_instead_of_a_shell(self):
+        from commonUtils.integrations.wrappers import cmdShellWrapper
+        result = cmdShellWrapper.CommandResult(0)
+        with patch.object(cmdShellWrapper, 'run_command', return_value=result) as run:
+            self.file.set_executable_permission()
+        run.assert_called_once_with(['chmod', '+x', str(self.source.absolute())],
+                                    idle_timeout=15, shell=False)
+
+    def test_relative_option_like_executable_name_becomes_an_absolute_operand(self):
+        from commonUtils.integrations.wrappers import cmdShellWrapper
+        relative = Path('-R')
+        with patch.object(cmdShellWrapper, 'run_command', return_value=cmdShellWrapper.CommandResult(0)) as run:
+            fileUtils.File(relative).set_executable_permission()
+        self.assertEqual(run.call_args.args[0], ['chmod', '+x', str(relative.absolute())])
+        self.assertFalse(run.call_args.kwargs['shell'])
+
+    def test_executable_permission_failure_is_not_silently_ignored(self):
+        from commonUtils.integrations.wrappers import cmdShellWrapper
+        result = cmdShellWrapper.CommandResult(3, stderr=('permission denied',))
+        with patch.object(cmdShellWrapper, 'run_command', return_value=result):
+            with self.assertRaises(OSError):
+                self.file.set_executable_permission()
+
+    @unittest.skipUnless(os.name != 'nt' and shutil.which('chmod'), 'Native POSIX chmod required')
+    def test_executable_permissions_preserve_literal_shell_metacharacters_in_filename(self):
+        path = self.root / 'literal "quotes" $(printf substituted)'
+        path.write_bytes(b'fixture payload')
+        path.chmod(0o600)
+        before = stat.S_IMODE(path.stat().st_mode)
+        fileUtils.File(path).set_executable_permission()
+        after = stat.S_IMODE(path.stat().st_mode)
+        self.assertTrue(after & stat.S_IXUSR)
+        self.assertEqual(after & ~0o111, before & ~0o111)
+        self.assertEqual(path.read_bytes(), b'fixture payload')
