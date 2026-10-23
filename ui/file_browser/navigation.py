@@ -136,7 +136,7 @@ class BreadcrumbBar(qt.QWidget):
         self.root_button.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly if compact
                                            else qt.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.root_button.setMaximumWidth(max(28, self.width() - 12))
-        qt.QTimer.singleShot(0, self._show_current)
+        qt.QTimer.singleShot(0, self, self._show_current)
 
     def minimumSizeHint(self):
         return qt.QSize(100, max(30, self.root_button.sizeHint().height() + 8))
