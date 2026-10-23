@@ -86,6 +86,15 @@ pinch/pan/edge paging and magnifier gestures, voice interruption and repeated
 install/dispose with late notifications on supported native hosts. Preserve paired
 allocation/restoration and callback ownership throughout such a change.
 
+### Factory construction
+
+Navigation constructors keep admission, saved bindings and final publication in
+one owner. Apple observer registration and child-controller assembly have named
+private stages; Android bottom-bar replacement, weak selection-listener binding
+and menu population do too. Their call order matches allocation/restoration order;
+callbacks and `dispose` remain on the existing adapters. Platform imports stay
+lazy inside the native construction path.
+
 On iOS, a software keyboard in the owning key window temporarily hides destination
 tabs and restores their previous visibility on dismissal or host uninstallation.
 UIKit's tab-bar visibility API releases the tab bar's safe-area reservation on

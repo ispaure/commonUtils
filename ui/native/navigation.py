@@ -89,7 +89,7 @@ class NativeNavigationHost:
 
 class AppleNavigation:
     def __init__(self, host, window):
-        from rubicon.objc import ObjCClass, SEL, Block, objc_id
+        from rubicon.objc import ObjCClass, SEL
         self.host, self.window = host, window
         self.impl = host.root._impl
         self.controller = self.impl.native_controller
@@ -97,6 +97,19 @@ class AppleNavigation:
         self.old_layout = window._impl.container.on_native_layout
         self.old_get_size = window._impl.get_size
         self.old_additional_insets = self.parent.additionalSafeAreaInsets
+        self._install_keyboard_observer()
+        self._install_controllers()
+        self.sidebar_available = bool(self.controller.respondsToSelector(SEL('setMode:')))
+        self.sidebar_used = (self.sidebar_available and host.prefer_sidebar
+                             and ObjCClass('UIDevice').currentDevice.userInterfaceIdiom == 1)
+        if self.sidebar_available:
+            self.controller.setMode(2 if self.sidebar_used else 1)  # Sidebar on iPad; bottom tabs on iPhone.
+        window._impl.container.on_native_layout = self.layout_window
+        window._impl.get_size = self.get_size
+        self.layout_window(window._impl.container)
+
+    def _install_keyboard_observer(self):
+        from rubicon.objc import ObjCClass, Block, objc_id
         self.keyboard_inset = 0
         self.keyboard_visible = False
         self.keyboard_tab_visibility = None
@@ -108,7 +121,10 @@ class AppleNavigation:
             self.notification_center = self.notification_center()
         self.keyboard_observer = self.notification_center.addObserverForName(
             'UIKeyboardDidChangeFrameNotification', object=None, queue=None, usingBlock=self.keyboard_block)
-        self.outer_navigation = window._impl.native.rootViewController
+
+    def _install_controllers(self):
+        from rubicon.objc import ObjCClass
+        self.outer_navigation = self.window._impl.native.rootViewController
         self.old_bar_hidden = bool(self.outer_navigation.isNavigationBarHidden())
         self.outer_navigation.setNavigationBarHidden(True, animated=False)
         self.containers = []
@@ -132,14 +148,6 @@ class AppleNavigation:
             self.containers.append((container, content))
             self.navigation.append(navigation)
         self.impl.refresh_tabs()
-        self.sidebar_available = bool(self.controller.respondsToSelector(SEL('setMode:')))
-        self.sidebar_used = (self.sidebar_available and host.prefer_sidebar
-                             and ObjCClass('UIDevice').currentDevice.userInterfaceIdiom == 1)
-        if self.sidebar_available:
-            self.controller.setMode(2 if self.sidebar_used else 1)  # Sidebar on iPad; bottom tabs on iPhone.
-        window._impl.container.on_native_layout = self.layout_window
-        window._impl.get_size = self.get_size
-        self.layout_window(window._impl.container)
 
     def get_size(self):
         from toga.types import Size
@@ -362,10 +370,6 @@ class AppleNavigation:
 
 class AndroidNavigation:
     def __init__(self, host, window):
-        from android import R
-        from com.google.android.material.navigation import NavigationBarView
-        from java import dynamic_proxy
-        import weakref
         self.host, self.window = host, window
         self.active = True
         # Admit the window before replacing any of Toga's native controls.
@@ -376,6 +380,33 @@ class AndroidNavigation:
         # keyboard-sized window and push its children behind the IME.
         host.root._MIN_HEIGHT = 0
         self.impl.rehint()
+        self._replace_bottom_bar()
+        self.rail = None
+        self.old_resize = self.impl.resize_tab_content
+        self.old_refreshed = self.impl.refreshed
+        self.native_window = self.impl._native_activity.getWindow()
+        self.old_soft_input = self.native_window.getAttributes().softInputMode
+        from android.view import WindowManager
+        self.native_window.setSoftInputMode((self.old_soft_input & ~WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST)
+                                           | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        self.layout_events = 0
+        self.keyboard_chrome = None
+        self.mode = 'bottom'
+        self.old_listener = self.impl.onItemSelectedListener
+        self._install_selection_listener()
+        self.bottom.setOnItemSelectedListener(self.impl.onItemSelectedListener)
+        self.impl.resize_tab_content = self.resize_content
+        self.impl.refreshed = self.content_refreshed
+        # GONE navigation bars do not receive a layout event themselves.
+        # Watch the content viewport so hiding/restoring chrome still relayouts
+        # the Python widgets after Android has reclaimed the actual space.
+        self.impl.native_content.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
+        window.on_resize = self.window_resized
+        self._populate_bottom_menu()
+        self.select_current_tab()
+        self.window_resized(window)
+
+    def _replace_bottom_bar(self):
         # The pinned backend constructs Material navigation with an AppCompat
         # context. Its fallback surface can be black while inactive items are
         # also black. Give both native presentations the same Material theme.
@@ -400,18 +431,11 @@ class AndroidNavigation:
         self.bottom.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
         self.impl.native.addView(self.bottom, LinearLayout.LayoutParams(-1, -2))
         self.impl.native_navigationview = self.bottom
-        self.rail = None
-        self.old_resize = self.impl.resize_tab_content
-        self.old_refreshed = self.impl.refreshed
-        self.native_window = self.impl._native_activity.getWindow()
-        self.old_soft_input = self.native_window.getAttributes().softInputMode
-        from android.view import WindowManager
-        self.native_window.setSoftInputMode((self.old_soft_input & ~WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST)
-                                           | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        self.layout_events = 0
-        self.keyboard_chrome = None
-        self.mode = 'bottom'
-        self.old_listener = self.impl.onItemSelectedListener
+
+    def _install_selection_listener(self):
+        from com.google.android.material.navigation import NavigationBarView
+        from java import dynamic_proxy
+        import weakref
         class SelectionListener(dynamic_proxy(NavigationBarView.OnItemSelectedListener)):
             def __init__(self, adapter):
                 super().__init__()
@@ -439,21 +463,14 @@ class AndroidNavigation:
                 return True
 
         self.impl.onItemSelectedListener = SelectionListener(self)
-        self.bottom.setOnItemSelectedListener(self.impl.onItemSelectedListener)
-        self.impl.resize_tab_content = self.resize_content
-        self.impl.refreshed = self.content_refreshed
-        # GONE navigation bars do not receive a layout event themselves.
-        # Watch the content viewport so hiding/restoring chrome still relayouts
-        # the Python widgets after Android has reclaimed the actual space.
-        self.impl.native_content.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
-        window.on_resize = self.window_resized
-        resources = [None if name == 'home' else getattr(R.drawable, name) for name in host.android_icons]
+
+    def _populate_bottom_menu(self):
+        from android import R
+        resources = [None if name == 'home' else getattr(R.drawable, name) for name in self.host.android_icons]
         self.bottom.getMenu().clear()
         for index, (option, resource) in enumerate(zip(self.impl.options, resources)):
             option.menu_item = self.bottom.getMenu().add(0, index + 1, index, option.text)
             option.menu_item.setIcon(resource if resource is not None else self.home_icon())
-        self.select_current_tab()
-        self.window_resized(window)
 
     def select_current_tab(self):
         # Toga publishes on_select even for programmatic native selection.
