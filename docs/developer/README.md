@@ -13,6 +13,8 @@ domain policy, dependency installation and user-facing destinations.
 Detailed API examples remain beside their owners and are linked from these guides.
 For interactive workflows, use the [component user guides](../../README.md#shared-component-user-guides).
 The [audit record](audit.md) explains the restructuring and remaining uncertainties.
+The [indexing and Markdown readability record](readability.md) defines the active
+maintenance pass, completion criteria and validation scope.
 
 [Process, diagnostics and presentation owners](lifecycle-owners.md) describes lifecycle boundaries.
 
