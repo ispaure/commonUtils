@@ -329,8 +329,9 @@ file.save()
 includes inherited defaults. `updated_text(text, {(section, key): value})` is also
 available for editors that own their save lifecycle. Field updates preserve
 comments, unrelated formatting and multiline values. Ambiguous layouts fail
-rather than silently changing unrelated settings. Save uses an atomic temporary
-file, preserves existing permissions/BOM/newlines, and refuses external changes
+rather than silently changing unrelated settings. Save delegates staging, content
+verification and replacement to `persistence.atomic_write_bytes`, preserves existing
+permissions/BOM/newlines, respects host provider boundaries, and refuses external changes
 since `read()`. Callers should serialize writes to the same file; the conflict
 check is not a cross-process lock. Standard I/O and ConfigParser errors propagate.
 INI parsing is independent of `configuration.legacy` and `TXTFile`.

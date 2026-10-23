@@ -57,11 +57,49 @@ class INIFileTests(unittest.TestCase):
             ini.save()
         self.assertIn('external', self.path.read_text())
 
+    def test_provider_boundary_blocks_existing_and_new_saves_before_parent_creation(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                path = self.path if existing else self.path.parent / 'nested/new.ini'
+                if existing:
+                    path.write_text('[S]\nx = old\n')
+                ini = INIFile(path)
+                if existing:
+                    ini.read()
+                ini.set('S', 'x', 'new')
+                release = protect_local_root(self.id(), self.path.parent, 'Use the provider')
+                try:
+                    with self.assertRaisesRegex(PermissionError, 'Use the provider'):
+                        ini.save()
+                    if existing:
+                        self.assertEqual(path.read_text(), '[S]\nx = old\n')
+                    self.assertFalse((self.path.parent / 'nested').exists())
+                finally:
+                    release()
+
+    def test_external_change_during_staging_preserves_file_and_loaded_baseline(self):
+        import os
+        self.path.write_bytes(b'[S]\nx = old\n')
+        ini = INIFile(self.path).read()
+        original = ini._original
+        ini.set('S', 'x', 'new')
+        fsync = os.fsync
+        def changed_after_flush(descriptor):
+            fsync(descriptor)
+            self.path.write_bytes(b'[S]\nx = external\n')
+        with patch('os.fsync', side_effect=changed_after_flush):
+            with self.assertRaisesRegex(OSError, 'changed on disk'):
+                ini.save()
+        self.assertEqual(self.path.read_bytes(), b'[S]\nx = external\n')
+        self.assertEqual(ini._original, original)
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+
     def test_failed_replace_keeps_original_and_cleans_temporary_file(self):
         self.path.write_text('[S]\nx = old\n')
         ini = INIFile(self.path).read()
         ini.set('S', 'x', 'new')
-        with patch('commonUtils.formats.iniType.os.replace', side_effect=OSError('failure')):
+        with patch('commonUtils.persistence.atomic.os.replace', side_effect=OSError('failure')):
             with self.assertRaises(OSError):
                 ini.save()
         self.assertIn('old', self.path.read_text())

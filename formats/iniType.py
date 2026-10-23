@@ -6,13 +6,12 @@ newlines, comments and unchanged formatting survive edits. DEFAULT inheritance
 follows ConfigParser. The legacy configUtils API is independent and unchanged.
 """
 from configparser import ConfigParser
-import os
 from pathlib import Path
 import re
-import stat
-from tempfile import NamedTemporaryFile
 
 from .txtType import TXTFile
+from ..filesystem.local_access import check_local_path
+from ..persistence import atomic_write_bytes
 
 
 class INIFile(TXTFile):
@@ -136,32 +135,18 @@ class INIFile(TXTFile):
     def save(self):
         """Atomically save; refuse to replace a file changed since read()."""
         self.parse(self.text)
-        current = self.path.read_bytes() if self.path.exists() else None
-        if current != self._original:
-            raise OSError('The INI changed on disk; read it again before saving')
+        def validate():
+            current = self.path.read_bytes() if self.path.exists() else None
+            if current != self._original:
+                raise OSError('The INI changed on disk; read it again before saving')
+        check_local_path(self.path)
+        validate()
         newline = '\r\n' if self._original and b'\r\n' in self._original else '\n'
         content = self.text.replace('\r\n', '\n').replace('\n', newline).encode('utf-8')
         if self._original and self._original.startswith(b'\xef\xbb\xbf'):
             content = b'\xef\xbb\xbf' + content
-        mode = stat.S_IMODE(self.path.stat().st_mode) if current is not None else None
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        staged = None
-        try:
-            with NamedTemporaryFile(dir=self.path.parent, prefix='.' + self.path.name,
-                                    suffix='.tmp', delete=False) as stream:
-                staged = Path(stream.name)
-                stream.write(content)
-                stream.flush()
-                os.fsync(stream.fileno())
-            if mode is not None:
-                staged.chmod(mode)
-            # Recheck after writing the temporary file, before replacement.
-            if (self.path.read_bytes() if self.path.exists() else None) != self._original:
-                raise OSError('The INI changed on disk; read it again before saving')
-            os.replace(staged, self.path)
-        finally:
-            if staged is not None:
-                staged.unlink(missing_ok=True)
+        atomic_write_bytes(self.path, content, validate=validate)
         self._original = content
         self.size = len(content)
 
