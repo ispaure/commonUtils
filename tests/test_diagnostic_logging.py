@@ -27,3 +27,16 @@ class DiagnosticLoggingTests(unittest.TestCase):
         logger.log_debug(Severity.CRITICAL, 'Failure', 'Diagnostic only')
         self.assertEqual(len(events), 1)
         self.assertIsNone(logger.presenter)
+
+    def test_multiline_color_and_file_output_keep_the_existing_format(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        events = []
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'events.log'
+            logger = DebugLogger(path, options=LoggingOptions(use_time_delta=False, write_to_log=True), sinks=[events.append])
+            logger.log_debug(Severity.ERROR, 'Title', 'one\ntwo')
+            expected = '[ERR] Title\n      one\n      two\n'
+            self.assertEqual(events[0].text, expected)
+            self.assertEqual(events[0].colored, '\033[31m' + expected + '\033[0m')
+            self.assertEqual(path.read_text(), expected + '\n')
