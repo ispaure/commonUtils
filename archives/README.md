@@ -69,7 +69,8 @@ and its source identity is unchanged immediately before replacement, after stage
 flush/permission work and the final cancellation callback. These checks are
 optimistic samples rather than locks against arbitrary concurrent writers.
 Additions do not silently replace names;
-removing a directory removes its descendants. Mixed encrypted/plain ZIPs cannot
+removal iterables are captured once and checked for every member, including
+directory descendants. Mixed encrypted/plain ZIPs cannot
 be rewritten. Source files are never deleted. Cancellation raises
 `commonUtils.runtime.operations.OperationCancelled` and discards staged work; publication
 is the success boundary.

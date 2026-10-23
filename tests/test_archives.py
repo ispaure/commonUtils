@@ -293,6 +293,20 @@ class ArchiveWorkspaceTests(unittest.TestCase):
         self.assertEqual((out / 'keep').read_text(), 'concurrent')
         self.assertFalse((out / 'source').exists())
 
+    def test_removal_selection_is_reused_for_every_member(self):
+        from commonUtils.archives import editing
+        for factory in (tuple, list, iter):
+            with self.subTest(factory=factory.__name__), TemporaryDirectory() as directory:
+                path = Path(directory) / 'sample.zip'
+                with zipfile.ZipFile(path, 'w') as archive:
+                    archive.writestr('keep.txt', 'keep')
+                    archive.writestr('remove-a.txt', 'a')
+                    archive.writestr('nested/remove-b.txt', 'b')
+                editing.update_zip(path, remove=factory(('remove-a.txt', 'nested/')))
+                with zipfile.ZipFile(path) as archive:
+                    self.assertEqual(archive.namelist(), ['keep.txt'])
+                    self.assertEqual(archive.read('keep.txt'), b'keep')
+
     def test_late_archive_changes_are_preserved(self):
         from commonUtils.archives import editing
         for stage in ('permissions', 'cancellation'):

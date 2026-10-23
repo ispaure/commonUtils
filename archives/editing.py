@@ -20,6 +20,7 @@ def update_zip(path, *, sources=(), remove=(), password=None,
     path = Path(path).absolute()
     if path.is_symlink():
         raise ValueError('Cannot edit an archive through a symbolic link')
+    remove = tuple(remove)
     before = path.stat()
     identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
     authenticate(path, password, all_members=True, for_rewrite=True, cancelled=cancelled)
