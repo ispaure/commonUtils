@@ -72,12 +72,16 @@ class CommandTests(unittest.TestCase):
     def test_pipe_read_failure_propagates_and_retires_the_child(self):
         from commonUtils.integrations.wrappers.cmdShellWrapper import result
         start = result.subprocess.Popen
+        arguments = [sys.executable, '-c', 'import time; time.sleep(10)']
         for name in ('stdout', 'stderr'):
             for error_type in (OSError, ValueError):
                 with self.subTest(stream=name, error=error_type.__name__):
                     spawned, streams = [], []
                     def launch(*args, **kwargs):
                         child = start(*args, **kwargs)
+                        # Leave platform cleanup helpers unmodified and uncounted.
+                        if child.args != arguments:
+                            return child
                         spawned.append(child)
                         streams.extend((child.stdout, child.stderr))
                         stream = getattr(child, name)
@@ -88,7 +92,7 @@ class CommandTests(unittest.TestCase):
                         return child
                     with patch.object(result.subprocess, 'Popen', side_effect=launch):
                         with self.assertRaisesRegex(error_type, 'synthetic pipe read failure'):
-                            run_command([sys.executable, '-c', 'import time; time.sleep(10)'], timeout=.2)
+                            run_command(arguments, timeout=.2)
                     self.assertEqual(len(spawned), 1)
                     self.assertIsNotNone(spawned[0].poll())
                     self.assertTrue(all(stream.closed for stream in streams))
@@ -98,6 +102,7 @@ class CommandTests(unittest.TestCase):
         from unittest.mock import Mock
         from commonUtils.integrations.wrappers.cmdShellWrapper import result, process
         release = Event()
+        arguments = [sys.executable, '-c', 'import time; time.sleep(10)']
         start, terminate = result.subprocess.Popen, process.terminate_process_tree
         def interrupted_read(_size):
             if not release.wait(2):
@@ -105,6 +110,8 @@ class CommandTests(unittest.TestCase):
             raise OSError('synthetic close interruption')
         def launch(*args, **kwargs):
             child = start(*args, **kwargs)
+            if child.args != arguments:
+                return child
             child.stdout = Mock(wraps=child.stdout)
             child.stdout.read1.side_effect = interrupted_read
             return child
@@ -113,7 +120,7 @@ class CommandTests(unittest.TestCase):
             terminate(child)
         with patch.object(result.subprocess, 'Popen', side_effect=launch), \
                 patch.object(process, 'terminate_process_tree', side_effect=stop):
-            captured = run_command([sys.executable, '-c', 'import time; time.sleep(10)'], timeout=.1)
+            captured = run_command(arguments, timeout=.1)
         self.assertTrue(captured.timed_out)
         self.assertFalse(captured.success)
 
