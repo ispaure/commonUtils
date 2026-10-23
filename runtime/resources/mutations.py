@@ -5,6 +5,7 @@ from uuid import uuid4
 from .paths import resource_path, resource_name
 from .provider import require_capability, WritableDirectoryProvider
 from ..operations import check_cancelled, MutationResult, MutationIncomplete
+from ..streams import iter_chunks
 from ...persistence.publication import mutation_lock, save_transaction
 from ...persistence.transfers import verify_unchanged, cleanup_published
 
@@ -64,8 +65,7 @@ def delete_resource(provider: WritableDirectoryProvider, path, *, cancelled=lamb
 def _digest(provider, path, cancelled):
     digest = sha256()
     with provider.open(path) as stream:
-        while chunk := stream.read(256 * 1024):
-            check_cancelled(cancelled)
+        for chunk in iter_chunks(stream, cancelled=cancelled):
             digest.update(chunk)
     return digest.digest()
 

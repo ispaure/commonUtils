@@ -7,6 +7,38 @@ from commonUtils.runtime.resources.mutations import move_resource, delete_resour
 
 
 class ResourceOperationsTests(unittest.TestCase):
+    def test_nonblocking_source_does_not_create_a_truncated_local_resource(self):
+        from io import BytesIO
+        class WouldBlock(BytesIO):
+            def read(self, limit=-1):
+                if self.tell():
+                    return None
+                return super().read(1)
+        with TemporaryDirectory() as directory:
+            provider = LocalFiles(directory)
+            with self.assertRaises(BlockingIOError):
+                provider.create_file('copy', WouldBlock(b'complete'))
+            self.assertEqual(list(provider.root.iterdir()), [])
+
+    def test_verification_cannot_treat_would_block_as_empty_content(self):
+        from contextlib import contextmanager
+        from commonUtils.runtime.resources.mutations import save_resource_bytes
+        class WouldBlock:
+            def read(self, limit):
+                return None
+        with TemporaryDirectory() as directory:
+            provider = LocalFiles(directory)
+            @contextmanager
+            def unavailable(path):
+                # Storage corruption plus a nonblocking verifier must not look
+                # like a verified empty save or publish the corrupted stage.
+                (provider.root / path).write_bytes(b'corrupted')
+                yield WouldBlock()
+            with patch.object(provider, 'open', side_effect=unavailable):
+                with self.assertRaises(BlockingIOError):
+                    save_resource_bytes(provider, 'copy', b'')
+            self.assertEqual(list(provider.root.iterdir()), [])
+
     def test_recursive_move_collisions_and_self_moves(self):
         with TemporaryDirectory() as directory:
             a, b = Path(directory) / 'a', Path(directory) / 'b'

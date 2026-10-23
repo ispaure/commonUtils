@@ -63,6 +63,13 @@ metadata never grants access to a file. Close `search.cache` after retiring its
 workers. Query rules, symlink exclusion and stale-name behavior match directory
 index search; applications own refresh scheduling and provider eligibility.
 
+## Streamed mutations
+
+Local file creation and mutation verification use the shared bounded stream
+helpers. A read returning `None` raises `BlockingIOError` rather than completing
+with truncated content. Failed local creation removes its own new file; failed
+verification preserves the selected destination and cleans the private stage.
+
 ## Leases and worker cancellation
 
 `lifetime.ResourceLeases(validate=..., close=...)` provides idempotent release

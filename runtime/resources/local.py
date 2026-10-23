@@ -7,6 +7,7 @@ import stat as stat_module
 from .paths import resource_path
 from .provider import ResourceCapabilities
 from ..operations import check_cancelled
+from ..streams import copy_stream
 from ...persistence.publication import mutation_lock, rename_exclusive
 
 
@@ -97,9 +98,7 @@ class LocalFiles:
             target = self._guard(self._physical(path))
             try:
                 with target.open('xb') as output:
-                    while chunk := stream.read(256 * 1024):
-                        check_cancelled(cancelled)
-                        output.write(chunk)
+                    copy_stream(stream, output, cancelled=cancelled)
                     output.flush()
                     os.fsync(output.fileno())
             except Exception:
