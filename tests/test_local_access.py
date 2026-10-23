@@ -89,6 +89,14 @@ class LocalAccessTests(unittest.TestCase):
                 finally:
                     release()
 
+    def test_unregistered_cyclic_directory_link_can_still_be_deleted(self):
+        from commonUtils.filesystem.directories import Directory
+        with TemporaryDirectory() as directory:
+            loop = Path(directory) / 'loop'
+            loop.symlink_to('loop', target_is_directory=True)
+            Directory(loop).delete()
+            self.assertFalse(loop.is_symlink())
+
     def test_backend_record_grant_is_exact_and_scoped(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

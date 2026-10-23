@@ -24,11 +24,13 @@ def protect_local_root(owner, root, message):
 
 def check_local_path(path, *, recursive=False):
     """Reject raw access inside a boundary, and recursive operations containing it."""
+    with _lock:
+        roots = tuple(_roots.values())
+    if not roots:
+        return
     candidate = Path(path).resolve()
     if not recursive and candidate in getattr(_local, 'records', ()):
         return
-    with _lock:
-        roots = tuple(_roots.values())
     for root, message in roots:
         root = root.resolve()
         if candidate == root or root in candidate.parents or (recursive and candidate in root.parents):
