@@ -151,6 +151,7 @@ class MarkdownPresentationTests(QtTestCase):
                 patch.object(qt.QMessageBox, 'information') as message:
             viewer.render_diagrams()
         self.assertIn('Mermaid CLI', message.call_args.args[2])
+        self.assertNotIn('Logistics', message.call_args.args[2])
         self.assertIn('A-->B', viewer.browser.toPlainText())
         self.assertEqual(viewer.markdown_text(), source)
 

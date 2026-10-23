@@ -56,7 +56,7 @@ class MermaidRenderer(qt.QObject):
         if not executable:
             qt.QMessageBox.information(self.viewer, 'Mermaid diagrams',
                 'Diagram rendering needs the optional Mermaid CLI (mmdc).\n\n'
-                'Install @mermaid-js/mermaid-cli using npm, then restart Logistics. '
+                'Install @mermaid-js/mermaid-cli using npm, then restart the application if needed. '
                 'Until then, Mermaid blocks remain visible as code. '
                 'Your Markdown file is unchanged.')
             return

@@ -8,7 +8,7 @@ MAX_FORMAT_CHARS = 1024 * 1024
 
 def validate_text(text, language):
     if len(text) > MAX_FORMAT_CHARS:
-        raise ValueError("Formatting and validation are limited to 1 MiB of text.")
+        raise ValueError("Formatting and validation are limited to 1,048,576 characters.")
     if language == "json":
         def reject(value):
             raise ValueError(f"Invalid JSON constant: {value}")

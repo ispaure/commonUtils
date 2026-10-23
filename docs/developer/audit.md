@@ -85,3 +85,17 @@ index reference and reader menus/chrome to workspace presentation; removes repea
 code-editor/Markdown summaries; and replaces mixed browser/Markdown narration with
 separate integration and user guides. Specialized archive, persistence, format and
 process references remain in place.
+
+## Follow-up status (2026-10-22)
+
+The historical findings above describe the documentation audit's source snapshot.
+Diagnostics now use an instance-owned GUI-free logger and explicit host presenters;
+the [lifecycle guide](lifecycle-owners.md) describes the current contract. Mermaid's
+missing-tool message is now application-neutral, and diff/formatting errors label
+the existing character bounds accurately. No text limits changed.
+
+Blue Hole is now available for independent consumer checks. Its active development
+branch is `blender-5.2.2/alpha`; the 4.5.1 branch remains a legacy snapshot. Host
+adapter and vendor-copy tests do not replace live Blender/Perforce validation.
+Volume-identity/offline index policy and native platform checks remain separate
+open concerns; neither is established by these corrections.

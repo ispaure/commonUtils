@@ -49,8 +49,7 @@ No existing File class is changed or automatically coupled to an editor.
 `transforms.transform_lines` is Qt independent. `formatting.validate_text` and
 `format_text` are bounded JSON/XML utilities. JSON output preserves lexical tokens;
 XML rejects DTD/entity declarations and refuses formatting mixed content, CDATA
-and xml:space-preserved content. Validation/formatting is limited to 1,048,576 Python characters (the UI labels this
-“1 MiB of text”).
+and xml:space-preserved content. Validation/formatting is limited to 1,048,576 Python characters.
 
 `CodeEdit` supports bounded multi-cursor editing via `set_cursors`,
 `add_next_occurrence`, `rectangular_selection` and `clear_extra_cursors`. Alt-click
@@ -69,8 +68,7 @@ fold markers and indentation guides follow the editor palette.
 side-by-side and unified views. An optional application callback applies a selected
 change. `apply_change` rejects stale buffers and returns Python-character offsets
 and replacement text; callers convert offsets to Qt positions and own undo/save
-policy. Limits are 1,048,576 Python characters and 5,000 lines per side (the UI calls the
-character limit “1 MiB”).
+policy. Limits are 1,048,576 Python characters and 5,000 lines per side.
 
 Outside this package, `ui.command_palette` searches/configures caller-owned QAction
 mappings. It imports no application feature modules. `persistence.session.SessionStore`
