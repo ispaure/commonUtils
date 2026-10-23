@@ -18,7 +18,7 @@ Public entry points: `read_up_to`, `iter_chunks`, `copy_stream`, `stream_signatu
 | `read_up_to` | Read through short reads until EOF or a nonnegative byte ceiling; leave the remaining stream unread. |
 | `iter_chunks` | Check cancellation before each read, including the final EOF read. |
 | `copy_stream` | Complete short writes; progress receives each completed read chunk’s byte count. |
-| `stream_signature` | Return (byte count, SHA-256); progress receives each chunk's byte count. |
+| `stream_signature` | Return (byte count, SHA-256); progress receives each chunk's byte count; optional `max_bytes` rejects oversized input. |
 
 ## Copy and hash bounded streams
 
@@ -28,6 +28,13 @@ performs no I/O. Short reads continue; `None` raises `BlockingIOError` and a sou
 returning more than requested raises `OSError`. The helper does not close the
 stream or decide whether a longer input is allowed. To enforce a maximum payload,
 read `maximum + 1` and reject a result longer than `maximum` before decoding it.
+
+`stream_signature(..., max_bytes=N)` rejects input exceeding a nonnegative integer
+limit with `ValueError`; the default `None` retains unbounded hashing. It reads in
+the existing 1 MiB chunks, so detecting overflow may consume one chunk beyond the
+limit. It never returns a digest of a truncated prefix. Invalid limits fail before
+stream reads. `filesystem.snapshots.verified_file_snapshot(..., max_bytes=N)`
+forwards the same bound while retaining its path/descriptor revision checks.
 
 Stream progress callbacks receive the **current chunk's size**, not a cumulative
 count. Download progress receives cumulative bytes; `OperationProgress` receives

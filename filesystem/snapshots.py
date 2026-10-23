@@ -15,11 +15,12 @@ def _revision(info):
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
-def verified_file_snapshot(path, *, cancelled=lambda: False):
+def verified_file_snapshot(path, *, cancelled=lambda: False, max_bytes=None):
     """Return (revision, SHA-256 bytes); reject changes during the read.
 
     Caller chooses whether links/hard links are allowed. Both the opened file and
-    its pathname must retain the original revision. This is not a writer lock.
+    its pathname must retain the original revision. An optional max_bytes bound
+    rejects growing/oversized input during hashing. This is not a writer lock.
     """
     check_cancelled(cancelled)
     path = Path(path)
@@ -30,7 +31,10 @@ def verified_file_snapshot(path, *, cancelled=lambda: False):
         # Compare content/identity across APIs, and each full revision to itself.
         if opened[:4] != before[:4]:
             raise ValueError('File changed during inspection.')
-        _, digest = stream_signature(stream, cancelled=cancelled)
+        if max_bytes is None:
+            _, digest = stream_signature(stream, cancelled=cancelled)
+        else:
+            _, digest = stream_signature(stream, cancelled=cancelled, max_bytes=max_bytes)
         if _revision(os.fstat(stream.fileno())) != opened or file_revision(path) != before:
             raise ValueError('File changed during inspection.')
     return before, bytes.fromhex(digest)

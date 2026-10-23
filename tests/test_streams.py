@@ -59,6 +59,25 @@ class StreamTests(unittest.TestCase):
         copy_stream(BytesIO(data), output)
         self.assertEqual(output.getvalue(), data)
 
+    def test_signature_limit_stops_growing_input_and_preserves_exact_boundary_hash(self):
+        data = b'payload'
+        self.assertEqual(stream_signature(BytesIO(data), max_bytes=len(data)),
+                         (len(data), sha256(data).hexdigest()))
+        class Growing:
+            reads = 0
+            def read(self, size):
+                self.reads += 1
+                return b'x' * size
+        source = Growing()
+        with self.assertRaisesRegex(ValueError, 'exceeds'):
+            stream_signature(source, max_bytes=CHUNK_SIZE + 2)
+        self.assertEqual(source.reads, 2)
+        for limit, error in ((-1, ValueError), (1.5, TypeError)):
+            with self.subTest(limit=limit), self.assertRaises(error):
+                stream_signature(source, max_bytes=limit)
+        self.assertEqual(source.reads, 2)
+        self.assertEqual(stream_signature(BytesIO(), max_bytes=0)[0], 0)
+
     def test_copy_cancels_before_next_chunk(self):
         cancel = Event()
         source = BytesIO(b'x' * (CHUNK_SIZE + 10))

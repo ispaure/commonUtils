@@ -57,11 +57,17 @@ def copy_stream(source, destination, *, cancelled=lambda: False, progress=None):
             progress(len(chunk))
 
 
-def stream_signature(stream, *, cancelled=lambda: False, progress=None):
-    """Return (byte count, SHA-256); progress receives each chunk's byte count."""
+def stream_signature(stream, *, cancelled=lambda: False, progress=None, max_bytes=None):
+    """Hash complete input; optionally reject a byte limit with one chunk of lookahead."""
+    if max_bytes is not None:
+        max_bytes = index(max_bytes)
+        if max_bytes < 0:
+            raise ValueError('Signature byte limit cannot be negative.')
     total, digest = 0, sha256()
     for chunk in iter_chunks(stream, cancelled=cancelled):
         total += len(chunk)
+        if max_bytes is not None and total > max_bytes:
+            raise ValueError(f'Stream exceeds {max_bytes} bytes.')
         digest.update(chunk)
         if progress:
             progress(len(chunk))

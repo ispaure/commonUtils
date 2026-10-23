@@ -54,6 +54,11 @@ so an unrelated provider does not prevent unlinking that ordinary link. Links
 inside a protected root remain denied; resolvable aliases retain target checks.
 The fallback does not resolve looping ancestors or grant access through a loop.
 
+`snapshots.verified_file_snapshot(path, max_bytes=N)` can bound hashing of an
+untrusted or growing file. Oversized input raises `ValueError` instead of returning
+a prefix digest; the default remains unbounded. Stream chunk lookahead and
+cancellation are documented under [streams](../runtime/streams/README.md).
+
 ## Verified content snapshots
 
 `snapshots.file_revision(path, follow_symlinks=True)` returns

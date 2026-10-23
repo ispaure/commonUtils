@@ -45,7 +45,8 @@ integers; other numeric symbols remain text. See [search](../../search/README.md
 retaining logical size as the API default. See [index contracts](../../filesystem/index/README.md).
 
 `filesystem.snapshots` supplies revision-verified file hashes and bounded tree
-content inventories. `filesystem.relocation.relocate_directory` supplies verified,
+content inventories. `verified_file_snapshot(..., max_bytes=N)` optionally rejects
+oversized/growing input during hashing; default hashing remains unbounded. `filesystem.relocation.relocate_directory` supplies verified,
 non-overwriting relocation with link rebasing. Persisted schemas, migration timing
 and conflict policy belong to callers. See [filesystem](../../filesystem/README.md).
 

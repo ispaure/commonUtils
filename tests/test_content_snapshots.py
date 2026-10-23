@@ -19,6 +19,16 @@ class ContentSnapshots(unittest.TestCase):
             with self.assertRaises(ValueError): tree_content_state(root, max_entries=1)
             with self.assertRaises(OperationCancelled): tree_content_state(root, cancelled=lambda: True)
 
+    def test_explicit_byte_limit_retains_the_default_snapshot_and_never_mutates_input(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'file'
+            path.write_bytes(b'payload')
+            expected = verified_file_snapshot(path)
+            self.assertEqual(verified_file_snapshot(path, max_bytes=7), expected)
+            with self.assertRaisesRegex(ValueError, 'exceeds'):
+                verified_file_snapshot(path, max_bytes=6)
+            self.assertEqual(path.read_bytes(), b'payload')
+
     def test_file_changes_during_hash_are_rejected(self):
         with TemporaryDirectory() as directory:
             path = Path(directory)/'file'
