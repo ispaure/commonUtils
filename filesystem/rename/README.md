@@ -85,3 +85,9 @@ case/Unicode collision, existing-destination and source-stamp checks as
 `plan_renames`. New names must stay in the source folder. Inspect `plan.valid`
 and each entry's `error`, then pass the plan to `apply_renames` for rollback and
 an undo receipt. A plan never changes files.
+
+Platform no-replace publication is owned by
+[`persistence.publication`](../../persistence/README.md#verified-publication-and-text-sessions).
+The rename planner retains provider access checks, source stamps and rollback
+policy. Missing native support raises a filesystem error before mutation; it does
+not fall back to a rename that could replace a competing destination.

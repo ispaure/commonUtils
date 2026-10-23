@@ -1,5 +1,6 @@
 """Serialized verified save transactions and atomic no-replace publication."""
 import ctypes
+import errno
 import os
 import threading
 from ..runtime.operations import check_cancelled, MutationResult, MutationIncomplete
@@ -57,17 +58,19 @@ def rename_exclusive(source, destination):
         return
     libc = ctypes.CDLL(None, use_errno=True)
     if current in {OS.MAC, OS.IOS}:
-        function = libc.renamex_np
-        function.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
-        result = function(source, destination, 4)  # RENAME_EXCL
+        function = getattr(libc, 'renamex_np', None)
+        argument_types = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        arguments = (source, destination, 4)  # RENAME_EXCL
     elif current in {OS.LINUX, OS.ANDROID}:
-        function = libc.renameat2
-        function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-        result = function(-100, source, -100, destination, 1)  # RENAME_NOREPLACE
+        function = getattr(libc, 'renameat2', None)
+        argument_types = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        arguments = (-100, source, -100, destination, 1)  # AT_FDCWD, RENAME_NOREPLACE
     else:
-        raise OSError('Atomic publication is unavailable on this platform.')
-    if result:
+        function = None
+    if function is None:
+        raise OSError(errno.ENOTSUP, 'This platform lacks exclusive rename support', os.fsdecode(destination))
+    function.argtypes = argument_types
+    function.restype = ctypes.c_int
+    if function(*arguments):
         code = ctypes.get_errno()
-        raise OSError(code, os.strerror(code))
-
-
+        raise OSError(code, os.strerror(code), os.fsdecode(destination))

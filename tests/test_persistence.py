@@ -10,6 +10,24 @@ from commonUtils.persistence import publication
 
 
 class PersistenceTests(unittest.TestCase):
+    def test_missing_native_rename_is_a_filesystem_error_and_preserves_paths(self):
+        import errno
+        from commonUtils.runtime.platform import OS
+        from commonUtils.filesystem.rename import rename_path
+        with TemporaryDirectory() as directory:
+            source, destination = Path(directory) / 'source', Path(directory) / 'destination'
+            source.write_bytes(b'original')
+            for platform in (OS.MAC, OS.IOS, OS.LINUX, OS.ANDROID):
+                for rename in (publication.rename_exclusive, rename_path):
+                    with self.subTest(platform=platform, rename=rename.__name__), \
+                            patch('commonUtils.runtime.platform.get_os', return_value=platform), \
+                            patch.object(publication.ctypes, 'CDLL', return_value=object()):
+                        with self.assertRaises(OSError) as caught:
+                            rename(source, destination)
+                        self.assertEqual(caught.exception.errno, errno.ENOTSUP)
+                        self.assertEqual(source.read_bytes(), b'original')
+                        self.assertFalse(destination.exists())
+
     def test_tree_publication_keeps_recovery_copy(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

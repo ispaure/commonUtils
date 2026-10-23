@@ -6,12 +6,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, fields, replace
 from datetime import datetime, timedelta
 from pathlib import Path
-import ctypes
-import errno
 import os
 import re
 import stat
-import sys
 import unicodedata
 import uuid
 
@@ -329,28 +326,12 @@ def plan_named_renames(items, *, case_sensitive=False):
 
 
 def _rename_exclusive(source, target):
+    """Guard provider paths, then publish through the shared no-replace owner."""
     from ..local_access import check_local_path
+    from ...persistence.publication import rename_exclusive
     check_local_path(source, recursive=True)
     check_local_path(target, recursive=True)
-    """Publish without replacement, including racing destinations and empty directories."""
-    if os.name == 'nt':
-        os.rename(source, target)  # Windows rename refuses existing destinations.
-        return
-    libc = ctypes.CDLL(None, use_errno=True)
-    if sys.platform == 'darwin':
-        function = libc.renamex_np
-        function.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
-        arguments = (os.fsencode(source), os.fsencode(target), 0x4)  # SDK sys/stdio.h: RENAME_EXCL
-    else:
-        function = getattr(libc, 'renameat2', None)
-        if function is None:
-            raise OSError(errno.ENOTSUP, 'This platform lacks exclusive rename support')
-        function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-        arguments = (-100, os.fsencode(source), -100, os.fsencode(target), 1)  # AT_FDCWD, RENAME_NOREPLACE
-    function.restype = ctypes.c_int
-    if function(*arguments):
-        code = ctypes.get_errno()
-        raise OSError(code, os.strerror(code), str(target))
+    rename_exclusive(source, target)
 
 
 def rename_path(source, target, *, overwrite=False):

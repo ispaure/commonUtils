@@ -68,7 +68,13 @@ crash-recovery journal.
 ## Verified publication and text sessions
 
 [publication.py](publication.py) owns the shared staging/verification/publication
-transaction and platform no-replace rename. Ordinary atomic writes and virtual
+transaction and platform no-replace rename. Filesystem rename planning retains its
+provider access checks and delegates the native call here. Missing native symbols
+raise `OSError(ENOTSUP)` before changing either path; no check-then-rename fallback
+weakens the collision guarantee. Android's libc exports `renameat2` from API 30
+([Android header](https://android.googlesource.com/platform/bionic/+/master/libc/include/stdio.h));
+older runtimes may therefore reject these operations. Host tests do not prove
+native Android/kernel/filesystem support. Ordinary atomic writes and virtual
 resource saves use the same sequence. See the [provider contract](../ui/resource-providers.md)
 for callback ownership, cancellation and partial-failure results.
 
