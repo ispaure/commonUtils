@@ -171,3 +171,38 @@ def minimize_console_window() -> bool:
             debugUtils.log(debugUtils.Severity.WARNING, title, msg)
 
     return False
+
+
+class ProcessSupervisor:
+    """Own one process tree and its I/O workers through every exit path.
+
+    I/O strategies retain their own buffers, deadlines, diagnostics and results.
+    Exceptional exit stops the tree even if the original parent already exited.
+    """
+    def __init__(self, child):
+        self.child = child
+        self.workers = []
+        self._stopped = False
+
+    def __enter__(self):
+        return self
+
+    def start(self, target, *, args=(), name=None):
+        from threading import Thread
+        worker = Thread(target=target, args=args, name=name, daemon=True)
+        self.workers.append(worker)
+        worker.start()
+        return worker
+
+    def stop(self):
+        if not self._stopped:
+            self._stopped = True
+            terminate_process_tree(self.child)
+
+    def __exit__(self, kind, error, traceback):
+        if kind is not None or self.child.poll() is None or any(worker.is_alive() for worker in self.workers):
+            self.stop()
+        for worker in self.workers:
+            if worker.ident is not None:
+                worker.join(timeout=1)
+        close_process_streams(self.child)

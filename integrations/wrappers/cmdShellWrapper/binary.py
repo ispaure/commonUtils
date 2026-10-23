@@ -3,7 +3,7 @@ from io import RawIOBase
 import subprocess
 import threading
 import time
-from .process import get_process_group_kwargs, terminate_process_tree
+from .process import get_process_group_kwargs, ProcessSupervisor
 
 
 class BinaryCommandError(OSError):
@@ -73,14 +73,12 @@ def run_bytes(arguments, *, environment=None, input_data=None, input_writer=None
                 child.stdin.close()
             except OSError:
                 pass
-    threads = [threading.Thread(target=read, args=(child.stdout, True), daemon=True),
-               threading.Thread(target=read, args=(child.stderr, False), daemon=True)]
-    if input_data is not None or input_writer is not None:
-        threads.append(threading.Thread(target=write, daemon=True))
-    for thread in threads:
-        thread.start()
-    started = time.monotonic()
-    try:
+    with ProcessSupervisor(child) as supervisor:
+        threads = [supervisor.start(read, args=(child.stdout, True)),
+                   supervisor.start(read, args=(child.stderr, False))]
+        if input_data is not None or input_writer is not None:
+            threads.append(supervisor.start(write))
+        started = time.monotonic()
         while child.poll() is None or any(thread.is_alive() for thread in threads):
             check_cancelled(cancelled)
             if overflow.is_set():
@@ -93,14 +91,3 @@ def run_bytes(arguments, *, environment=None, input_data=None, input_writer=None
         if child.returncode or errors:
             raise BinaryCommandError(child.returncode, bytes(diagnostics))
         return bytes(output)
-    finally:
-        if child.poll() is None:
-            terminate_process_tree(child)
-        for stream in (child.stdin, child.stdout, child.stderr):
-            if stream:
-                try:
-                    stream.close()
-                except OSError:
-                    pass
-        for thread in threads:
-            thread.join(timeout=1)

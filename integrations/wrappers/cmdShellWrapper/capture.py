@@ -10,8 +10,7 @@ import errno
 import subprocess
 from tempfile import TemporaryFile
 from time import monotonic
-from threading import Thread
-from .process import get_process_group_kwargs, terminate_process_tree
+from .process import get_process_group_kwargs, ProcessSupervisor
 from ....runtime.operations import check_cancelled
 
 
@@ -50,6 +49,10 @@ def run_captured(
     discard_output routes both outputs to DEVNULL and publishes no progress.
     Hosts own argument/environment policy and validation of input size.
     """
+    from ....runtime.platform.capabilities import Capability, require_capability
+    require_capability(Capability.SUBPROCESS, 'run_captured')
+    if limit < 0 or timeout is not None and timeout < 0:
+        raise ValueError('Invalid capture limits.')
     check_cancelled(cancelled)
     started = monotonic()
     with TemporaryFile() as output, TemporaryFile() as errors:
@@ -68,7 +71,7 @@ def run_captured(
         position = 0
         writer = None
         write_errors = []
-        try:
+        with ProcessSupervisor(process) as supervisor:
             if input_data is not None:
                 # Keep credential input off disk, but never let a full stdin pipe
                 # prevent the supervising thread from enforcing cancellation.
@@ -85,8 +88,7 @@ def run_captured(
                             write_errors.append(error)
                     except BaseException as error:
                         write_errors.append(error)
-                writer = Thread(target=write_input, name='command-capture-stdin', daemon=True)
-                writer.start()
+                writer = supervisor.start(write_input, name='command-capture-stdin')
             while True:
                 check_cancelled(cancelled)
                 if write_errors:
@@ -119,12 +121,6 @@ def run_captured(
                     # A descendant may still hold stdin after its parent exits.
                     # Continue supervision until the writer retires or is stopped.
                     writer.join(timeout=0.05)
-        except BaseException:
-            terminate_process_tree(process)
-            raise
-        finally:
-            if writer is not None and writer.ident is not None:
-                writer.join()
         output.seek(0)
         data = output.read(limit + 1)
         errors.seek(max(0, os.fstat(errors.fileno()).st_size - 65536))

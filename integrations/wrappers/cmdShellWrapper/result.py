@@ -8,7 +8,6 @@ from pathlib import Path
 import os
 import queue
 import subprocess
-import threading
 import time
 
 from . import output, process
@@ -56,14 +55,12 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
                              **process.get_process_group_kwargs())
     events = queue.Queue()
     buffers = {'stdout': bytearray(), 'stderr': bytearray()}
-    readers = [threading.Thread(target=output.read_stream, args=(stream, name, events), daemon=True)
-               for name, stream in (('stdout', child.stdout), ('stderr', child.stderr))]
-    for reader in readers:
-        reader.start()
     started = last_output = time.monotonic()
     active = 2
     timed_out = was_cancelled = False
-    try:
+    with process.ProcessSupervisor(child) as supervisor:
+        for name, stream in (('stdout', child.stdout), ('stderr', child.stderr)):
+            supervisor.start(output.read_stream, args=(stream, name, events))
         # Continue polling after EOF: a command can close its streams before exiting.
         while active or child.poll() is None:
             now = time.monotonic()
@@ -71,7 +68,7 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
             timed_out = ((timeout is not None and now - started >= timeout)
                          or (idle_timeout is not None and now - last_output >= idle_timeout))
             if was_cancelled or timed_out:
-                process.terminate_process_tree(child)
+                supervisor.stop()
                 break
             try:
                 name, chunk = events.get(timeout=.05)
@@ -83,14 +80,7 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
                 buffers[name].extend(chunk)
                 last_output = time.monotonic()
         child.wait()
-    except BaseException:
-        process.terminate_process_tree(child)
-        raise
-    finally:
-        for reader in readers:
-            reader.join(timeout=1)
-        output.drain_output_queue(events, buffers['stdout'], buffers['stderr'])
-        process.close_process_streams(child)
+    output.drain_output_queue(events, buffers['stdout'], buffers['stderr'])
     def lines(name):
         return tuple(line.decode('utf-8', errors='replace').rstrip('\r')
                      for line in output.output_bytes_to_lines(bytes(buffers[name])))
