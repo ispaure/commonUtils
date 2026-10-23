@@ -311,6 +311,26 @@ class P4File:
             'as it is more optimized!')
         log(Severity.WARNING, tool_name, msg)
 
+        if not self._prepare_checkout(silent):
+            return False
+        if not self._apply_checkout_actions(silent, allow_sync):
+            return False
+
+        # Update fields
+        result = self.update_fields()
+        if not result:  # Fields didn't properly get set
+            return False
+
+        # If not checked out or marked for add, did not succeed
+        if self.status not in [P4FileStatus.MARKED_FOR_ADD, P4FileStatus.CHECKOUT_BY_ME]:
+            msg = f'File "{self.file_name}" could not be successfully checked out! Check log for details.'
+            log(Severity.ERROR, tool_name, msg)
+            return False
+
+        return True
+
+    def _prepare_checkout(self, silent):
+        """Refresh and validate the existing server/workspace/file admission checks."""
         # Perforce Server accessible Check
         p4_info_cls = P4Info()
         if not p4_info_cls.is_server_accessible(silent):
@@ -334,7 +354,10 @@ class P4File:
         elif not self.is_not_marked_for_delete(silent=True):
             P4ErrorMessage(silent).marked_for_delete_elaborate()
             return False
+        return True
 
+    def _apply_checkout_actions(self, silent, allow_sync):
+        """Run add/sync/edit in order, rechecking status after extension hooks."""
         # Mark not added for add
         if self.status in [P4FileStatus.NOT_ADDED]:
             if silent:
@@ -379,18 +402,6 @@ class P4File:
                         return False
                 else:
                     return False
-
-        # Update fields
-        result = self.update_fields()
-        if not result:  # Fields didn't properly get set
-            return False
-
-        # If not checked out or marked for add, did not succeed
-        if self.status not in [P4FileStatus.MARKED_FOR_ADD, P4FileStatus.CHECKOUT_BY_ME]:
-            msg = f'File "{self.file_name}" could not be successfully checked out! Check log for details.'
-            log(Severity.ERROR, tool_name, msg)
-            return False
-
         return True
 
     def run_p4_move(self, move_to_path_str):

@@ -77,6 +77,28 @@ class CheckoutTests(unittest.TestCase):
         item._callback_post_sync.assert_not_called()
         self.assertEqual(run.call_count, 1)
 
+    def test_post_sync_hook_can_change_the_following_checkout_decision(self):
+        for silent in (False, True):
+            with self.subTest(silent=silent):
+                item = self.file_with_refreshes(P4FileStatus.NOT_LATEST_REVISION, P4FileStatus.CHECKOUT_BY_ME)
+                item._callback_post_sync = Mock(side_effect=lambda: setattr(item, 'status', P4FileStatus.CHECKOUT_BY_ME))
+                with patch.object(p4_file, 'exec_p4_arguments', return_value=Result(0)) as run, \
+                        patch.object(p4_file.ui, 'display_msg_box_ok_cancel', return_value=True) as prompt:
+                    self.assertTrue(item.open_for_edit(silent=silent))
+                run.assert_called_once_with(['sync', '-f', item.clientFile])
+                item._callback_post_sync.assert_called_once_with()
+                self.assertEqual(prompt.call_count, 0 if silent else 1)
+
+    def test_declining_add_or_sync_stops_before_commands_and_final_refresh(self):
+        for status in (P4FileStatus.NOT_ADDED, P4FileStatus.NOT_LATEST_REVISION):
+            with self.subTest(status=status):
+                item = self.file_with_refreshes(status, P4FileStatus.CHECKOUT_BY_ME)
+                with patch.object(p4_file.ui, 'display_msg_box_ok_cancel', return_value=False), \
+                        patch.object(p4_file, 'exec_p4_arguments') as run:
+                    self.assertFalse(item.open_for_edit())
+                run.assert_not_called()
+                item.update_fields.assert_called_once_with()
+
     def test_add_placeholder_preserves_content_and_hooks(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / 'new export.fbx'

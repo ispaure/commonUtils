@@ -51,3 +51,11 @@ Checkout preserves add/sync/edit ordering and verifies final readiness for every
 file. Failed phases stop subsequent commands; successful single-file commands
 retain their extension hooks. Hosts retain save/export policy. See the
 [workflow regression tests](../../../../../tests/integrations/test_perforce_workflows.py).
+
+`P4File.open_for_edit` retains the cost warning and final status refresh/readiness
+decision. `_prepare_checkout` runs the existing server/workspace/status guards;
+`_apply_checkout_actions` retains interactive/silent Add, optional Sync and Edit.
+It evaluates each action against current status after preceding extension hooks,
+rather than preparing a stale command list. Declined prompts stop before command
+execution and final refresh. Field names, hook methods, argument boundaries and
+consumer adapters remain unchanged; compatibility facade exports are retained.
