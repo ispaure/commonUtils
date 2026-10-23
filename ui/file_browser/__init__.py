@@ -391,25 +391,9 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         menu.addSeparator()
         standard('Rename', lambda: self.file_actions.rename(current_index()), enabled=mutating and single,
                  key=qt.Qt.Key.Key_F2)
-        # Capture the full selection, deduplicate, and keep ordering independent of
-        # filesystem row order or feature discovery order.
-        contributions = {}
-        for selected in context.selection:
-            entries = list(selected.browser_actions(context))
-            for provider in self.action_providers:
-                entries.extend(provider(selected, context))
-            for entry in entries:
-                contributions.setdefault(entry.key, entry)
-        def contributed(entry):
-            action = menu.addAction(entry.title)
-            action.setEnabled(mutating)
-            source = entry.source or 'Extensions'
-            action.setToolTip(f'Provided by {source}')
-            action.setProperty('source', source)
-            action.triggered.connect(lambda checked=False: self._run(lambda: entry.run(context)))
-        for entry in sorted((entry for entry in contributions.values() if entry.category == 'rename'),
-                            key=lambda entry: (entry.order, entry.title.casefold())):
-            contributed(entry)
+        contributions = self._selection_actions(context)
+        for entry in self._ordered_actions(entry for entry in contributions.values() if entry.category == 'rename'):
+            self._add_contributed_action(menu, entry, context, enabled=mutating)
         standard('Move to Trash / Recycle Bin…', lambda: self.file_actions.delete(context.selection),
                  enabled=mutating, key=qt.QKeySequence.StandardKey.Delete)
         groups = {}
@@ -418,11 +402,35 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
                 groups.setdefault(entry.source or 'Extensions', []).append(entry)
         for source, entries in sorted(groups.items(), key=lambda group: (min(entry.order for entry in group[1]), group[0].casefold())):
             menu.addSection(source)
-            for entry in sorted(entries, key=lambda entry: (entry.order, entry.title.casefold())):
-                contributed(entry)
+            for entry in self._ordered_actions(entries):
+                self._add_contributed_action(menu, entry, context, enabled=mutating)
         menu.addSeparator()
         standard(desktop_actions.reveal_label(), lambda: desktop_actions.reveal(item.path))
         return menu
+
+    def _selection_actions(self, context):
+        """Capture providers once per selected item; the first action for a key wins."""
+        contributions = {}
+        for selected in context.selection:
+            entries = list(selected.browser_actions(context))
+            for provider in self.action_providers:
+                entries.extend(provider(selected, context))
+            for entry in entries:
+                contributions.setdefault(entry.key, entry)
+        return contributions
+
+    @staticmethod
+    def _ordered_actions(entries):
+        return sorted(entries, key=lambda entry: (entry.order, entry.title.casefold()))
+
+    def _add_contributed_action(self, menu, entry, context, *, enabled):
+        """Bind each menu action to its captured contribution and selection."""
+        action = menu.addAction(entry.title)
+        action.setEnabled(enabled)
+        source = entry.source or 'Extensions'
+        action.setToolTip(f'Provided by {source}')
+        action.setProperty('source', source)
+        action.triggered.connect(lambda checked=False: self._run(lambda: entry.run(context)))
 
     def _context_menu(self, index):
         menu = self.context_menu_for(index, directory=getattr(self.views, 'context_directory', None))

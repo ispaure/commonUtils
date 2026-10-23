@@ -98,6 +98,29 @@ class PersistentIndexTests(unittest.TestCase):
         # Superseded generations remain readable while their old results are open.
         self.assertEqual(old.search('file')[0].size, 3)
 
+    def test_cancellation_after_full_batch_preserves_tail_and_resumes_without_duplicates(self):
+        root = self.root / 'large'
+        root.mkdir()
+        for number in range(600):
+            (root / f'{number}.txt').write_bytes(b'content')
+        cancel = Event()
+        def report(done, total, message):
+            if message == f'Indexing {root}' and done == 513:
+                cancel.set()
+        with self.assertRaises(OperationCancelled):
+            self.cache.get(root, cancelled=cancel.is_set, report=report)
+        with self.cache.peek(root) as partial:
+            self.assertFalse(partial.complete)
+            self.assertEqual(len(partial.entries), 513)
+            self.assertTrue(all(entry.size == 7 for entry in partial.entries))
+        with DirectoryCache(database=self.database) as restarted:
+            with restarted.get(root) as complete:
+                self.assertTrue(complete.complete)
+                self.assertTrue(complete.resumed)
+                self.assertEqual(len(complete.entries), 600)
+                self.assertEqual(len({entry.path for entry in complete.entries}), 600)
+                self.assertEqual(complete.folder_stats()[root].size, 4200)
+
     def test_refresh_discards_partial_and_clear_preserves_open_results(self):
         self.pause()
         rebuilt = self.cache.get(self.root, refresh=True)

@@ -190,6 +190,13 @@ folder checkpoints; incomplete work is not published as a completed replacement.
 These internal splits do not change cache paths, schema or the public facade.
 Callers must not depend on database IDs or mutate the schema directly.
 
+Within `DirectoryCache`, `_scan_folder` keeps enumeration and error handling
+together. `_prepare_folder_scan` resets immediate children, `_flush_scan_batch`
+persists bounded pending rows and restores SQLite cancellation, and
+`_save_progressive_totals` applies the existing aggregate checkpoint interval.
+Final flushing still runs during cancellation; a 513-entry interruption fixture
+checks preservation across the 512-row batch boundary and duplicate-free restart.
+
 ## Compact cache (schema 4)
 
 `folder_paths` stores a folder's cached absolute address, parent ID, segment name,

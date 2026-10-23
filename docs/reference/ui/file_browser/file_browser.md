@@ -113,6 +113,13 @@ and detached-window behavior; application destinations remain host-owned.
 
 ## Maintenance boundaries
 
+Context-menu assembly keeps standard commands in `context_menu_for()`.
+`_selection_actions()` captures each selected item's contributions and providers,
+keeping the first action for each key. `_ordered_actions()` supplies the same
+order/title sort for rename actions and feature groups. `_add_contributed_action()`
+binds the captured selection and source label to each action. Providers still run
+at menu construction; later selection changes do not rebind an open menu.
+
 Orchestration/selection is in `__init__.py`; views/model map source objects to
 presentation; indexing/index_worker own lifecycle and subscriptions; storage/search
 modules read snapshots. File/trash actions own confirmation and mutation integration.

@@ -1,5 +1,15 @@
 # Testing commonUtils
 
+## Native filesystem notifications
+
+Qt browser/watcher tests need access to the operating system's filesystem
+notification service. A restricted macOS runner can list existing files while
+missing later changes, causing rename/row-discovery timeouts, stale watches and
+index-search update failures. Recheck these suites with native notification access
+and isolated temporary storage before changing their event-driven behavior.
+Keep their real watcher assertions; manually emitting notifications or extending
+timeouts does not validate automatic updates.
+
 Cross-process indexing tests allow a bounded 30 seconds for cold interpreter
 startup and durable checkpoints on slower hosts. Marker waits report child
 exit status and stderr immediately if a runner dies. Browser subscription tests

@@ -353,7 +353,8 @@ class DirectoryCache:
                 db.execute(f'DELETE FROM {table} WHERE generation=? AND path>=? AND path<?',
                            (generation,prefix,upper))
 
-    def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report, *, checkpoint=True):
+    def _prepare_folder_scan(self, db, generation, folder, *, checkpoint):
+        """Replace immediate children, retaining reconciliation records when needed."""
         text = str(folder)
         parent_id = ensure_folder(db, folder)
         prefix = text.rstrip(os.sep)+os.sep
@@ -366,25 +367,41 @@ class DirectoryCache:
             db.execute('INSERT OR IGNORE INTO reconcile_records SELECT record_id FROM generation_entries '
                        'WHERE generation=? AND parent_id=?', (generation,parent_id))
         delete_children(db, generation, folder)
+        return text, parent_id
+
+    def _flush_scan_batch(self, db, generation, parent_id, entry_rows, folder_rows, cancelled):
+        """Persist pending rows even during cancellation; restore SQL cancellation afterward."""
+        if not entry_rows:
+            return
+        # A cancelled scan still saves its last bounded metadata batch.
+        db.set_progress_handler(None,0)
+        started = perf_counter()
+        try:
+            write_entries(db, generation, parent_id, entry_rows)
+            db.executemany("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "
+                           "DO UPDATE SET status=CASE WHEN folders.identity=? AND folders.status='done' "
+                           "THEN 'done' ELSE 'pending' END",folder_rows)
+            self._scan_state.checkpoint_entries += len(entry_rows)
+            entry_rows.clear();folder_rows.clear()
+        finally:
+            self.last_metrics['database_write_seconds'] += perf_counter()-started
+            db.set_progress_handler(lambda:int(cancelled()),10000)
+
+    def _save_progressive_totals(self, db, generation, root, cancelled, report):
+        """Publish due aggregates and keep the existing adaptive checkpoint interval."""
+        if not cancelled() and time() - self._scan_state.totals_last > self._scan_state.totals_interval:
+            started = time()
+            self._publish_totals(db,generation,root,cancelled)
+            self._checkpoint(db,cancelled,force=True)
+            self._scan_state.totals_last = time()
+            self._scan_state.totals_interval = max(2, min(60, (self._scan_state.totals_last - started) * 20))
+            report(0, 0, 'Saved progressive folder totals')
+
+    def _scan_folder(self, db, generation, root, recursive, folder, cancelled, report, *, checkpoint=True):
+        text, parent_id = self._prepare_folder_scan(db, generation, folder, checkpoint=checkpoint)
         seen = set()
         count = 0
         entry_rows, folder_rows = [], []
-        def flush():
-            if not entry_rows:
-                return
-            # A cancelled scan still saves its last bounded metadata batch.
-            db.set_progress_handler(None,0)
-            started = perf_counter()
-            try:
-                write_entries(db, generation, parent_id, entry_rows)
-                db.executemany("INSERT INTO folders VALUES(?,?,?,'pending',NULL) ON CONFLICT(generation,path) "
-                               "DO UPDATE SET status=CASE WHEN folders.identity=? AND folders.status='done' "
-                               "THEN 'done' ELSE 'pending' END",folder_rows)
-                self._scan_state.checkpoint_entries += len(entry_rows)
-                entry_rows.clear();folder_rows.clear()
-            finally:
-                self.last_metrics['database_write_seconds'] += perf_counter()-started
-                db.set_progress_handler(lambda:int(cancelled()),10000)
         try:
             before = self._folder_identity(folder, root)
             with os.scandir(folder) as children:
@@ -414,11 +431,11 @@ class DirectoryCache:
                     count += 1
                     self._scan_state.discovered_entries += 1
                     if count % 512 == 0:
-                        flush()
+                        self._flush_scan_batch(db, generation, parent_id, entry_rows, folder_rows, cancelled)
                         if checkpoint:
                             self._checkpoint(db,cancelled)
                     report(self._scan_state.discovered_entries, 0, f'Indexing {folder}')
-            flush()
+            self._flush_scan_batch(db, generation, parent_id, entry_rows, folder_rows, cancelled)
             for (old,) in db.execute('SELECT path FROM folders WHERE generation=? AND parent=?', (generation, text)).fetchall():
                 if old not in seen:
                     self._remove_tree(db, generation, old)
@@ -434,17 +451,11 @@ class DirectoryCache:
             db.execute("UPDATE folders SET status='error' WHERE generation=? AND path=?", (generation, text))
         finally:
             # Preserve partial metadata; the folder stays pending until enumeration finishes.
-            flush()
+            self._flush_scan_batch(db, generation, parent_id, entry_rows, folder_rows, cancelled)
             self._mark_totals_changed(folder,root)
             if checkpoint:
                 self._checkpoint(db,cancelled)
-            if checkpoint and not cancelled() and time() - self._scan_state.totals_last > self._scan_state.totals_interval:
-                started = time()
-                self._publish_totals(db,generation,root,cancelled)
-                self._checkpoint(db,cancelled,force=True)
-                self._scan_state.totals_last = time()
-                self._scan_state.totals_interval = max(2, min(60, (self._scan_state.totals_last - started) * 20))
-                report(0, 0, 'Saved progressive folder totals')
+                self._save_progressive_totals(db, generation, root, cancelled, report)
 
     def _snapshot(self, db, generation, root, recursive, **options):
         return assemble_snapshot(self.database, self._readers, db, generation, root, recursive, **options)
