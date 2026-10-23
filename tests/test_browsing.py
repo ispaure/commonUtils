@@ -28,6 +28,64 @@ class BrowsingTests(unittest.TestCase):
 
 
 class RangeValidationTests(unittest.TestCase):
+    def test_readinto_uses_the_byte_capacity_of_typed_buffers(self):
+        from array import array
+        from io import BytesIO
+        from commonUtils.runtime.resources.range_reader import RangeReader
+        data = b'abcdefgh'
+        expected = array('I', [0, 0])
+        expected_count = BytesIO(data).readinto(expected)
+        actual = array('I', [0, 0])
+        with RangeReader(len(data), lambda offset, count: data[offset:offset + count]) as stream:
+            self.assertEqual(stream.readinto(actual), expected_count)
+            self.assertEqual(actual.tobytes(), expected.tobytes())
+            self.assertEqual(stream.tell(), expected_count)
+
+    def test_invalid_readinto_buffers_do_not_consume_source_data(self):
+        from array import array
+        from io import BytesIO
+        from commonUtils.runtime.resources.range_reader import RangeReader
+        for buffer in (b'xxxx', memoryview(b'xxxx'), memoryview(array('I', [0, 0, 0, 0]))[::2]):
+            with self.subTest(readonly=memoryview(buffer).readonly, contiguous=memoryview(buffer).c_contiguous):
+                reference = BytesIO(b'abcdefgh')
+                with self.assertRaises(TypeError):
+                    reference.readinto(buffer)
+                calls = []
+                def read(offset, count):
+                    calls.append((offset, count))
+                    return b'abcdefgh'[offset:offset + count]
+                with RangeReader(8, read) as stream:
+                    with self.assertRaises(TypeError):
+                        stream.readinto(buffer)
+                    self.assertEqual(stream.tell(), 0)
+                    self.assertEqual(calls, [])
+
+    def test_readinto_retains_strided_byte_view_support(self):
+        from commonUtils.runtime.resources.range_reader import RangeReader
+        buffer = bytearray(8)
+        with RangeReader(8, lambda offset, count: b'abcdefgh'[offset:offset + count]) as stream:
+            self.assertEqual(stream.readinto(memoryview(buffer)[::2]), 4)
+            self.assertEqual(buffer, b'a\x00b\x00c\x00d\x00')
+            self.assertEqual(stream.tell(), 4)
+
+    def test_non_integer_io_arguments_fail_before_fetch_or_position_change(self):
+        from io import BytesIO
+        from commonUtils.runtime.resources.range_reader import RangeReader
+        for method, arguments in (('seek', (1.5,)), ('seek', (0, 1.0)),
+                                  ('read', (1.5,)), ('read', (-1.5,))):
+            with self.subTest(method=method, arguments=arguments):
+                with self.assertRaises(TypeError):
+                    getattr(BytesIO(b'abcdefgh'), method)(*arguments)
+                calls = []
+                def read(offset, count):
+                    calls.append((offset, count))
+                    return b'abcdefgh'[offset:offset + count]
+                with RangeReader(8, read) as stream:
+                    with self.assertRaises(TypeError):
+                        getattr(stream, method)(*arguments)
+                    self.assertEqual(stream.tell(), 0)
+                    self.assertEqual(calls, [])
+
     def test_cached_ranges_still_check_source_lease(self):
         from commonUtils.runtime.resources.range_reader import RangeReader
         locked = False

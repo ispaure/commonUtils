@@ -1,6 +1,7 @@
 """Seekable read-only streams over bounded range callbacks; no disk cache."""
 from collections import OrderedDict
 from io import RawIOBase, SEEK_SET, SEEK_CUR, SEEK_END
+from operator import index
 
 
 class RangeReader(RawIOBase):
@@ -26,6 +27,7 @@ class RangeReader(RawIOBase):
 
     def seek(self, offset, whence=SEEK_SET):
         self._checkClosed()
+        offset, whence = index(offset), index(whence)
         if self.validate:
             self.validate()
         base = {SEEK_SET: 0, SEEK_CUR: self.position, SEEK_END: self.size}.get(whence)
@@ -36,6 +38,7 @@ class RangeReader(RawIOBase):
 
     def read(self, count=-1):
         self._checkClosed()
+        count = index(count)
         if self.validate:
             self.validate()
         count = max(0, self.size - self.position) if count < 0 else min(count, max(0, self.size - self.position))
@@ -63,9 +66,21 @@ class RangeReader(RawIOBase):
         return bytes(result)
 
     def readinto(self, buffer):
-        value = self.read(len(buffer))
-        buffer[:len(value)] = value
-        return len(value)
+        self._checkClosed()
+        with memoryview(buffer) as destination:
+            if destination.readonly:
+                raise TypeError('readinto() requires a writable bytes-like buffer.')
+            if not destination.c_contiguous:
+                # Retain the existing one-dimensional strided byte-view support.
+                if destination.ndim != 1 or destination.format != 'B':
+                    raise TypeError('readinto() requires a contiguous typed buffer or a byte view.')
+                value = self.read(destination.nbytes)
+                destination[:len(value)] = value
+                return len(value)
+            with destination.cast('B') as raw:
+                value = self.read(raw.nbytes)
+                raw[:len(value)] = value
+                return len(value)
 
     def close(self):
         self.blocks.clear()

@@ -43,7 +43,12 @@ revisions during reads where underlying content can change. `RangeReader` adapts
 bounded `(offset, count) -> bytes` callbacks into such a reader: callbacks must
 return exactly the requested byte count. Its default cache is eight 1 MiB blocks;
 a single read is limited to 128 MiB. Closing clears cached blocks. It creates no
-disk cache. Sources own any additional whole-document/member limits.
+disk cache. `readinto` accepts writable contiguous buffers by byte capacity,
+including typed arrays. Existing one-dimensional strided byte views remain
+supported. Invalid buffers fail before consuming bytes or fetching
+a range. Sources own any additional whole-document/member limits.
+Read counts, seek offsets and whence values follow the integer I/O contract;
+invalid numeric arguments fail before source access or position changes.
 
 `WritableArchiveSource.replace_stream(path, writer, expected_revision=token,
 verify=None)` gives `writer` a binary output stream. Stage changes without replacing
