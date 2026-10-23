@@ -38,7 +38,8 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
 
     Pass an argument sequence by default. Shell strings require shell=True.
     timeout bounds elapsed time; idle_timeout bounds time without output. Neither
-    limit is enabled by default. Launch errors propagate as OSError.
+    limit is enabled by default. Launch and pipe-read errors propagate; timeout/
+    cancellation results retain partial output even if closing a pipe interrupts its reader.
     """
     require_capability(Capability.SUBPROCESS, 'run_command')
     if isinstance(arguments, str) != shell:
@@ -76,11 +77,14 @@ def run_command(arguments: Sequence[str | os.PathLike] | str, *, cwd: str | Path
                 continue
             if chunk is None:
                 active -= 1
+            elif isinstance(chunk, Exception):
+                raise chunk
             else:
                 buffers[name].extend(chunk)
                 last_output = time.monotonic()
         child.wait()
-    output.drain_output_queue(events, buffers['stdout'], buffers['stderr'])
+    output.drain_output_queue(events, buffers['stdout'], buffers['stderr'],
+                              ignore_errors=timed_out or was_cancelled)
     def lines(name):
         return tuple(line.decode('utf-8', errors='replace').rstrip('\r')
                      for line in output.output_bytes_to_lines(bytes(buffers[name])))

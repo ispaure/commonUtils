@@ -107,7 +107,9 @@ durable requests available for takeover. See the coordinator contract in the
 
 `run_command(arguments, timeout=..., idle_timeout=...)` waits and returns a
 `CommandResult` with return code, stdout/stderr tuples and timeout/cancellation
-flags. `success` requires exit code zero without timeout/cancellation. Launch errors
+flags. `success` requires exit code zero without timeout/cancellation. Pipe-read
+errors propagate after process cleanup; stopping a timed-out/cancelled reader
+preserves its result flags and partial output. Launch errors
 raise OSError. Use a sequence with the default shell-free mode; strings require
 `shell=True`. Timeouts must be positive. Run it off the GUI thread.
 

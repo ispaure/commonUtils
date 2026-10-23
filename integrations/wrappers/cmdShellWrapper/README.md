@@ -22,6 +22,11 @@ if not result.success:
 `success` requires exit status zero with neither timeout nor cancellation.
 A missing executable raises `OSError`. A cancelled call does not start a process.
 
+Pipe-read `OSError`/`ValueError` failures propagate after retiring the child and
+closing its streams, rather than being reported as successful output capture.
+Timeout/cancellation keep their explicit result flags and partial output; a reader
+interrupted by stopping the process does not mask that outcome.
+
 Pass `cancelled=event.is_set` to stop a running process tree. `timeout` limits
 elapsed time; `idle_timeout` limits time without output. Both are disabled unless
 specified. Even a process that closes both output streams remains subject to

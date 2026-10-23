@@ -69,6 +69,54 @@ class CommandTests(unittest.TestCase):
         self.assertIsNone(run_command(['does-not-exist'], cancelled=lambda: True).returncode)
         self.assertEqual(exec_cmd('echo compatible'), ['compatible'])
 
+    def test_pipe_read_failure_propagates_and_retires_the_child(self):
+        from commonUtils.integrations.wrappers.cmdShellWrapper import result
+        start = result.subprocess.Popen
+        for name in ('stdout', 'stderr'):
+            for error_type in (OSError, ValueError):
+                with self.subTest(stream=name, error=error_type.__name__):
+                    spawned, streams = [], []
+                    def launch(*args, **kwargs):
+                        child = start(*args, **kwargs)
+                        spawned.append(child)
+                        streams.extend((child.stdout, child.stderr))
+                        stream = getattr(child, name)
+                        from unittest.mock import Mock
+                        reader = Mock(wraps=stream)
+                        reader.read1.side_effect = error_type('synthetic pipe read failure')
+                        setattr(child, name, reader)
+                        return child
+                    with patch.object(result.subprocess, 'Popen', side_effect=launch):
+                        with self.assertRaisesRegex(error_type, 'synthetic pipe read failure'):
+                            run_command([sys.executable, '-c', 'import time; time.sleep(10)'], timeout=.2)
+                    self.assertEqual(len(spawned), 1)
+                    self.assertIsNotNone(spawned[0].poll())
+                    self.assertTrue(all(stream.closed for stream in streams))
+
+    def test_timeout_retains_outcome_when_stopping_interrupts_a_pipe_reader(self):
+        from threading import Event
+        from unittest.mock import Mock
+        from commonUtils.integrations.wrappers.cmdShellWrapper import result, process
+        release = Event()
+        start, terminate = result.subprocess.Popen, process.terminate_process_tree
+        def interrupted_read(_size):
+            if not release.wait(2):
+                raise RuntimeError('fixture reader was not stopped')
+            raise OSError('synthetic close interruption')
+        def launch(*args, **kwargs):
+            child = start(*args, **kwargs)
+            child.stdout = Mock(wraps=child.stdout)
+            child.stdout.read1.side_effect = interrupted_read
+            return child
+        def stop(child):
+            release.set()
+            terminate(child)
+        with patch.object(result.subprocess, 'Popen', side_effect=launch), \
+                patch.object(process, 'terminate_process_tree', side_effect=stop):
+            captured = run_command([sys.executable, '-c', 'import time; time.sleep(10)'], timeout=.1)
+        self.assertTrue(captured.timed_out)
+        self.assertFalse(captured.success)
+
     def test_missing_executable_and_implicit_shell_strings_are_rejected(self):
         with self.assertRaises(OSError):
             run_command(['this-executable-does-not-exist'])

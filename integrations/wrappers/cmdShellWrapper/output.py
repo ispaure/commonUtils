@@ -28,6 +28,7 @@ def read_stream(stream, stream_name: str, output_queue: queue.Queue):
 
     Reading chunks instead of complete lines ensures output such as progress updates using carriage returns or
     partial writes still counts as activity and resets the idle timeout.
+    Queue read failures before EOF so the owner can distinguish failure from completion.
     """
     try:
         while True:
@@ -41,15 +42,15 @@ def read_stream(stream, stream_name: str, output_queue: queue.Queue):
 
             output_queue.put((stream_name, chunk))
 
-    except (OSError, ValueError):
-        # The stream may be closed by timeout handling while this reader is blocked.
-        pass
+    except (OSError, ValueError) as error:
+        output_queue.put((stream_name, error))
 
     finally:
         output_queue.put((stream_name, None))
 
 
-def drain_output_queue(output_queue: queue.Queue, stdout_output: bytearray, stderr_output: bytearray):
+def drain_output_queue(output_queue: queue.Queue, stdout_output: bytearray, stderr_output: bytearray,
+                       *, ignore_errors=False):
     """Drain any output that reached the queue immediately before the process streams were closed."""
     while True:
         try:
@@ -58,6 +59,10 @@ def drain_output_queue(output_queue: queue.Queue, stdout_output: bytearray, stde
             break
 
         if chunk is None:
+            continue
+        if isinstance(chunk, Exception):
+            if not ignore_errors:
+                raise chunk
             continue
 
         if stream_name == 'stdout':
