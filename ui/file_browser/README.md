@@ -7,7 +7,8 @@ For workflows and settings, see the [user guide](user_docs/README.md).
 
 Deferred breadcrumb reveals are bound to the bar's Qt lifetime and ignore an
 already-retired native scroll area. Range/layout callbacks during teardown must
-not access deleted child widgets.
+not access deleted child widgets. Deferred cover requests and queue advancement
+are likewise bound to the native item view lifetime.
 
 ## Construction and navigation
 

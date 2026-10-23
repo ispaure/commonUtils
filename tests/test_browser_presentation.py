@@ -11,6 +11,25 @@ from commonUtils.ui.file_browser.status import format_duration, indexing_phase, 
 
 
 class BrowserPresentationTests(QtTestCase):
+    def test_queued_cover_request_does_not_outlive_native_views(self):
+        import sys
+        from commonUtils.ui.file_browser.views import BrowserViews
+        model = qt.QStandardItemModel()
+        model.appendRow(qt.QStandardItem('fixture'))
+        model.browse_network = lambda path: False
+        model.browse_index = lambda path: model.index(0, 0)
+        self.addCleanup(model.deleteLater)
+        tree = qt.QTreeView()
+        tree.setModel(model)
+        views = BrowserViews(model, tree, column_navigation=False)
+        errors = []
+        with patch.object(sys, 'excepthook', lambda kind, error, tb: errors.append(str(error))):
+            views._request_cover(Path('/fixture'))
+            views.deleteLater()
+            self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+        self.assertEqual(errors, [])
+
     def test_column_preview_native_visibility_waits_for_model(self):
         from commonUtils.ui.file_browser.columns import FolderColumnView
         calls = []

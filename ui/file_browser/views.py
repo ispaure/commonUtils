@@ -309,7 +309,7 @@ class BrowserViews(qt.QStackedWidget):
     def _request_cover(self, path):
         if self.closing or self.model.browse_network(path):
             return
-        qt.QTimer.singleShot(0, lambda: self._enqueue_cover(path))
+        qt.QTimer.singleShot(0, self, lambda: self._enqueue_cover(path))
 
     def _visible_cover(self, path):
         index = self.covers.mapFromSource(self.model.browse_index(path))
@@ -330,7 +330,7 @@ class BrowserViews(qt.QStackedWidget):
         path = self.cover_path
         if not self._visible_cover(path):
             self.covers.requested.discard(path)
-            qt.QTimer.singleShot(0, self._next_cover)
+            qt.QTimer.singleShot(0, self, self._next_cover)
             return
         self.cover_busy = True
         thumbnail = self.model.browse_index(path).data(BrowseRole.Thumbnail)
