@@ -36,6 +36,28 @@ assert not any(name.startswith('commonUtils.') for name in sys.modules)
 """
         subprocess.run([sys.executable, '-c', script], check=True)
 
+    def test_native_browser_lifecycle_import_does_not_require_a_toolkit(self):
+        script = """
+import sys
+class RejectToolkits:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'toga', 'PySide6'}:
+            raise AssertionError('Portable lifecycle imported ' + fullname)
+sys.meta_path.insert(0, RejectToolkits())
+import commonUtils.ui.native_browser as browser
+from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
+assert browser.BrowserLifecycle is BrowserLifecycle
+assert 'NativeBrowser' in dir(browser)
+assert 'commonUtils.ui.native_browser.presentation' not in sys.modules
+try:
+    browser.unknown_export
+except AttributeError:
+    pass
+else:
+    raise AssertionError('Unknown package exports must raise AttributeError')
+"""
+        subprocess.run([sys.executable, '-c', script], check=True)
+
     def test_vendored_namespace_has_independent_modules_and_registry(self):
         script = """
 import importlib, sys, types
@@ -48,7 +70,7 @@ sys.modules['_vendor'] = vendor
 vendored = importlib.import_module('_vendor.commonUtils')
 for name in ('runtime.platform', 'formats.registry', 'filesystem.index.metadata',
              'integrations.wrappers.cmdShellWrapper.command', 'ui.native.dialogs', 'runtime.resources.provider',
-             'runtime.resources.local', 'runtime.resources.selection'):
+             'runtime.resources.local', 'runtime.resources.selection', 'ui.native_browser.lifecycle'):
     module = importlib.import_module('_vendor.commonUtils.' + name)
     standalone = importlib.import_module('commonUtils.' + name)
     assert module is not standalone
@@ -57,6 +79,7 @@ for name in ('runtime.platform', 'formats.registry', 'filesystem.index.metadata'
 from commonUtils.formats.registry import file_types
 from _vendor.commonUtils.formats.registry import file_types as vendored_types
 assert vendored_types is not file_types
+assert 'toga' not in sys.modules
 assert not any(name.startswith('PySide6') for name in sys.modules)
 """
         subprocess.run([sys.executable, '-c', script], check=True)

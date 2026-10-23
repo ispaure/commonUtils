@@ -182,6 +182,13 @@ viewport-limited tiles. `BrowserPresentation` supplies appearance hooks;
 row component independently. See the [continuous browser guide](../../ui/native_browser/README.md#continuous-mobile-browsing)
 and [list contract](../../ui/native/README.md#recycled-lists).
 
+The `ui.native_browser` package exposes its existing presentation exports lazily.
+Importing it or `ui.native_browser.lifecycle.BrowserLifecycle` requires neither
+Toga nor Qt; requesting `NativeBrowser` loads `ui.native_browser.presentation`.
+This keeps retirement/generation tests usable in headless and desktop consumers
+without adding a native toolkit dependency. Presentation callbacks and object
+identity across package exports remain unchanged.
+
 `formats.markdown.wiki.MarkdownWiki` supplies a GUI-free local documentation
 catalog with folder landing pages, body-heading titles (after optional YAML frontmatter) and recursive text/name search.
 

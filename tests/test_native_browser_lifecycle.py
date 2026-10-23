@@ -4,12 +4,11 @@ from importlib.util import find_spec
 from threading import Event
 from types import SimpleNamespace
 import unittest
+from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
+
 HAS_TOGA = find_spec('toga') is not None
-if HAS_TOGA:
-    from commonUtils.ui.native_browser.lifecycle import BrowserLifecycle
 
 
-@unittest.skipUnless(HAS_TOGA, 'Optional Toga browser backend is not installed')
 class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_late_cover_cannot_publish_after_generation_change(self):
         work = BrowserLifecycle()
@@ -44,6 +43,7 @@ class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(work.decoded)
         await work.close()
 
+    @unittest.skipUnless(HAS_TOGA, 'Optional Toga browser backend is not installed')
     async def test_retired_tile_keeps_its_storage_worker_owned_until_close(self):
         from commonUtils.ui.native_browser.recycled import RecycledBrowser
         work = BrowserLifecycle()
@@ -88,6 +88,14 @@ class BrowserLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(finished.is_set())
         self.assertFalse(work.tasks)
         self.assertEqual(published, [])
+
+    @unittest.skipUnless(HAS_TOGA, 'Optional Toga browser backend is not installed')
+    def test_public_browser_exports_retain_presentation_identity(self):
+        from commonUtils.ui import native_browser
+        from commonUtils.ui.native_browser import presentation
+        self.assertIs(native_browser.NativeBrowser, presentation.NativeBrowser)
+        self.assertIs(native_browser.clear_box, presentation.clear_box)
+        self.assertIs(native_browser.BrowserLifecycle, BrowserLifecycle)
 
     def test_close_drains_done_tasks_before_their_callbacks_run(self):
         # A subprocess timeout catches a tight event-loop spin without stranding

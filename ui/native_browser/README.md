@@ -2,8 +2,12 @@
 
 Toga list/tile presentation for portable BrowseTree snapshots and rooted provider
 rows. See the [shared contract](../resource-providers.md#native-list-and-tile-presentation)
-for callbacks, cache bounds and cooperative shutdown. Import this module directly;
-Toga is optional for consumers that only use the portable model or Qt views.
+for callbacks, cache bounds and cooperative shutdown. Importing this package or
+`lifecycle.BrowserLifecycle` loads no Toga or Qt. Requesting the existing
+`NativeBrowser` or `clear_box` exports loads their Toga presentation lazily;
+`presentation.py` owns that implementation. Toga remains optional for consumers
+that only use lifecycle mechanics, the portable model or Qt views. The recycled
+and paginated presentation modules still require their native toolkit.
 
 ## Continuous mobile browsing
 
