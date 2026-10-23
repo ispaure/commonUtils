@@ -244,84 +244,6 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             self._update_watch_paths(path, (path,))
             self.refresh_folder_totals()
 
-    def _set_network_location(self, path):
-        from ...filesystem.network import is_network_location
-        network = is_network_location(path)
-        changed = self.network_location != network
-        self.network_location = network
-        self.model.network_location = network
-        self.model.setOption(qt.QFileSystemModel.Option.DontWatchForChanges, network)
-        for mode in (3, 4):
-            self.view_selector.buttons[mode].setEnabled(not network)
-            self.view_selector.buttons[mode].setToolTip('Size map disabled for network drives' if network
-                else ('Treemap view' if mode == 3 else 'Radial view'))
-        self.refresh_button.setToolTip('Indexing and scans disabled for network drives' if network
-            else 'Check all files and saved sizes below the current folder')
-        self.search_button.setEnabled(not network)
-        self.search_button.setToolTip('Indexed search disabled for network drives' if network
-            else 'Show or hide search (Ctrl/Cmd+F)')
-        if network:
-            self.reconcile_debounce.stop()
-            self._changed_paths.clear(); self._full_index_refresh = False
-            self.folder_pending = False; self._reconcile_pending = False
-            if self.folder_busy: self.folder_operation.requestInterruption()
-            watches = self.index_watcher.directories() + self.index_watcher.files()
-            if watches: self.index_watcher.removePaths(watches)
-            self.close_search()
-            self.model.set_folder_totals({})
-            self.index_incomplete = False
-            self.index_activity.hide(); self.index_details_button.hide()
-            self.index_status.setText('Indexing and scans disabled for network drives')
-            self.index_progress.emit(self.index_status.text())
-            if self.views.currentIndex() == 3: self.view_selector.setCurrentIndex(0)
-        elif changed:
-            self.index_status.setText('Loading saved sizes…')
-        self._update_index_controls()
-        self.index_state_changed.emit()
-
-    def _directory_opened(self, path):
-        # Reopening the same folder checks new items without checking on every
-        # selection event (which also publishes directory_changed).
-        from .index_policy import index_policy
-        if not self.network_location and path == self.folder_root and not self.folder_busy and index_policy(path=self.index_settings_path).refresh_on_revisit:
-            from ...filesystem.index import directory_cache
-            directory_cache.invalidate(path)
-            self._changed_paths.add(path)
-            self.refresh_folder_totals()
-
-    def _update_watch_paths(self, root, paths):
-        if self.stopping or self.network_location or root != self.navigation.directory:
-            return
-        from ...filesystem.index import directory_cache
-        from ...filesystem.index.exclusions import scan_exclusions, is_excluded
-        exclusions = scan_exclusions(root, directory_cache.database)
-        expected = {str(path) for path in paths if not is_excluded(path, exclusions)}
-        previous = set(self.index_watcher.directories()) | set(self.index_watcher.files())
-        if previous - expected: self.index_watcher.removePaths(list(previous - expected))
-        if expected - previous: self.index_watcher.addPaths(list(expected - previous))
-
-    def _indexed_path_changed(self, path):
-        if self.stopping or self.network_location or not self.calculate_folder_sizes: return
-        from .index_policy import index_policy
-        if not index_policy(path=self.index_settings_path).watch_changes: return
-        root = self.navigation.directory
-        path = Path(path)
-        if root is None or (path != root and root not in path.parents):
-            return
-        from ...filesystem.index import directory_cache
-        from ...filesystem.index.exclusions import scan_exclusions, is_excluded
-        if is_excluded(Path(path), scan_exclusions(self.navigation.directory, directory_cache.database)):
-            return
-        directory_cache.invalidate(Path(path))
-        self._changed_paths.add(Path(path))
-        self._reconcile_pending = True
-        self.reconcile_debounce.start()
-
-    def _reconcile_index(self):
-        if self.stopping or self.network_location or not self.calculate_folder_sizes or self._index_paused or self.folder_busy: return
-        self._reconcile_pending = False
-        self.refresh_folder_totals()
-
     def handle_directory(self, path):
         return bool(self.directory_handler and self.directory_handler(Path(path)))
 
@@ -645,10 +567,14 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.file_actions.stop()
         if self.folder_busy:
             self.folder_operation.requestInterruption()
+        return self._owned_operations_busy()
+
+    def _owned_operations_busy(self):
+        """Close and idle share admission across all owned worker families."""
         return self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy()
 
     def _maybe_idle(self):
-        if self.stopping and not (self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy()):
+        if self.stopping and not self._owned_operations_busy():
             self.idle.emit()
 
     def shutdown(self):

@@ -100,6 +100,13 @@ on Windows. Do not close a shared cache while other views still use it.
 
 ## Shutdown and workspaces
 
+`BrowserIndexing` owns network policy, watch-set replacement and queued
+notification/revisit handling. These remain inherited FileBrowser methods, with
+the same callback signatures and state fields. FileBrowser coordinates all owned
+worker families through one close/idle admission expression. A running details
+worker stays owned until finished; pending refresh or shutdown rejects its late
+publication before controls or `details_loaded` are updated.
+
 `stop()` returns **true while workers are still finishing**. Ignore close while
 true and retry on `idle`. `shutdown()` waits during final application exit. Retain
 controllers and feature bindings as long as their jobs need them: browser stop does

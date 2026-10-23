@@ -35,6 +35,36 @@ class CustomFile(File):
 
 
 class BrowserTests(QtTestCase):
+    def test_stop_retains_a_running_details_worker_and_rejects_its_late_publication(self):
+        from threading import Event
+        started, release = Event(), Event()
+
+        def slow_details():
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError('Details fixture was not released')
+            return BrowserDetails((('Sensitive field', 'Late details'),))
+
+        class SlowFile(File):
+            def browser_panels(self):
+                return (BrowserPanel('slow', 'Slow details', slow_details),)
+
+        self.wait()
+        path = self.root / 'slow.dat'
+        path.write_bytes(b'fixture')
+        published = []
+        self.browser.details_loaded.connect(published.append)
+        try:
+            self.browser.load(SlowFile(path))
+            self.wait_until(started.is_set, timeout=5)
+            self.assertTrue(self.browser.stop())
+            self.assertTrue(self.browser.busy)
+            self.assertEqual(published, [])
+        finally:
+            release.set()
+            self.wait_until(lambda: not self.browser.busy, timeout=5)
+        self.assertEqual(published, [])
+
     def test_host_can_omit_column_view_and_keep_list_tile_navigation(self):
         self.browser.close()
         self.wait()
