@@ -15,6 +15,8 @@ startup and durable checkpoints on slower hosts. Marker waits report child
 exit status and stderr immediately if a runner dies. Browser subscription tests
 retry transient SQLite queue locks within their deadline, matching production
 followers; assertions still verify completion, totals and durable task ownership.
+The no-duplicate-scan assertion counts exact folders across both process journals:
+transient queue contention can hand off ownership after a durable checkpoint.
 
 See [maintenance and documentation ownership](../../developer/maintenance.md).
 

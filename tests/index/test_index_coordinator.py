@@ -120,7 +120,13 @@ class CoordinatorTests(unittest.TestCase):
         self.assertFalse(other_journal.exists())
         release.touch()
         self.assert_done(identity)
-        self.assertEqual(len(journal.read_text().splitlines()), 6)
+        # A transient SQLite queue lock may yield ownership after a durable
+        # checkpoint. Check the combined scan, rather than requiring one
+        # process to retain ownership for the entire job on every platform.
+        scanned = journal.read_text().splitlines()
+        if other_journal.exists():
+            scanned += other_journal.read_text().splitlines()
+        self.assertCountEqual(scanned, [str(self.root), *(str(self.root / str(i)) for i in range(5))])
         self.assertIsNone(first.poll())
         self.assertIsNone(second.poll())
 
