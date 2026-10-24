@@ -92,3 +92,15 @@ storage leases merely because rows disappeared. For a memory trim,
 `work.prune(set())` clears both cache tiers without changing selection. Hosts must
 also release their own displayed image references when appropriate. Stop/close
 remain the retirement path.
+
+## Hidden item appearance
+
+Recycled lists and tiles use a provider's `hidden` flag or a dot-prefixed
+basename. A hidden ancestor alone does not dim an ordinary child in search
+results. Provider payloads retain that metadata through browse projections;
+indexed search revalidates hits through the provider before publication.
+Native selection preserves muted hidden names, including Android high-contrast
+selection; iOS binds both normal and highlighted colors on every reused cell.
+The default tile presentation uses system/theme surface roles and resets the
+normal foreground when a non-hidden item is drawn. These rules affect styling,
+not visibility, access, encryption or indexing admission.

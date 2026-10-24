@@ -38,9 +38,10 @@ class BrowserPresentation:
         pass
 
     def highlight(self, widget, selected):
-        widget.style.background_color = '#dce9ff' if selected else 'transparent'
-        if isinstance(widget, toga.Button) and getattr(widget, 'browser_hidden', False):
-            widget.style.color = '#808080'
+        from ..native.appearance import SurfaceStyle, SurfacePainter
+        SurfacePainter().paint(widget._impl, SurfaceStyle(radius=8, background='hover' if selected else 'surface',
+            foreground=('muted' if getattr(widget, 'browser_hidden', False) else 'text')
+            if isinstance(widget, toga.Button) else None))
 
     def bind_keyboard(self, browser):
         from ..native.keyboard import SearchDismissal

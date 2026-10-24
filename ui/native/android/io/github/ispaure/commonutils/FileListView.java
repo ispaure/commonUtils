@@ -239,7 +239,9 @@ public final class FileListView extends ListView {
 
     private void paint(View view, boolean selected) {
         Holder holder = (Holder) view.getTag();
-        int foreground = selected ? selectedTextColor : holder.hidden ? mutedColor : textColor;
+        int foreground = holder.hidden
+            ? (selected && outlined ? (selectedTextColor & 0x00ffffff) | 0xb3000000 : mutedColor)
+            : selected ? selectedTextColor : textColor;
         view.setBackgroundColor(selected ? selectedColor : surfaceColor);
         holder.title.setTextColor(foreground);
         holder.subtitle.setTextColor(selected ? foreground : mutedColor);

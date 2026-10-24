@@ -55,6 +55,16 @@ class IOSFileListLifecycleTests(unittest.TestCase):
     def bind(self):
         return self.controller.tableView_cellForRowAtIndexPath_(self.table, self.index)
 
+    def test_hidden_text_and_selected_text_reset_when_a_cell_is_reused(self):
+        self.row.hidden = True
+        self.bind()
+        self.assertEqual(self.cell.textLabel.textColor, 'muted')
+        self.assertEqual(self.cell.textLabel.highlightedTextColor, 'muted')
+        self.row.hidden = False
+        self.bind()
+        self.assertEqual(self.cell.textLabel.textColor, 'text')
+        self.assertEqual(self.cell.textLabel.highlightedTextColor, 'text')
+
     def test_rows_without_icons_clear_recycled_images_and_use_injected_icon_slot(self):
         self.row.icon = None
         self.interface.appearance.icon_size = 32
