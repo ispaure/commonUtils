@@ -29,3 +29,11 @@ invalid/unknown values, preview isolation, independent section callbacks, reset,
 concurrent edits and no-op saves. Construction does not persist or apply settings.
 
 [Configuration contracts](../../configuration/configuration.md) and [editor workflows](../../../user/components/components.md).
+
+Successful Save refreshes values, sparse override indicators and conflict snapshots
+without rebuilding the form. Existing controls and font previews retain identity,
+so the active tab, focus, selection and scroll stay in place. Parser-normalized
+values are synchronized with signals blocked. Repeated saves use the latest file
+snapshot; external changes still require Reload. Explicit Reload rebuilds controls
+and rereads the schema. A write followed by a readback error reports that the write
+succeeded but that Reload is required, rather than reporting an ordinary success.

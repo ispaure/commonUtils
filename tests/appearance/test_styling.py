@@ -34,6 +34,44 @@ class StylingTests(QtTestCase):
         controller.set_mode('dark')
         self.assertEqual(button.font().pointSizeF(), self.controller.font('ui').pointSizeF())
 
+    def test_accent_reload_skips_font_callbacks_but_notifies_rendering_consumers(self):
+        widgets = [qt.QWidget() for _ in range(4)]
+        callbacks = []
+        for widget, role in zip(widgets, ('ui', 'browser', 'reading', 'code')):
+            self.addCleanup(widget.deleteLater)
+            self.controller.bind(widget, role, lambda role=role: callbacks.append(role))
+        callbacks.clear()
+        notifications = []
+        self.controller.changed.connect(lambda: notifications.append(True))
+        self.store.save({('Styling', 'accent_color_str'): '#00aa77'})
+        with patch.object(self.controller, '_update', wraps=self.controller._update) as update:
+            self.controller.reload()
+            update.assert_not_called()
+        self.assertFalse(callbacks)
+        self.assertEqual(notifications, [True])
+        self.store.save({('Styling', 'code_font_size_int'): '14'})
+        self.controller.reload()
+        self.assertCountEqual(callbacks, ['code', 'reading'])
+        callbacks.clear()
+        self.store.save({('Styling', 'browser_font_size_int'): '16'})
+        self.controller.reload()
+        self.assertEqual(callbacks, ['browser'])
+
+    def test_saving_accent_retains_font_selectors_and_preview_widgets(self):
+        panel = LayeredSettingsEditor(self.store, sections=('Styling',))
+        self.addCleanup(panel.deleteLater)
+        fields, previews = dict(panel.fields), dict(panel.font_previews)
+        for accent in ('#00aa77', '#cc5500'):
+            panel.fields['Styling', 'accent_color_str'].setText(accent)
+            self.assertTrue(panel.save(), panel.status.text())
+            self.assertEqual(panel.fields, fields)
+            self.assertEqual(panel.font_previews, previews)
+            self.assertFalse(panel.pending)
+        panel.fields['Styling', 'reading_font_size_int'].setValue(16)
+        self.assertTrue(panel.save())
+        self.controller.reload()
+        self.assertEqual(self.controller.values['reading_font_size_int'], 16)
+
     def test_reference_sizes_keep_metrics_consistent_at_platform_font_resolutions(self):
         from commonUtils.ui.appearance.typography import setting_size
         reference = None

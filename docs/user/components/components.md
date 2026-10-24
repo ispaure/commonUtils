@@ -123,6 +123,11 @@ The Menus settings include **Launch with sidebar**, enabled by default, for host
 that support sidebar navigation on their launch screen. Hosts apply the choice
 when opening a workspace.
 
+Saving a layered settings form keeps the current tab, scroll position and existing
+controls, including font previews. Override indicators update immediately. Reload
+rereads the files and rebuilds the form; external changes must be reloaded before
+saving over them.
+
 ## Password visibility
 
 Password and token controls start hidden. Use the eye button to show or hide the

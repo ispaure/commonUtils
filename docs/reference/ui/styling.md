@@ -76,3 +76,17 @@ and skip unchanged palettes/stylesheets. Font roles cache their resolved fonts a
 already-bound controls are not rebound during polish/show events. Syntax highlighting
 skips palette notifications that retain its effective token style. These changes
 avoid repeated font/layout work while preserving document text, undo and saved sizes.
+
+Accent and dark-surface tint changes use palette brushes in the application
+stylesheet. When its text is unchanged, the theme controller unpolishes/polishes
+the application style to invalidate cached QSS brushes, rather than resetting the
+stylesheet and repolishing every widget. Light/dark transitions can still replace
+the stylesheet because muted tab/disabled colors differ. Rendered-pixel tests
+check that existing fields, checked buttons and progress bars adopt successive
+accent/surface changes; checking palette values alone misses stale QSS brushes.
+
+Saved styling reloads update only changed font roles. Automatic browser/reading
+families also follow interface font changes, and reading callbacks run for code
+font changes because documents contain code spans. Accent-only reloads retain
+font caches and skip font-binding callbacks. The broad `changed` signal still
+fires for specialized color/rendering consumers.

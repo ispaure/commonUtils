@@ -1,5 +1,6 @@
 """Opt-in theme, accessible palettes and active workspace tab rendering."""
 import importlib
+from dataclasses import replace
 import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import unittest
@@ -84,6 +85,41 @@ class ThemeTests(QtTestCase):
         with patch.object(self.app, 'setPalette', side_effect=nested_palette) as set_palette:
             controller.set_mode('dark')
             self.assertLessEqual(set_palette.call_count, 1)
+
+    def test_accent_and_tint_repaint_existing_controls_without_replacing_stylesheet(self):
+        host = qt.QWidget()
+        self.addCleanup(host.deleteLater)
+        layout = qt.QVBoxLayout(host)
+        field = qt.QLineEdit()
+        button = qt.QPushButton()
+        button.setCheckable(True)
+        button.setChecked(True)
+        progress = qt.QProgressBar()
+        progress.setValue(100)
+        progress.setTextVisible(False)
+        for widget in (field, button, progress):
+            widget.setFixedSize(150, 35)
+            layout.addWidget(widget)
+        host.show()
+        controller = apply_theme(self.app, mode='light')
+        try:
+            for mode in ('light', 'dark'):
+                controller.set_mode(mode)
+                for accent, surface in (('#007755', '#aaccdd'), ('#ffff00', '#334455')):
+                    colors = replace(configured_colors(mode == 'dark'), accent=accent,
+                                     selection_background=accent, surface=surface)
+                    with patch('commonUtils.ui.appearance.theme.configured_colors', return_value=colors), \
+                            patch.object(self.app, 'setStyleSheet', wraps=self.app.setStyleSheet) as set_sheet:
+                        controller._apply()
+                        self.app.processEvents()
+                        set_sheet.assert_not_called()
+                        # Inspect pixels: palette values alone cannot detect QSS
+                        # render rules retaining brushes from the previous accent.
+                        for widget, expected in ((field, surface), (button, accent), (progress, accent)):
+                            actual = widget.grab().toImage().pixelColor(70, 15).name()
+                            self.assertEqual(actual, expected, f'{type(widget).__name__} in {mode}')
+        finally:
+            host.close()
 
     def test_compact_form_fields_have_room_for_text_in_both_modes(self):
         controller = apply_theme(self.app, mode='light')

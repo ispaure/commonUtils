@@ -73,47 +73,48 @@ def theme_palette(colors):
 
 
 def theme_stylesheet(c):
-    highlight = c.selection_background or c.accent
+    # Keep accent/tint changes in the palette; replacing application QSS
+    # repolishes every widget, including hidden pages and font dropdowns.
     return f'''
-        QToolTip {{ color: {c.text}; background: {c.surface}; border: 1px solid {c.border}; padding: 5px; }}
+        QToolTip {{ color: palette(text); background: palette(base); border: 1px solid palette(mid); padding: 5px; }}
         QLineEdit, QTextEdit, QPlainTextEdit, QAbstractItemView {{
-            background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; border-radius: 6px;
-            selection-background-color: {highlight}; selection-color: {c.selected_text};
+            background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 6px;
+            selection-background-color: palette(highlight); selection-color: palette(highlighted-text);
         }}
         QLineEdit {{ padding: 1px 5px; }}
-        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {c.accent}; }}
+        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 1px solid palette(link); }}
         QAbstractItemView::item {{ padding: 4px; margin: 0px; border: none; }}
-        QAbstractItemView::item:hover {{ background: {c.hover}; padding: 4px; margin: 0px; border: none; }}
-        QAbstractItemView::item:selected {{ background: {highlight}; color: {c.selected_text}; padding: 4px; margin: 0px; border: none; }}
-        QHeaderView::section {{ background: {c.window}; color: {c.text}; border: none;
-            border-bottom: 1px solid {c.border}; padding: 7px; }}
-        QPushButton, QComboBox {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border};
+        QAbstractItemView::item:hover {{ background: palette(midlight); padding: 4px; margin: 0px; border: none; }}
+        QAbstractItemView::item:selected {{ background: palette(highlight); color: palette(highlighted-text); padding: 4px; margin: 0px; border: none; }}
+        QHeaderView::section {{ background: palette(window); color: palette(text); border: none;
+            border-bottom: 1px solid palette(mid); padding: 7px; }}
+        QPushButton, QComboBox {{ background: palette(base); color: palette(text); border: 1px solid palette(mid);
             border-radius: 6px; padding: 2px 8px; }}
-        QComboBox, QAbstractSpinBox {{ padding: 1px 8px; border: 1px solid {c.border}; border-radius: 6px;
-            background: {c.surface}; color: {c.text}; }}
-        QPushButton:hover, QComboBox:hover, QToolButton:hover {{ background: {c.hover}; }}
-        QPushButton:pressed, QPushButton:checked {{ background: {highlight}; color: {c.selected_text}; }}
-        QPushButton:focus, QComboBox:focus, QToolButton:focus {{ border: 1px solid {c.accent}; }}
+        QComboBox, QAbstractSpinBox {{ padding: 1px 8px; border: 1px solid palette(mid); border-radius: 6px;
+            background: palette(base); color: palette(text); }}
+        QPushButton:hover, QComboBox:hover, QToolButton:hover {{ background: palette(midlight); }}
+        QPushButton:pressed, QPushButton:checked {{ background: palette(highlight); color: palette(highlighted-text); }}
+        QPushButton:focus, QComboBox:focus, QToolButton:focus {{ border: 1px solid palette(link); }}
         QPushButton:disabled, QComboBox:disabled {{ color: {c.muted}; }}
         QComboBox QLineEdit, QAbstractSpinBox QLineEdit,
         QComboBox QLineEdit:focus, QAbstractSpinBox QLineEdit:focus {{
             border: none; border-radius: 0px; padding: 0px; background: transparent; }}
         QToolButton {{ border: 1px solid transparent; border-radius: 4px; padding: 2px; }}
-        QGroupBox {{ border: 1px solid {c.border}; border-radius: 6px; margin-top: 12px; padding-top: 8px; }}
+        QGroupBox {{ border: 1px solid palette(mid); border-radius: 6px; margin-top: 12px; padding-top: 8px; }}
         QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0px 4px; }}
-        QTabWidget::pane {{ border: 1px solid {c.border}; }}
-        QTabBar::tab {{ background: {c.window}; color: {c.muted}; padding: 8px 14px;
+        QTabWidget::pane {{ border: 1px solid palette(mid); }}
+        QTabBar::tab {{ background: palette(window); color: {c.muted}; padding: 8px 14px;
             border: none; border-bottom: 3px solid transparent; }}
-        QTabBar::tab:hover {{ background: {c.hover}; color: {c.text}; }}
-        QTabBar::tab:selected {{ background: {c.surface}; color: {c.text};
-            border-bottom: 3px solid {c.accent}; font-weight: bold; }}
-        QProgressBar {{ border: none; background: {c.alternate}; border-radius: 4px;
-            min-height: 16px; text-align: center; color: {c.text}; }}
-        QProgressBar::chunk {{ background: {c.accent}; border-radius: 4px; }}
-        QMenu {{ background: {c.surface}; color: {c.text}; border: 1px solid {c.border}; }}
+        QTabBar::tab:hover {{ background: palette(midlight); color: palette(text); }}
+        QTabBar::tab:selected {{ background: palette(base); color: palette(text);
+            border-bottom: 3px solid palette(link); font-weight: bold; }}
+        QProgressBar {{ border: none; background: palette(alternate-base); border-radius: 4px;
+            min-height: 16px; text-align: center; color: palette(text); }}
+        QProgressBar::chunk {{ background: palette(link); border-radius: 4px; }}
+        QMenu {{ background: palette(base); color: palette(text); border: 1px solid palette(mid); }}
         QMenu::item {{ padding: 6px 22px; }}
-        QMenu::item:selected {{ background: {highlight}; color: {c.selected_text}; }}
-        QSplitter::handle {{ background: {c.window}; }}
+        QMenu::item:selected {{ background: palette(highlight); color: palette(highlighted-text); }}
+        QSplitter::handle {{ background: palette(window); }}
     '''
 
 
@@ -175,6 +176,12 @@ class ThemeController(qt.QObject):
         if self.app.styleSheet() != stylesheet:
             self.app.setStyleSheet(stylesheet)
             changed = True
+        elif changed:
+            # QSS caches palette() brushes in its render rules. Invalidate the
+            # application caches without repolishing every widget/font/layout.
+            style = self.app.style()
+            style.unpolish(self.app)
+            style.polish(self.app)
         if not changed:
             return
         self._applied_colors = self.colors

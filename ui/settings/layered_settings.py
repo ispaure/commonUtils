@@ -53,15 +53,7 @@ class LayeredSettingsEditor(qt.QWidget):
     def reload(self, *, initial=False):
         if self.pending and not initial and not self.can_close():
             return False
-        try:
-            self.original = self.store.values(self.scope)
-            self.defaults = self.store.values('application')
-            self.overrides = self.store.overrides()
-            self.snapshot = self._bytes(self.path)
-            self.default_snapshot = self._bytes(self.store.defaults)
-        except (OSError, UnicodeError, Error) as error:
-            self.status.setText(f'Cannot read settings: {error}. The file has been preserved.')
-            self.save_button.setEnabled(False)
+        if not self._read_snapshot():
             return False
         self.pending.clear()
         self.path_label.setText(str(self.path))
@@ -71,6 +63,21 @@ class LayeredSettingsEditor(qt.QWidget):
         self.status.setText('Software defaults: edits change this installation’s repository INI.'
                             if self.scope == 'application' else 'Inherited values follow software defaults. ↶ removes a personal override.')
         self.save_button.setEnabled(False)
+        return True
+
+    def _read_snapshot(self):
+        try:
+            original = self.store.values(self.scope)
+            defaults = self.store.values('application')
+            overrides = self.store.overrides()
+            snapshot = self._bytes(self.path)
+            default_snapshot = self._bytes(self.store.defaults)
+        except (OSError, UnicodeError, Error) as error:
+            self.status.setText(f'Cannot read settings: {error}. The file has been preserved.')
+            self.save_button.setEnabled(False)
+            return False
+        self.original, self.defaults, self.overrides = original, defaults, overrides
+        self.snapshot, self.default_snapshot = snapshot, default_snapshot
         return True
 
     def _build(self):
@@ -279,9 +286,7 @@ class LayeredSettingsEditor(qt.QWidget):
         self.status.setText('Unsaved settings.' if self.pending else '')
         self._update_font_previews()
 
-    def _reset(self, identity):
-        value = self.defaults.get(identity, '') if self.scope == 'personal' else self.original[identity]
-        self.building = True
+    def _set_field_value(self, identity, value):
         control = self.fields[identity]
         with qt.QSignalBlocker(control):
             if isinstance(control, qt.QCheckBox):
@@ -300,7 +305,10 @@ class LayeredSettingsEditor(qt.QWidget):
                 control.setPlainText(value)
             else:
                 control.setText(value)
-        self.building = False
+
+    def _reset(self, identity):
+        value = self.defaults.get(identity, '') if self.scope == 'personal' else self.original[identity]
+        self._set_field_value(identity, value)
         if self.scope == 'personal' and identity in self.overrides:
             self.pending[identity] = None
         else:
@@ -334,9 +342,20 @@ class LayeredSettingsEditor(qt.QWidget):
             self.status.setText(f'Could not save settings: {error}')
             return False
         self.pending.clear()
-        self.reload(initial=True)
+        if self._read_snapshot():
+            # The saved values are already displayed. Retain controls, previews,
+            # selection and scroll; only synchronize parser-normalized values.
+            for identity in self.fields:
+                value = self.original.get(identity, '')
+                if value != effective.get(identity, ''):
+                    self._set_field_value(identity, value)
+                self._state(identity)
+            self._update_font_previews()
+            self.save_button.setEnabled(False)
+            self.status.setText('Settings saved.')
+        else:
+            self.status.setText('Settings saved, but could not read them back. Reload before editing further.')
         self.saved.emit(self.path)
-        self.status.setText('Settings saved.')
         return True
 
     def can_close(self):

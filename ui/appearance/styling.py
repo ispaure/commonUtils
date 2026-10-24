@@ -185,7 +185,15 @@ class Styling(qt.QObject):
         previous = self.values
         initial = not previous
         self.values = values
-        self._font_cache.clear()
+        changed_roles = {role for role in ('ui', 'browser', 'reading', 'code')
+                         if initial or any(values[f'{role}_font_{field}'] != previous[f'{role}_font_{field}']
+                                           for field in ('family_str', 'size_int'))}
+        # Automatic browser/reading families inherit the application font.
+        if 'ui' in changed_roles:
+            changed_roles.update(role for role in ('browser', 'reading')
+                                 if not values[f'{role}_font_family_str'].strip())
+        if changed_roles:
+            self._font_cache.clear()
         controller = getattr(self.app, '_commonutils_theme', None)
         if controller is not None and not initial and self.apply_application:
             if values['theme_mode'] != previous['theme_mode']:
@@ -195,7 +203,9 @@ class Styling(qt.QObject):
         if self.apply_application and self.app.font() != self.font('ui'):
             self.app.setFont(self.font('ui'))
         for widget, (role, callback) in tuple(self.views.items()):
-            self._update(widget, role, callback)
+            # Reading callbacks also refresh embedded code typography.
+            if role in changed_roles or role == 'reading' and 'code' in changed_roles:
+                self._update(widget, role, callback)
         self.changed.emit()
 
 
