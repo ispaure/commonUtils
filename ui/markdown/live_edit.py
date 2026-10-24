@@ -1,4 +1,5 @@
 """Same-pane Markdown syntax, paired selections and cursor-sensitive preview."""
+from ...formats.markdown.editing import SELECTION_MARKERS
 from .. import pyside as qt
 from ..text_commands import wrap_selection
 from ..column_guide import ColumnGuide
@@ -15,7 +16,7 @@ class SourceMarkdownEdit(ImageDropMixin, ColumnGuide, qt.QPlainTextEdit):
     """Source editor with paired delimiters around the current selection."""
     def keyPressEvent(self, event):
         cursor = self.textCursor()
-        if (not self.isReadOnly() and cursor.hasSelection() and event.text() in ('*', '_', '`')
+        if (not self.isReadOnly() and cursor.hasSelection() and event.text() in SELECTION_MARKERS
                 and not event.modifiers() & (qt.Qt.KeyboardModifier.ControlModifier |
                                             qt.Qt.KeyboardModifier.MetaModifier |
                                             qt.Qt.KeyboardModifier.AltModifier)):
@@ -117,7 +118,7 @@ class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
         plain = not event.modifiers() & (qt.Qt.KeyboardModifier.ControlModifier |
                                          qt.Qt.KeyboardModifier.MetaModifier |
                                          qt.Qt.KeyboardModifier.AltModifier)
-        if plain and cursor.hasSelection() and event.text() in ('*', '_', '`'):
+        if plain and cursor.hasSelection() and event.text() in SELECTION_MARKERS:
             self._wrap_selection(event.text())
             event.accept()
             return
