@@ -82,7 +82,10 @@ provider access checks and delegates the native call here. Missing native symbol
 raise `OSError(ENOTSUP)` before changing either path; no check-then-rename fallback
 weakens the collision guarantee. Android's libc exports `renameat2` from API 30
 ([Android header](https://android.googlesource.com/platform/bionic/+/master/libc/include/stdio.h));
-older runtimes may therefore reject these operations. Host tests do not prove
+ARM64 Android runtimes without that wrapper use the same kernel `renameat2`
+operation through `syscall` (number 276 in the Linux asm-generic UAPI). Kernel or
+filesystem rejection remains an error; no overwrite-capable fallback is used.
+Other architectures still require the libc wrapper. Host tests do not prove
 native Android/kernel/filesystem support. Ordinary atomic writes and virtual
 resource saves use the same sequence. See the [provider contract](../ui/resource-providers.md)
 for callback ownership, cancellation and partial-failure results.

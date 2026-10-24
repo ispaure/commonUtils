@@ -10,6 +10,28 @@ from commonUtils.persistence import publication
 
 
 class PersistenceTests(unittest.TestCase):
+    def test_android_arm64_without_libc_wrapper_uses_atomic_kernel_operation(self):
+        import ctypes
+        import errno
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from commonUtils.runtime.platform import OS
+        call = Mock(return_value=0)
+        with patch('commonUtils.runtime.platform.get_os', return_value=OS.ANDROID), \
+                patch('platform.machine', return_value='aarch64'), \
+                patch.object(publication.ctypes, 'CDLL', return_value=SimpleNamespace(syscall=call)):
+            publication.rename_exclusive('staged', 'destination')
+            call.assert_called_once_with(276, -100, b'staged', -100, b'destination', 1)
+            self.assertEqual(call.argtypes[0], ctypes.c_long)
+            call.return_value = -1
+            with patch.object(publication.ctypes, 'get_errno', return_value=errno.EEXIST):
+                with self.assertRaises(FileExistsError):
+                    publication.rename_exclusive('staged', 'destination')
+            with patch.object(publication.ctypes, 'get_errno', return_value=errno.ENOSYS):
+                with self.assertRaises(OSError) as error:
+                    publication.rename_exclusive('staged', 'destination')
+                self.assertEqual(error.exception.errno, errno.ENOSYS)
+
     def test_missing_native_rename_is_a_filesystem_error_and_preserves_paths(self):
         import errno
         from commonUtils.runtime.platform import OS

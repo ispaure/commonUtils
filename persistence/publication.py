@@ -65,6 +65,15 @@ def rename_exclusive(source, destination):
         function = getattr(libc, 'renameat2', None)
         argument_types = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
         arguments = (-100, source, -100, destination, 1)  # AT_FDCWD, RENAME_NOREPLACE
+        if function is None and current is OS.ANDROID:
+            import platform
+            # Android's exported wrapper arrived in API 30, later than the
+            # ARM64 kernel operation. Keep the same atomic no-replace syscall;
+            # never weaken this to an existence check followed by rename.
+            if platform.machine().lower() in ('aarch64', 'arm64'):
+                function = getattr(libc, 'syscall', None)
+                argument_types.insert(0, ctypes.c_long)
+                arguments = (276, *arguments)  # Linux asm-generic __NR_renameat2
     else:
         function = None
     if function is None:
