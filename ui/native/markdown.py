@@ -13,7 +13,7 @@ from toga.style.pack import COLUMN, ROW
 
 from ...formats.markdown.wiki import MarkdownWiki, resolve_document_path, documentation_root
 from .markdown_preview import markdown_preview
-from .markdown_images import local_image_source
+from ...formats.markdown.image_sources import local_image_source
 from .adaptive import AdaptiveSidebar, allocated_width
 from .presentation import hierarchy_row, navigation_button
 

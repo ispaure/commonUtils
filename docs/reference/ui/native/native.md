@@ -486,13 +486,13 @@ apply the same image policy without loading an application module. Wiki parsing
 is opt-in; code spans, fenced code and escaped embeds remain literal.
 
 The default `MarkdownWikiView` renderer uses
-`markdown_images.local_image_source(document, root)` for page-relative local
+`commonUtils.formats.markdown.image_sources.local_image_source(document, root)` for page-relative local
 images within the documentation root. A custom `render` callback keeps its old
 arguments unless `image_source_factory(document, root)` is explicitly supplied;
 then the renderer also receives the per-page `image_source` keyword. Logistics'
 Documentation reader opts in through this factory as well.
 
-`markdown_images.folder_image_source(provider, document)` supplies the bounded
+`commonUtils.formats.markdown.image_sources.folder_image_source(provider, document)` supplies the bounded
 shared resolver for folder-backed native readers/editors. It accepts a rooted
 provider with `relative`, `entry` and `open` methods; paths resolve relative to
 the document's provider key. All reads stay behind that provider, with revision

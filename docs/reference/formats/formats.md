@@ -472,3 +472,12 @@ and document lifetimes; the model owns no widgets, worker or persistence policy.
 Native CodeInput and desktop consumers share this model. `tests/formats/test_code_language.py`
 covers transitions, bounded detection and catalogue identities;
 `tests/runtime/test_choices.py` covers collection contracts.
+
+## Provider-backed Markdown images
+
+`formats.markdown.image_sources` owns `folder_image_source(provider, document)`
+and `local_image_source(document, root)`. These toolkit-free callbacks resolve
+relative raster images through a rooted provider, enforce byte/dimension budgets
+and recheck revisions and access before returning cached image bytes. Native
+Markdown presentation consumes them; portable note libraries can use them without
+importing the UI package.

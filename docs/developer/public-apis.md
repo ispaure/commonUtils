@@ -295,7 +295,7 @@ only when a native constructor is called. Returned native views are consumer-own
 live subscribers. No GUI imports, timers or retained application owners.
 
 Native Markdown hosts can use
-`ui.native.markdown_images.folder_image_source(provider, document)` for bounded,
+`formats.markdown.image_sources.folder_image_source(provider, document)` for bounded,
 revision-checked provider image reads, including animated GIFs. Feed its callback
 to `markdown_preview` or a formatted editor using `embedded_image`. See the
 [native image contract](../reference/ui/native/native.md#host-supplied-markdown-images).
