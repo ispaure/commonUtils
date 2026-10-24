@@ -30,6 +30,17 @@ remove their workspace tab immediately, before cooperative shutdown begins.
 Their owners stay alive until `prepare_close()` succeeds after an `idle` signal.
 
 
+## Split layout planning
+
+`workspace_layout.split_at` captures tab order, active tabs and visible geometry
+before removing any docks. Private `_TabGroup` and `_Split` records distinguish
+tab leaves from spatial partitions. Planning preserves vertical partitions,
+flattens adjacent splits on the same axis and retains registration order when
+geometry is unavailable. Qt application then builds the split skeleton, resizes
+it and restores tab groups/activation in that order. This is an internal layout
+representation; transfer approval, rollback and cooperative closing stay with
+`Workspace`.
+
 ## Passive archive contents
 
 See [Passive archive contents](archive_view/archive_view.md).
