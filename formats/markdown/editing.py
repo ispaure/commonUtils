@@ -62,4 +62,37 @@ def web_patterns():
         return re.sub(r'\(\?P=([a-z]+)\)', r'\\k<\1>',
                       pattern.replace('(?P<', '(?<').replace(r'\w', r'\p{L}\p{N}'))
     return dict(inline=[javascript(pattern.pattern) for pattern in _INLINE],
-                heading=HEADING.pattern, selection=list(SELECTION_MARKERS))
+                heading=HEADING.pattern, selection=list(SELECTION_MARKERS), active=WEB_EDITING_JS)
+
+
+# Kept beside the shared syntax grammar so native and web adapters use one
+# visibility contract: touching caret boundaries, strictly overlapping selections.
+def syntax_active(start, end, first, last):
+    """Whether a source interval is being edited (all offsets in caller units)."""
+    return first < end and last > start if first != last else start <= first <= end
+
+
+SYNTAX_ACTIVE_JS = """function syntaxActive(start, end, first, last) {
+    return first !== last ? first < end && last > start : start <= first && first <= end;
+}"""
+
+
+# Web adapter lives with the native parser and interval predicate. Consumers
+# supply livePatterns/inlinePatterns; DOM, source and undo remain host-owned.
+WEB_EDITING_JS = SYNTAX_ACTIVE_JS + r"""
+function liveSpans(text) {
+    const spans = [], code = [];
+    for (const pattern of inlinePatterns) {
+        pattern.lastIndex = 0;
+        for (const match of text.matchAll(pattern)) {
+            const start = match.index, end = start + match[0].length;
+            if (code.some(([first, last]) => first <= start && start < last)) continue;
+            const marker = match.groups.marker;
+            if (!marker.startsWith('`') && (text.slice(0, start).match(/(?<![\\`])`(?!`)/g) || []).length % 2) continue;
+            spans.push({start, end, marker});
+            if (marker.startsWith('`')) code.push([start, end]);
+        }
+    }
+    return spans;
+}
+"""

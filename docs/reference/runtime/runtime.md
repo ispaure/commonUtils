@@ -91,6 +91,14 @@ Qt read-aloud also uses `SpeechSession` and `PlaybackTimer`;
 `ui.readers.qt_speech` adapts Qt scheduling and engine callbacks. Each platform
 retains its own widgets, voice selection and installed-engine availability.
 
+`speech_language.passage_language(text, hint='')` detects up to 6,000 characters
+locally with optional `langdetect==1.0.9` profiles. Detection uses a deterministic
+seed, at least 20 letters and a probability threshold of 0.85; uncertain text
+falls back to the supplied language tag. Only profiles are cached, never text.
+`matching_locale(language, locales, preferred='')` selects an offered locale,
+preferring an exact tag or a compatible preferred dialect. No match returns an
+empty string. Consumers own dependency installation and missing-voice UI.
+
 ## Coalesced async signals
 
 `signals.CoalescedSignal` broadcasts without timers or retained owners. Call

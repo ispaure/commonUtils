@@ -40,7 +40,16 @@ Python 3.12 pathlib methods. GUI-free catalog tests live in
 The Qt Markdown adapter uses these definitions for display and export.
 `web_patterns()` exports the inline patterns with JavaScript named captures and
 Unicode character classes, plus the heading pattern and selection delimiters.
-WebView hosts compile inline patterns with the `gu` flags and own DOM interaction,
-selection positions, composition and undo. They must protect code payloads and
-incomplete backticks just as `inline_spans` does; exporting patterns does not
-implement an input widget or a complete CommonMark parser.
+The `active` entry contains the web adapter functions `syntaxActive` and
+`liveSpans`; hosts compile inline patterns with `gu` flags and insert this adapter
+beside those patterns. Code payload protection and incomplete-backtick handling
+live beside the native parser rather than in each consuming application.
+
+`syntax_active(start, end, first, last)` owns the native interval predicate.
+A collapsed caret reveals syntax at either endpoint or inside an interval; a
+selection must strictly overlap it. Offsets use the caller's units (Qt and DOM
+use UTF-16). Headings use the whole heading interval; inline markers use their
+own span. The web adapter implements the same predicate, with consumer browser
+regressions comparing its results to `syntax_active`, including emoji offsets.
+WebView hosts own DOM interaction, selection positions, composition and undo.
+These helpers do not implement a complete CommonMark parser.

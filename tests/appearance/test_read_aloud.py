@@ -16,10 +16,11 @@ class SilentEngine(qt.QObject):
         self.current = Speech.State.Ready
         self.spoken = []
     def state(self): return self.current
-    def availableLocales(self): return []
+    def availableLocales(self): return [qt.QLocale('en_US'), qt.QLocale('af_ZA')]
     def availableVoices(self): return []
     def locale(self): return qt.QLocale()
     def voice(self): return None
+    def setLocale(self, value): self.selected_locale = value
     def setRate(self, value): pass
     def engineCapabilities(self): return Speech.Capability.PauseResume
     def errorString(self): return 'Test backend unavailable'
@@ -36,6 +37,10 @@ class SilentEngine(qt.QObject):
 
 class SpeechTests(QtTestCase):
     def setUp(self):
+        from unittest.mock import patch
+        detector = patch('commonUtils.ui.readers.read_aloud.passage_language', return_value='')
+        detector.start()
+        self.addCleanup(detector.stop)
         self.app = qt.QApplication.instance() or qt.QApplication([])
         self.owner = qt.QWidget()
         self.owner.show()
@@ -47,6 +52,27 @@ class SpeechTests(QtTestCase):
         self.assertIsNone(speech.engine)
         speech.show()
         return speech
+
+    def test_automatic_locale_changes_per_passage_and_manual_choice_wins(self):
+        from unittest.mock import patch
+        speech = self.speech('A passage to read aloud.')
+        locales = [qt.QLocale('en_US'), qt.QLocale('fr_FR')]
+        with patch.object(speech.engine, 'availableLocales', return_value=locales), \
+             patch('commonUtils.ui.readers.read_aloud.passage_language', return_value='fr'):
+            speech.start()
+            self.assertEqual(speech.engine.selected_locale.name(), 'fr_FR')
+            speech.stop()
+            speech.language.addItem('English', locales[0])
+            speech.language.setCurrentIndex(1)
+            speech.start()
+            self.assertEqual(speech.engine.selected_locale.name(), 'en_US')
+            speech.stop()
+            speech.language.setCurrentIndex(0)
+            with patch('commonUtils.ui.readers.read_aloud.passage_language', return_value='de'):
+                count = len(speech.engine.spoken)
+                speech.start()
+                self.assertEqual(len(speech.engine.spoken), count)
+                self.assertIn('No installed voice for de', speech.message.text())
 
     def test_speed_detents_and_timer_follow_play_pause_reset_and_expiry(self):
         from unittest.mock import patch

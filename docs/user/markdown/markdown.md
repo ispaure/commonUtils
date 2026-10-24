@@ -113,7 +113,9 @@ if that theme's image has not been generated. Temporary rendering files are clea
 
 ## Read aloud
 
-Click the speaker icon to open Read aloud, select a voice/language and press Play. A selected passage takes
+Click the speaker icon to open Read aloud and press Play. Language defaults to
+**Automatic (detect text)** and chooses an installed voice for the passage’s
+language locally. You can choose a language and voice manually. A selected passage takes
 priority; otherwise playback starts from the visible reading area. Speech follows
 the rendered reading view: links read their visible labels without the underlying
 destinations, and formatting markers are omitted. URLs and code written visibly

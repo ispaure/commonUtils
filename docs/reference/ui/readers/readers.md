@@ -41,3 +41,10 @@ or 350 without; the portable session supplies approximate progress where needed.
 Host selection/UTF-16 mapping, highlighting and voice preferences stay with
 `ReadAloud`. A Qt host still needs an installed usable speech engine; portable
 session tests do not establish voice availability on a device.
+
+Read-aloud defaults to **Automatic (detect text)**. Each fresh Play detects the
+selected passage or text starting at the visible position. The optional
+`language_provider` callback supplies a fallback language declaration. Automatic
+mode chooses an available locale and reports a missing language voice; explicit
+language/voice selections remain manual overrides. The automatic mode disables
+the voice selector. Installing `langdetect==1.0.9` enables text detection.

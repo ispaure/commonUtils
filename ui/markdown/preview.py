@@ -1,4 +1,5 @@
 """Cursor-sensitive Markdown display; highlighting never changes text or undo history."""
+from ...formats.markdown.editing import syntax_active
 from .. import pyside as qt
 from .syntax import inline_spans, FENCE_OPEN, fence_close, HEADING, fenced_regions
 from .syntax import _units
@@ -32,9 +33,7 @@ class LivePreviewHighlighter(qt.QSyntaxHighlighter):
 
     def _active(self, start, end):
         cursor = self.editor.textCursor()
-        if cursor.hasSelection():
-            return cursor.selectionStart() < end and cursor.selectionEnd() > start
-        return start <= cursor.position() <= end
+        return syntax_active(start, end, cursor.selectionStart(), cursor.selectionEnd())
 
     def _marker_format(self, active, *, collapse=False):
         fmt = qt.QTextCharFormat()

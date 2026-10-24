@@ -115,3 +115,7 @@ the artwork, labels and colors; rendering preserves callbacks and enabled state.
 Form labels fit the available pane, including long unbroken identifiers and
 changing status messages. Disclosure buttons retain their full accessible hit
 area. Collapsing advanced fields hides them while preserving entered values.
+
+When the application hides destination controls for reading or typing, iPad's
+sidebar and toggle hide along with the tab bar. Returning restores the prior
+sidebar presentation. The document's own navigation remains host-controlled.

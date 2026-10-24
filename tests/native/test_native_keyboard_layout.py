@@ -139,6 +139,24 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         adapter.keyboard_frame = None
         return adapter, state
 
+    def test_ipad_sidebar_and_toggle_restore_original_presentation_after_nested_hiding(self):
+        for sidebar_hidden in (True, False):
+            adapter, state = self.adapter()
+            adapter.sidebar_used = True
+            state.sidebar_hidden = sidebar_hidden
+            adapter.controller.mode = 2
+            adapter.controller.setMode = lambda value: setattr(adapter.controller, 'mode', value)
+            adapter.controller.sidebar = NS(isHidden=lambda: state.sidebar_hidden,
+                setHidden=lambda value: setattr(state, 'sidebar_hidden', value))
+            adapter.set_keyboard_tabs_hidden(True, True)
+            self.assertEqual(adapter.controller.mode, 1)
+            self.assertTrue(state.sidebar_hidden)
+            adapter.set_keyboard_tabs_hidden(True, True)
+            adapter.set_keyboard_tabs_hidden(True, False)
+            self.assertEqual(adapter.controller.mode, 2)
+            self.assertEqual(state.sidebar_hidden, sidebar_hidden)
+            self.assertFalse(state.hidden)
+
     def test_inactive_scene_releases_keyboard_even_when_its_window_remains_key(self):
         adapter, state = self.adapter()
         self.frame(adapter)

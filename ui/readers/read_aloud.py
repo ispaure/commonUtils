@@ -8,6 +8,7 @@ import math
 from time import monotonic
 from ...runtime.speech import SpeechSession, PlaybackTimer, utterances
 from .qt_speech import QtScheduler, QtSpeechEngine
+from ...runtime.speech_language import passage_language, matching_locale
 from .. import pyside as qt
 from ..appearance.icons import set_painted_icon
 from .reader_chrome import ReaderIcon, reader_button, prevent_reader_popup_replay
@@ -39,7 +40,7 @@ class ReadAloud(qt.QObject):
     positionChanged = qt.Signal(int, int)
 
     def __init__(self, owner, text_provider, *, engine_factory=None, scope='the current document',
-                 text_widget=None, start_provider=None):
+                 text_widget=None, start_provider=None, language_provider=lambda: ''):
         super().__init__(owner)
         self.owner = owner
         self.text_provider = text_provider
@@ -47,6 +48,7 @@ class ReadAloud(qt.QObject):
         self.engine_factory = engine_factory
         self.text_widget = text_widget
         self.start_provider = start_provider
+        self.language_provider = language_provider
         self._highlight_widget = None
         self.anchor = None
         self.engine = None
@@ -157,10 +159,10 @@ class ReadAloud(qt.QObject):
                                          on_state=self._session_state, clock=lambda: monotonic())
             self.engine.errorOccurred.connect(lambda *args: self._error())
             self.engine.stateChanged.connect(lambda state: self._error() if state == QTextToSpeech.State.Error else None)
+            self.language.addItem('Automatic (detect text)', None)
+            self._default_locale = self.engine.locale()
             for locale in self.engine.availableLocales():
                 self.language.addItem(locale.nativeLanguageName() + ' — ' + locale.name(), locale)
-                if locale == self.engine.locale():
-                    self.language.setCurrentIndex(self.language.count() - 1)
             self.language.currentIndexChanged.connect(self._language_changed)
             self._voices()
             self.voice.currentIndexChanged.connect(self._voice_changed)
@@ -220,13 +222,14 @@ class ReadAloud(qt.QObject):
             if voice == self.engine.voice():
                 self.voice.setCurrentIndex(self.voice.count() - 1)
         self.voice.blockSignals(False)
+        self.voice.setEnabled(self.language.currentData() is not None)
 
     def _language_changed(self):
         self.stop()
         locale = self.language.currentData()
         if locale is not None:
             self.engine.setLocale(locale)
-            self._voices()
+        self._voices()
 
     def _voice_changed(self):
         self.stop()
@@ -246,6 +249,17 @@ class ReadAloud(qt.QObject):
         self.stop()
         self._source_base = source_base
         self._highlight_widget = widget
+        if self.language.currentData() is None:
+            start = max(0, base - source_base)
+            sample = text.encode('utf-16-le')[start * 2:].decode('utf-16-le')
+            language = passage_language(sample, self.language_provider())
+            locales = {locale.name(): locale for locale in self.engine.availableLocales()}
+            tag = matching_locale(language, locales, self._default_locale.name())
+            if language and not tag:
+                self.message.setText(f'No installed voice for {language}. Install a system voice or choose a language manually.')
+                return
+            self.engine.setLocale(locales[tag] if tag else self._default_locale)
+            self._voices()
         self.session.play(text, max(0, base - source_base), speed=self.speed.value() / 100)
 
     @property
@@ -316,6 +330,7 @@ class ReadAloud(qt.QObject):
             button.setEnabled(speaking or paused)
         for control in (self.language, self.voice):
             control.setEnabled(not speaking and not paused)
+        self.voice.setEnabled(not speaking and not paused and self.language.currentData() is not None)
         self.message.setText(message)
 
     def _error(self):

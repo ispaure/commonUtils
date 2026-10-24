@@ -292,6 +292,22 @@ class AppleNavigation:
             self.set_keyboard_tabs_hidden(modern, True)
 
     def set_keyboard_tabs_hidden(self, modern, hidden):
+        # A hidden tab bar alone leaves iPad's sidebar and its toggle available.
+        # Temporarily use tab-only mode, retaining the user's sidebar state for
+        # route/keyboard/fullscreen restoration through this same entry point.
+        if getattr(self, 'sidebar_used', False):
+            saved = getattr(self, '_sidebar_visibility', None)
+            if hidden:
+                if saved is None:
+                    self._sidebar_visibility = (int(self.controller.mode),
+                                                bool(self.controller.sidebar.isHidden()))
+                self.controller.sidebar.setHidden(True)
+                self.controller.setMode(1)
+            elif saved is not None:
+                self._sidebar_visibility = None
+                mode, sidebar_hidden = saved
+                self.controller.setMode(mode)
+                self.controller.sidebar.setHidden(sidebar_hidden)
         if modern:
             # UIKit also releases the tab bar's safe-area reservation.
             self.controller.setTabBarHidden(hidden, animated=False)

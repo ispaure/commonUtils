@@ -266,7 +266,7 @@ class NativeSpeech:
         voices = ObjCClass("AVSpeechSynthesisVoice").speechVoices
         for voice in voices() if callable(voices) else voices:
             self.voices[str(voice.language) + " · " + str(voice.name)] = voice
-        default = ObjCClass("AVSpeechSynthesisVoice").voiceWithLanguage("en-US")
+        default = ObjCClass("AVSpeechSynthesisVoice").voiceWithLanguage(None)
         self.default_voice = next(
             (
                 label
@@ -281,6 +281,17 @@ class NativeSpeech:
             self.error = (
                 "No installed voice. Add a system voice in Spoken Content settings."
             )
+
+    def voice_for_language(self, language, preferred=''):
+        from ...runtime.speech_language import matching_locale
+        fallback = preferred if preferred in self.voices else self.default_voice
+        locales = {label: label.split(' · ', 1)[0] for label in self.voices}
+        tag = matching_locale(language, locales.values(), locales.get(fallback, ''))
+        if not language:
+            return fallback
+        if fallback in locales and locales[fallback] == tag:
+            return fallback
+        return next((label for label in self.voices if locales[label] == tag), '')
 
     def speak(self, text, voice, speed, token):
         if self.closed or not self.ready or voice not in self.voices:

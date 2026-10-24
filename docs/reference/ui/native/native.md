@@ -121,6 +121,13 @@ iOS 18 and later; older systems use native view visibility. Floating keyboards
 hide the tabs without claiming a full-width keyboard inset. Immersive reader
 chrome keeps independent restoration ownership; leaving a reader while typing
 reapplies temporary keyboard suppression.
+`set_keyboard_tabs_hidden(modern, hidden)` owns both Apple destination surfaces.
+When the adapter uses the iPad sidebar, hiding snapshots its mode and visibility,
+collapses the sidebar and uses tab-only mode to remove the sidebar toggle before
+hiding the bar. Repeated hiding preserves that snapshot; showing restores it.
+Immersive chrome uses this same path so keyboard/document transitions share
+restoration without losing the original sidebar presentation.
+
 `tabs_hidden()` reports the active UIKit tab-container visibility, which can differ
 from `tabBar.isHidden`. Keyboard geometry changes coalesce a consumer resize
 callback even when the window dimensions stay constant, so callers can release
@@ -520,6 +527,11 @@ include the shared native Java root when building. The listener carries opaque
 utterance tokens and ranges, not source text or document names. Disposal detaches
 native callbacks and suppresses queued deliveries. System media controls, audio
 session/privacy policy and document title publication remain consumer-owned.
+`voice_for_language(language, preferred='')` chooses a matching offered voice,
+preserving a compatible preference, or returns an empty string when none is
+installed. An empty language uses the preferred/system default voice. iOS uses
+the system’s default language rather than forcing English. Text detection stays
+with the caller through `runtime.speech_language`.
 
 `private_webview.PrivateWebView(max_html_bytes=..., **toga_options)` creates a
 nonpersistent WKWebView on iOS or a cache-disabled Android WebView. Backend
