@@ -34,6 +34,24 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             navigation.NativeNavigationHost(items + (('8', 'Eight', 'doc', 'ic_menu_edit'),))
 
+    def test_apple_overflow_resolves_the_actual_navigation_and_route_depth(self):
+        from types import SimpleNamespace as NS
+        adapter = object.__new__(navigation.AppleNavigation)
+        own = NS(topViewController=None)
+        more = NS(topViewController='Settings content', viewControllers=['More list', 'Settings content', 'Detail'])
+        root = NS(navigationController=more)
+        adapter.host = NS(destinations=('home', 'settings'), state=NS(destination='settings'))
+        adapter.containers = [(None, NS(navigationController=None)), (None, root)]
+        adapter.navigation = [NS(topViewController='Home'), own]
+        adapter.controller = NS(moreNavigationController=more)
+        self.assertIs(adapter.navigation_for('settings'), more)
+        self.assertEqual(adapter.content_controller('settings'), 'Settings content')
+        self.assertEqual(adapter.destination_for_navigation(more), 'settings')
+        self.assertEqual(adapter.route_depth(more), 1)
+        root.navigationController = None
+        self.assertIs(adapter.navigation_for('settings'), own)
+        self.assertIs(adapter.content_controller('settings'), root)
+
     def test_navigation_reinstall_preserves_selection_and_restores_before_detaching(self):
         selected = Mock()
         host = navigation.NativeNavigationHost((

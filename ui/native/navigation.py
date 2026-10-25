@@ -343,6 +343,27 @@ class AppleNavigation:
             self.keyboard_tab_visibility = None
             self.set_keyboard_tabs_hidden(modern, hidden)
 
+    def navigation_for(self, destination):
+        """UIKit More can move a tab's root into its own navigation stack."""
+        index = self.host.destinations.index(destination)
+        root = self.containers[index][1]
+        return root.navigationController or self.navigation[index]
+
+    def content_controller(self, destination):
+        index = self.host.destinations.index(destination)
+        navigation = self.navigation_for(destination)
+        return navigation.topViewController or self.containers[index][1]
+
+    def destination_for_navigation(self, navigation):
+        if navigation == self.controller.moreNavigationController:
+            return self.host.state.destination
+        return self.host.destinations[self.navigation.index(navigation)]
+
+    def route_depth(self, navigation):
+        # More's own list precedes the selected tab's root.
+        root_count = 2 if navigation == self.controller.moreNavigationController else 1
+        return max(0, len(navigation.viewControllers) - root_count)
+
     def push(self, destination, widget, title):
         from toga_iOS.container import ControlledContainer
         container = ControlledContainer(on_refresh=lambda value: None,
@@ -352,11 +373,11 @@ class AppleNavigation:
         container.content = widget._impl
         container.controller.title = title
         self.panes.append(container)
-        self.navigation[self.host.destinations.index(destination)].pushViewController(container.controller, animated=False)
+        self.navigation_for(destination).pushViewController(container.controller, animated=False)
         return container
 
     def pop(self, destination):
-        return self.navigation[self.host.destinations.index(destination)].popViewControllerAnimated(False)
+        return self.navigation_for(destination).popViewControllerAnimated(False)
 
     def release_pane(self, container):
         from rubicon.objc import ObjCClass

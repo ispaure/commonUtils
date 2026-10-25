@@ -21,7 +21,7 @@ class NavigationChrome:
         if adapter is None or not hasattr(adapter, 'navigation'):
             self.restore_page_swipes()
             return
-        navigation = navigation or adapter.navigation[self.host.destinations.index(self.host.state.destination)]
+        navigation = navigation or adapter.navigation_for(self.host.state.destination)
         if not active or navigation != self.page_navigation:
             self.restore_page_swipes()
         if not active:
@@ -51,7 +51,7 @@ class NavigationChrome:
         if adapter is None:
             return
         if hasattr(adapter, 'navigation'):
-            navigation = navigation or adapter.navigation[self.host.destinations.index(self.host.state.destination)]
+            navigation = navigation or adapter.navigation_for(self.host.state.destination)
         context = (self.host.state.destination, navigation)
         changed = self.context != context
         if not hidden or changed:

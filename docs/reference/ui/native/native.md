@@ -53,7 +53,10 @@ For six or seven destinations Android uses the bundled
 before creating backend option references and retains it when replacing chrome.
 The rail still uses Material navigation. UIKit retains its native overflow
 presentation on compact devices; applications must use destination identities
-instead of fixed numeric tab positions.
+instead of fixed numeric tab positions. `navigation_for(identity)` resolves the
+actual navigation stack when UIKit More reparents a tab root;
+`content_controller(identity)` resolves its visible controller. Route delegates
+forward More selection callbacks and exclude its list from document route depth.
 
 `install(window)` establishes native containment and layout/keyboard listeners;
 `uninstall()` restores them, and `dispose()` retires the host's widgets and

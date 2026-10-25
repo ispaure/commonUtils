@@ -16,6 +16,12 @@ def apple_delegate():
             owner = objc_property(object, weak=True)
 
             @objc_method
+            def navigationController_willShowViewController_animated_(self, navigation, controller, animated: bool) -> None:
+                owner = self.owner
+                if owner is not None and navigation == owner.host.adapter.controller.moreNavigationController:
+                    owner.host.adapter.controller.navigationController_willShowViewController_animated_(navigation, controller, animated)
+
+            @objc_method
             def navigationController_didShowViewController_animated_(self, navigation, controller, animated: bool) -> None:
                 owner = self.owner
                 if owner is not None:
@@ -59,6 +65,7 @@ class Routes:
             self.delegate.owner = self
             for navigation in self.host.adapter.navigation:
                 navigation.delegate = self.delegate
+            self.host.adapter.controller.moreNavigationController.delegate = self.delegate
         elif self.host.adapter is not None:
             from java import dynamic_proxy
             from io.github.ispaure.commonutils import NavigationBack
@@ -82,6 +89,7 @@ class Routes:
         if self.delegate is not None and self.apple:
             for navigation in self.host.adapter.navigation:
                 navigation.delegate = None
+            self.host.adapter.controller.moreNavigationController.delegate = self.host.adapter.controller
             self.delegate = None
         if self.back_callback is not None:
             self.back_callback.remove()
@@ -141,7 +149,7 @@ class Routes:
         self.changing = True
         try:
             if native and self.apple:
-                navigation = self.host.adapter.navigation[self.host.destinations.index(destination)]
+                navigation = self.host.adapter.navigation_for(destination)
                 target = screens[count - 1][2].controller if count else self.host.adapter.containers[self.host.destinations.index(destination)][1]
                 navigation.popToViewController(target, animated=False)
             for _, panel, pane in screens[count:]:
@@ -155,8 +163,8 @@ class Routes:
     def native_popped(self, navigation):
         if self.changing:
             return
-        destination = self.host.destinations[self.host.adapter.navigation.index(navigation)]
-        count = len(navigation.viewControllers) - 1
+        destination = self.host.adapter.destination_for_navigation(navigation)
+        count = self.host.adapter.route_depth(navigation)
         if count < len(self.screens[destination]):
             if self.intent is not None:
                 self.intent()
