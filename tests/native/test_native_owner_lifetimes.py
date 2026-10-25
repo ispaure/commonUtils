@@ -71,6 +71,9 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         with patch.object(host.root._impl, 'set_current_tab_index', wraps=host.root._impl.set_current_tab_index) as setter:
             host.activate('5')
         setter.assert_not_called()
+        host._programmatic_overflow = '5'
+        host.activate('2')
+        self.assertIsNone(host._programmatic_overflow)
 
     def test_navigation_reinstall_preserves_selection_and_restores_before_detaching(self):
         selected = Mock()

@@ -73,9 +73,12 @@ class NativeNavigationHost:
         if current is not None and current.index == index:
             self.state.select(destination)
             return
+        self._programmatic_overflow = None
         if (len(self.destinations) > 5 and index >= 4
                 and type(self.root._impl).__module__.startswith('toga_iOS.')
-                and getattr(self.root._impl, 'uses_more', False)):
+                and getattr(self.root._impl, 'uses_more', False)
+                and self.adapter is not None
+                and len(list(self.adapter.controller.tabBar.items or ())) == 5):
             self._programmatic_overflow = destination
         self.changing = True
         try:
