@@ -194,7 +194,11 @@ with another finger to change `magnifier_zoom` through 150, 170, 190, 210, 230 a
 label overlays the image.
 UIKit adds the buttons as siblings of the clipped lens; Android uses a split-touch
 popup at the lens's bottom edge. The original hold stays on the image; button taps do not
-page or toggle controls. Releasing the original hold dismisses the lens and buttons.
+page or toggle controls. UIKit drag updates translate existing image/button centers;
+sizes and enabled states update when the lens layout or zoom changes. Android
+coalesces popup movement to display frames and updates enabled/alpha states only
+when zoom changes. Releasing the original hold dismisses the lens and buttons,
+including pending Android movement callbacks.
 `on_magnifier_zoom(canvas, percent)` receives a requested change before applying it;
 return `False` to reject a failed host save. Assigning `magnifier_zoom` updates a
 visible lens without firing the callback. `change_magnifier_zoom(direction)` steps

@@ -34,6 +34,12 @@ public final class ImageCanvasView extends AppCompatImageView {
     private int magnifierZoom = 190;
     private PopupWindow lensControls;
     private Button lensLess, lensMore;
+    private int lensControlZoom = -1;
+    private boolean lensControlUpdatePending;
+    private final Runnable lensControlUpdate = () -> {
+        lensControlUpdatePending = false;
+        updateLensControls();
+    };
     private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path lensClip = new Path();
     private final Runnable hold = () -> {
@@ -50,6 +56,8 @@ public final class ImageCanvasView extends AppCompatImageView {
     }
     private void dismissMagnifier() {
         if (hold != null) removeCallbacks(hold);
+        if (lensControlUpdate != null) removeCallbacks(lensControlUpdate);
+        lensControlUpdatePending = false;
         lensActive = false;
         if (lensControls != null) lensControls.dismiss();
         lensControls = null;
@@ -102,6 +110,7 @@ public final class ImageCanvasView extends AppCompatImageView {
         float density = getResources().getDisplayMetrics().density;
         int side = Math.round(33*density);
         FrameLayout bar = new FrameLayout(context);
+        lensControlZoom = -1;
         lensLess = new Button(context);
         lensMore = new Button(context);
         for (Button button : new Button[]{lensLess, lensMore}) {
@@ -134,9 +143,12 @@ public final class ImageCanvasView extends AppCompatImageView {
     }
     private void updateLensControls() {
         if (lensControls == null) return;
-        lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
-        lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
-        lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
+        if (lensControlZoom != magnifierZoom) {
+            lensControlZoom = magnifierZoom;
+            lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
+            lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
+            lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
+        }
         RectF rect = lensControlsBounds();
         int[] origin = new int[2]; getLocationOnScreen(origin);
         float density = getResources().getDisplayMetrics().density;
@@ -274,7 +286,16 @@ public final class ImageCanvasView extends AppCompatImageView {
             getParent().requestDisallowInterceptTouchEvent(true);
         }
         lastX = event.getX(); lastY = event.getY();
-        if (lensActive) { updateLensControls(); invalidate(); }
+        if (lensActive) {
+            // Motion events can arrive faster than display frames. Move the
+            // popup once per frame using the latest sample, avoiding repeated
+            // WindowManager relayouts and button state updates per touch event.
+            if (!lensControlUpdatePending) {
+                lensControlUpdatePending = true;
+                postOnAnimation(lensControlUpdate);
+            }
+            postInvalidateOnAnimation();
+        }
         return true;
     }
     @Override public boolean performClick() {

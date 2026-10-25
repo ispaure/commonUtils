@@ -75,9 +75,13 @@ class AppleLensTests(unittest.TestCase):
         lens = backend.lens
         backend.show_magnifier(self.gesture(thumb_x=399, thumb_y=10))
         self.assertIs(backend.lens, lens)
-        self.assertEqual((lens.frame.origin.x, lens.frame.origin.y), (220, 0))
-        frame = backend.lens_picture.frame
-        self.assertEqual((frame.origin.x, frame.origin.y), (-668, 270))
+        self.assertEqual((lens.center.x, lens.center.y), (310, 70))
+        center = backend.lens_picture.center
+        self.assertEqual((center.x, center.y), (-268, 870))
+        # Motion must not repeatedly resize/reconfigure the native image/buttons.
+        self.assertEqual((backend.lens_picture.frame.origin.x, backend.lens_picture.frame.origin.y), (-70, -390))
+        backend.lens_less.setEnabled.assert_called_once_with(True)
+        backend.lens_more.setEnabled.assert_called_once_with(True)
 
     def test_lens_over_letterbox_does_not_shift_sample_to_page_edge(self):
         backend = self.backend

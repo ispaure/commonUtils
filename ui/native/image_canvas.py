@@ -221,9 +221,9 @@ def apple_backend(interface):
             if parent is None or self.picture.image is None or not self.interface.magnifier_enabled:
                 self.hide_magnifier()
                 return
-            source = gesture.locationInView(self.picture)
             size = self.picture.bounds.size
             if self.lens is None:
+                source = gesture.locationInView(self.picture)
                 # Ignore holds in the letterbox, but allow an active lens to
                 # follow the thumb across page edges without changing gestures.
                 if not (0 <= source.x <= size.width and 0 <= source.y <= size.height):
@@ -235,7 +235,6 @@ def apple_backend(interface):
             rect = self.native.convertRect(self.native.bounds, toView=parent)
             x, y, width, height, sample_x, sample_y = magnifier_geometry(
                 rect.size.width, rect.size.height, thumb.x - rect.origin.x, thumb.y - rect.origin.y)
-            self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
             source = self.picture.convertPoint(
                 CGPoint(rect.origin.x + sample_x, rect.origin.y + sample_y), fromView=parent)
             percent = getattr(self.interface, 'magnifier_zoom', 200)
@@ -243,15 +242,29 @@ def apple_backend(interface):
             # clamp to the reader viewport so edge holds keep both reachable.
             left, right, top = magnifier_controls_geometry(
                 rect.size.width, rect.size.height, x, y, width, height)
-            self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
-            self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
-            self.lens_less.setEnabled(percent > 150)
-            self.lens_more.setEnabled(percent < 250)
             scale = percent / 100 * float(self.native.zoomScale)
-            self.lens_picture.frame = CGRect((width / 2 - source.x * scale, height / 2 - source.y * scale),
-                                              (size.width * scale, size.height * scale))
+            layout = (width, height, size.width, size.height, scale, percent)
+            if self.lens_layout != layout:
+                self.lens_layout = layout
+                self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
+                self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
+                self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
+                self.lens_picture.frame = CGRect(
+                    (width / 2 - source.x * scale, height / 2 - source.y * scale),
+                    (size.width * scale, size.height * scale))
+                self.lens_less.setEnabled(percent > 150)
+                self.lens_more.setEnabled(percent < 250)
+            else:
+                # Dragging only translates existing layers. Setting UIImageView
+                # and UIButton frames repeatedly schedules layout/content work.
+                self.lens.center = CGPoint(rect.origin.x + x + width / 2, rect.origin.y + y + height / 2)
+                self.lens_less.center = CGPoint(rect.origin.x + left + 16.5, rect.origin.y + top + 16.5)
+                self.lens_more.center = CGPoint(rect.origin.x + right + 16.5, rect.origin.y + top + 16.5)
+                self.lens_picture.center = CGPoint(width / 2 + (size.width / 2 - source.x) * scale,
+                                                    height / 2 + (size.height / 2 - source.y) * scale)
 
         def _create_magnifier(self, parent):
+            self.lens_layout = None
             self.lens = apple_lens_class().alloc().init()
             self.lens.userInteractionEnabled = True
             self.lens.clipsToBounds = True
