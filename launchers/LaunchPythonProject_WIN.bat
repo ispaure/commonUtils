@@ -6,6 +6,18 @@ set "CONFIG_FILE=%~2"
 set "PAUSE_ON_EXIT=%~3"
 if not defined PAUSE_ON_EXIT set "PAUSE_ON_EXIT=false"
 
+rem Preserve quoted application arguments after the three launcher parameters.
+shift
+shift
+shift
+set "LAUNCH_ARGUMENTS="
+:CollectLaunchArguments
+if [%1]==[] goto LaunchArgumentsCollected
+set LAUNCH_ARGUMENTS=%LAUNCH_ARGUMENTS% %1
+shift
+goto CollectLaunchArguments
+:LaunchArgumentsCollected
+
 if /I "%PAUSE_ON_EXIT%"=="true" (
     set "PAUSE_ON_EXIT=true"
 ) else if "%PAUSE_ON_EXIT%"=="1" (
@@ -208,7 +220,7 @@ if not exist "%VENV_DIR%\." (
 )
 
 echo Launching: %LAUNCH_FILE_VALUE%.py
-"%UV_EXE%" run --locked --no-sync --no-python-downloads python "%LAUNCH_PATH%"
+"%UV_EXE%" run --locked --no-sync --no-python-downloads python "%LAUNCH_PATH%" %LAUNCH_ARGUMENTS%
 set "LAUNCH_STATUS=%ERRORLEVEL%"
 popd
 
