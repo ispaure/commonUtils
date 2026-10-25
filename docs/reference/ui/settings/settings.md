@@ -12,6 +12,7 @@ modules have been removed; update imports and mock patch targets to this package
 - `ini_editor`
 - `layered_settings`
 - `settings_sections`
+- `navigation`
 - `font_preview`
 
 ## Layered field construction
@@ -37,3 +38,13 @@ values are synchronized with signals blocked. Repeated saves use the latest file
 snapshot; external changes still require Reload. Explicit Reload rebuilds controls
 and rereads the schema. A write followed by a readback error reports that the write
 succeeded but that Reload is required, rather than reporting an ordinary success.
+
+## Category navigation
+
+`navigation.SettingsNavigation(parent)` is a horizontal splitter exposing a
+`sidebar` (`QTreeWidget`) and retained `stack` (`QStackedWidget`). Hosts populate
+category items and connect their selection policy to the stack, supporting lazy
+feature pages as well as static forms. The widget owns presentation, accessible
+category naming and splitter proportions; it does not discover features or read,
+write or apply configuration. Logistics settings and its build manager use this
+same navigation shell with separate fields and persistence policies.
