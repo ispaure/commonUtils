@@ -31,7 +31,7 @@ class Navigation:
 class NativeReaderGestureTests(unittest.TestCase):
     def test_both_pop_gestures_disabled_and_original_states_restored(self):
         navigation = Navigation()
-        host = SimpleNamespace(adapter=SimpleNamespace(navigation=[navigation]),
+        host = SimpleNamespace(adapter=SimpleNamespace(navigation=[navigation], navigation_for=lambda destination: navigation),
                                destinations=['reader'], state=SimpleNamespace(destination='reader'))
         chrome = NavigationChrome(host)
         with patch.dict(sys.modules, {'rubicon.objc': SimpleNamespace(SEL=lambda value: value)}):
@@ -46,7 +46,7 @@ class NativeReaderGestureTests(unittest.TestCase):
 
     def test_split_controller_change_and_uninstall_restore_edge_only_older_system(self):
         primary, secondary = Navigation(content=False), Navigation()
-        host = SimpleNamespace(adapter=SimpleNamespace(navigation=[primary]),
+        host = SimpleNamespace(adapter=SimpleNamespace(navigation=[primary], navigation_for=lambda destination: primary),
                                destinations=['reader'], state=SimpleNamespace(destination='reader'))
         chrome = NavigationChrome(host)
         with patch.dict(sys.modules, {'rubicon.objc': SimpleNamespace(SEL=lambda value: value)}):
