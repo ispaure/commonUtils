@@ -157,12 +157,13 @@ class ReconcileTests(unittest.TestCase):
     def test_completed_navigation_checks_one_folder_without_enumerating_descendants(self):
         first = self.cache.get(self.root)
         with patch.object(self.cache, '_validate', side_effect=AssertionError('Full-tree validation')):
-            with patch('commonUtils.filesystem.index.os.scandir', side_effect=AssertionError('Unchanged folders enumerated')):
+            with patch('commonUtils.filesystem.index.os.scandir', side_effect=AssertionError('Unchanged folders enumerated')), \
+                    patch('commonUtils.filesystem.index.reconcile.time', return_value=first.scanned_at + 1):
                 checked = self.cache.reconcile_folder(self.child)
         self.assertEqual(checked.entries.generation, first.entries.generation)
         self.assertEqual(len(checked.entries), 2)
         self.assertFalse(checked.metadata_checked)
-        self.assertGreater(checked.folder_stats([self.child])[self.child].scanned_at, first.scanned_at)
+        self.assertEqual(checked.folder_stats([self.child])[self.child].scanned_at, first.scanned_at + 1)
 
     def test_new_file_in_browsed_folder_updates_parent_sizes_without_copying_generation(self):
         previous = self.cache.get(self.root)
