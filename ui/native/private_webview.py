@@ -69,14 +69,21 @@ class PrivateWebView(toga.WebView):
                     NativeWebView.setWebContentsDebuggingEnabled(False)
                     inner.interface.private_configured = True
 
+                def set_content(inner, root_url, content):
+                    # Toga's large-content path writes HTML to its cache. Keep
+                    # private documents in WebView memory, including custom
+                    # limits above its 2 MiB data-URL threshold.
+                    inner.loaded_future = None
+                    inner.native.loadDataWithBaseURL(root_url, content, "text/html", "utf-8", None)
+
             return PrivateBackend(interface=self)
         raise RuntimeError("This backend does not support a private WebView.")
 
     def set_content(self, root_url, content):
         if self.private_closed or not self.private_configured:
             raise RuntimeError("Private view is closed or unprotected.")
-        # Toga Android writes larger HTML documents to its disk cache. Keep the
-        # byte bound as well as the character bound, before entering the toolkit.
+        # Enforce the caller's byte bound before crossing the native boundary.
+        # Android's private backend bypasses Toga's disk-backed HTML fallback.
         if len(content.encode("utf-8")) > getattr(
             self, "max_html_bytes", DEFAULT_MAX_HTML
         ):

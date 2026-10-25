@@ -551,7 +551,9 @@ with the caller through `runtime.speech_language`.
 `private_webview.PrivateWebView(max_html_bytes=..., **toga_options)` creates a
 nonpersistent WKWebView on iOS or a cache-disabled Android WebView. Backend
 selection follows Toga's factory. `private_webview_supported()` reports those
-supported backends. `set_content` checks encoded UTF-8 bytes before entering Toga;
+supported backends. `set_content` checks encoded UTF-8 bytes before entering Toga. The Android
+private backend loads HTML directly with `loadDataWithBaseURL`, including caller
+limits above 2 MiB, rather than using Toga's plaintext large-content cache;
 `clear_private_content()` retires callbacks, clears the live document and disposes
 the native view idempotently. Unsupported backends fail closed. Callers choose
 HTML byte limits and supply navigation, resource and credential-validity policy.
