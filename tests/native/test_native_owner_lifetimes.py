@@ -40,6 +40,7 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         own = NS(topViewController=None)
         more = NS(topViewController='Settings content', viewControllers=['More list', 'Settings content', 'Detail'])
         root = NS(navigationController=more)
+        more.viewControllers = ['More list', root, 'Detail']
         adapter.host = NS(destinations=('home', 'settings'), state=NS(destination='settings'))
         adapter.containers = [(None, NS(navigationController=None)), (None, root)]
         adapter.navigation = [NS(topViewController='Home'), own]
@@ -48,6 +49,8 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         self.assertEqual(adapter.content_controller('settings'), 'Settings content')
         self.assertEqual(adapter.destination_for_navigation(more), 'settings')
         self.assertEqual(adapter.route_depth(more), 1)
+        more.viewControllers = ['More list']
+        self.assertIsNone(adapter.destination_for_navigation(more))
         root.navigationController = None
         self.assertIs(adapter.navigation_for('settings'), own)
         self.assertIs(adapter.content_controller('settings'), root)

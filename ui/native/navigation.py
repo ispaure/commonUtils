@@ -356,7 +356,11 @@ class AppleNavigation:
 
     def destination_for_navigation(self, navigation):
         if navigation == self.controller.moreNavigationController:
-            return self.host.state.destination
+            stack = list(navigation.viewControllers)
+            for index, (_, root) in enumerate(self.containers):
+                if root in stack:
+                    return self.host.destinations[index]
+            return None  # The overflow list itself has no document route.
         return self.host.destinations[self.navigation.index(navigation)]
 
     def route_depth(self, navigation):

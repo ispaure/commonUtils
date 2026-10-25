@@ -161,9 +161,11 @@ class Routes:
             self.changing = False
 
     def native_popped(self, navigation):
-        if self.changing:
+        if self.changing or self.host.changing:
             return
         destination = self.host.adapter.destination_for_navigation(navigation)
+        if destination is None:
+            return
         count = self.host.adapter.route_depth(navigation)
         if count < len(self.screens[destination]):
             if self.intent is not None:
