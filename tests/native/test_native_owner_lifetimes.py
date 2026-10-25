@@ -24,6 +24,16 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = toga.App('Owner contracts', 'org.example.ownercontracts')
 
+    def test_six_destinations_retain_order_and_seventh_is_selectable(self):
+        items = tuple((str(i), 'Page ' + str(i), 'doc', 'ic_menu_edit') for i in range(7))
+        host = navigation.NativeNavigationHost(items)
+        self.assertEqual([item.text for item in host.root.content], [item[1] for item in items])
+        host.activate('6')
+        self.assertEqual(host.root.current_tab.text, 'Page 6')
+        self.assertEqual(host.state.destination, '6')
+        with self.assertRaises(ValueError):
+            navigation.NativeNavigationHost(items + (('8', 'Eight', 'doc', 'ic_menu_edit'),))
+
     def test_navigation_reinstall_preserves_selection_and_restores_before_detaching(self):
         selected = Mock()
         host = navigation.NativeNavigationHost((

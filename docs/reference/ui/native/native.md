@@ -42,10 +42,18 @@ are described in the [native browser guide](../native_browser/native_browser.md)
 ## Configurable navigation
 
 `NativeNavigationHost(items, state=None, on_select=None, prefer_sidebar=True)`
-accepts one to five `(identity, label, Apple symbol, Android drawable name)` tuples.
+accepts one to seven `(identity, label, Apple symbol, Android drawable name)` tuples.
 Identities must be unique. Android's `home` icon name selects the vector house;
 other names resolve through `android.R.drawable`. The optional state must have
 the same destinations in the same order. Labels and destinations are caller data.
+
+For six or seven destinations Android uses the bundled
+`ExpandedBottomNavigationView`, with evenly measured compact icon cells; include
+`ui/native/android` in the application Java sources. The shared host installs it
+before creating backend option references and retains it when replacing chrome.
+The rail still uses Material navigation. UIKit retains its native overflow
+presentation on compact devices; applications must use destination identities
+instead of fixed numeric tab positions.
 
 `install(window)` establishes native containment and layout/keyboard listeners;
 `uninstall()` restores them, and `dispose()` retires the host's widgets and

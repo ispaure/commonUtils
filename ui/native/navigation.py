@@ -13,8 +13,8 @@ from .chrome import NavigationChrome
 class NativeNavigationHost:
     def __init__(self, items, *, state=None, on_select=None, prefer_sidebar=True):
         items = tuple(items)
-        if not 1 <= len(items) <= 5 or any(len(item) != 4 for item in items):
-            raise ValueError('Supply one to five (key, label, Apple symbol, Android icon) destinations.')
+        if not 1 <= len(items) <= 7 or any(len(item) != 4 for item in items):
+            raise ValueError('Supply one to seven (key, label, Apple symbol, Android icon) destinations.')
         self.destinations, self.labels, self.symbols, self.android_icons = map(tuple, zip(*items))
         self.state = state or NavigationState(self.destinations)
         if self.state.destinations != self.destinations:
@@ -23,13 +23,33 @@ class NativeNavigationHost:
         self.prefer_sidebar = prefer_sidebar
         self.changing = False
         self.bodies = {key: toga.Box(style=Pack(direction=COLUMN, flex=1)) for key in self.destinations}
-        self.root = toga.OptionContainer(content=[(label, self.bodies[key])
-            for key, label in zip(self.destinations, self.labels)], on_select=self._selected,
-            style=Pack(flex=1))
+        self.root = toga.OptionContainer(style=Pack(flex=1))
+        if len(items) > 5 and type(self.root._impl).__module__.startswith('toga_android.'):
+            self._expand_android_bar()
+        for key, label in zip(self.destinations, self.labels):
+            self.root.content.append(label, self.bodies[key])
+        self.root.on_select = self._selected
         self.adapter = None
         self.window = None
         self.chrome = NavigationChrome(self)
         self.activate(self.state.destination)
+
+    def _expand_android_bar(self):
+        """Prepare the backend before it creates option references for item six."""
+        from java import jclass
+        from android.widget import LinearLayout
+        impl = self.root._impl
+        old = impl.native_navigationview
+        old.setOnItemSelectedListener(None)
+        old.removeOnLayoutChangeListener(impl.onLayoutChangeListener)
+        impl.native.removeView(old)
+        bar = jclass('io.github.ispaure.commonutils.ExpandedBottomNavigationView')(impl._native_activity)
+        bar.setLabelVisibilityMode(2)
+        bar.setOnItemSelectedListener(impl.onItemSelectedListener)
+        bar.addOnLayoutChangeListener(impl.onLayoutChangeListener)
+        impl.native.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        impl.native_navigationview = bar
+        impl.max_items = bar.getMaxItemCount()
 
     def _selected(self, widget, **kwargs):
         if self.changing or widget.current_tab is None:
@@ -471,14 +491,18 @@ class AndroidNavigation:
         self.impl.native.removeView(self.original_bottom)
         context = ContextThemeWrapper(self.impl._native_activity,
             MaterialR.style.Theme_MaterialComponents_DayNight)
-        self.bottom = BottomNavigationView(context)
+        if len(self.host.destinations) > 5:
+            from java import jclass
+            self.bottom = jclass('io.github.ispaure.commonutils.ExpandedBottomNavigationView')(context)
+        else:
+            self.bottom = BottomNavigationView(context)
         # Material 1.12's default inset listener treats the IME bottom inset as
         # navigation padding. Under adjustResize that grows this WRAP_CONTENT
         # bar to the whole remaining viewport and gives the content zero height.
         # The window/navigation host already reserves system and keyboard space.
         from java import jclass
         jclass('androidx.core.view.ViewCompat').setOnApplyWindowInsetsListener(self.bottom, None)
-        self.bottom.setLabelVisibilityMode(1)
+        self.bottom.setLabelVisibilityMode(2 if len(self.host.destinations) > 5 else 1)
         self.bottom.addOnLayoutChangeListener(self.impl.onLayoutChangeListener)
         self.impl.native.addView(self.bottom, LinearLayout.LayoutParams(-1, -2))
         self.impl.native_navigationview = self.bottom
