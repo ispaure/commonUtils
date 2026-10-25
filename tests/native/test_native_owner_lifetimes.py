@@ -45,6 +45,8 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         adapter.containers = [(None, NS(navigationController=None)), (None, root)]
         adapter.navigation = [NS(topViewController='Home'), own]
         adapter.controller = NS(moreNavigationController=more)
+        self.assertTrue(adapter.is_destination_controller(root))
+        self.assertFalse(adapter.is_destination_controller(object()))
         self.assertIs(adapter.navigation_for('settings'), more)
         self.assertEqual(adapter.content_controller('settings'), 'Settings content')
         self.assertEqual(adapter.destination_for_navigation(more), 'settings')
@@ -54,6 +56,21 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         root.navigationController = None
         self.assertIs(adapter.navigation_for('settings'), own)
         self.assertIs(adapter.content_controller('settings'), root)
+
+    def test_programmatic_overflow_callback_does_not_reselect_or_cancel_routes(self):
+        selected = Mock()
+        items = tuple((str(i), 'Page ' + str(i), 'doc', 'ic_menu_edit') for i in range(6))
+        host = navigation.NativeNavigationHost(items, on_select=selected)
+        host.activate('5')
+        host._programmatic_overflow = '5'
+        host._selected(host.root)
+        selected.assert_not_called()
+        self.assertIsNone(host._programmatic_overflow)
+        host._selected(host.root)
+        selected.assert_called_once_with('5')
+        with patch.object(host.root._impl, 'set_current_tab_index', wraps=host.root._impl.set_current_tab_index) as setter:
+            host.activate('5')
+        setter.assert_not_called()
 
     def test_navigation_reinstall_preserves_selection_and_restores_before_detaching(self):
         selected = Mock()

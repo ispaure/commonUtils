@@ -22,6 +22,7 @@ class NativeNavigationHost:
         self.on_select = on_select
         self.prefer_sidebar = prefer_sidebar
         self.changing = False
+        self._programmatic_overflow = None
         self.bodies = {key: toga.Box(style=Pack(direction=COLUMN, flex=1)) for key in self.destinations}
         self.root = toga.OptionContainer(style=Pack(flex=1))
         if len(items) > 5 and type(self.root._impl).__module__.startswith('toga_android.'):
@@ -55,6 +56,10 @@ class NativeNavigationHost:
         if self.changing or widget.current_tab is None:
             return
         destination = self.destinations[widget.current_tab.index]
+        if self._programmatic_overflow == destination:
+            self._programmatic_overflow = None
+            return
+        self._programmatic_overflow = None
         if self.on_select is not None and self.on_select(destination) is False:
             self.activate(self.state.destination)
             return
@@ -63,9 +68,18 @@ class NativeNavigationHost:
     def activate(self, destination):
         if destination not in self.destinations:
             raise ValueError('Unknown mobile destination.')
+        index = self.destinations.index(destination)
+        current = self.root.current_tab
+        if current is not None and current.index == index:
+            self.state.select(destination)
+            return
+        if (len(self.destinations) > 5 and index >= 4
+                and type(self.root._impl).__module__.startswith('toga_iOS.')
+                and getattr(self.root._impl, 'uses_more', False)):
+            self._programmatic_overflow = destination
         self.changing = True
         try:
-            self.root.current_tab = self.destinations.index(destination)
+            self.root.current_tab = index
             self.state.select(destination)
         finally:
             self.changing = False
@@ -353,6 +367,10 @@ class AppleNavigation:
         index = self.host.destinations.index(destination)
         navigation = self.navigation_for(destination)
         return navigation.topViewController or self.containers[index][1]
+
+    def is_destination_controller(self, controller):
+        return any(controller == root or controller == navigation
+                   for (_, root), navigation in zip(self.containers, self.navigation))
 
     def destination_for_navigation(self, navigation):
         if navigation == self.controller.moreNavigationController:
