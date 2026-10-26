@@ -65,3 +65,10 @@ keys; absent keys inherit. Explicit empty values remain empty. Missing personal
 files are ignored. Duplicate entries for a requested launch key within either layer are rejected.
 Unix and native Windows readers use the same layered contract. Hosts own the
 personal path and expose editable defaults and overrides in their settings UI.
+
+## Application arguments
+
+The first three shared-launcher arguments are the project root, config file and
+pause flag. Additional arguments are forwarded to the Python launch file. Root
+wrappers must pass their argument list as separate arguments (`"$@"` on Bash,
+`%*` on Windows). Launch-file exit codes are returned to the caller.

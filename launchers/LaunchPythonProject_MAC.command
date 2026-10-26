@@ -353,7 +353,7 @@ fi
 [[ -d "$VENV_DIR" ]] || fail "uv sync completed without creating the expected virtual environment: $VENV_DIR"
 
 info "Launching: $LAUNCH_FILE_VALUE.py"
-uv run --locked --no-sync --no-python-downloads python "$LAUNCH_PATH"
+uv run --locked --no-sync --no-python-downloads python "$LAUNCH_PATH" "${@:4}"
 status=$?
 
 echo
