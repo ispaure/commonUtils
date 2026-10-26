@@ -141,3 +141,34 @@ class MarkdownImageSizeTests(QtTestCase):
         self.assertLessEqual(following.y() - first.y() - first.height(), 20)
         # Ordinary paragraphs retain their proportional prose spacing.
         self.assertEqual(block.next().blockFormat().lineHeight(), 145)
+
+    def test_raster_formats_and_hash_names_share_panel_sizing_and_small_gaps(self):
+        from PIL import Image
+        for kind, extension in (('PNG', 'PNG'), ('JPEG', 'jpeg'), ('WEBP', 'webp'), ('GIF', 'gif')):
+            name = 'large photo #1.' + extension
+            Image.new('RGB', (1600, 800), 'red').save(self.root / name, kind)
+            source = '![[ ' + name + '|1200]]\n\nFollowing text\n'
+            path = self.root / 'note.md'
+            path.write_text(source)
+            viewer = MarkdownViewer(path, allow_edit=True)
+            viewer.show()
+            for editing in (False, True):
+                viewer.set_editing(editing)
+                viewer.set_edit_mode('formatted')
+                surface = viewer.formatted_editor if editing else viewer.browser
+                for width in (700, 320, 500):
+                    with self.subTest(kind=kind, editing=editing, width=width):
+                        viewer.resize(width, 600)
+                        qt.QApplication.processEvents()
+                        document = surface.document()
+                        block = document.begin()
+                        line = block.layout().lineAt(0)
+                        self.assertLessEqual(line.naturalTextWidth(), surface.viewport().width())
+                        self.assertGreater(line.height(), 100)
+                        self.assertAlmostEqual(line.naturalTextWidth() / line.height(), 2, delta=.04)
+                        layout = document.documentLayout()
+                        gap = layout.blockBoundingRect(block.next()).top() - layout.blockBoundingRect(block).bottom()
+                        self.assertLessEqual(gap, 20)
+                        self.assertEqual(viewer.markdown_text(), source)
+                        self.assertFalse(viewer.is_modified)
+            viewer.deleteLater()

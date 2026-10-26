@@ -73,6 +73,40 @@ class MarkdownPresentationTests(QtTestCase):
         rendered, callouts = reading_source('> ```md\n> [!note] Example\n\nOutside\n\n> [!info] Actual callout')
         self.assertEqual(len(callouts), 1)
 
+    def test_reading_measure_tracks_window_and_zoom_without_changing_source(self):
+        source = '# Heading\n\n' + ('A readable paragraph with `inline code`. ' * 30) + '\n\n```python\nprint(1)\n```\n'
+        viewer = self.viewer(source)
+        browser = viewer.browser
+        document = browser.document()
+        viewer.resize(1600, 700)
+        self.app.processEvents()
+        wide_margin = document.rootFrame().frameFormat().leftMargin()
+        self.assertGreater(wide_margin, 28)
+        measure = qt.QFontMetricsF(browser.font()).horizontalAdvance('n') * 88
+        self.assertAlmostEqual(browser.viewport().width() - 2 * wide_margin, measure, delta=1)
+        viewer.set_reading_size(18)
+        self.app.processEvents()
+        self.assertLess(document.rootFrame().frameFormat().leftMargin(), wide_margin)
+        code_sizes = []
+        block = document.begin()
+        while block.isValid():
+            it = block.begin()
+            while not it.atEnd():
+                fragment = it.fragment()
+                if fragment.charFormat().fontFixedPitch():
+                    code_sizes.append(fragment.charFormat().fontPointSize())
+                it += 1
+            block = block.next()
+        self.assertGreater(len(code_sizes), 1)
+        self.assertTrue(all(size == browser.font().pointSizeF() for size in code_sizes))
+        viewer.resize(520, 700)
+        self.app.processEvents()
+        self.assertEqual(document.rootFrame().frameFormat().leftMargin(), 28)
+        self.assertEqual(document.rootFrame().frameFormat().rightMargin(), 28)
+        self.assertEqual(viewer.markdown_text(), source)
+        self.assertFalse(viewer.is_modified)
+        self.assertEqual(self.path.read_text(), source)
+
     def test_table_formatting_and_theme_change_do_not_dirty_source(self):
         source = '# Heading\n\n| A | B |\n| --- | --- |\n| One | Two |\n| Three | Four |\n'
         viewer = self.viewer(source, edit=True)

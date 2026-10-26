@@ -30,10 +30,6 @@ def monospace_family():
     return _font_values()['code_font_family_str'].strip() or _automatic_monospace_family()
 
 
-def code_point_size():
-    return point_size(_font_values()['code_font_size_int'])
-
-
 def _font_values():
     from ..appearance.styling import style_values
     app = qt.QApplication.instance()
@@ -161,7 +157,7 @@ def _style_inline_code(document, inline_code, alternate, text):
         code_cursor.setPosition(position + length, qt.QTextCursor.MoveMode.KeepAnchor)
         chars = qt.QTextCharFormat()
         chars.setFontFamilies([monospace_family()])
-        chars.setFontPointSize(code_point_size())
+        chars.setFontPointSize(document.defaultFont().pointSizeF())
         chars.setBackground(alternate)
         chars.setForeground(text)
         code_cursor.mergeCharFormat(chars)
@@ -177,7 +173,7 @@ def _style_fenced_code(block, fmt, alternate, text):
     code_cursor.movePosition(qt.QTextCursor.MoveOperation.EndOfBlock, qt.QTextCursor.MoveMode.KeepAnchor)
     chars = qt.QTextCharFormat()
     chars.setFontFamilies([monospace_family()])
-    chars.setFontPointSize(code_point_size())
+    chars.setFontPointSize(block.document().defaultFont().pointSizeF())
     chars.setForeground(text)
     code_cursor.mergeCharFormat(chars)
 
@@ -380,6 +376,25 @@ def tables(frame):
 
 class MarkdownBrowser(qt.QTextBrowser):
     """Native selectable text with slim quote/callout accent rules."""
+    def update_reading_width(self):
+        """Center a readable text measure while allowing narrow windows to wrap."""
+        document = self.document()
+        measure = qt.QFontMetricsF(self.font()).horizontalAdvance('n') * 88
+        margin = max(28.0, (self.viewport().width() - measure) / 2)
+        frame = document.rootFrame()
+        fmt = frame.frameFormat()
+        if fmt.leftMargin() == margin and fmt.rightMargin() == margin:
+            return
+        modified = document.isModified()
+        fmt.setLeftMargin(margin)
+        fmt.setRightMargin(margin)
+        frame.setFrameFormat(fmt)
+        document.setModified(modified)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_reading_width()
+
     def loadResource(self, kind, url):
         loader = getattr(self, 'resource_loader', None)
         if loader is not None:
@@ -453,11 +468,13 @@ def configure_text(widget, *, source=False):
                     cursor.setPosition(fragment.position() + fragment.length(), qt.QTextCursor.MoveMode.KeepAnchor)
                     fmt = qt.QTextCharFormat()
                     fmt.setFontFamilies([monospace_family()])
-                    fmt.setFontPointSize(code_point_size())
+                    fmt.setFontPointSize(document.defaultFont().pointSizeF())
                     cursor.mergeCharFormat(fmt)
                 it += 1
             block = block.next()
         document.setModified(modified)
+        if isinstance(target, MarkdownBrowser):
+            target.update_reading_width()
     controller.bind(widget, 'code' if source else 'reading', None if source else refresh)
     font = widget.font()
     widget.setFrameShape(qt.QFrame.Shape.NoFrame)

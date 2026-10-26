@@ -280,7 +280,7 @@ public final class FileListView extends ListView {
                 row.addView(holder.icon, new LinearLayout.LayoutParams(dp(iconSize), dp(iconSize)));
                 LinearLayout text = new LinearLayout(getContext());
                 text.setOrientation(LinearLayout.VERTICAL);
-                text.setPadding(dp(12), 0, dp(8), 0);
+                text.setPadding(dp(6), 0, dp(4), 0);
                 holder.title = new TextView(getContext());
                 holder.title.setSingleLine(true);
                 holder.title.setEllipsize(TextUtils.TruncateAt.MIDDLE);

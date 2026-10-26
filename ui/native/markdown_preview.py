@@ -5,15 +5,15 @@ import re
 from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
-from markdown_it.token import Token
-from ...formats.markdown.images import image_size
+from ...formats.markdown.images import image_size, wiki_image
 
-_ALIAS = re.compile(r'\[\[([^]\n|]+)\|([^]\n]+)\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
+_ALIAS = re.compile(r'\[\[([^]\n|]+)(?:\|([^]\n]+))?\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
 
 
 def _alias(state, silent):
     """Recognize existing wiki aliases through the parser, outside code spans."""
-    if state.src[state.pos] != '[' or state.linkLevel:
+    if (state.src[state.pos] != '[' or state.linkLevel
+            or (state.pos and state.src[state.pos - 1] in '![')):
         return False
     match = _ALIAS.match(state.src, state.pos, state.posMax)
     if not match:
@@ -22,7 +22,7 @@ def _alias(state, silent):
         token = state.push('link_open', 'a', 1)
         token.attrSet('href', quote((match[1] or match[3]).strip(), safe='/:@%#?=&+'))
         token = state.push('text', '', 0)
-        token.content = match[2] or match[4]
+        token.content = match[2] or match[4] or match[1]
         state.push('link_close', 'a', -1)
     state.pos = match.end()
     return True
@@ -46,33 +46,12 @@ def embedded_image(target, alt, image_source=None):
                     if height is not None:
                         dimensions += f' height="{height}"'
                         style += f';aspect-ratio:{width}/{height}'
+                style += ';vertical-align:middle'
                 encoded = base64.b64encode(data).decode('ascii')
                 return f'<img src="data:{mime};base64,{encoded}" alt="{escape(caption, quote=True)}"{dimensions} style="{style}">'
         except (OSError, ValueError):
             pass
     return '<span class="image-alt">' + escape(alt) + '</span>'
-
-
-def wiki_image(state, silent):
-    """Opt-in image embeds; code spans and escaped syntax stay literal."""
-    if not state.src.startswith('![[', state.pos):
-        return False
-    end = state.src.find(']]', state.pos + 3, state.posMax)
-    if end < 0 or '\n' in state.src[state.pos:end]:
-        return False
-    content = state.src[state.pos + 3:end]
-    target, _, alt = content.partition('|')
-    if not target.strip():
-        return False
-    if not silent:
-        token = state.push('image', 'img', 0)
-        token.attrSet('src', quote(target.strip(), safe='/:%'))
-        token.content = (target.strip() + '|' + alt) if image_size(alt)[1] is not None else (alt or target.strip())
-        child = Token('text', '', 0)
-        child.content = token.content
-        token.children = [child]
-    state.pos = end + 2
-    return True
 
 
 def markdown_body(text, *, local_links=False, image_source=None):

@@ -14,7 +14,9 @@ Android keeps selected-row text readable against the selection background.
 Hosts using the continuous browser show all matching rows in one scrolling list;
 scroll to reach later items instead of using Previous/Next. Tiles load as they
 enter the visible area. A row's contextual button selects it for actions; a
-normal tap opens it when the host supplies an Open action.
+normal tap opens it when the host supplies an Open action. Touch and hold an
+Android row, or an iOS row using the host's contextual action handler, to invoke
+that same handler. The host supplies the available commands and their presentation.
 
 Covers load in the background. Missing or locked covers leave names selectable;
 view changes and closing stop obsolete work. Thumbnails stay in memory.

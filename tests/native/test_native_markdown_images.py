@@ -70,3 +70,26 @@ class NativeMarkdownImageTests(unittest.TestCase):
         self.image.write_bytes(b'X' * (8 * 1024 * 1024 + 65))
         with patch.object(self.provider, 'open', side_effect=AssertionError('oversized open')):
             self.assertIsNone(self.load(self.target))
+
+    def test_library_root_and_attachment_fallbacks_stay_inside_the_library(self):
+        (self.root / 'Vault/Notes').mkdir(parents=True)
+        (self.root / 'Vault/Attachments').mkdir()
+        (self.root / 'Vault/Attachments/photo.GIF').write_bytes(GIF)
+        load = folder_image_source(self.provider, 'Vault/Notes/read.md', root='Vault')
+        self.assertEqual(load('photo.GIF'), ('image/gif', GIF))
+        self.assertEqual(load('Attachments/photo.GIF'), ('image/gif', GIF))
+        (self.root / 'Vault/Notes/photo.GIF').write_bytes(GIF + b'local')
+        self.assertEqual(load('photo.GIF'), ('image/gif', GIF + b'local'))
+        (self.root / 'Vault/.obsidian').mkdir()
+        (self.root / 'Vault/.obsidian/secret.gif').write_bytes(GIF)
+        for target in ('../../colors%20%231%20%25.GIF', '../.obsidian/secret.gif'):
+            self.assertIsNone(load(target))
+        with patch.object(self.provider, 'list', side_effect=AssertionError('recursive scan')):
+            self.assertIsNone(load('absent.gif'))
+
+    def test_image_destination_collection_handles_wiki_references_and_literal_hashes(self):
+        from commonUtils.formats.markdown.images import image_targets
+        text = ('![[two colors #1.PNG|900x600]]\n\n'
+                '![Reference][photo]\n\n[photo]: <images/with space.webp> "Title"\n\n'
+                '`![[code.png]]`\n\n```\n![[fenced.png]]\n```\n')
+        self.assertEqual(image_targets(text), ('two%20colors%20%231.PNG', 'images/with%20space.webp'))

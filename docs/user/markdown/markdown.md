@@ -19,6 +19,15 @@ A similarly named document elsewhere in a vault is not automatically discovered.
 Web/mail links open in the operating system's default application. Local non-Markdown
 links and other URL schemes are not launched by this reader.
 
+Native Markdown previews also recognize bare wiki links such as `[[Tech]]`,
+including inside headings, when the host enables local links. The host chooses
+how to find the destination. Code spans and image embeds keep their own meaning.
+
+The default reading size is 12 reference points (about 16 logical pixels). Inline
+code and fenced code use that same reading size with a monospace family; changing
+the code editor size does not resize code inside rendered Markdown. Wide windows
+center a reading column of roughly 88 text characters; narrow windows wrap to fit.
+
 Reading appearance adjusts text from 10–24 pt for the current window without changing
 the file or editing font. Reading follows the host's light/dark palette. F11 toggles
 fullscreen. Escape closes Contents/Find first, then leaves fullscreen. Missing or
@@ -157,13 +166,13 @@ and no persistent private drafts. The host decides which locations are available
 and whether opening another document uses a new window. Save failures retain your
 current buffer; inspect a reported saved destination before retrying Save As.
 
-## Browse documentation folders
+## Documentation Library
 
 A host can open a Markdown directory as a wiki. Arrow keys in the left tree open
 the highlighted page immediately; Cancel on an unsaved edit restores the current
 page selection. A page named after the root folder becomes the single top entry,
 with the rest of the documentation nested beneath it. Use the left tree to browse nested
-folders and pages. On desktop, **Library** search filters pages across the library;
+folders and pages. On desktop, **Documentation Library** search filters pages across the library;
 its file names/titles or page text selector appears only while a query is entered.
 Opening a result highlights matching text in the document and scrolls to its first
 match. File-name-only matches may have no matching text in the page. Library marks
@@ -217,7 +226,15 @@ Use Obsidian image embeds such as `![[assets/demo.gif|400]]` or standard Markdow
 `![Demo|400](../../../ui/markdown/user_docs/assets/demo.gif)` to request a width in pixels. Add `|400x200` for
 an explicit width and height. Both forms shrink proportionally if needed to fit
 the page; smaller images stay small. The source size survives editing and saving.
+Obsidian targets may contain spaces and `#`, for example `![[photo #1.png|400]]`.
+PNG, JPEG and WebP share the same panel-width and paragraph-spacing rules as GIF.
 Code examples and escaped embeds remain literal.
 
 Storage-provider documents keep their existing resource-loading policy; local file
 drops and direct GIF decoders are disabled for those documents.
+
+
+Documentation Library uses heading titles for navigation. Its sidebar never creates,
+renames or moves files, including when page editing is enabled with Alt/Option.
+Hosts that need filename-based note organization supply their own Notes Library
+workspace rather than changing documentation navigation.

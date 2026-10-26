@@ -24,10 +24,11 @@ message, bounded progress meter and Cancel button. See
 
 `ui/settings.ini [Styling]` declares 11 settings. Families and sizes use four roles:
 `ui_font_*` (interface and dialogs), `browser_font_*`, `reading_font_*` (Markdown
-and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
+and consumer book readers), and `code_font_*` (editors and diffs; the family also
+applies to Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
 with one shared monospace fallback for editors, diffs and Markdown code. Defaults
-are 10 pt for UI/browser, 9 pt for code and Arial at 10 pt for reading. All four font sizes
+are 10 pt for UI/browser, 9 pt for code editors and Arial at 12 pt for reading. All four font sizes
 allow 7–24 pt.
 Sizes are reference points at 96 logical DPI: an 11 setting occupies about
 15 logical pixels on every platform. `ui.appearance.typography.point_size(size)`
@@ -37,8 +38,9 @@ without overriding Qt's screen scaling. Families retain their native metrics,
 so identical sizes do not guarantee identical glyph widths. Previews, Markdown
 code, reading controls and editor zoom use the same convention. Saved values and
 their 7–24 range remain unchanged; macOS text becomes larger at the same setting.
-The smaller shipped defaults (10 for UI/browser/reading, 9 for code) retain the
-previous macOS proportions across platforms. Existing personal overrides take
+Markdown inline code and fenced blocks use the surrounding document's reading
+size, including local reading zoom. They use the shared monospace family but
+ignore the code editor size. Source Markdown editing uses the code role throughout. Existing personal overrides take
 precedence and are never rewritten to the new defaults.
 Code families must be installed fixed-pitch fonts, or blank for the monospace
 fallback. The layered editor filters its code family list accordingly and validates
@@ -109,6 +111,6 @@ accent/surface changes; checking palette values alone misses stale QSS brushes.
 
 Saved styling reloads update only changed font roles. Automatic browser/reading
 families also follow interface font changes, and reading callbacks run for code
-font changes because documents contain code spans. Accent-only reloads retain
+family changes because documents contain code spans. Accent-only reloads retain
 font caches and skip font-binding callbacks. The broad `changed` signal still
 fires for specialized color/rendering consumers.

@@ -92,6 +92,7 @@ class MarkdownReadingMixin:
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
         configure_images(self.browser.document(), images)
         style_document(self.browser.document(), self.browser.palette(), callouts=callouts)
+        self.browser.update_reading_width()
         self._callouts = callouts
         self.diagrams_button.setVisible(bool(mermaid_blocks(parts.body)) and not self.edit_button.isChecked())
         # Qt renders headings but does not supply GitHub-style fragment names.
@@ -129,7 +130,8 @@ class MarkdownReadingMixin:
         if self._diagram_renderer is None or not self._diagram_renderer.images:
             return
         block = self.browser.document().begin()
-        width = max(120, self.browser.viewport().width() - 60)
+        frame = self.browser.document().rootFrame().frameFormat()
+        width = max(120, self.browser.viewport().width() - frame.leftMargin() - frame.rightMargin())
         while block.isValid():
             fragment = block.begin()
             while not fragment.atEnd():

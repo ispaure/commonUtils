@@ -65,13 +65,13 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         self.assertEqual(self.cell.textLabel.textColor, 'text')
         self.assertEqual(self.cell.textLabel.highlightedTextColor, 'text')
 
-    def test_rows_without_icons_clear_recycled_images_and_use_injected_icon_slot(self):
+    def test_rows_without_icons_clear_recycled_images_without_reserving_an_extra_icon_slot(self):
         self.row.icon = None
         self.interface.appearance.icon_size = 32
         self.cell.imageView.image = object()
         self.bind()
         self.assertIsNone(self.cell.imageView.image)
-        self.assertEqual(self.cell.separatorInset, (0, 60, 0, 12))
+        self.assertEqual(self.cell.separatorInset, (0, 12, 0, 12))
 
     @unittest.skipUnless(importlib.util.find_spec('toga'), 'Optional Toga backend is not installed')
     def test_row_dropdown_resolves_current_row_and_rejects_retired_accessory(self):
@@ -174,7 +174,9 @@ class IOSFileListLifecycleTests(unittest.TestCase):
             for index in reversed(range(count)):
                 self.index.row = index
                 self.bind()
-                self.assertEqual(self.cell.separatorInset, (0, 56, 0, 12))
+                self.assertEqual(self.cell.separatorInset, (0, 12, 0, 12))
+                self.assertEqual(self.cell.layoutMargins, (0, 12, 0, 12))
+                self.assertFalse(self.cell.preservesSuperviewLayoutMargins)
                 self.assertEqual(self.cell.textLabel.text, 'Documents')
                 self.assertEqual(self.separator.isHidden(), index == count - 1)
                 self.assertEqual(self.separator.frame, ((12, 47), (296, 1)))

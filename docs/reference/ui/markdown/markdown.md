@@ -253,6 +253,8 @@ source, dirty state or undo history. Obsidian `![[image.gif|400]]` and standard
 wiki embeds retain their exact source through formatted editing/export. Direct animation loading
 respects protected local roots and never bypasses a supplied resource loader.
 Provider-backed resources retain their existing static rendering contract.
+Obsidian image targets can contain literal spaces and `#` in filenames, including
+PNG/JPEG/WebP images; the importer encodes these for Qt without altering saved source.
 
 Image paragraphs use text-based minimum line heights in Read and Formatted modes,
 including table cells, so paragraph leading does not multiply the image height.
@@ -263,3 +265,10 @@ in Formatted mode, with one undo operation per drop. The viewer supplies the sav
 document folder for relative paths; unsaved documents and separate Windows drives
 use absolute file URLs. Files are referenced in place. Provider-backed documents
 disable this local-file insertion path. See the [user guide](../../../user/markdown/markdown.md#images-and-animated-gifs).
+
+
+`WikiPanel` presents a **Documentation Library** with heading-based page titles.
+The tree explicitly disables drag/drop and item editing; `allow_edit` affects the
+page editor, not library structure. Native `MarkdownWikiView` uses the same
+Documentation Library label and catalog title rules. These shared viewers do not
+own notes/vault file organization; consumers implement that workflow.

@@ -111,7 +111,7 @@ class StylingTests(QtTestCase):
             self.assertAlmostEqual(setting_size(editor.font()), 10)
             self.assertEqual(self.store.overrides()['Styling', 'code_font_size_int'], '10')
             self.assertFalse(editor.document().isModified())
-            self.assertAlmostEqual(reading.document().lastBlock().begin().fragment().charFormat().fontPointSize(), 40 / 3)
+            self.assertAlmostEqual(reading.document().lastBlock().begin().fragment().charFormat().fontPointSize(), reading.font().pointSizeF())
             self.controller.code_font.set_size(80, save=False)
             self.assertAlmostEqual(setting_size(editor.font()), 24)
 
@@ -311,7 +311,7 @@ class StylingTests(QtTestCase):
         self.assertFalse(editor.document().isModified())
         self.assertFalse(reading.document().isModified())
         block = reading.document().lastBlock()
-        self.assertEqual(block.begin().fragment().charFormat().fontPointSize(), 13)
+        self.assertEqual(block.begin().fragment().charFormat().fontPointSize(), 19)
         self.assertEqual(block.begin().fragment().charFormat().fontFamilies(), [self._code_family()])
 
     def test_reset_removes_personal_key_and_default_editor_changes_repository_file(self):
@@ -374,9 +374,10 @@ class StylingTests(QtTestCase):
         self.assertFalse(viewer.is_modified)
         self.assertEqual(path.read_text(), source)
 
-    def test_formatted_code_uses_shared_size_immediately_and_preserves_undo_on_reload(self):
+    def test_formatted_code_uses_reading_size_and_preserves_undo_on_reload(self):
         from commonUtils.ui.markdown.viewer import MarkdownViewer
         self.store.save({('Styling', 'code_font_family_str'): self._code_family(),
+                         ('Styling', 'reading_font_size_int'): '15',
                          ('Styling', 'code_font_size_int'): '20'})
         self.controller.reload()
         path = self.root / 'live-code.md'
@@ -397,13 +398,16 @@ class StylingTests(QtTestCase):
                 block = block.next()
             return result
         self.assertTrue(code_formats())
-        self.assertTrue(all(fmt.fontPointSize() == 20 and fmt.fontFamilies() == [self._code_family()]
+        self.assertTrue(all(fmt.fontPointSize() == 15 and fmt.fontFamilies() == [self._code_family()]
                             for fmt in code_formats()))
         self.store.save({('Styling', 'code_font_size_int'): '21',
                          ('Styling', 'code_font_family_str'): self._code_family(1)})
         self.controller.reload()
-        self.assertTrue(all(fmt.fontPointSize() == 21 and fmt.fontFamilies() == [self._code_family(1)]
+        self.assertTrue(all(fmt.fontPointSize() == 15 and fmt.fontFamilies() == [self._code_family(1)]
                             for fmt in code_formats()))
+        self.store.save({('Styling', 'reading_font_size_int'): '18'})
+        self.controller.reload()
+        self.assertTrue(all(fmt.fontPointSize() == 18 for fmt in code_formats()))
         self.assertEqual(document.availableUndoSteps(), undo)
         self.assertEqual(viewer.markdown_text(), original)
         self.assertFalse(viewer.is_modified)

@@ -172,7 +172,7 @@ def prepare_wiki_images(markdown):
             if any(start <= match.start() < end for start, end in code):
                 return match[0]
             target = match[1].strip()
-            if Path(target.split('#')[0]).suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.tif', '.tiff'):
+            if Path(target).suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.tif', '.tiff'):
                 return match[0]
             key = f'{prefix}{len(tokens)}z'
             suffix = match[2] or ''
@@ -236,7 +236,8 @@ class ResponsiveImages(qt.QPyTextObject):
         width = image_format.width() or natural.width() or 16
         height = image_format.height() or (width * natural.height() / natural.width() if natural.width() else 16)
         block = document.findBlock(position).blockFormat()
-        available = (document.textWidth() - document.documentMargin() * 2
+        frame = document.rootFrame().frameFormat()
+        available = (document.textWidth() - frame.leftMargin() - frame.rightMargin()
                      - block.leftMargin() - block.rightMargin() - block.indent() * document.indentWidth())
         if available > 0 and width > available:
             height *= available / width

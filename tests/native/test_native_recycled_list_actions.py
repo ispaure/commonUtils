@@ -75,6 +75,46 @@ class FileRowActionTests(unittest.TestCase):
         self.module._bind_actions(self.interface, self.cell, self.row)
         self.assertIsNone(self.cell.accessoryView)
 
+    def test_hold_and_button_dispatch_the_same_live_row_once(self):
+        controller = self.module.FileTableController()
+        controller.interface = self.interface
+        controller.tableView = Mock()
+        controller.tableView.cellForRowAtIndexPath.return_value = self.cell
+        gesture = Mock(state=1)
+        controller.holdRow_(gesture)
+        self.interface.on_primary_action.assert_called_once_with(row=self.row)
+        self.interface.on_primary_action.reset_mock()
+        # Changed/ended events must not reopen a second menu.
+        gesture.state = 3
+        controller.holdRow_(gesture)
+        self.interface.on_primary_action.assert_not_called()
+
+    def test_hold_recognizer_leaves_native_menu_providers_and_actionless_lists_alone(self):
+        controller = self.module.FileTableController()
+        controller.interface, controller.impl = self.interface, self.interface._impl
+        self.assertTrue(controller.gestureRecognizerShouldBegin_(None))
+        self.interface.menu_provider = Mock()
+        self.assertFalse(controller.gestureRecognizerShouldBegin_(None))
+        self.interface.menu_provider = None
+        self.interface._impl.primary_action_enabled = False
+        self.assertFalse(controller.gestureRecognizerShouldBegin_(None))
+
+    def test_hold_ignores_empty_space_disabled_lists_and_retired_cells(self):
+        controller = self.module.FileTableController()
+        controller.interface = self.interface
+        controller.tableView = Mock()
+        gesture = Mock(state=1)
+        controller.tableView.indexPathForRowAtPoint.return_value = None
+        controller.holdRow_(gesture)
+        controller.tableView.indexPathForRowAtPoint.return_value = NS(row=0)
+        controller.tableView.cellForRowAtIndexPath.return_value = self.cell
+        self.interface.enabled = False
+        controller.holdRow_(gesture)
+        self.interface.enabled = True
+        self.interface.data = [NS(index=0, title='Replacement.md')]
+        controller.holdRow_(gesture)
+        self.interface.on_primary_action.assert_not_called()
+
     def test_async_menu_retains_copied_completion_until_delivery(self):
         import asyncio
         import gc

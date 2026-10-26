@@ -117,8 +117,11 @@ def _bind_file_cell(interface, cell, index):
     cell.layer.maskedCorners = (3 if index == 0 else 0) | (12 if index == len(interface.data) - 1 else 0)
     cell.layer.masksToBounds = True
     # UIKit also uses the separator's leading inset to lay out cell content.
-    # Keep it bounded for every row, including the last and single-row groups.
-    cell.separatorInset = UIEdgeInsets(0, interface.appearance.icon_size + 28, 0, 12)
+    # Use the outer gutter here; adding an icon slot shifts the image and text
+    # a second time. The image's point size already reserves its own space.
+    cell.preservesSuperviewLayoutMargins = False
+    cell.layoutMargins = UIEdgeInsets(0, 12, 0, 12)
+    cell.separatorInset = UIEdgeInsets(0, 12, 0, 12)
     _bind_separator(cell, last=index == len(interface.data) - 1, color=apple_color('border'))
     cell.textLabel.textColor = apple_color('muted' if getattr(row, 'hidden', False) else 'text')
     cell.textLabel.highlightedTextColor = cell.textLabel.textColor
@@ -130,6 +133,24 @@ def _bind_file_cell(interface, cell, index):
 
 
 class FileTableController(TogaTableViewController):
+    @objc_method
+    def gestureRecognizerShouldBegin_(self, gesture) -> bool:
+        return (self.interface.enabled and self.impl.primary_action_enabled
+                and getattr(self.interface, 'menu_provider', None) is None)
+
+    @objc_method
+    def holdRow_(self, gesture) -> None:
+        # Resolve the live cell when the hold begins; never keep a recycled index.
+        if gesture.state != 1 or not self.interface.enabled:
+            return
+        path = self.tableView.indexPathForRowAtPoint(gesture.locationInView(self.tableView))
+        if path is None:
+            return
+        cell = self.tableView.cellForRowAtIndexPath(path)
+        button = cell.accessoryView if cell is not None else None
+        if button is not None and getattr(self.interface, 'menu_provider', None) is None:
+            button.selectRow_(button)
+
     @objc_method
     def tableView_didEndDisplayingCell_forRowAtIndexPath_(self, tableView, cell, indexPath):
         # A delayed retirement notification can arrive after UIKit has already
@@ -214,13 +235,18 @@ class IOSFileList(DetailedList):
         # pop, briefly shifting its rows down before the live browser returns.
         self.native.contentInsetAdjustmentBehavior = 2  # Never
         self.native.delegate = self.native_controller
+        from rubicon.objc import ObjCClass, SEL
+        self.hold_gesture = ObjCClass('UILongPressGestureRecognizer').alloc().initWithTarget(
+            self.native_controller, action=SEL('holdRow:'))
+        self.hold_gesture.delegate = self.native_controller
+        self.native.addGestureRecognizer(self.hold_gesture)
         self.native.rowHeight = self.interface.appearance.row_height
         self.native.keyboardDismissMode = 1
         from rubicon.objc import UIEdgeInsets
         self.native.backgroundColor = self.interface.appearance.apple_color('transparent')
         self.native.separatorColor = self.interface.appearance.apple_color('transparent')
         self.native.separatorStyle = 0  # App-owned lines only between rows.
-        self.native.separatorInset = UIEdgeInsets(0, self.interface.appearance.icon_size + 28, 0, 12)
+        self.native.separatorInset = UIEdgeInsets(0, 12, 0, 12)
         self.primary_action_enabled = self.secondary_action_enabled = False
         self.add_constraints()
 

@@ -113,6 +113,13 @@ Hard break.
         literal = markdown_preview('`[test.md|Test]` ` [Test](test.md)`', local_links=True)
         self.assertNotIn('<a href=', literal)
 
+    def test_bare_wiki_links_in_headings_preserve_code_and_embeds(self):
+        html = markdown_preview('# **[[Tech]]**\n\n`[[Literal]]`\n\n![[photo.png]] ![[other.png|Caption]]', local_links=True)
+        self.assertIn('<a href="Tech">Tech</a>', html)
+        self.assertNotIn('href="Literal"', html)
+        self.assertNotIn('href="photo.png"', html)
+        self.assertNotIn('href="other.png"', html)
+
     @unittest.skipUnless(importlib.util.find_spec('toga'), 'Optional Toga backend is not installed')
     def test_standalone_phone_tablet_search_without_consumer_or_qt(self):
         script = '''

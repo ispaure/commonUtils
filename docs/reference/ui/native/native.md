@@ -24,6 +24,12 @@ current source row to update its visible image without rebuilding the table.
 `on_primary_action(row=...)` handles contextual actions. `select_index(index)`
 changes selection without activation. `clear()` scrubs rows and selection.
 Use `primary_action=None` when contextual actions are unavailable.
+On Android, long-press and the row's contextual button both dispatch
+`on_primary_action`. On iOS, rows without a `menu_provider` use the same handler
+for the contextual button and a long-press when it begins. The hold resolves the
+current cell and reuses the button's source-identity and enabled checks, without
+activating the row. Hosts supplying a deferred `menu_provider` retain UIKit's
+button menu presentation.
 
 `ListAppearance` injects `palette(dark)`, `apple_color(role)`, `high_contrast()`
 and `icon(folder)` callbacks, plus positive integer native dimensions:
@@ -34,6 +40,10 @@ configure Android's sp fonts; UIKit retains native text fonts. Palette roles are
 Hosts call `refresh_palette()` for Android theme/high-contrast changes; Apple
 color callbacks should return dynamic colors. No app-wide theme registry is
 installed by the shared component.
+UIKit cells use a 12-point leading gutter; the image
+point size reserves the icon slot without adding it again to the separator inset.
+Android retains the injected icon size and uses 6 dp between icon and text,
+with 4 dp between text and the contextual action target.
 
 `thumbnail_image(image, size=28)` fits a row image while preserving the UIKit
 renderer scale on Retina devices. Generic browsing composition and its lifecycle
@@ -318,7 +328,10 @@ Place its `view` widget in your host and call `reflow(width)` on resize.
 The default inert renderer, `ui.native.markdown_preview`, requires the pure-Python
 `markdown-it-py` package (Logistics pins 4.2.0 in its mobile manifest). It renders
 CommonMark plus tables and strikethrough, including nested lists, quotes, emphasis,
-reference links and heading IDs. HTML is escaped, image alt text is displayed,
+reference links and heading IDs. With `local_links=True`, bare `[[Page]]` and
+aliased wiki links render as local anchors; the host owns destination lookup.
+Code spans and image embeds are not treated as wiki links.
+HTML is escaped, image alt text is displayed,
 and external links remain inert. Tables/code scroll horizontally without widening
 the page. Input/output limits remain 1/2 MiB, without scripts or remote resources. A host renderer may inject its
 own CSS palette. Neither module imports Qt or a consumer application.
@@ -679,3 +692,21 @@ messages, fullscreen behavior, release and window/app assignment.
 That module owns desktop platform dispatch; explicitly imported Toga adapters
 remain separate. No neighboring-file loader, synthetic module or standalone
 namespace alias is needed. See [UI backend selection](../ui.md#backends-and-diagnostics).
+
+
+The canonical wiki-image rule and `image_targets(text)` live in
+`formats.markdown.images`; the native renderer continues to expose `wiki_image`
+for existing formatted-editor callers. `image_targets` includes CommonMark inline
+and reference images plus wiki embeds, excludes code/escaped syntax, and returns
+unique encoded destinations in document order. Wiki image tokens retain exact
+source spelling in `token.meta['wiki_source']` for lossless protected DOM markup.
+Image markup caps width at the containing block and uses automatic height with
+middle alignment so inline baseline descent does not add excess space below it.
+
+`folder_image_source(provider, document, root=library_root)` opts into library
+resolution: note-relative, root-relative, then common `Attachments`, `Assets` and
+`Images` folders (and lowercase variants) for bare filenames. First match wins.
+Explicit `./`/`../` paths remain relative; hidden paths and escapes outside the
+supplied library root are rejected. Resolution probes bounded candidates through
+`entry` and never performs recursive listing. Omitting `root` retains strict
+note-relative provider resolution.

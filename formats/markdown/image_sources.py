@@ -1,7 +1,7 @@
 """Bounded provider-backed raster images for native Markdown readers/editors."""
 
-def folder_image_source(provider, document):
-    """Resolve sibling raster images through the document's rooted provider."""
+def folder_image_source(provider, document, *, root=None):
+    """Resolve relative images, with optional library-root/attachment fallbacks."""
     import posixpath
     from urllib.parse import unquote, urlsplit
     from ...formats.image_headers import image_header, gif_header
@@ -9,6 +9,17 @@ def folder_image_source(provider, document):
     used = 0
     cache = {}
     parent = posixpath.dirname(provider.relative(document))
+    library_root = provider.relative(root) if root is not None else None
+
+    def contained(path):
+        if path == '..' or path.startswith('../'):
+            return False
+        if library_root is None:
+            return True
+        if library_root and path != library_root and not path.startswith(library_root + '/'):
+            return False
+        relative = posixpath.relpath(path, library_root or '.')
+        return not any(part.startswith('.') for part in relative.split('/'))
 
     def load(target):
         nonlocal used
@@ -21,13 +32,28 @@ def folder_image_source(provider, document):
                 or any(ord(c) < 32 for c in path_text)):
             return None
         path = posixpath.normpath(posixpath.join(parent, path_text))
-        if path == '..' or path.startswith('../'):
+        if not contained(path) or not path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):
             return None
-        path = provider.relative(path)
-        if not path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):
+        candidates = [path]
+        if library_root is not None and not path_text.startswith(('./', '../')):
+            candidates.append(posixpath.normpath(posixpath.join(library_root, path_text)))
+            if '/' not in path_text:
+                candidates.extend(posixpath.join(library_root, folder, path_text) for folder in
+                                  ('Attachments', 'attachments', 'Assets', 'assets', 'Images', 'images'))
+        for candidate in dict.fromkeys(candidates):
+            if not contained(candidate):
+                continue
+            candidate = provider.relative(candidate)
+            try:
+                before = provider.entry(candidate)
+            except (FileNotFoundError, NotADirectoryError, ValueError):
+                continue
+            if not before['directory']:
+                path = candidate
+                break
+        else:
             return None
         # Recheck cached entries too: another scene can revoke credentials.
-        before = provider.entry(path)
         if (before['directory'] or before.get('size', 0) > MAX_IMAGE + 64
                 or used + max(0, before.get('size', 0) - 64) > 16 * 1024 * 1024):
             return None

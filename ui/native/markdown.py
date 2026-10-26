@@ -34,13 +34,13 @@ class MarkdownWikiView:
         self.reading = False
         self.pending_fragment = ''
         self.wide = None
-        self.search = toga.TextInput(placeholder='Search library', on_change=DebouncedCallback(self.filter),
+        self.search = toga.TextInput(placeholder='Search documentation', on_change=DebouncedCallback(self.filter),
                                      style=Pack(height=48))
         self.mode = toga.Selection(items=['File names & titles', 'Page text'],
                                    on_change=self.filter, style=Pack(height=48))
         self.rows = toga.Box(style=Pack(direction=COLUMN))
         self.notice = toga.Label('')
-        self.browse = toga.Box(children=[toga.Label('Library search'), self.search,
+        self.browse = toga.Box(children=[toga.Label('Documentation Library'), self.search,
             toga.ScrollContainer(content=self.rows, horizontal=False, style=Pack(flex=1))],
             style=Pack(direction=COLUMN, flex=1))
         self.web = toga.WebView(on_navigation_starting=self.follow_link,
