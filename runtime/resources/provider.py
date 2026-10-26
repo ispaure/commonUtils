@@ -66,10 +66,16 @@ class ArchiveSource(Protocol):
     def open(self, path: str | Path) -> ContextManager[BinaryIO]: ...
 
 
+class ContentSource(Protocol):
+    """Decoded streams whose lifetime is owned by ProviderContent."""
+    def open(self, path: str | Path) -> ContextManager[BinaryIO]: ...
+    def close(self) -> None: ...
+
+
 class ContentProvider(Protocol):
     """Optional decoding factory; receives a logical path and operation scope."""
     def content_source(self, path: str, *, password: str,
-                       cancelled: Callable[[], bool]) -> ArchiveSource: ...
+                       cancelled: Callable[[], bool]) -> ContentSource: ...
 
 
 class ByteReplacementProvider(Protocol):
