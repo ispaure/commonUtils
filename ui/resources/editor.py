@@ -1,5 +1,6 @@
 """Provider-backed text editor: all drafts are session-only, even after export."""
 from .. import pyside as qt
+from ..appearance.status_line import StatusLine
 from .lifecycle import operations_for
 from ..tasks.operation_progress import OperationProgress
 from ...runtime.resources.selection import ResourceTextSession
@@ -21,8 +22,7 @@ class ResourceTextWindow(qt.QMainWindow):
         self.editor = qt.QPlainTextEdit()
         self.editor.setPlainText(session.text.text)
         self.editor.document().setModified(False)
-        self.status = qt.QLabel('Session-only draft · No recovery files or recent-file entries')
-        self.status.setWordWrap(True)
+        self.status = StatusLine('Session-only draft · No recovery files or recent-file entries')
         self.operation = OperationProgress(self)
         self.operation.completed.connect(self._saved)
         self.operations = operations_for(self)

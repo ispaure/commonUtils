@@ -7,30 +7,28 @@ on the GUI thread only after the worker has stopped, so owners can close safely.
 from threading import Event
 from time import monotonic
 from .. import pyside as qt
+from ..appearance.status_line import StatusFooter
 from .operations import Operation, _format_error
 
 
-class OperationProgress(qt.QWidget):
+class OperationProgress(StatusFooter):
     completed = qt.Signal(object, str)
     progress_changed = qt.Signal(object, object, str)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent=parent)
         self.busy = False
         self.cancelled = Event()
         self.operation = None
         self._result = (None, '')
-        layout = qt.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.message = qt.QLabel()
-        self.message.setWordWrap(True)
-        self.message.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.bar = qt.QProgressBar()
+        self.bar.setMaximumWidth(140)
+        self.bar.setSizePolicy(qt.QSizePolicy.Policy.Preferred, qt.QSizePolicy.Policy.Fixed)
         self.cancel_button = qt.QPushButton('Cancel')
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self.request_cancel)
-        for widget in (self.message, self.bar, self.cancel_button):
-            layout.addWidget(widget)
+        for widget in (self.bar, self.cancel_button):
+            self.layout().addWidget(widget)
         self.progress_changed.connect(self._progress)
         self.hide()
 

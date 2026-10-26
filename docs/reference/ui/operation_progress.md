@@ -7,6 +7,13 @@
 thread, throttled, and support arbitrary-size byte counts. `total=0` means busy
 progress. `completed(result, error)` is delivered only after the worker stops.
 
+The controls share the compact [panel footer](styling.md#panel-status-footers):
+an elided status message, a progress meter at most 140 logical pixels wide and a
+Cancel button in one row. The footer retains its natural height when embedded
+under an editor or browser. Full message text remains available through the
+tooltip and accessible description. `start(..., show_progress=False)` keeps the
+footer hidden for background work while retaining the same worker lifecycle.
+
 This complete example hashes selected files. It checks cancellation between files
 and within each file. Supply actual paths when launching it:
 

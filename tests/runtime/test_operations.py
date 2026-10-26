@@ -64,6 +64,39 @@ class OperationProgressTests(QtTestCase):
         self.assertTrue(self.progress.isVisible())
         self.wait()
 
+    def test_save_footer_stays_one_row_in_tall_and_narrow_panels(self):
+        panel = qt.QWidget()
+        layout = qt.QVBoxLayout(panel)
+        canvas = qt.QWidget()
+        canvas.setSizePolicy(qt.QSizePolicy.Policy.Expanding, qt.QSizePolicy.Policy.Expanding)
+        layout.addWidget(canvas)
+        layout.addWidget(self.progress)
+        self.addCleanup(panel.deleteLater)
+        release = Event()
+        message = 'Saving notebook…\n' + 'Long destination path / ' * 80
+        self.progress.start(lambda report, cancelled: release.wait(5), message=message)
+        try:
+            panel.show()
+            for width, height in ((1000, 800), (360, 600), (1200, 1200)):
+                panel.resize(width, height)
+                self.app.processEvents()
+                self.assertEqual(panel.width(), width, 'Status must not widen the panel')
+                self.assertEqual(self.progress.height(), self.progress.sizeHint().height())
+                self.assertGreater(canvas.height(), height * .8)
+                self.assertEqual(self.progress.message.text(), message)
+                self.assertEqual(self.progress.message.toolTip(), message)
+                self.assertFalse(self.progress.message.wordWrap())
+                self.assertLessEqual(self.progress.bar.width(), 140)
+                for control in (self.progress.message, self.progress.bar, self.progress.cancel_button):
+                    self.assertLessEqual(abs(control.geometry().center().y() -
+                                             self.progress.rect().center().y()), 1)
+            self.progress.cancel_button.click()
+            self.assertTrue(self.progress.cancelled.is_set())
+            self.assertEqual(self.progress.message.text(), 'Cancelling safely…')
+        finally:
+            release.set()
+            self.wait()
+
     def test_empty_exception_is_reported_as_failure_after_worker_shutdown(self):
         results = []
         def fail(report, cancelled):

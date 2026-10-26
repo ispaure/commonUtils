@@ -140,3 +140,22 @@ continues to live at `ui/settings.ini`.
 - [Virtual resource providers](resource-providers.md)
 - [Project-confined tab gestures](scoped_tabs.md)
 - [Anchor-relative dock placement](workspace_layout.md)
+
+## Embedded HTML dropdowns
+
+`ui.native.web_dropdown` exports offline `DROPDOWN_CSS` and `DROPDOWN_SCRIPT`
+strings. Embed them once in a WebView document, then construct
+`new WebDropdown(surface, trigger, {close, items})`. `items` defaults to the
+surface; pass a command container when a surface also hosts other panels.
+After making the surface visible, `activate()` assigns menu/menuitem roles,
+updates the trigger and focuses the first visible enabled command. `deactivate()`
+clears active navigation and the expanded state. The host owns showing/hiding,
+outside-click dismissal, focus restoration and command execution; `close` must
+perform that lifecycle. Arrow keys wrap and skip hidden/disabled commands;
+Home/End select endpoints and Escape calls `close`.
+
+Rows are borderless. Override `--dropdown-row-height`, `--dropdown-row-padding`
+and `--dropdown-hover` for platform sizing and palette. High-contrast host styles
+must preserve borderless `[role=menuitem]` rows while retaining visible keyboard
+focus. Form controls in option panels remain distinct controls. Use native Qt,
+UIKit or Android menus for native widgets; this component serves embedded HTML.

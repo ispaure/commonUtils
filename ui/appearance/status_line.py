@@ -68,6 +68,22 @@ class StatusLine(qt.QLabel):
         return self.sizeHint()
 
 
+class StatusFooter(qt.QWidget):
+    """One-line panel footer with an elided message and optional trailing controls.
+
+    Append controls with ``layout().addWidget(control)``. The footer keeps its
+    natural row height while the panel's main content takes the remaining space.
+    """
+    def __init__(self, text='', parent=None):
+        super().__init__(parent)
+        self.setSizePolicy(qt.QSizePolicy.Policy.Expanding, qt.QSizePolicy.Policy.Fixed)
+        row = qt.QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 10, 0)
+        row.setSpacing(6)
+        self.message = StatusLine(text, self)
+        row.addWidget(self.message, 1)
+
+
 def style_status_bar(bar):
     """Apply the same font/color to native QStatusBar messages without moving controls."""
     bar.setSizeGripEnabled(False)

@@ -1,5 +1,27 @@
 # Shared styling
 
+## Panel status footers
+
+`ui.appearance.status_line.StatusLine` is the shared single-line status label.
+It uses the UI font, muted italic text and fixed vertical sizing. Long messages
+are elided; `text()`, the tooltip and accessible description retain the full message.
+Newlines display as separators and do not increase the footer height.
+
+For messages with trailing controls, use `StatusFooter(text='', parent=None)`
+from the same module. Its `message` is a `StatusLine`; append progress meters,
+Cancel buttons or other controls with `footer.layout().addWidget(control)`.
+Place the footer after the panel content in its vertical layout. It keeps its
+natural row height as the panel grows, leaving the extra space to the content.
+Plain message footers can use `StatusLine` directly. Native `QStatusBar` hosts
+use `style_status_bar(bar)` to share typography while preserving timed messages
+and permanent controls.
+
+`ui.tasks.operation_progress.OperationProgress` uses `StatusFooter` for its
+message, bounded progress meter and Cancel button. See
+[operation progress](operation_progress.md) for worker and cancellation ownership.
+
+## Typography and themes
+
 `ui/settings.ini [Styling]` declares 11 settings. Families and sizes use four roles:
 `ui_font_*` (interface and dialogs), `browser_font_*`, `reading_font_*` (Markdown
 and consumer book readers), and `code_font_*` (editors, diffs and Markdown code).
