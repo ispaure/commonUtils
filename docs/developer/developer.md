@@ -9,6 +9,8 @@ domain policy, dependency installation and user-facing destinations.
 4. [Extension points](extension-points.md): add file types and browser capabilities.
 5. [Integration contracts](contracts.md): imports, persistent formats and consumer upgrades.
 6. [Maintenance](maintenance.md): validation and documentation responsibilities.
+7. [Refactoring safely](refactoring.md): current priorities, existing mechanisms
+   to reuse and a contribution loop that preserves consumers.
 
 Detailed API examples live in the [API reference](../reference/reference.md), grouped by source owner.
 For interactive workflows, use the [component user guides](../user/user.md).

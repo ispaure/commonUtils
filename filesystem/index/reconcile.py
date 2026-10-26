@@ -11,11 +11,13 @@ import os
 from pathlib import Path
 from time import time
 from .metadata import entry_fingerprint
+from .operation import IndexWriterContext
 from ...runtime.operations import check_cancelled
 from .exclusions import scan_exclusions, is_excluded
 
 
-def _changed(cache, db, generation, folder, source_root, cancelled, report):
+def _changed(context, cache, folder, source_root, cancelled, report):
+    db, generation, state = context.database, context.generation, context.state
     row = db.execute('SELECT identity,status FROM folders WHERE generation=? AND path=?',
                      (generation, str(folder))).fetchone()
     if row is None or row[1] != 'done':
@@ -26,8 +28,8 @@ def _changed(cache, db, generation, folder, source_root, cancelled, report):
         for path, identity in db.execute('SELECT path,identity FROM entries WHERE generation=? AND parent=?',
                                         (generation, str(folder))):
             check_cancelled(cancelled)
-            cache._scan_state.checked_entries += 1
-            report(cache._scan_state.checked_entries, 0, 'Checking indexed files')
+            state.checked_entries += 1
+            report(state.checked_entries, 0, 'Checking indexed files')
             if json.dumps(entry_fingerprint(path, Path(path).lstat())) != identity:
                 return True
     except OSError:
@@ -53,11 +55,12 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
         if row is None or (partial and not allow_partial) or (not partial and row[1] is None):
             return None
         source_root, generation = Path(row[0]), row[2] if partial else row[1]
+        context = IndexWriterContext(db, generation, cache._scan_state)
         exclusions = scan_exclusions(source_root, cache.database)
         if is_excluded(root, exclusions):
             return None  # An explicit Data view needs its own independently scoped index.
-        cache._scan_state.excluded_paths = exclusions
-        targets = _reconciliation_targets(cache, db, generation, root, source_root, changes)
+        context.state.excluded_paths = exclusions
+        targets = _reconciliation_targets(context, root, source_root, changes)
         try:
             db.execute('BEGIN IMMEDIATE')
             db.execute('CREATE TEMP TABLE reconciled_folders(path TEXT PRIMARY KEY)')
@@ -78,7 +81,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                 check_cancelled(cancelled)
                 if failed(folder) or is_excluded(folder, exclusions):
                     continue
-                if _changed(cache, db, generation, folder, source_root, cancelled, report):
+                if _changed(context, cache, folder, source_root, cancelled, report):
                     db.execute("INSERT OR IGNORE INTO folders VALUES(?,?,?,'pending',NULL)",
                                (generation,str(folder),str(folder.parent)))
                     cache.invalidate(folder)
@@ -86,7 +89,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                 checked.add(folder)
                 db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (str(folder),))
             if full:
-                _validate_descendants(cache, db, generation, root, source_root, cancelled, report, checked)
+                _validate_descendants(context, cache, root, source_root, cancelled, report, checked)
             # Scanning changed parents adds only new/changed child folders to the
             # pending queue. Existing unchanged descendant folders remain done.
             while True:
@@ -105,7 +108,7 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                     cache._scan_folder(db, generation, source_root, True, folder, cancelled, report, checkpoint=False)
                     checked.add(folder)
                     db.execute('INSERT OR IGNORE INTO reconciled_folders VALUES(?)', (str(folder),))
-            if cache._scan_state.dirty_totals:
+            if context.state.dirty_totals:
                 report(0, 0, 'Saving folder sizes')
                 cache._publish_totals(db, generation, source_root, cancelled)
             _retire_replaced_records(db)
@@ -122,7 +125,8 @@ def reconcile_existing(cache, root, changes, cancelled, report, *, full=False, a
                                scope=root if root != source_root else None, cancelled=cancelled)
 
 
-def _reconciliation_targets(cache, db, generation, root, source_root, changes):
+def _reconciliation_targets(context, root, source_root, changes):
+    db, generation = context.database, context.generation
     targets = {root}
     if not db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
                       (generation, str(root))).fetchone():
@@ -140,13 +144,14 @@ def _reconciliation_targets(cache, db, generation, root, source_root, changes):
             continue
         directory = db.execute('SELECT 1 FROM folders WHERE generation=? AND path=?',
                                (generation, str(path))).fetchone()
-        if any(path == excluded or excluded in path.parents for excluded in cache._scan_state.excluded_paths):
+        if any(path == excluded or excluded in path.parents for excluded in context.state.excluded_paths):
             continue
         targets.add(path if directory and path.is_dir() else path.parent)
     return targets
 
 
-def _validate_descendants(cache, db, generation, root, source_root, cancelled, report, checked):
+def _validate_descendants(context, cache, root, source_root, cancelled, report, checked):
+    db, generation = context.database, context.generation
     # Explicit Refresh validates descendants in the same generation,
     # retaining ancestor totals and avoiding a duplicate subtree root.
     # Read fixed-size batches: do not materialize a disk-sized queue.
@@ -167,7 +172,7 @@ def _validate_descendants(cache, db, generation, root, source_root, cancelled, r
                               (generation,text)).fetchone():
                 continue  # A checked parent removed this cached branch.
             folder = Path(text)
-            if _changed(cache, db, generation, folder, source_root, cancelled, report):
+            if _changed(context, cache, folder, source_root, cancelled, report):
                 cache.invalidate(folder)
                 cache._scan_folder(db, generation, source_root, True, folder, cancelled, report, checkpoint=False)
             checked.add(folder)

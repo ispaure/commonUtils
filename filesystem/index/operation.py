@@ -30,3 +30,11 @@ class ScanState:
 
     def blocks(self, folder):
         return folder in self.blocked_folders or any(parent in self.blocked_folders for parent in folder.parents)
+
+
+@dataclass(frozen=True)
+class IndexWriterContext:
+    """Explicit database/generation/state for one reconciliation mutation path."""
+    database: object
+    generation: int
+    state: ScanState

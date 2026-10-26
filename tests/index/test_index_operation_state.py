@@ -9,6 +9,31 @@ from commonUtils.runtime.operations import OperationCancelled
 
 
 class IndexOperationStateTests(unittest.TestCase):
+    def test_reconciliation_metadata_uses_its_captured_writer_context(self):
+        import json
+        import sqlite3
+        from types import SimpleNamespace
+        from commonUtils.filesystem.index.operation import IndexWriterContext, ScanState
+        from commonUtils.filesystem.index.metadata import entry_fingerprint
+        from commonUtils.filesystem.index.reconcile import _changed
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = root / 'one.txt'
+            file.write_bytes(b'first')
+            with sqlite3.connect(':memory:') as db:
+                db.execute('CREATE TABLE folders(generation,path,identity,status)')
+                db.execute('CREATE TABLE entries(generation,parent,path,identity)')
+                db.execute('INSERT INTO folders VALUES(1,?,?,?)', (str(root), 'same', 'done'))
+                db.execute('INSERT INTO entries VALUES(1,?,?,?)',
+                           (str(root), str(file), json.dumps(entry_fingerprint(file, file.lstat()))))
+                context = IndexWriterContext(db, 1, ScanState())
+                # No mutable active-operation lookup exists on this collaborator.
+                cache = SimpleNamespace(_folder_identity=lambda *_: 'same')
+                self.assertFalse(_changed(context, cache, root, root, lambda: False, lambda *_: None))
+                self.assertEqual(context.state.checked_entries, 1)
+                file.write_bytes(b'different')
+                self.assertTrue(_changed(context, cache, root, root, lambda: False, lambda *_: None))
+
     def test_cancelled_scan_releases_state_and_next_root_starts_clean(self):
         with TemporaryDirectory() as directory:
             base = Path(directory)

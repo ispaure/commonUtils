@@ -1,5 +1,9 @@
 # Documentation audit — October 2026
 
+For the current source review and next changes, use
+[Refactoring commonUtils safely](refactoring.md). The dated record below includes
+findings that later sections explicitly close; it is not the current backlog.
+
 ## Findings and structure
 
 The previous documentation had useful package-local references but no audience-based
