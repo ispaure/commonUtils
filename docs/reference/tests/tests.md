@@ -12,7 +12,9 @@ timeouts does not validate automatic updates.
 
 Cross-process indexing tests allow a bounded 30 seconds for cold interpreter
 startup and durable checkpoints on slower hosts. Marker waits report child
-exit status and stderr immediately if a runner dies. Browser subscription tests
+exit status and stderr immediately if a runner dies. A waiting child records its
+Python stack after 20 seconds; checkpoint timeouts include that trace so a
+Windows SQLite lock can be diagnosed before temporary evidence is removed. Browser subscription tests
 retry transient SQLite queue locks within their deadline, matching production
 followers; assertions still verify completion, totals and durable task ownership.
 The no-duplicate-scan assertion counts exact folders across both process journals:

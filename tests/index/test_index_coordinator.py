@@ -18,11 +18,14 @@ from commonUtils.runtime.operations import OperationCancelled
 # Each child scans an isolated fixture. A marker stops the elected owner after
 # its first durable folder checkpoint, while still holding the actual writer lock.
 RUNNER = r'''
-import sys,time
+import sys,time,faulthandler
 from pathlib import Path
 from commonUtils.filesystem.index import DirectoryCache
 from commonUtils.filesystem.index.coordinator import IndexCoordinator
-database, stop, marker, release, journal = map(Path,sys.argv[1:])
+database, stop, marker, release, journal, trace = map(Path,sys.argv[1:])
+fault = trace.open('w')
+faulthandler.enable(fault)
+faulthandler.dump_traceback_later(20, file=fault)
 class InstrumentedCache(DirectoryCache):
     def _checkpoint(self, db, cancelled, *, force=False):
         partial = marker.name.startswith('mid') and self.active_operation.checkpoint_entries >= 512 and not marker.exists()
@@ -77,7 +80,8 @@ class CoordinatorTests(unittest.TestCase):
                 receipts = [dict(row) for row in db.execute('SELECT state,message,error FROM jobs')]
         except sqlite3.Error as error:
             receipts = str(error)
-        self.fail(f'Timed out waiting for shared index state; receipts={receipts}')
+        traces = '\n'.join(path.read_text(errors='replace') for path in self.base.glob('*.trace'))
+        self.fail(f'Timed out waiting for shared index state; receipts={receipts}; child stacks={traces}')
 
     def runner(self, name, *, stall=False):
         stop = self.base / (name+'.stop')
@@ -85,7 +89,7 @@ class CoordinatorTests(unittest.TestCase):
         release = self.base / (name+'.release')
         journal = self.base / (name+'.journal')
         child = subprocess.Popen([sys.executable, '-c', RUNNER, str(self.cache.database),
-                                  str(stop), str(marker), str(release), str(journal)],
+                                  str(stop), str(marker), str(release), str(journal), str(self.base / (name+'.trace'))],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         def cleanup():
