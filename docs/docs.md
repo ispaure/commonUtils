@@ -1,14 +1,8 @@
 # commonUtils documentation
 
-Choose a task to enter the shared library wiki. Page titles and the folder tree
-are available in the Markdown viewer sidebar; all substantive guides live here.
-Applications own their workflows; this wiki explains reusable mechanisms and
-embedding contracts.
+Choose a guide for your task. User guides describe setup and interactive workflows;
+developer guides cover architecture, APIs, integration and validation.
+Both audiences remain available in the same searchable wiki.
 
-- [Library overview](overview.md)
-- [Developing and integrating commonUtils](developer/developer.md)
-- [API reference by source owner](reference/reference.md)
-- [Shared component user guides](user/user.md)
-
-Source-local README and user_docs entries are short compatibility links. The
-Perforce wrapper, its runtime configuration and consumer packaging are unchanged.
+- [User guides](user/user.md)
+- [Developer guides](development/development.md)

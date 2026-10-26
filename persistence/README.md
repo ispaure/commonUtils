@@ -1,3 +1,3 @@
 # Persistence
 
-See the [commonUtils wiki guide](../docs/reference/persistence/persistence.md).
+See the [commonUtils wiki guide](../docs/development/reference/persistence/persistence.md).

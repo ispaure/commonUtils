@@ -1,3 +1,3 @@
 # Directory index
 
-See the [commonUtils wiki guide](../../docs/reference/filesystem/index/index.md).
+See the [commonUtils wiki guide](../../docs/development/reference/filesystem/index/index.md).

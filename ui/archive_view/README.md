@@ -1,3 +1,3 @@
 # Archive contents widgets
 
-See the [commonUtils wiki guide](../../docs/reference/ui/archive_view/archive_view.md).
+See the [commonUtils wiki guide](../../docs/development/reference/ui/archive_view/archive_view.md).

@@ -74,7 +74,7 @@ merge, a stale buffer or a size limit. If a feature is absent entirely, the host
 not expose it. JSON/XML formatting is deliberately conservative and bounded; XML
 with mixed content, CDATA or preserved whitespace can be refused rather than altered.
 
-[Developer integration](../../reference/ui/code_editor/code_editor.md) · [All shared guides](../../overview.md#shared-component-user-guides)
+[Developer integration](../../development/reference/ui/code_editor/code_editor.md) · [All shared guides](../../development/overview.md#shared-component-user-guides)
 
 PHP files highlight embedded HTML. Laravel `.blade.php` files are detected before
 ordinary PHP and highlight Blade directives and single-line interpolations using

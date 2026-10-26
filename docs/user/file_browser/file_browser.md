@@ -156,7 +156,7 @@ editors use their reading/code font settings.
 - **Removal failed:** read Details, check permissions/trash support and retain files
   unless permanent removal is explicitly intended.
 
-[Developer integration](../../reference/ui/file_browser/file_browser.md) · [All shared guides](../../overview.md#shared-component-user-guides)
+[Developer integration](../../development/reference/ui/file_browser/file_browser.md) · [All shared guides](../../development/overview.md#shared-component-user-guides)
 
 ## Pick and drop links
 

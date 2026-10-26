@@ -157,7 +157,7 @@ panel explains the problem; available voices depend on the operating system.
   unsupported diagram resources. The document remains readable without rendering.
 - **Save blocked by external edits:** preserve your version with Save As before reloading.
 
-[Developer integration](../../reference/ui/markdown/markdown.md) · [All shared guides](../../overview.md#shared-component-user-guides)
+[Developer integration](../../development/reference/ui/markdown/markdown.md) · [All shared guides](../../development/overview.md#shared-component-user-guides)
 
 
 Hosts may supply a shared storage browser for Open and Save As. Private storage

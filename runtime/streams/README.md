@@ -1,3 +1,3 @@
 # streams
 
-See the [commonUtils wiki guide](../../docs/reference/runtime/streams/streams.md).
+See the [commonUtils wiki guide](../../docs/development/reference/runtime/streams/streams.md).

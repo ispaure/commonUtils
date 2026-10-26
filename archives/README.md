@@ -1,3 +1,3 @@
 # Archive operations
 
-See the [commonUtils wiki guide](../docs/reference/archives/archives.md).
+See the [commonUtils wiki guide](../docs/development/reference/archives/archives.md).

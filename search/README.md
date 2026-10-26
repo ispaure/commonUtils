@@ -1,3 +1,3 @@
 # Shared search
 
-See the [commonUtils wiki guide](../docs/reference/search/search.md).
+See the [commonUtils wiki guide](../docs/development/reference/search/search.md).

@@ -1,3 +1,3 @@
 # Open a web link
 
-See the [commonUtils wiki guide](../../docs/reference/integrations/web/web.md).
+See the [commonUtils wiki guide](../../docs/development/reference/integrations/web/web.md).

@@ -26,4 +26,4 @@ If no contents appear, open an archive through the host first. If a preview is e
 select one file and check the host's reported result. For extraction or password
 problems consult the application's archive workflow rather than changing view settings.
 
-[Developer integration](../../reference/ui/archive_view/archive_view.md) · [All shared guides](../../overview.md#shared-component-user-guides)
+[Developer integration](../../development/reference/ui/archive_view/archive_view.md) · [All shared guides](../../development/overview.md#shared-component-user-guides)

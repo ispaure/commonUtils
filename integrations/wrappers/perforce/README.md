@@ -1,3 +1,3 @@
 # Perforce wrapper
 
-See the [commonUtils wiki guide](../../../docs/reference/integrations/wrappers/perforce/perforce.md).
+See the [commonUtils wiki guide](../../../docs/development/reference/integrations/wrappers/perforce/perforce.md).

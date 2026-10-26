@@ -1,3 +1,3 @@
 # Browser feature declarations
 
-See the [commonUtils wiki guide](../../docs/reference/ui/features/features.md).
+See the [commonUtils wiki guide](../../docs/development/reference/ui/features/features.md).

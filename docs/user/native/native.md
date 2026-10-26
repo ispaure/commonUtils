@@ -39,7 +39,7 @@ changes until Automatic is chosen again. Plain Text disables syntax colours.
 Changing the language does not edit source text; the application decides whether
 to remember the choice after closing the document.
 
-[Embedding and packaging](../../reference/ui/native/native.md)
+[Embedding and packaging](../../development/reference/ui/native/native.md)
 
 ## Documentation
 

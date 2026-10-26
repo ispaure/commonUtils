@@ -1,3 +1,3 @@
 # ZIP access
 
-See the [commonUtils wiki guide](../docs/reference/archives/zip_access.md).
+See the [commonUtils wiki guide](../docs/development/reference/archives/zip_access.md).

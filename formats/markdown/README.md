@@ -1,3 +1,3 @@
 # Markdown text helpers
 
-See the [commonUtils wiki guide](../../docs/reference/formats/markdown/markdown.md).
+See the [commonUtils wiki guide](../../docs/development/reference/formats/markdown/markdown.md).

@@ -56,7 +56,7 @@ Only components using page navigation adopt these preferences; a plain text docu
 continuous scroll is different. [Browser preferences](../file_browser/file_browser.md#settings-and-their-effects)
 have their own guide.
 
-[Configuration integration](../../reference/configuration/configuration.md) · [All shared guides](../../overview.md#shared-component-user-guides)
+[Configuration integration](../../development/reference/configuration/configuration.md) · [All shared guides](../../development/overview.md#shared-component-user-guides)
 
 ## Menus in hosted windows
 

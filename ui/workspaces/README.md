@@ -1,3 +1,3 @@
 # Docking workspaces
 
-See the [commonUtils wiki guide](../../docs/reference/ui/workspaces/workspaces.md).
+See the [commonUtils wiki guide](../../docs/development/reference/ui/workspaces/workspaces.md).

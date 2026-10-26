@@ -1,3 +1,3 @@
 # File Types
 
-See the [commonUtils wiki guide](../docs/reference/formats/formats.md).
+See the [commonUtils wiki guide](../docs/development/reference/formats/formats.md).

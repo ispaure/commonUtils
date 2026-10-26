@@ -1,3 +1,3 @@
 # Application updates
 
-See the [commonUtils wiki guide](../../docs/reference/runtime/updates/updates.md).
+See the [commonUtils wiki guide](../../docs/development/reference/runtime/updates/updates.md).
