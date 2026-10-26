@@ -13,6 +13,7 @@ from toga.style.pack import COLUMN, ROW
 
 from ...formats.markdown.wiki import MarkdownWiki, resolve_document_path, documentation_root
 from .markdown_preview import markdown_preview
+from .inline_html import set_inline_html
 from ...formats.markdown.image_sources import local_image_source
 from .adaptive import AdaptiveSidebar, allocated_width
 from .presentation import hierarchy_row, navigation_button
@@ -197,7 +198,7 @@ class MarkdownWikiView:
                       'href="' + self.base + '?target=' + quote(unescape(match[1]), safe='') + '"', html)
         self.pending_fragment = fragment
         self.page_search.loading()
-        self.web.set_content(self.base, html)
+        set_inline_html(self.web, self.base, html)
         self.title.text = self.catalog.title(text, path.stem)
         self.reading = True
         self.filter()

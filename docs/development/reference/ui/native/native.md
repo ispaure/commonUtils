@@ -710,3 +710,16 @@ Explicit `./`/`../` paths remain relative; hidden paths and escapes outside the
 supplied library root are rejected. Resolution probes bounded candidates through
 `entry` and never performs recursive listing. Omitting `root` retains strict
 note-relative provider resolution.
+
+## Inline document HTML
+
+`ui.native.inline_html.set_inline_html(view, root_url, content)` loads fully
+inlined documents through the view's existing `set_content` method. On iOS,
+synthetic HTTP(S) roots ending in `.invalid` use an `app-document` origin while
+keeping the authority, path, query and fragment. Keep the original routing
+identifier in document link/bridge metadata; only the native content base changes.
+Other backends, actual web origins and blank roots keep their existing behavior.
+
+The helper keeps ordinary/private view validation, byte bounds, data stores and
+navigation guards. Hosts still own navigation decisions, asset embedding and
+document retirement. It installs no URL scheme handler; use it for inline assets.
