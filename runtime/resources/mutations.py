@@ -139,6 +139,11 @@ def save_resource_bytes(provider: WritableDirectoryProvider, path, data, *, expe
     """Publish verified bytes as one operation; None means create, never overwrite."""
     from io import BytesIO
     with mutation_lock:
+        replace = getattr(provider, 'replace_bytes', None)
+        if expected_revision is not None and replace is not None:
+            require_capability(provider, 'replace')
+            check_cancelled(cancelled)
+            return replace(provider.relative(path), data, expected_revision=expected_revision, cancelled=cancelled)
         require_capability(provider, 'create')
         require_capability(provider, 'delete')
         require_capability(provider, 'rename' if expected_revision is None else 'replace')

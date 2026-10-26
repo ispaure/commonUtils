@@ -37,6 +37,59 @@ widget and provider until `idle` and retry closure.
 
 ## Seekable archives and replacements
 
+### Injected content mechanisms
+
+`runtime.resources.content.ProviderContent(provider, path, password='',
+cancelled=callback)` retains an independent provider view and lease when the
+provider offers them. It validates the logical revision and access before and
+after operations, rejects other document paths, and closes its content backend
+and lease idempotently. It never imports an application, encryption package or UI.
+
+A provider may expose `content_source(path, *, password, cancelled)`. This factory
+can be a function or class returning a seekable source with `open(path)` and
+`close()`. An optional `open_archive(path, password=None)` supplies authenticated
+native member access. Otherwise `ProviderContent` reads the ZIP through the
+source's stream with bounded members and header validation. Providers without a
+factory use their existing `open`/`open_archive` methods. The factory owns decoding,
+keys, authenticated range reads and any backend caches; the host owns discovery,
+credential prompts and whether private documents may enter history or recovery.
+
+For example, an application can attach a class with the factory signature to a
+provider instance:
+
+```python
+provider.content_source = MyContentSource
+content = ProviderContent(provider, 'notes/book.epub', password=session_password)
+try:
+    with content.open_archive('notes/book.epub') as archive:
+        chapter = archive.read('chapter1.xhtml')
+finally:
+    content.close()
+```
+
+The provider's ordinary `open` must also expose logical bytes to generic copies,
+bounded document sessions and verification. A content factory augments that byte
+contract with backend-specific streaming/archive access; it does not grant writes
+or bypass the provider's revision and lifetime checks.
+
+Providers whose storage cannot expose temporary logical filenames may implement
+`replace_bytes(path, data, *, expected_revision, cancelled)`. The shared
+`save_resource_bytes` operation calls this hook for replacements only, after
+checking the `replace` capability and cancellation. The backend must stage its
+encoded output exclusively, verify the complete decoded bytes, recheck access,
+the expected revision and cancellation, publish atomically, and clean up on
+failure. Once publication happens, later failures must report `MutationIncomplete`
+with `destination_published=True`. Creation retains the normal exclusive-create
+contract. This hook is not permission to overwrite an unobserved destination.
+
+`ArchiveReplacementProvider.replace_archive_members(path, replacements,
+expected_revision=token, password='', cancelled=callback)` is the optional native
+archive equivalent. Callers supply member-name/byte replacements, not format or
+encryption instructions. Backends must authenticate and compare the expected
+content manifest, preserve untouched members and use the same staged-publication
+rules. A backend can reject unsupported replacement sets before publication.
+Structural contracts for these hooks live in `runtime.resources.provider`.
+
 `ArchiveSource.version(path)` returns an equality-comparable revision token.
 `open(path)` is a context manager yielding a seekable binary reader. Validate
 revisions during reads where underlying content can change. `RangeReader` adapts

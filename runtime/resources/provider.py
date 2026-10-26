@@ -66,6 +66,24 @@ class ArchiveSource(Protocol):
     def open(self, path: str | Path) -> ContextManager[BinaryIO]: ...
 
 
+class ContentProvider(Protocol):
+    """Optional decoding factory; receives a logical path and operation scope."""
+    def content_source(self, path: str, *, password: str,
+                       cancelled: Callable[[], bool]) -> ArchiveSource: ...
+
+
+class ByteReplacementProvider(Protocol):
+    """Optional verified replacement for stores without public staging names."""
+    def replace_bytes(self, path: str, data: bytes, *, expected_revision: object,
+                      cancelled: Callable[[], bool]) -> None: ...
+
+
+class ArchiveReplacementProvider(Protocol):
+    def replace_archive_members(self, path: str, replacements: dict[str, bytes], *,
+                                expected_revision: object, password: str,
+                                cancelled: Callable[[], bool]) -> None: ...
+
+
 class WritableArchiveSource(ArchiveSource, Protocol):
     def replace_stream(self, path: str | Path, writer: Callable[[BinaryIO], object], *,
                        expected_revision: object, verify: Callable[[Path], object] | None = None) -> None: ...
