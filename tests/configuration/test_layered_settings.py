@@ -34,7 +34,10 @@ class LayeredSettingsTests(unittest.TestCase):
         self.store.save({('Options', 'size_int'): '18'})
         # Filesystems can preserve creation time and coarsen modification times.
         # Exercise the exact cache-key collision instead of sleeping between writes.
-        stamp = SimpleNamespace(st_mtime_ns=1, st_ctime_ns=1, st_size=64)
+        real = self.personal.stat()
+        stamp = SimpleNamespace(**{name: getattr(real, name) for name in dir(real) if name.startswith('st_')})
+        stamp.st_mtime_ns = stamp.st_ctime_ns = 1
+        stamp.st_size = 64
         actual_stat = Path.stat
         def metadata(path, *args, **kwargs):
             if path == self.personal:
