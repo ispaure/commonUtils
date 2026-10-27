@@ -407,7 +407,10 @@ class StylingTests(QtTestCase):
                             for fmt in code_formats()))
         self.store.save({('Styling', 'reading_font_size_int'): '18'})
         self.controller.reload()
-        self.assertTrue(all(fmt.fontPointSize() == 18 for fmt in code_formats()))
+        self.assertTrue(all(fmt.fontPointSize() == 18 for fmt in code_formats()),
+                        f'code sizes={[fmt.fontPointSize() for fmt in code_formats()]}; '
+                        f'widget={viewer.formatted_editor.font().pointSizeF()}; '
+                        f'document={document.defaultFont().pointSizeF()}')
         self.assertEqual(document.availableUndoSteps(), undo)
         self.assertEqual(viewer.markdown_text(), original)
         self.assertFalse(viewer.is_modified)
