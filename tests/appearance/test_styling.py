@@ -374,7 +374,9 @@ class StylingTests(QtTestCase):
         self.assertFalse(viewer.is_modified)
         self.assertEqual(path.read_text(), source)
 
-    def test_formatted_code_uses_reading_size_and_preserves_undo_on_reload(self):
+    @patch('commonUtils.ui.appearance.typography.font_dpi', return_value=144.0)
+    def test_formatted_code_uses_reading_size_and_preserves_undo_on_reload(self, _dpi):
+        from commonUtils.ui.appearance.typography import point_size
         from commonUtils.ui.markdown.viewer import MarkdownViewer
         self.store.save({('Styling', 'code_font_family_str'): self._code_family(),
                          ('Styling', 'reading_font_size_int'): '15',
@@ -398,16 +400,16 @@ class StylingTests(QtTestCase):
                 block = block.next()
             return result
         self.assertTrue(code_formats())
-        self.assertTrue(all(fmt.fontPointSize() == 15 and fmt.fontFamilies() == [self._code_family()]
+        self.assertTrue(all(fmt.fontPointSize() == point_size(15) and fmt.fontFamilies() == [self._code_family()]
                             for fmt in code_formats()))
         self.store.save({('Styling', 'code_font_size_int'): '21',
                          ('Styling', 'code_font_family_str'): self._code_family(1)})
         self.controller.reload()
-        self.assertTrue(all(fmt.fontPointSize() == 15 and fmt.fontFamilies() == [self._code_family(1)]
+        self.assertTrue(all(fmt.fontPointSize() == point_size(15) and fmt.fontFamilies() == [self._code_family(1)]
                             for fmt in code_formats()))
         self.store.save({('Styling', 'reading_font_size_int'): '18'})
         self.controller.reload()
-        self.assertTrue(all(fmt.fontPointSize() == 18 for fmt in code_formats()),
+        self.assertTrue(all(fmt.fontPointSize() == point_size(18) for fmt in code_formats()),
                         f'code sizes={[fmt.fontPointSize() for fmt in code_formats()]}; '
                         f'widget={viewer.formatted_editor.font().pointSizeF()}; '
                         f'document={document.defaultFont().pointSizeF()}')
