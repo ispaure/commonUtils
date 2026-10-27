@@ -155,6 +155,9 @@ class LayeredSettings:
         # bytes again and atomically preserves encoding, line endings and mode.
         INIFile.parse(ini.text)
         ini.save()
+        # Atomic replacement can retain the cache stamp on some filesystems.
+        # A successful local save must become visible before notifying readers.
+        _read_values.cache_clear()
         from .monitor import settings_monitor
         settings_monitor().notify((path,))
 

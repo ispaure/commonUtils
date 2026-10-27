@@ -87,7 +87,9 @@ workflows in the consuming application.
 Registered defaults/personal INI paths enable sparse, validated overrides without
 changing unregistered consumers. Reads do not create files; malformed overrides
 remain untouched. Reset removes an explicit personal field, never a software
-schema field. Atomic saves reject concurrent edits. Hosts own migration and paths.
+schema field. Atomic saves reject concurrent edits and invalidate cached reads before notifying
+subscribers, including when filesystem timestamps and size are unchanged. Hosts
+own migration and paths.
 See the configuration guide for the API, and `ui/styling.md` for live font roles,
 weak widget binding, optional application-font opt-in and settings navigation.
 Shared font-size settings use a 96-logical-DPI reference. Convert settings through

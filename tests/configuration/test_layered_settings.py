@@ -27,6 +27,24 @@ class LayeredSettingsTests(unittest.TestCase):
         self.assertEqual(get_setting('Options', 'size_int', 7, path=self.defaults, maximum=48), 11)
         self.assertEqual(self.defaults.read_bytes(), original)
 
+    def test_save_refreshes_cached_values_even_when_file_metadata_collides(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from commonUtils.configuration import layered
+        self.store.save({('Options', 'size_int'): '18'})
+        # Filesystems can preserve creation time and coarsen modification times.
+        # Exercise the exact cache-key collision instead of sleeping between writes.
+        stamp = SimpleNamespace(st_mtime_ns=1, st_ctime_ns=1, st_size=64)
+        actual_stat = Path.stat
+        def metadata(path, *args, **kwargs):
+            if path == self.personal:
+                return stamp
+            return actual_stat(path, *args, **kwargs)
+        with patch.object(Path, 'stat', metadata):
+            self.assertEqual(layered.read_values(self.personal)[('Options', 'size_int')], '18')
+            self.store.save({('Options', 'size_int'): '19'})
+            self.assertEqual(layered.read_values(self.personal)[('Options', 'size_int')], '19')
+
     def test_reset_removes_override_and_follows_later_default_edits(self):
         self.store.save({('Options', 'name_str'): 'line one\nline two', ('Other', 'keep'): 'yes'})
         self.store.save({('Options', 'name_str'): None})
