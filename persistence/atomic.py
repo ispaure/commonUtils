@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import stat
+import time
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
@@ -44,12 +45,17 @@ def promote_path(staged, destination):
     return backup
 
 
-def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
+def atomic_write_bytes(path, content, *, validate=None, overwrite=True,
+                       file_mode=None, replace_timeout=0):
     """Validate before staging and publication, preserve mode, clean failed staging.
 
+    file_mode explicitly overrides permission preservation (for example 0o600).
+    replace_timeout opts into bounded retries of Windows sharing/access errors.
     No path resolution, encoding, size limit, or symlink policy is imposed here.
     overwrite=False uses atomic no-replace publication to reject a racing file.
     """
+    if replace_timeout < 0:
+        raise ValueError('Replacement timeout cannot be negative.')
     from .publication import save_transaction, rename_exclusive
     from ..filesystem.local_access import check_local_path
     requested_validate = validate
@@ -58,7 +64,7 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
         if requested_validate:
             requested_validate()
     path = Path(path)
-    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
+    mode = file_mode if file_mode is not None else (stat.S_IMODE(path.stat().st_mode) if path.exists() else None)
     staged = None
     def stage():
         nonlocal staged
@@ -74,7 +80,16 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True):
             raise OSError('Staged content verification failed.')
     def publish():
         if overwrite:
-            os.replace(staged, path)
+            deadline = time.monotonic() + replace_timeout
+            while True:
+                try:
+                    os.replace(staged, path)
+                    break
+                except OSError as error:
+                    if (os.name != 'nt' or getattr(error, 'winerror', None) not in (5, 32, 33)
+                            or time.monotonic() >= deadline):
+                        raise
+                    time.sleep(.02)
         else:
             rename_exclusive(staged, path)
     def cleanup():

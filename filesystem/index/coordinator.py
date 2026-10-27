@@ -5,9 +5,7 @@ transaction. An OS lock elects a runner, not a PID or a heartbeat timeout. Jobs
 survive the submitting browser and process; hosts opt in by running ``run``.
 """
 from contextlib import contextmanager
-import errno
 import json
-import os
 from pathlib import Path
 import sqlite3
 from time import monotonic, sleep, time
@@ -36,35 +34,9 @@ def _retry_sql(callback, cancelled=lambda: False):
 @contextmanager
 def runner_lock(path):
     """Try ownership without waiting. Never unlink a live lock's inode."""
-    with path.open('a+b') as stream:
-        acquired = False
-        if os.name == 'nt':
-            import msvcrt
-            stream.seek(0, 2)
-            if not stream.tell():
-                stream.write(b'0')
-                stream.flush()
-        else:
-            import fcntl
-        try:
-            try:
-                if os.name == 'nt':
-                    stream.seek(0)
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                acquired = True
-            except OSError as error:
-                if error.errno not in (errno.EAGAIN, errno.EACCES, 36):
-                    raise
-            yield acquired
-        finally:
-            if acquired:
-                if os.name == 'nt':
-                    stream.seek(0)
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    from ...persistence.locking import file_lock
+    with file_lock(path) as acquired:
+        yield acquired
 
 
 class IndexCoordinator:

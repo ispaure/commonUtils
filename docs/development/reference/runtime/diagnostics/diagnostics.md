@@ -36,3 +36,10 @@ operation's contract and inspect both worker errors and per-item results.
 strings and common token/password/authorization assignments in complete diagnostic
 text. Callers choose its use; arbitrary chunks can split credentials. Discard output
 for sensitive commands instead of relying on this filter as a security boundary.
+
+`redaction.LineRedactor(secrets=())` filters complete ordered lines, including
+explicit secret values, recognizable provider tokens, assignments, HTTP URL
+credentials and multiline PEM private keys. Keep one instance per output stream;
+it retains PEM state and never reads the environment. Callers choose inherited
+secret values and output policy. This preserves the line filter's existing output
+format; it does not replace the complete-text query stripping of `redact`.

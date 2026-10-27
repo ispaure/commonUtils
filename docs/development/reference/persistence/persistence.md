@@ -8,6 +8,7 @@ Atomic byte/JSON publication, text decoding and session recovery. Atomic staging
 
 | File | Responsibility / public entry points |
 | --- | --- |
+| [locking.py](../../../../persistence/locking.py) | Advisory Windows/POSIX file locks; caller-owned paths and contention policy. |
 | [atomic.py](../../../../persistence/atomic.py) | Atomic byte publication; format validation and overwrite policy stay with callers. |
 | [session.py](../../../../persistence/session.py) | Versioned, bounded, atomic private JSON checkpoints without Qt dependencies. |
 | [text.py](../../../../persistence/text.py) | Bounded text recognition and conflict-checked, lossless atomic text writes. |
@@ -16,10 +17,25 @@ Atomic byte/JSON publication, text decoding and session recovery. Atomic staging
 
 ## Atomic persistence
 
-`persistence.atomic_write_bytes(path, data, validate=None, overwrite=True)` stages
+`persistence.atomic_write_bytes(path, data, validate=None, overwrite=True,
+file_mode=None, replace_timeout=0)` stages
 bytes beside the destination, flushes them, preserves existing permissions and
 validates again before publication. No encoding, extension, symlink or size policy
 is imposed. `overwrite=False` uses atomic no-clobber creation.
+
+An explicit `file_mode` overrides preservation of existing permissions, including
+when tightening an existing private state file to `0o600`. `replace_timeout`
+opts into bounded retries of Windows access/sharing errors (5, 32, 33); other
+errors propagate immediately. Defaults preserve existing behavior. Directory
+creation, JSON formatting and writer coordination remain caller-owned.
+
+`persistence.locking.file_lock(path, timeout=0)` yields a boolean indicating
+exclusive advisory ownership. The parent must already exist. Contention yields
+False after the timeout; unrelated OS failures propagate. Release happens even
+when the body raises. Never delete a live lock file or replace its inode. Windows
+locks one byte without initializing it, avoiding a concurrent first-opener race.
+The caller decides whether contention is an error, a skipped job or a retry.
+Locks are cooperative and do not make multi-file changes transactional.
 
 `atomic_write_json` adds caller-selected serialization, byte limits and optional
 parent-directory durability. Callers create directories with their own permission
