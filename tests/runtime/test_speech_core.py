@@ -77,3 +77,33 @@ class SpeechCoreTests(unittest.TestCase):
         engine.completed(current)
         self.assertEqual(session.state, 'stopped')
         session.dispose()
+
+    def test_media_preparation_pause_or_revocation_prevents_utterance_submission(self):
+        for mode in ('pause', 'revoke'):
+            engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+            allowed = [True]
+            def changed(state, message):
+                if state == 'speaking':
+                    if mode == 'pause':
+                        session.pause()
+                    else:
+                        allowed[0] = False
+            session = SpeechSession(engine, on_range=Mock(), on_state=changed)
+            session.can_speak = lambda: allowed[0]
+            session.play('Never submit this after route revocation.')
+            engine.speak.assert_not_called()
+            self.assertIn(session.state, {'paused', 'stopped'})
+            session.dispose()
+
+    def test_native_paused_utterance_rechecks_permission_before_resume(self):
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock(),
+                                 pause_utterance=lambda: True, resume_utterance=Mock())
+        session = SpeechSession(engine, on_range=Mock(), on_state=Mock())
+        session.play('A paused native utterance remains subject to permission.')
+        session.pause()
+        self.assertTrue(session.native_paused)
+        session.can_speak = lambda: False
+        session.resume()
+        engine.resume_utterance.assert_not_called()
+        self.assertEqual(session.state, 'paused')
+        session.dispose()

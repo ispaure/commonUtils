@@ -181,6 +181,13 @@ class SpeechSession:
             self.started_at = self.clock()
             self.elapsed = 0
             self.on_state("speaking", "Reading aloud · current word highlighted")
+            # Preparing media controls may synchronously revoke the route/session.
+            # Do not submit audio after a reentrant pause, stop or permission loss.
+            if self.closed or self.state != "speaking":
+                return
+            if not self.can_speak():
+                self.stop()
+                return
             self.engine.speak(text, self.voice, self.speed, self.token)
         except Exception:
             self.stop()
@@ -278,7 +285,7 @@ class SpeechSession:
             self.on_state("paused", "Paused · Resume continues from the current word.")
 
     def resume(self):
-        if not self.closed and self.state == "paused":
+        if not self.closed and self.state == "paused" and self.can_speak():
             self.state = "speaking"
             if self.native_paused:
                 self.native_paused = False
