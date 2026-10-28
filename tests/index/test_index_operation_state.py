@@ -34,6 +34,24 @@ class IndexOperationStateTests(unittest.TestCase):
                 file.write_bytes(b'different')
                 self.assertTrue(_changed(context, cache, root, root, lambda: False, lambda *_: None))
 
+    def test_scan_validation_uses_explicit_context_and_marks_only_its_totals(self):
+        import sqlite3
+        from commonUtils.filesystem.index.operation import IndexWriterContext, ScanState
+        from commonUtils.filesystem.index.validation import validate
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with sqlite3.connect(':memory:') as db:
+                db.execute('CREATE TABLE errors(generation,path,error)')
+                db.execute('CREATE TABLE folders(generation,path,identity,status)')
+                db.execute('INSERT INTO folders VALUES(1,?,?,?)', (str(root), 'old', 'done'))
+                state = ScanState()
+                context = IndexWriterContext(db, 1, state)
+                self.assertFalse(validate(context, root, lambda: False, lambda *_: None,
+                                          folder_identity=lambda *_: 'changed', check_files=False))
+                self.assertEqual(state.dirty_totals, {root})
+                self.assertEqual(db.execute('SELECT status FROM folders').fetchone()[0], 'pending')
+                self.assertFalse(ScanState().dirty_totals)
+
     def test_cancelled_scan_releases_state_and_next_root_starts_clean(self):
         with TemporaryDirectory() as directory:
             base = Path(directory)

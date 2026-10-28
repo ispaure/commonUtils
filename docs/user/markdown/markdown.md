@@ -23,7 +23,8 @@ Native Markdown previews also recognize bare wiki links such as `[[Tech]]`,
 including inside headings, when the host enables local links. The host chooses
 how to find the destination. Code spans and image embeds keep their own meaning.
 
-The default reading size is 12 reference points (about 16 logical pixels). Inline
+The default reading size is 10 reference points (about 13.3 logical pixels). Saved
+reading-size preferences take precedence over this default. Inline
 code and fenced code use that same reading size with a monospace family; changing
 the code editor size does not resize code inside rendered Markdown. Wide windows
 center a reading column of roughly 88 text characters; narrow windows wrap to fit.

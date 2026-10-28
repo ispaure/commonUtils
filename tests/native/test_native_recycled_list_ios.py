@@ -93,7 +93,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         completion = Mock()
         loop = asyncio.new_event_loop()
         self.addCleanup(loop.close)
-        bridge = SimpleNamespace(objc_property=Mock(), SEL=Mock(), CGRect=Mock(),
+        bridge = SimpleNamespace(objc_property=Mock(), SEL=Mock(), CGRect=Mock(), CGPoint=object,
             ObjCClass=lambda name: classes[name], Block=lambda callback, *args: callback,
             objc_id=object, ns_from_py=lambda value: value)
         with patch.dict('sys.modules', {'rubicon.objc': bridge}), \

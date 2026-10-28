@@ -34,7 +34,17 @@ class ScanState:
 
 @dataclass(frozen=True)
 class IndexWriterContext:
-    """Explicit database/generation/state for one reconciliation mutation path."""
+    """Explicit database/generation/state for scan validation or reconciliation."""
     database: object
     generation: int
     state: ScanState
+
+
+def mark_totals_changed(state, folder, root):
+    state.dirty_totals.add(folder)
+    if folder == root or root not in folder.parents:
+        return
+    for parent in folder.parents:
+        state.dirty_totals.add(parent)
+        if parent == root:
+            break

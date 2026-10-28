@@ -1,5 +1,16 @@
 # Testing commonUtils
 
+Start with the [test-owner map](#find-a-regression-owner) and run the smallest
+relevant module using the consumer's configured interpreter. The commands in this
+guide assume the parent of the `commonUtils` checkout is on the import path.
+For Logistics, `python3 dev.py test shared FILENAME` handles paths, isolated
+processes and the relevant desktop/mobile-host legs for you.
+
+A **portable** test exercises logic on the host. An **offscreen** Qt test runs Qt
+without a visible window. A **dummy-backend** mobile test checks host-side behavior
+without the native controls. Native acceptance runs on the actual supported
+platform; none of the first three proves the last.
+
 ## Native filesystem notifications
 
 Qt browser/watcher tests need access to the operating system's filesystem

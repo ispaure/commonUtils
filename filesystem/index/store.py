@@ -209,13 +209,8 @@ class DirectoryCache:
         return json.dumps(fingerprint(info))
 
     def _mark_totals_changed(self, folder, root):
-        self._scan_state.dirty_totals.add(folder)
-        if folder == root or root not in folder.parents:
-            return
-        for parent in folder.parents:
-            self._scan_state.dirty_totals.add(parent)
-            if parent == root:
-                break
+        from .operation import mark_totals_changed
+        mark_totals_changed(self._scan_state, folder, root)
 
     def _publish_totals(self, db, generation, root, cancelled):
         started = perf_counter()
@@ -308,46 +303,11 @@ class DirectoryCache:
             self.last_metrics['validation_seconds'] += perf_counter()-started
 
     def _validate_impl(self, db, generation, root, cancelled, report, *, root_only=False, check_files=True):
-        unchanged = True
-        for (path,) in db.execute('SELECT path FROM errors WHERE generation=?', (generation,)).fetchall():
-            db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=coalesce("
-                       "(SELECT path FROM folders WHERE generation=? AND path=?),?)",
-                       (generation, generation, path, str(Path(path).parent)))
-        rows = db.execute('SELECT path,identity,status FROM folders WHERE generation=?' +
-                          (' AND path=?' if root_only else '') + ' ORDER BY path',
-                          (generation, str(root)) if root_only else (generation,))
-        count = 0
-        for text, expected, status in rows:
-            check_cancelled(cancelled)
-            if self._scan_blocked(Path(text)):
-                unchanged = False
-                continue
-            valid = status == 'done'
-            failed_path = text
-            try:
-                valid = valid and self._folder_identity(Path(text), root) == expected
-                if valid and check_files:
-                    children = db.execute('SELECT path,identity FROM entries WHERE generation=? AND parent=?', (generation, text))
-                    for child, identity in children:
-                        check_cancelled(cancelled)
-                        self._scan_state.checked_entries += 1
-                        report(self._scan_state.checked_entries, 0, f'Checking file metadata · {text}')
-                        failed_path = child
-                        if json.dumps(entry_fingerprint(child, Path(child).lstat())) != identity:
-                            valid = False
-                            break
-            except OSError as error:
-                db.execute('INSERT OR REPLACE INTO errors VALUES(?,?,?)',
-                           (generation, failed_path, str(error)))
-                valid = False
-            if not valid:
-                self._mark_totals_changed(Path(text),root)
-                unchanged = False
-                db.execute("UPDATE folders SET status='pending' WHERE generation=? AND path=?", (generation, text))
-            count += 1
-            report(self._scan_state.checked_entries, 0, f'Checking indexed folder {text}')
-        db.commit()
-        return unchanged
+        from .operation import IndexWriterContext
+        from .validation import validate
+        context = IndexWriterContext(db, generation, self._scan_state)
+        return validate(context, root, cancelled, report, folder_identity=self._folder_identity,
+                        root_only=root_only, check_files=check_files)
 
     @staticmethod
     def _remove_tree(db, generation, folder):

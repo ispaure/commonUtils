@@ -19,6 +19,25 @@ Keep README a developer entry point. Preserve useful package references and stab
 links. A new guide needs substantive content and a link from its owner/navigation.
 Do not invent API stability or a supported dependency range from naming alone.
 
+## Write guides that a new contributor can use
+
+Start each guide with its audience and outcome. A task guide needs prerequisites,
+a short ordered sequence, the expected result and a recovery action for likely
+failures. State the working directory and interpreter before commands. Use
+disposable fixtures for tutorials and mark snippets that need host objects.
+Explain unfamiliar lifecycle or ownership terms before relying on them.
+
+Keep learning examples, task instructions, API reference and architectural
+explanation distinct, with links between them. Preserve one authoritative contract
+rather than copying it into each consumer. Historical validation records need dates
+and scope; do not present their counts as current acceptance.
+
+This approach follows [Diátaxis](https://www.diataxis.fr/start-here/) and
+[Write the Docs](https://www.writethedocs.org/guide/writing/beginners-guide-to-docs/).
+Use concrete subjects and verbs, as described in
+[Google's technical writing guidance](https://developers.google.com/tech-writing/one/clear-sentences).
+These are writing principles, not evidence that a software contract works.
+
 ## Run tests
 
 From the checkout's parent with the project's interpreter:

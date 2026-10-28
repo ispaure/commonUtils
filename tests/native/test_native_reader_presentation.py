@@ -79,3 +79,32 @@ class NativeReaderPresentationTests(unittest.TestCase):
             native.setPadding.assert_called_with(16, 0, 16, 0)
             sliders.style_slider(widget, palette=palette, force_ltr=True)
             native.setLayoutDirection.assert_called_once_with(0)
+            for reverse in (True, False):
+                shapes.clear()
+                sliders.style_slider(widget, palette=palette, force_ltr=True, reverse_fill=reverse)
+                self.assertEqual(shapes[0].setColor.call_args.args,
+                                 ('#112233' if reverse else '#aabbcc',))
+                self.assertEqual(shapes[1].setColor.call_args.args,
+                                 ('#aabbcc' if reverse else '#112233',))
+                self.assertEqual(shapes[2].setColor.call_args.args, ('#112233',))
+
+    def test_apple_reverse_fill_swaps_tracks_but_preserves_accent_thumb(self):
+        widget = content('toga_iOS.widgets.slider')
+        renderer = Mock()
+        renderer.imageWithActions.side_effect = lambda draw: (draw(None), Mock())[1]
+        renderer_class = Mock()
+        renderer_class.alloc.return_value.initWithSize.return_value = renderer
+        colors = Mock(return_value=Mock())
+        modules = {
+            'rubicon.objc': NS(ObjCClass=Mock(), Block=lambda draw, *args: draw,
+                               objc_id=object, UIEdgeInsets=lambda *args: args),
+            'toga_iOS.libs': NS(UIGraphicsImageRenderer=renderer_class,
+                                CGSize=lambda *args: args, CGRect=lambda *args: args),
+        }
+        with patch.dict('sys.modules', modules):
+            for reverse in (True, False):
+                colors.reset_mock()
+                sliders.style_slider(widget, apple_color=colors, force_ltr=True, reverse_fill=reverse)
+                self.assertEqual([call.args[0] for call in colors.call_args_list],
+                                 ['border', 'accent', 'accent'] if reverse else ['accent', 'border', 'accent'])
+                self.assertEqual(widget._impl.native.semanticContentAttribute, 3)

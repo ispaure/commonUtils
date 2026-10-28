@@ -15,6 +15,29 @@ spec.loader.exec_module(ci)
 
 
 class MobileCITests(unittest.TestCase):
+    def test_native_swift_sources_are_staged_and_local_edits_require_development_mode(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / 'repo'
+            native = repo / 'ui/native/ios'
+            native.mkdir(parents=True)
+            (repo / 'tests').mkdir()
+            (repo / 'tests/mobile_smoke.py').write_text('# smoke\n')
+            swift = native / 'Value.swift'
+            swift.write_text('// shared native component\n')
+            subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+            subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                            '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture'], check=True)
+            ci.stage(repo, root / 'strict')
+            self.assertEqual((root / 'strict/commonUtils/ui/native/ios/Value.swift').read_text(), swift.read_text())
+            swift.write_text('// local change\n')
+            with self.assertRaises(ValueError):
+                ci.stage(repo, root / 'changed')
+            ci.stage(repo, root / 'development', allow_dirty=True)
+            self.assertTrue(json.loads((root / 'development/source.json').read_text())['commonUtils_dirty'])
+            self.assertEqual((root / 'development/commonUtils/ui/native/ios/Value.swift').read_text(), swift.read_text())
+
     def report(self, **changes):
         report = dict(schema=1, suite='commonUtils-mobile-smoke', target='ios', sys_platform='ios',
                       environment='ios-simulator', success=True, failures=0, errors=0, skipped=0,

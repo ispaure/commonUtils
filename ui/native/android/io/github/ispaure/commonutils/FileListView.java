@@ -6,9 +6,12 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.SparseArray;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.TouchDelegate;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -50,7 +53,7 @@ public final class FileListView extends ListView {
         super(context);
         // Reserve the scrollbar width plus a small gap outside the row outlines.
         setScrollBarStyle(View.SCROLLBARS_OUTSIDE_INSET);
-        setPadding(0, 0, dp(4), 0);
+        setPadding(0, 0, dp(2), 0);
         setAdapter(rows);
         setChoiceMode(CHOICE_MODE_SINGLE);
         setHeaderDividersEnabled(false);
@@ -256,6 +259,31 @@ public final class FileListView extends ListView {
         boolean preview, hidden;
     }
 
+    private final class ActionRow extends LinearLayout {
+        View action;
+        TouchDelegate actionTouch;
+
+        ActionRow(Context context) { super(context); }
+
+        @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            super.onLayout(changed, l, t, r, b);
+            actionTouch = null;
+            if (action != null && action.getVisibility() == View.VISIBLE) {
+                Rect hit = new Rect();
+                action.getHitRect(hit);
+                hit.left = hit.right - dp(rowHeight);
+                actionTouch = new TouchDelegate(hit, action);
+            }
+        }
+
+        @Override public boolean dispatchTouchEvent(MotionEvent event) {
+            // The expanded dots target wins over the end of the filename.
+            if (contextActions && FileListView.this.isEnabled() && actionTouch != null
+                    && actionTouch.onTouchEvent(event)) return true;
+            return super.dispatchTouchEvent(event);
+        }
+    }
+
     private final class Rows extends BaseAdapter {
         @Override public int getCount() { return titles.length; }
         @Override public Object getItem(int position) { return titles[position]; }
@@ -265,9 +293,9 @@ public final class FileListView extends ListView {
             Holder holder;
             if (recycled == null) {
                 createdRows++;
-                LinearLayout row = new LinearLayout(getContext());
+                ActionRow row = new ActionRow(getContext());
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(8), 0, dp(8), 0);
+                row.setPadding(dp(8), 0, dp(4), 0);
                 row.setLayoutParams(new ListView.LayoutParams(-1, dp(rowHeight)));
                 android.util.TypedValue background = new android.util.TypedValue();
                 getContext().getTheme().resolveAttribute(android.R.attr.activatedBackgroundIndicator,
@@ -295,9 +323,13 @@ public final class FileListView extends ListView {
                 holder.actions.setText("⋯");
                 holder.actions.setTextSize(24);
                 holder.actions.setGravity(Gravity.CENTER);
+                holder.actions.setPadding(0, 0, 0, 0);
+                holder.actions.setMinWidth(0);
+                holder.actions.setMinimumWidth(0);
                 holder.actions.setFocusable(false);
                 holder.actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(rowHeight), -1));
+                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(Math.min(28, rowHeight)), -1));
+                row.action = holder.actions;
                 row.setTag(holder);
                 recycled = row;
             } else holder = (Holder) recycled.getTag();

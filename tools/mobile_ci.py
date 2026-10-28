@@ -13,14 +13,14 @@ def stage(source, destination, *, allow_dirty=False):
     source, destination = Path(source).resolve(), Path(destination).resolve()
     if destination == source or source in destination.parents:
         raise ValueError('Stage outside the source checkout')
-    dirty = bool(subprocess.check_output(['git', '-C', str(source), 'diff', '--name-only', 'HEAD', '--', '*.py', 'ui/native/**/*.java']))
+    dirty = bool(subprocess.check_output(['git', '-C', str(source), 'diff', '--name-only', 'HEAD', '--', '*.py', 'ui/native/**/*.java', 'ui/native/**/*.swift']))
     if dirty and not allow_dirty:
         raise ValueError('Commit shared Python sources before staging, or explicitly allow a local development payload.')
     tracked = subprocess.check_output(['git', '-C', str(source), 'ls-files', '-z']).decode().split('\0')
     paths = sorted({Path(name) for name in tracked if name.endswith('.py')})
     native_root = source / 'ui/native'
     native_paths = {path.relative_to(source) for path in native_root.rglob('*')
-                    if path.is_file() and path.suffix in {'.py', '.java'}}
+                    if path.is_file() and path.suffix in {'.py', '.java', '.swift'}}
     untracked_native = native_paths - {Path(name) for name in tracked}
     if untracked_native and not allow_dirty:
         raise ValueError('Commit native UI sources before release staging.')

@@ -20,7 +20,7 @@ STYLE_FIELDS = {
     'browser_font_family_str': ('File browser font', '', None),
     'browser_font_size_int': ('File browser size (pt)', 10, (7, 24)),
     'reading_font_family_str': ('Reading font (Markdown and EPUB)', 'Arial', None),
-    'reading_font_size_int': ('Reading size (pt)', 12, (7, 24)),
+    'reading_font_size_int': ('Reading size (pt)', 10, (7, 24)),
     'code_font_family_str': ('Code font (editors and Markdown)', '', None),
     'code_font_size_int': ('Code editor size (pt)', 9, (7, 24)),
 }

@@ -1,5 +1,11 @@
 # API reference
 
+Use this reference to look up behavior after choosing an API in the
+[public API map](../public-apis.md). For a first integration, start with the
+[runnable example](../getting-started.md); reference sections describe contracts,
+not an installation sequence. Paths in examples beginning with `commonUtils`
+are Python imports; their files live directly under this repository's packages.
+
 ## Pages
 
 - [Archive operations](archives/archives.md)

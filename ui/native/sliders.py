@@ -1,21 +1,21 @@
 """Native slider tracks and thumbs with caller-supplied palette and direction."""
 
 
-def style_slider(slider, *, apple_color=None, palette=None, force_ltr=False):
+def style_slider(slider, *, apple_color=None, palette=None, force_ltr=False, reverse_fill=False):
     backend = type(slider._impl).__module__
     if backend.startswith('toga_iOS.'):
         if apple_color is None:
             from .appearance import default_apple_color
             apple_color = default_apple_color
-        _apple(slider._impl.native, apple_color, force_ltr)
+        _apple(slider._impl.native, apple_color, force_ltr, reverse_fill)
     elif backend.startswith('toga_android.'):
         if palette is None:
             from .appearance import default_palette
             palette = default_palette
-        _android(slider._impl.native, palette, force_ltr)
+        _android(slider._impl.native, palette, force_ltr, reverse_fill)
 
 
-def _apple(native, apple_color, force_ltr):
+def _apple(native, apple_color, force_ltr, reverse_fill=False):
     from rubicon.objc import ObjCClass, Block, objc_id, UIEdgeInsets
     from toga_iOS.libs import UIGraphicsImageRenderer, CGSize, CGRect
 
@@ -31,12 +31,12 @@ def _apple(native, apple_color, force_ltr):
 
     if force_ltr:
         native.semanticContentAttribute = 3
-    native.setMinimumTrackImage(image(4, 'accent').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
-    native.setMaximumTrackImage(image(4, 'border').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
+    native.setMinimumTrackImage(image(4, 'border' if reverse_fill else 'accent').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
+    native.setMaximumTrackImage(image(4, 'accent' if reverse_fill else 'border').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
     native.setThumbImage(image(16, 'accent', circle=True), forState=0)
 
 
-def _android(native, palette, force_ltr):
+def _android(native, palette, force_ltr, reverse_fill=False):
     from android import R
     from android.graphics import Color
     from android.graphics.drawable import GradientDrawable, LayerDrawable, ClipDrawable
@@ -55,7 +55,8 @@ def _android(native, palette, force_ltr):
         else:
             drawable.setCornerRadius(dp(2))
         return drawable
-    track = LayerDrawable([shape('border'), ClipDrawable(shape('accent'), Gravity.LEFT, ClipDrawable.HORIZONTAL)])
+    track = LayerDrawable([shape('accent' if reverse_fill else 'border'),
+                           ClipDrawable(shape('border' if reverse_fill else 'accent'), Gravity.LEFT, ClipDrawable.HORIZONTAL)])
     for index, identifier in enumerate((R.id.background, R.id.progress)):
         track.setId(index, identifier)
         track.setLayerHeight(index, dp(4))

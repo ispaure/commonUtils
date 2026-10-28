@@ -1,5 +1,8 @@
 # Native Toga components
 
+For independently compiled Swift extension components, see
+[native iOS widget values](widget-values.md).
+
 This optional package supplies Toga navigation and native image gestures.
 Importing `commonUtils.ui.native` or `navigation_state` loads no toolkit.
 Import `navigation`, `routes` or `image_canvas` explicitly in a Toga host.
@@ -44,6 +47,14 @@ UIKit cells use a 12-point leading gutter; the image
 point size reserves the icon slot without adding it again to the separator inset.
 Android retains the injected icon size and uses 6 dp between icon and text,
 with 4 dp between text and the contextual action target.
+Both platforms reserve 28 points/dp for the contextual button, with a 4-unit
+gap from the filename label to its bounds. UIKit cells reclaim the default
+accessory gutter after native layout. The button's touch area extends left over
+the end of the filename to retain a 48-by-48-unit target at the default row
+height; contextual actions take priority in that overlap.
+iOS places the button 4 points from the trailing safe edge, increasing that to
+8 points for a scrollable list with a vertical scrollbar. Android uses a 4 dp
+row gutter plus a 2 dp gap outside the rows before its separately reserved scrollbar.
 
 `thumbnail_image(image, size=28)` fits a row image while preserving the UIKit
 renderer scale on Retina devices. Generic browsing composition and its lifecycle
@@ -627,10 +638,13 @@ reduced-motion/disabled-animation settings remain authoritative. The host choose
 whether E Ink or other application policy disables effects.
 
 `ui.native.sliders.style_slider(widget, apple_color=None, palette=None,
-force_ltr=False)` paints slim tracks and circular thumbs while preserving the
+force_ltr=False, reverse_fill=False)` paints slim tracks and circular thumbs while preserving the
 widget's full touch area. Supply semantic UIKit colors and Android palette roles
 `accent`/`border`; defaults are neutral native colors. Direction follows the
-platform unless explicitly forced. Hosts own value reversal, theme refresh
+platform unless explicitly forced. `reverse_fill=True` highlights the track from
+the thumb toward the maximum end, retaining the accent thumb; it does not change
+values or touch direction. Hosts using reversed values can use this for progress
+from right to left. Hosts own value reversal, theme refresh
 registration, reader progress and page changes.
 
 ## Surface appearance primitives

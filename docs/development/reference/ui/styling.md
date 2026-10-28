@@ -28,7 +28,8 @@ and consumer book readers), and `code_font_*` (editors and diffs; the family als
 applies to Markdown code).
 Each pair has `family_str` and `size_int`; blank families use the platform font,
 with one shared monospace fallback for editors, diffs and Markdown code. Defaults
-are 10 pt for UI/browser, 9 pt for code editors and Arial at 12 pt for reading. All four font sizes
+are 10 pt for UI/browser, 9 pt for code editors and Arial at 10 pt for reading. Saved
+personal overrides take precedence over these defaults. All four font sizes
 allow 7–24 pt.
 Sizes are reference points at 96 logical DPI: an 11 setting occupies about
 15 logical pixels on every platform. `ui.appearance.typography.point_size(size)`

@@ -291,3 +291,12 @@ queue writer reservation. Initial schema creation retains normal SQL retries.
 Metadata scanning and Windows index checks use the existing portable junction
 query, including its reparse-tag fallback on Python versions before 3.12.
 Directory links remain excluded from recursive payload totals.
+
+## Captured validation context
+
+Scan generation validation and reconciliation metadata checks receive an
+`IndexWriterContext` containing the database, generation and per-operation state.
+The validation owner receives the folder-identity function explicitly and does
+not look up mutable cache state. `DirectoryCache` retains its existing entry
+points, scan instrumentation, metrics, writer lifecycle and checkpoint behavior.
+No schema, snapshot or persisted checkpoint format changes are involved.

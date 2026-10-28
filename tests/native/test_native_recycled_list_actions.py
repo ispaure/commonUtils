@@ -12,6 +12,8 @@ class Button:
         return cls()
 
     def initWithFrame(self, frame):
+        self.frame = frame
+        self.bounds = NS(size=NS(width=frame[1][0], height=frame[1][1]))
         self.titleLabel = NS()
         self.setTitle = Mock()
         self.setTitleColor = Mock()
@@ -30,7 +32,7 @@ class FileRowActionTests(unittest.TestCase):
                 ObjCBlock=Mock(), Block=Mock(), objc_id=object, ns_from_py=lambda value: value,
                 objc_property=lambda *args, **kw: None,
                 ObjCClass=lambda name: Button if name == 'UIButton' else NS(systemFontOfSize=lambda size: size),
-                SEL=lambda value: value, CGRect=lambda *args: args),
+                SEL=lambda value: value, CGRect=lambda *args: args, CGPoint=object),
             'toga_iOS.widgets.detailedlist': NS(DetailedList=object, TogaTableViewController=object),
             'toga_iOS.libs': NS(UITableViewCell=Mock(), UITableViewCellStyleSubtitle=1, UIView=Mock()),
         }
@@ -52,6 +54,44 @@ class FileRowActionTests(unittest.TestCase):
         self.assertEqual(button.accessibilityLabel, 'Select Example.md')
         button.selectRow_(button)
         self.interface.on_primary_action.assert_called_once_with(row=self.row)
+
+    def test_compact_accessory_retains_48_point_hit_area(self):
+        button = self.cell.accessoryView
+        self.assertEqual(button.frame, ((0, 0), (28, 48)))
+        for x in (-20, 0, 14, 28):
+            self.assertTrue(button.pointInside_withEvent_(NS(x=x, y=24), None))
+        for x, y in ((-21, 24), (29, 24), (14, -1), (14, 49)):
+            self.assertFalse(button.pointInside_withEvent_(NS(x=x, y=y), None))
+
+    def test_filename_reclaims_uikit_gutter_without_entering_visible_button(self):
+        def rect(x, y, width, height):
+            return NS(origin=NS(x=x, y=y), size=NS(width=width, height=height))
+        title = NS(frame=rect(52, 0, 180, 48))
+        detail = NS(frame=rect(52, 28, 180, 16))
+        content = NS(frame=rect(0, 0, 240, 48))
+        cell = NS(accessoryView=NS(frame=rect(260, 0, 28, 48)),
+                  contentView=content, textLabel=title, detailTextLabel=detail,
+                  superview=None, bounds=rect(0, 0, 292, 48), safeAreaInsets=NS(right=0))
+        self.module._layout_action_labels(cell)
+        self.assertEqual(content.frame, ((0, 0), (256, 48)))
+        self.assertEqual(title.frame, ((52, 0), (204, 48)))
+        self.assertEqual(detail.frame, ((52, 28), (204, 16)))
+
+    def test_trailing_space_respects_scrollbar_and_safe_area(self):
+        def rect(x, y, width, height):
+            return NS(origin=NS(x=x, y=y), size=NS(width=width, height=height))
+        for scrolling, indicator, safe, expected in (
+                (False, True, 0, 288), (True, True, 0, 284),
+                (True, False, 0, 288), (False, True, 20, 268)):
+            table = NS(showsVerticalScrollIndicator=lambda: indicator,
+                       contentSize=NS(height=600 if scrolling else 48), bounds=rect(0, 0, 320, 400))
+            cell = NS(accessoryView=NS(frame=rect(280, 0, 28, 48)),
+                      contentView=NS(frame=rect(0, 0, 260, 48)),
+                      textLabel=NS(frame=rect(52, 0, 200, 48)),
+                      detailTextLabel=NS(frame=rect(52, 28, 200, 16)),
+                      superview=lambda: table, bounds=rect(0, 0, 320, 48), safeAreaInsets=NS(right=safe))
+            self.module._layout_action_labels(cell)
+            self.assertEqual(cell.accessoryView.frame[0][0], expected)
 
     def test_source_replacement_and_disabled_table_reject_old_row_actions(self):
         button = self.cell.accessoryView

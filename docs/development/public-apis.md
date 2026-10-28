@@ -5,6 +5,23 @@ external integration. This is a curated map, not a promise that every public-loo
 name is stable. Concrete UI fields and consumer patch targets can still be
 part of the integration contract; see [integration contracts](contracts.md).
 
+## Choose by the result you need
+
+| Goal | Start with | Caller still decides |
+| --- | --- | --- |
+| List paths and filter names | `filesystem.traversal.scan_directory` | Roots, recursion and cancellation policy |
+| Work with file objects and specialized formats | `filesystem.directories.Directory`, `formats.registry.file_from_path` | Registration and domain validation |
+| Save one JSON document atomically | `persistence.atomic_write_json` | Schema, writer coordination and when to save |
+| Run a process without widgets | `integrations.wrappers.cmdShellWrapper.run_command` | Argument list, timeouts and failure presentation |
+| Embed interactive controls | [UI reference](reference/ui/ui.md) | Application lifecycle, navigation and storage access |
+
+The sections below explain returns and failure boundaries. Start with the
+[runnable file example](getting-started.md#work-with-registered-file-objects) if
+you are learning these concepts. A **snapshot** records information at a moment
+in time; a **registry** chooses an implementation; a **host** composes components
+and supplies application policy. None of these terms implies automatic refresh,
+validation or permission to mutate user files.
+
 ## Files, types and directories
 
 Use `commonUtils.filesystem.files.File` for a plain file snapshot, and

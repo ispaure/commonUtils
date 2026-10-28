@@ -4,6 +4,58 @@ from toga_iOS.widgets.detailedlist import DetailedList, TogaTableViewController
 from toga_iOS.libs import UITableViewCell, UITableViewCellStyleSubtitle, UIView
 
 _row_action_type = None
+_file_cell_type = None
+
+
+def _superview(view):
+    parent = view.superview
+    return parent() if callable(parent) else parent
+
+
+def _layout_action_labels(cell):
+    """Use a small visual gap instead of UIKit's accessory gutter."""
+    button = cell.accessoryView
+    if button is None:
+        return
+    from rubicon.objc import CGRect
+    trailing = 4
+    view = _superview(cell)
+    while view is not None:
+        if hasattr(view, 'showsVerticalScrollIndicator'):
+            indicator = view.showsVerticalScrollIndicator
+            indicator = indicator() if callable(indicator) else indicator
+            if indicator and view.contentSize.height > view.bounds.size.height:
+                trailing = 8
+            break
+        view = _superview(view)
+    frame = button.frame
+    button_x = max(0, float(cell.bounds.size.width) - float(cell.safeAreaInsets.right)
+                   - trailing - float(frame.size.width))
+    button.frame = CGRect((button_x, frame.origin.y),
+                          (frame.size.width, frame.size.height))
+    content = cell.contentView
+    frame = content.frame
+    right = button_x - float(frame.origin.x) - 4
+    content.frame = CGRect((frame.origin.x, frame.origin.y),
+                           (max(0, right), frame.size.height))
+    for label in (cell.textLabel, cell.detailTextLabel):
+        frame = label.frame
+        label.frame = CGRect((frame.origin.x, frame.origin.y),
+                             (max(0, right - float(frame.origin.x)), frame.size.height))
+
+
+def _new_file_cell():
+    global _file_cell_type
+    if _file_cell_type is None:
+        from rubicon.objc import send_super
+        class CommonUtilsFileCell(UITableViewCell):
+            @objc_method
+            def layoutSubviews(self) -> None:
+                send_super(__class__, self, 'layoutSubviews')
+                _layout_action_labels(self)
+        _file_cell_type = CommonUtilsFileCell
+    return _file_cell_type.alloc().initWithStyle(
+        UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
 
 
 def _bind_actions(interface, cell, row):
@@ -14,13 +66,22 @@ def _bind_actions(interface, cell, row):
         cell.accessoryView = None
         return
     global _row_action_type
-    from rubicon.objc import ObjCClass, objc_property, SEL, CGRect, Block, objc_id, ns_from_py
+    from rubicon.objc import ObjCClass, objc_property, SEL, CGRect, CGPoint, Block, objc_id, ns_from_py
     import weakref
     if _row_action_type is None:
         class FileRowAction(ObjCClass('UIButton')):
             owner = objc_property(object)
             row = objc_property(object)
             menu_provider_block = objc_property(object)
+
+            @objc_method
+            def pointInside_withEvent_(self, point: CGPoint, event: ObjCInstance) -> bool:
+                # Give the dots priority over the end of the filename, retaining
+                # a row-height-wide target without reserving that much text space.
+                bounds = self.bounds
+                inset = max(0, float(bounds.size.height) - float(bounds.size.width))
+                return (-inset <= point.x <= float(bounds.size.width)
+                        and 0 <= point.y <= float(bounds.size.height))
 
             @objc_method
             def selectRow_(self, sender) -> None:
@@ -32,7 +93,8 @@ def _bind_actions(interface, cell, row):
         _row_action_type = FileRowAction
     button = cell.accessoryView
     if button is None:
-        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (interface.appearance.row_height, interface.appearance.row_height)))
+        height = interface.appearance.row_height
+        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (min(28, height), height)))
         button.setTitle('⋯', forState=0)
         button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
         button.addTarget(button, action=SEL('selectRow:'), forControlEvents=1 << 6)
@@ -173,8 +235,7 @@ class FileTableController(TogaTableViewController):
     def tableView_cellForRowAtIndexPath_(self, tableView, indexPath):
         cell = tableView.dequeueReusableCellWithIdentifier('file-row')
         if cell is None:
-            cell = UITableViewCell.alloc().initWithStyle(
-                UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
+            cell = _new_file_cell()
             selection = UIView.alloc().init()
             selection.backgroundColor = self.interface.appearance.apple_color('hover')
             cell.selectedBackgroundView = selection

@@ -12,6 +12,12 @@ domain policy, dependency installation and user-facing destinations.
 7. [Refactoring safely](refactoring.md): current priorities, existing mechanisms
    to reuse and a contribution loop that preserves consumers.
 
+For your first change, run the disposable example in Getting started, choose its
+owning package in the API map, read that contract and find its tests in the
+[test-owner map](reference/tests/tests.md#find-a-regression-owner). Validate the
+shared behavior and the affected consumer before updating a pin. A library-only
+pass cannot establish that an application integrates the change correctly.
+
 Detailed API examples live in the [API reference](reference/reference.md), grouped by source owner.
 For interactive workflows, use the [component user guides](../user/user.md).
 The [audit record](audit.md) explains the restructuring and remaining uncertainties.
