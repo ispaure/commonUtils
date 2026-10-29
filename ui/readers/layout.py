@@ -53,7 +53,7 @@ def rounded_clearance(start, stop, corners, *, vertical=False):
     return leading, trailing
 
 
-def overlay_insets(width, height, safe, corners=(), *, margin=12, extent=48):
+def overlay_insets(width, height, safe, corners=(), *, margin=READER_LAYOUT.overlay_margin, extent=READER_LAYOUT.touch_extent):
     """Insets for bottom overlay controls, preserving canvas size and hit areas."""
     left, top, right, bottom = safe
     leading, trailing = rounded_clearance(max(top, height - bottom - extent), height - bottom, corners)
