@@ -40,7 +40,7 @@ class ReadAloud(qt.QObject):
     positionChanged = qt.Signal(int, int)
 
     def __init__(self, owner, text_provider, *, engine_factory=None, scope='the current document',
-                 text_widget=None, start_provider=None, language_provider=lambda: ''):
+                 text_widget=None, start_provider=None, language_provider=lambda: '', on_finished=lambda: None):
         super().__init__(owner)
         self.owner = owner
         self.text_provider = text_provider
@@ -49,6 +49,8 @@ class ReadAloud(qt.QObject):
         self.text_widget = text_widget
         self.start_provider = start_provider
         self.language_provider = language_provider
+        self.on_finished = on_finished
+        self._selected_passage = False
         self._highlight_widget = None
         self.anchor = None
         self.engine = None
@@ -157,6 +159,7 @@ class ReadAloud(qt.QObject):
             self.adapter = QtSpeechEngine(self.engine, QTextToSpeech, self.scheduler)
             self.session = SpeechSession(self.adapter, on_range=self._range_changed,
                                          on_state=self._session_state, clock=lambda: monotonic())
+            self.session.on_finished = lambda: self.on_finished() if not self._selected_passage else None
             self.engine.errorOccurred.connect(lambda *args: self._error())
             self.engine.stateChanged.connect(lambda state: self._error() if state == QTextToSpeech.State.Error else None)
             self.language.addItem('Automatic (detect text)', None)
@@ -242,6 +245,7 @@ class ReadAloud(qt.QObject):
             return
         widget = self.text_widget() if callable(self.text_widget) else self.text_widget
         cursor = widget.textCursor() if widget is not None else None
+        self._selected_passage = cursor is not None and cursor.hasSelection()
         base = cursor.selectionStart() if cursor is not None and cursor.hasSelection() else (
             self.start_provider() if self.start_provider else visible_text_start(widget) if widget is not None else 0)
         text = reader_text(widget, start=0) if widget is not None and not cursor.hasSelection() else self.text_provider()

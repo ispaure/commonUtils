@@ -115,6 +115,7 @@ class SpeechSession:
         self.clock = clock
         self.engine, self.on_range, self.on_state = engine, on_range, on_state
         self.can_speak = lambda: True
+        self.on_finished = lambda: None
         self.closed, self.state, self.generation = False, "stopped", 0
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()
@@ -157,7 +158,15 @@ class SpeechSession:
             self.state = "speaking"
             self.next()
         else:
-            self.on_state("stopped", "No text to read from this passage.")
+            self.finish()
+
+    def finish(self):
+        """Natural exhaustion only; hosts may lazily supply another document."""
+        self.stop()
+        generation = self.generation
+        self.on_state("stopped", "Finished the selected passage or current chapter.")
+        if not self.closed and generation == self.generation:
+            self.on_finished()
 
     def next(self):
         if self.closed or self.state != "speaking":
@@ -166,10 +175,7 @@ class SpeechSession:
             self.stop()
             return
         if self.index >= len(self.ranges):
-            self.stop()
-            self.on_state(
-                "stopped", "Finished the selected passage or current chapter."
-            )
+            self.finish()
             return
         text, start, end = self.ranges[self.index]
         self.cancel_timer()
@@ -373,3 +379,4 @@ class SpeechSession:
             ) = lambda *args: None
             self.on_range = self.on_state = lambda *args: None
             self.can_speak = lambda: False
+            self.on_finished = lambda: None

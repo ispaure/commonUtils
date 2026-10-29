@@ -8,6 +8,23 @@ from commonUtils.runtime.speech import SpeechSession, utterances, PlaybackTimer
 
 
 class SpeechCoreTests(unittest.TestCase):
+    def test_natural_finish_can_chain_but_stop_failure_and_stale_callbacks_cannot(self):
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        session = SpeechSession(engine, on_range=Mock(), on_state=Mock())
+        finished = session.on_finished = Mock()
+        session.play('First chapter')
+        old = session.token
+        session.completed(old)
+        finished.assert_called_once_with()
+        session.completed(old)
+        session.stop()
+        session.play('Second chapter')
+        session.failed(session.token)
+        self.assertEqual(finished.call_count, 1)
+        session.play('   ')
+        self.assertEqual(finished.call_count, 2)
+        session.dispose()
+
     def test_utf16_selection_and_bounds_preserve_astral_offsets(self):
         self.assertEqual(list(utterances("A😀 B", 1, 3)), [("😀", 1, 3)])
         chunks = list(utterances("one two three four", limit=7))

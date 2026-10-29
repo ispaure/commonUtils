@@ -82,6 +82,12 @@ callbacks. Engines supply `ready`, `error`, `speak(text, voice, speed, token)`,
 `stop()` and `close()`, and receive `started`, `progress`, `completed` and `failed`
 callbacks. An optional engine loop schedules approximate word progress.
 `can_speak` is a caller-supplied gate checked before each utterance.
+`on_finished` is an optional callback after natural exhaustion, including an empty
+passage. It runs after text/highlight cleanup and the stopped notification; Stop,
+failure, disposal and stale engine completions never invoke it. Hosts may use it
+to fetch the next passage lazily, retaining their own cancellation and access
+checks. Qt `ReadAloud(..., on_finished=...)` forwards this event only when the user
+is reading the document rather than a text selection.
 
 `PlaybackTimer(loop, changed=..., expired=..., clock=...)` tracks active listening
 time. Pause preserves the remaining budget; Play after expiry starts a fresh
