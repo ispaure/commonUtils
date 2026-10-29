@@ -79,6 +79,11 @@ actual navigation stack when UIKit More reparents a tab root;
 `content_controller(identity)` resolves its visible controller. Route delegates
 forward More selection callbacks and exclude its list from document route depth.
 
+Apple safe-area callbacks defer host resize handlers to the next event-loop turn,
+coalescing repeated callbacks to the latest container. This keeps host menu and
+controller replacement outside UIKit's active safe-area/rotation call stack.
+A queued resize is ignored after adapter disposal.
+
 `install(window)` establishes native containment and layout/keyboard listeners;
 `uninstall()` restores them, and `dispose()` retires the host's widgets and
 callbacks. `activate(identity)` selects a destination without rebuilding views.
