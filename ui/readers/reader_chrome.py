@@ -6,8 +6,10 @@ handles and supply actions; both text and image readers use the same geometry.
 from .. import pyside as qt
 from ..appearance.icons import painted_icon, set_painted_icon
 
-READER_MARGINS = (8, 2, 8, 3)
-READER_SPACING = 4
+from .layout import READER_LAYOUT
+
+READER_MARGINS = READER_LAYOUT.desktop_margins
+READER_SPACING = READER_LAYOUT.spacing
 
 
 class ReaderIcon(qt.QIconEngine):

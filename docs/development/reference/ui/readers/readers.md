@@ -13,8 +13,36 @@ modules have been removed; update imports and mock patch targets to this package
 - `reader_menus`
 - `read_aloud`
 - `page_wheel`
+- `layout` (portable control geometry; no Qt/native imports)
 
 [Shared reader workflows](../../../../user/components/components.md) and [Markdown](../markdown/markdown.md).
+
+## Reader edges and progress metrics
+
+`layout.READER_LAYOUT` owns the reader touch extent, progress track/thumb sizes,
+row spacing, overlay side gap and desktop outer margins. Desktop `reader_chrome`
+exports its existing margin/spacing names from this policy. Consumers may use the
+portable policy without importing Qt. Native hosts supply logical geometry at
+layout time; the library contains no device model tables or inferred radii.
+
+`remaining_clearance(edge, safe_edge, trailing=True)` returns only the unconsumed
+part of a safe inset. Applying a system inset and then adding the same inset to
+a footer is incorrect. Use one coordinate space, including in split windows.
+`rounded_clearance(start, stop, corners, vertical=False)` computes the leading and
+trailing safe coordinates for a horizontal row or vertical progress strip. Each
+corner is `(trailing_axis, trailing_cross_axis, center_x, center_y, radius)` in the
+host's coordinate space. The calculation follows the circular boundary only
+where the row intersects it; it does not reserve a full radius along every edge.
+`overlay_insets(width, height, safe, corners=(), margin=12, extent=48)` merges
+system insets and corner clearance for a bottom overlay. It returns left, top,
+right and bottom padding, without changing the underlying media canvas.
+
+UIKit hosts use public safe areas, which already protect screen curvature.
+Android hosts can supply `WindowInsets.getRoundedCorner` metadata on API 31+;
+missing metadata preserves ordinary bar/cutout insets. Never guess a radius or
+use private screen properties. Native acceptance still needs rotation, changing
+window bounds, and any supported fold postures; pure geometry tests alone do
+not certify a particular device.
 
 ## Speech presentation and highlights
 

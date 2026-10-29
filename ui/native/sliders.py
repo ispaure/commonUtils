@@ -1,4 +1,5 @@
 """Native slider tracks and thumbs with caller-supplied palette and direction."""
+from ..readers.layout import READER_LAYOUT
 
 
 def style_slider(slider, *, apple_color=None, palette=None, force_ltr=False, reverse_fill=False):
@@ -31,9 +32,9 @@ def _apple(native, apple_color, force_ltr, reverse_fill=False):
 
     if force_ltr:
         native.semanticContentAttribute = 3
-    native.setMinimumTrackImage(image(4, 'border' if reverse_fill else 'accent').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
-    native.setMaximumTrackImage(image(4, 'accent' if reverse_fill else 'border').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
-    native.setThumbImage(image(16, 'accent', circle=True), forState=0)
+    native.setMinimumTrackImage(image(READER_LAYOUT.track_extent, 'border' if reverse_fill else 'accent').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
+    native.setMaximumTrackImage(image(READER_LAYOUT.track_extent, 'accent' if reverse_fill else 'border').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
+    native.setThumbImage(image(READER_LAYOUT.thumb_extent, 'accent', circle=True), forState=0)
 
 
 def _android(native, palette, force_ltr, reverse_fill=False):
@@ -51,15 +52,15 @@ def _android(native, palette, force_ltr, reverse_fill=False):
         drawable.setColor(Color.parseColor(colors[role]))
         drawable.setShape(GradientDrawable.OVAL if circle else GradientDrawable.RECTANGLE)
         if circle:
-            drawable.setSize(dp(16), dp(16))
+            drawable.setSize(dp(READER_LAYOUT.thumb_extent), dp(READER_LAYOUT.thumb_extent))
         else:
-            drawable.setCornerRadius(dp(2))
+            drawable.setCornerRadius(dp(READER_LAYOUT.track_extent / 2))
         return drawable
     track = LayerDrawable([shape('accent' if reverse_fill else 'border'),
                            ClipDrawable(shape('border' if reverse_fill else 'accent'), Gravity.LEFT, ClipDrawable.HORIZONTAL)])
     for index, identifier in enumerate((R.id.background, R.id.progress)):
         track.setId(index, identifier)
-        track.setLayerHeight(index, dp(4))
+        track.setLayerHeight(index, dp(READER_LAYOUT.track_extent))
         track.setLayerGravity(index, Gravity.CENTER_VERTICAL)
     if force_ltr:
         native.setLayoutDirection(0)
@@ -68,6 +69,6 @@ def _android(native, palette, force_ltr, reverse_fill=False):
     native.setThumbTintList(None)
     native.setProgressDrawable(track)
     native.setThumb(shape('accent', circle=True))
-    native.setThumbOffset(dp(8))
+    native.setThumbOffset(dp(READER_LAYOUT.thumb_extent / 2))
     native.setSplitTrack(False)
-    native.setPadding(dp(8), 0, dp(8), 0)
+    native.setPadding(dp(READER_LAYOUT.thumb_extent / 2), 0, dp(READER_LAYOUT.thumb_extent / 2), 0)
