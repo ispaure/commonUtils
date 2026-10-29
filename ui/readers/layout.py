@@ -17,6 +17,7 @@ class ReaderLayout:
     spacing: int = 4
     desktop_margins: tuple = (8, 2, 8, 3)
     overlay_margin: int = 12
+    caption_size: float = 12.75
 
 
 READER_LAYOUT = ReaderLayout()
