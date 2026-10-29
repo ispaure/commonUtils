@@ -576,8 +576,12 @@ with the caller through `runtime.speech_language`.
 nonpersistent WKWebView on iOS or a cache-disabled Android WebView. Backend
 selection follows Toga's factory. `private_webview_supported()` reports those
 supported backends. `set_content` checks encoded UTF-8 bytes before entering Toga. The Android
-private backend loads HTML directly with `loadDataWithBaseURL`, including caller
-limits above 2 MiB, rather than using Toga's plaintext large-content cache;
+private backend loads directly with `loadDataWithBaseURL`, including caller limits
+above 2 MiB, instead of Toga's plaintext large-content cache. A bounded, owned
+completion task checks a unique inert document marker because Android can omit
+its native completion callback for memory-loaded pages. Reload/disposal cancels
+the task; a replaced document cannot publish a stale completion. Completion
+handlers retain Toga's idempotent event contract.
 `clear_private_content()` retires callbacks, clears the live document and disposes
 the native view idempotently. Unsupported backends fail closed. Callers choose
 HTML byte limits and supply navigation, resource and credential-validity policy.

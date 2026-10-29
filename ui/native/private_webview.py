@@ -4,6 +4,10 @@ Toolkit adapters are selected by the active backend, not the host OS. Unsupporte
 backends use the native text fallback rather than an ordinary persistent WebView.
 """
 
+import asyncio
+import json
+from uuid import uuid4
+
 import toga
 from toga.platform import get_factory
 
@@ -74,10 +78,23 @@ class PrivateWebView(toga.WebView):
                     # private documents in WebView memory, including custom
                     # limits above its 2 MiB data-URL threshold.
                     inner.loaded_future = None
-                    inner.native.loadDataWithBaseURL(root_url, content, "text/html", "utf-8", None)
+                    inner.native.loadDataWithBaseURL(root_url, content, "text/html", "utf-8", root_url)
 
             return PrivateBackend(interface=self)
         raise RuntimeError("This backend does not support a private WebView.")
+
+    @toga.WebView.on_webview_load.setter
+    def on_webview_load(self, handler):
+        toga.WebView.on_webview_load.fset(self, handler)
+        if handler and self.factory.WebView.__module__.startswith('toga_android.'):
+            callback = self._on_webview_load
+            def loaded(*args, **kwargs):
+                # The initial blank navigation can finish after set_content.
+                # Publish only after the current memory document is verified.
+                if not self.private_closed and getattr(self, '_private_content_ready', True):
+                    return callback(*args, **kwargs)
+            loaded._raw = handler
+            self._on_webview_load = loaded
 
     def set_content(self, root_url, content):
         if self.private_closed or not self.private_configured:
@@ -88,12 +105,52 @@ class PrivateWebView(toga.WebView):
             self, "max_html_bytes", DEFAULT_MAX_HTML
         ):
             raise ValueError("Private HTML exceeds the memory-only byte limit.")
-        return super().set_content(root_url, content)
+        if not self.factory.WebView.__module__.startswith('toga_android.'):
+            return super().set_content(root_url, content)
+        self._private_content_ready = False
+        self._cancel_private_load()
+        token = self._private_load_token = uuid4().hex
+        # A trailing comment has no layout effect and identifies this exact load.
+        result = super().set_content(root_url, content + '<!--private-load:' + token + '-->')
+        self._private_load_task = toga.App.app.loop.create_task(self._finish_private_load(token))
+        return result
+
+    def _cancel_private_load(self):
+        task = getattr(self, '_private_load_task', None)
+        if task is not None:
+            task.cancel()
+            self._private_load_task = None
+
+    async def _finish_private_load(self, token):
+        # Android can omit onPageFinished for memory-loaded documents even when
+        # their DOM is complete. Native completion events may already repeat;
+        # callers must retain that same idempotent event contract.
+        marker = json.dumps('private-load:' + token)
+        script = """document.readyState === 'complete' && (() => {
+          const comments=document.createTreeWalker(document,128);let node;
+          while(node=comments.nextNode())if(node.data===MARKER)return true;
+          return false;
+        })()""".replace('MARKER', marker)
+        try:
+            async with asyncio.timeout(15):
+                while not self.private_closed and self._private_load_token == token:
+                    await asyncio.sleep(.05)
+                    if await asyncio.shield(self.evaluate_javascript(script)):
+                        if not self.private_closed and self._private_load_token == token:
+                            self._private_content_ready = True
+                            self.on_webview_load()
+                        return
+        except TimeoutError:
+            pass
+        finally:
+            if getattr(self, '_private_load_task', None) is asyncio.current_task():
+                self._private_load_task = None
 
     def clear_private_content(self):
         if self.private_closed:
             return
         self.private_closed = True
+        PrivateWebView._cancel_private_load(self)
         self.on_webview_load = None
         self.on_navigation_starting = lambda widget, url, **kw: False
         native = self._impl.native
