@@ -5,6 +5,7 @@ safeguard, not an OS sandbox; arbitrary third-party filesystem calls are unaffec
 """
 from pathlib import Path
 import threading
+from .native_paths import native_path
 
 _roots = {}
 _lock = threading.RLock()
@@ -30,17 +31,17 @@ def check_local_path(path, *, recursive=False):
         return
     requested = Path(path)
     try:
-        candidate = requested.resolve()
+        candidate = native_path(requested).resolve()
     except RuntimeError:
         if not requested.is_symlink():
             raise
         # A looping leaf has no reachable content; its parent still determines
         # whether ordinary unlink/rename would mutate a provider-owned path.
-        candidate = requested.parent.resolve() / requested.name
+        candidate = native_path(requested.parent).resolve() / requested.name
     if not recursive and candidate in getattr(_local, 'records', ()):
         return
     for root, message in roots:
-        root = root.resolve()
+        root = native_path(root).resolve()
         if candidate == root or root in candidate.parents or (recursive and candidate in root.parents):
             raise PermissionError(message)
 
@@ -54,7 +55,7 @@ _local = threading.local()
 def provider_record_access(path):
     """Allow an owning backend to publish one internal record on this thread."""
     previous = getattr(_local, 'records', ())
-    _local.records = (*previous, Path(path).resolve())
+    _local.records = (*previous, native_path(path).resolve())
     try:
         yield
     finally:

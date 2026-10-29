@@ -8,6 +8,7 @@ see the [developer API guide](../../public-apis.md#files-types-and-directories).
 | --- | --- |
 | File information and copy/move/rename methods | [File objects](files/files.md) |
 | Registered file objects from a directory | [Directory](directories/directories.md) |
+| Absolute native I/O paths, including Windows long paths | `filesystem.native_paths.native_path` |
 | Plain paths, masks and cancellable traversal | `filesystem.traversal.scan_directory`; skips nested directory links |
 | Symlinks, junctions and platform shortcuts | [Links](links/links.md) |
 | Batch filename changes | [Rename](rename/rename.md) |
@@ -138,3 +139,11 @@ semantics, passing an absolute filename as a literal argument with `shell=False`
 Quotes, substitutions and option-like relative filenames are never shell syntax.
 Command failures raise OSError instead of silently continuing; the existing
 15-second idle-output timeout remains. The host provider guard runs first.
+
+`native_path(path)` returns an absolute `Path`, using the extended-length Windows
+namespace on Windows. It preserves ordinary platform path semantics without
+following links, including POSIX parent components through symbolic links.
+Adapters retain logical resource names and their existing link/grant checks.
+Local storage protection compares both normal and extended spellings in the same
+namespace, including exact backend record allowances; adding a prefix cannot
+bypass a protected root. This does not enable a machine-wide Windows setting.
