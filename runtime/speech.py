@@ -1,12 +1,8 @@
 """Bounded utterances, UTF-16 ranges and session-owned native read-aloud."""
 
 from bisect import bisect_left, bisect_right
-import re
 from time import monotonic
-
-
-def utf16_length(text):
-    return len(text.encode("utf-16-le")) // 2
+from .speech_text import SpeechText, PROSE_DASH, dash_padding, word_ranges, utf16_length
 
 
 class PlaybackTimer:
@@ -78,8 +74,12 @@ class PlaybackTimer:
 def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_breaks=True):
     """Keep browser offsets intact, including astral characters and block edges."""
     units = [0]
-    for char in text:
+    budget = [0]
+    dashes = {match.start() for match in PROSE_DASH.finditer(text)}
+    for index, char in enumerate(text):
         units.append(units[-1] + utf16_length(char))
+        padding = sum(dash_padding(text, index)) if index in dashes else 0
+        budget.append(budget[-1] + utf16_length(char) + padding)
     left = bisect_left(units, max(0, start))
     right = bisect_left(
         units, units[-1] if end is None else min(units[-1], max(start, end))
@@ -91,7 +91,7 @@ def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_break
         if left >= right:
             break
         stop = left + 1
-        while stop < right and units[stop + 1] - units[left] <= limit:
+        while stop < right and budget[stop + 1] - budget[left] <= limit:
             if units[stop] in boundaries or (
                 sentence_breaks and text[stop - 1] in ".!?。！？" and text[stop].isspace()
             ):
@@ -126,6 +126,7 @@ class SpeechSession:
         engine.progress = self.progress
         engine.started = self.started
         self.word_timer = None
+        self.spoken = None
 
     def utterances(self, text, start=0, end=None, *, breaks=()):
         return utterances(text, start, end, breaks=breaks,
@@ -142,16 +143,8 @@ class SpeechSession:
             )
             return
         self.text, self.start, self.end, self.breaks = text, start, end, breaks
-        self.words = []
-        units = 0
-        for match in re.finditer(r"\s+|\S+", text):
-            if (
-                not match[0].isspace()
-                and units >= start
-                and (end is None or units < end)
-            ):
-                self.words.append(units)
-            units += utf16_length(match[0])
+        self.words = [left for left, _ in word_ranges(text)
+                      if left >= start and (end is None or left < end)]
         self.ranges = list(self.utterances(text, start, end, breaks=breaks))
         self.voice, self.speed, self.index = voice, speed, 0
         if self.ranges:
@@ -178,6 +171,8 @@ class SpeechSession:
             self.finish()
             return
         text, start, end = self.ranges[self.index]
+        self.spoken = SpeechText(text)
+        self.utterance_words = list(word_ranges(text, start))
         self.cancel_timer()
         self.native_progress = False
         self.position = start
@@ -194,7 +189,7 @@ class SpeechSession:
             if not self.can_speak():
                 self.stop()
                 return
-            self.engine.speak(text, self.voice, self.speed, self.token)
+            self.engine.speak(self.spoken.text, self.voice, self.speed, self.token)
         except Exception:
             self.stop()
             self.on_state(
@@ -210,13 +205,6 @@ class SpeechSession:
         if self.closed or self.state != "speaking" or token != self.token:
             return
         self.started_at = self.clock()
-        text, base, _ = self.ranges[self.index]
-        self.utterance_words = []
-        for match in re.finditer(r"\S+", text):
-            start = utf16_length(text[: match.start()])
-            self.utterance_words.append(
-                (base + start, base + start + utf16_length(match[0]))
-            )
         if self.utterance_words:
             self.on_range(*self.utterance_words[0])
         if not self.native_progress and not getattr(
@@ -250,13 +238,22 @@ class SpeechSession:
     def progress(self, token, start, end):
         if self.closed or self.state != "speaking" or token != self.token:
             return
-        _, base, limit = self.ranges[self.index]
-        if not 0 <= start < end <= limit - base:
+        _, base, _ = self.ranges[self.index]
+        mapped = self.spoken.source_range(start, end)
+        if mapped is None:
             return
+        left, right = (base + value for value in mapped)
+        # Some engines include punctuation or multiple words in their ranges.
+        # Publish a single source word, never a dash-joined phrase or padding.
+        word = next(((a, b) for a, b in self.utterance_words
+                     if a < right and b > left), None)
+        if word is None:
+            return
+        left, right = max(left, word[0]), min(right, word[1])
         self.native_progress = True
         self.cancel_timer()
-        self.position = base + start
-        self.on_range(base + start, base + end)
+        self.position = left
+        self.on_range(left, right)
 
     def completed(self, token):
         if not self.closed and self.state == "speaking" and token == self.token:
@@ -349,9 +346,9 @@ class SpeechSession:
         self.index, self.elapsed = 0, 0
         if paused:
             text, base, _ = self.ranges[0]
-            word = re.search(r"\S+", text)
+            word = next(word_ranges(text, base), None)
             if word:
-                self.on_range(base, base + utf16_length(word[0]))
+                self.on_range(*word)
             self.on_state("paused", "Paused · Resume reads from the new position.")
         else:
             self.next()
@@ -365,6 +362,8 @@ class SpeechSession:
         self.engine.stop()
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()
+        self.spoken = None
+        self.utterance_words = []
         self.elapsed = 0
         self.on_range(-1, -1)
         self.on_state("stopped", "Stopped")

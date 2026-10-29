@@ -144,6 +144,11 @@ click the speaker to toggle the panel open or closed. Back/forward estimate a
 new word, including mirrored reader panes. Unrelated search/selection marks are
 preserved. Highlights may use estimated timing where word events are unavailable.
 
+Prose dashes separate spoken words even when the document omits spaces, as in
+`Sumire—Never`. The cursor follows the separate source words. Compound hyphens,
+apostrophes and numeric ranges retain their original speech input; pronunciation
+still depends on the selected installed voice.
+
 Playback stops when content is replaced, editing begins or the
 reader closes. Speech does not edit the file. If no engine/voice is available, the
 panel explains the problem; available voices depend on the operating system.

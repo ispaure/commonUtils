@@ -8,6 +8,63 @@ from commonUtils.runtime.speech import SpeechSession, utterances, PlaybackTimer
 
 
 class SpeechCoreTests(unittest.TestCase):
+    def test_prose_dash_payload_and_native_ranges_use_original_utf16_positions(self):
+        from commonUtils.runtime.speech_text import utf16_length
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        ranges = Mock()
+        session = SpeechSession(engine, on_range=ranges, on_state=Mock())
+        source = '😀 café Sumire—Never–again―today.'
+        session.play(source)
+        spoken = engine.speak.call_args.args[0]
+        self.assertEqual(spoken, '😀 café Sumire — Never – again ― today.')
+        for word in ('Sumire', 'Never', 'again', 'today'):
+            start = utf16_length(spoken[:spoken.index(word)])
+            engine.progress(session.token, start, start + len(word))
+            original = utf16_length(source[:source.index(word)])
+            self.assertEqual(ranges.call_args.args, (original, original + len(word)))
+        # Generated spaces and dash-only events must not become cursor words.
+        previous = ranges.call_count
+        start = utf16_length(spoken[:spoken.index('—')])
+        engine.progress(session.token, start - 1, start)
+        engine.progress(session.token, start, start + 1)
+        self.assertEqual(ranges.call_count, previous)
+        engine.progress(session.token, 0, 10000)
+        self.assertEqual(ranges.call_count, previous)
+        session.play('Intro. Sumire—Never', breaks=(7,))
+        engine.completed(session.token)
+        self.assertEqual(engine.speak.call_args.args[0], 'Sumire — Never')
+        engine.progress(session.token, 9, 14)
+        self.assertEqual(ranges.call_args.args, (14, 19))
+        engine.progress(session.token, 0, 14)
+        self.assertEqual(ranges.call_args.args, (7, 13))
+        session.dispose()
+        self.assertIsNone(session.spoken)
+        self.assertEqual(session.text, '')
+
+    def test_dash_fallback_pause_resume_selection_and_limits_keep_source_anchors(self):
+        from commonUtils.runtime.speech_text import SpeechText, word_ranges
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        ranges = Mock()
+        session = SpeechSession(engine, on_range=ranges, on_state=Mock())
+        session.play('Sumire—Never again')
+        engine.started(session.token)
+        self.assertEqual(session.utterance_words, [(0, 6), (7, 12), (13, 18)])
+        session.estimated_word(session.token, 1)
+        self.assertEqual(ranges.call_args.args, (7, 12))
+        session.pause()
+        session.resume()
+        self.assertEqual(engine.speak.call_args.args[0], 'Never again')
+        session.play('😀 Sumire—Never again', 10, 15)
+        self.assertEqual(engine.speak.call_args.args[0], 'Never')
+        source = 'Sumire—Never–again―today ' * 20
+        chunks = list(utterances(source, limit=24))
+        self.assertTrue(all(len(SpeechText(text).text) <= 24 for text, _, _ in chunks))
+        self.assertEqual(''.join(text for text, _, _ in chunks).replace(' ', ''), source.replace(' ', ''))
+        unchanged = "well-known non‑breaking don't l’amour 10–12 −5 3.14 https://a-b.test"
+        self.assertEqual(SpeechText(unchanged).text, unchanged)
+        self.assertEqual(len(list(word_ranges(unchanged))), 8)
+        session.dispose()
+
     def test_natural_finish_can_chain_but_stop_failure_and_stale_callbacks_cannot(self):
         engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
         session = SpeechSession(engine, on_range=Mock(), on_state=Mock())

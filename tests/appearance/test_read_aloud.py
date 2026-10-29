@@ -36,6 +36,24 @@ class SilentEngine(qt.QObject):
 
 
 class SpeechTests(QtTestCase):
+    def test_dash_words_reach_qt_separately_and_highlight_original_document(self):
+        widget = qt.QTextBrowser(self.owner)
+        original = '😀 Sumire—Never again'
+        widget.setPlainText(original)
+        speech = ReadAloud(self.owner, lambda: reader_text(widget), text_widget=widget, engine_factory=SilentEngine)
+        speech.show()
+        speech.start()
+        self.assertEqual(speech.engine.spoken[-1], '😀 Sumire — Never again')
+        speech.engine.sayingWord.emit('Sumire', 0, 3, 6)
+        selections = widget.extraSelections()
+        self.assertEqual(selections[0].cursor.selectedText(), 'Sumire')
+        speech.engine.sayingWord.emit('Never', 0, 12, 5)
+        selections = widget.extraSelections()
+        cursor = selections[0].cursor
+        self.assertEqual((cursor.selectedText(), cursor.selectionStart()), ('Never', 10))
+        self.assertEqual(widget.toPlainText(), original)
+        speech.stop()
+
     def setUp(self):
         from unittest.mock import patch
         detector = patch('commonUtils.ui.readers.read_aloud.passage_language', return_value='')

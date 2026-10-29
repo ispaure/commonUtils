@@ -97,6 +97,16 @@ Qt read-aloud also uses `SpeechSession` and `PlaybackTimer`;
 `ui.readers.qt_speech` adapts Qt scheduling and engine callbacks. Each platform
 retains its own widgets, voice selection and installed-engine availability.
 
+Speech input separates prose em/en dashes and horizontal bars from adjacent words
+with spaces, so `Sumire—Never` is submitted as `Sumire — Never`. Ordinary compound
+hyphens, apostrophes, minus signs and numeric en-dash ranges are preserved. The
+utterance budget includes inserted spaces. Source queue text remains untouched;
+each engine payload owns a UTF-16 boundary map back to the source. Native range
+callbacks map through it and exclude separator-only spans; fallback word cursors
+and skip targets also split at prose dashes. Pause, resume and selection bounds
+stay in source coordinates. Stop/disposal releases payload text and its map. This
+prepares word boundaries, while pronunciation still depends on the installed voice.
+
 `speech_language.passage_language(text, hint='')` detects up to 6,000 characters
 locally with optional `langdetect==1.0.9` profiles. Detection uses a deterministic
 seed, at least 20 letters and a probability threshold of 0.85; uncertain text
