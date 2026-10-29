@@ -1,4 +1,8 @@
 """Filename transformations and no-overwrite/rollback behavior on real temporary files."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory

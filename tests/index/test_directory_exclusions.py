@@ -1,4 +1,8 @@
 """Synthetic macOS firmlink layout: never traverse the Data alias from /."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory

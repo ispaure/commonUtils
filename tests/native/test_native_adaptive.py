@@ -1,4 +1,8 @@
 """Allocated logical width, independent of device branding or pixel density."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.SMOKE
 from types import SimpleNamespace
 import unittest
 

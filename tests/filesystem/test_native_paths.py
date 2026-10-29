@@ -1,4 +1,8 @@
 """Native path spelling preserves long I/O and local storage protection."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 from pathlib import Path
 import shutil

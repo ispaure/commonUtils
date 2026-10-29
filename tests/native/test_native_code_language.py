@@ -1,4 +1,8 @@
 """Standalone CodeInput consumes portable language state without Logistics."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import asyncio
 import importlib.util
 import os

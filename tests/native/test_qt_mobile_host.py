@@ -1,4 +1,8 @@
 """Host admission contracts; simulator evidence belongs to the consuming app."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from unittest.mock import patch
 from PySide6.QtWidgets import QApplication

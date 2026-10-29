@@ -1,4 +1,8 @@
 """Lens image transforms and lifetime, without a UIKit runtime."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import sys
 import importlib.util
 from pathlib import Path

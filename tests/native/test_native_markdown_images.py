@@ -1,4 +1,8 @@
 """Provider-backed native GIFs preserve bytes, names and access boundaries."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import base64
 from pathlib import Path
 from tempfile import TemporaryDirectory

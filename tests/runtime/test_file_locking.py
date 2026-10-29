@@ -1,4 +1,8 @@
 """Advisory locks retain one inode and release ownership on every exit path."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import errno
 import os
 from pathlib import Path

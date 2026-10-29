@@ -1,4 +1,8 @@
 """Reader gestures restore native navigation state across controller changes."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import sys
 from types import SimpleNamespace
 import unittest

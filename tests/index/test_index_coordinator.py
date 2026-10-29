@@ -1,4 +1,8 @@
 """Real processes share progress, serialize writers and recover saved work."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from contextlib import closing
 from pathlib import Path
 import sqlite3

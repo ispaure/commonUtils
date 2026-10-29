@@ -1,4 +1,8 @@
 """Three-way resolution invariants, live ranges, Unicode and reversible edits."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import random
 import unittest
 from commonUtils.persistence.merge import MergeSession, merge_text

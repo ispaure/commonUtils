@@ -1,4 +1,8 @@
 """Writer operations isolate transient state while retaining durable snapshots."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest

@@ -1,4 +1,8 @@
 """Shared footer messages remain readable without controlling workspace height."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.appearance.status_line import StatusLine, style_status_bar

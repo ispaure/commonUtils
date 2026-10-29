@@ -1,4 +1,8 @@
 """An independent Toga consumer exercises browser lifetime and bounded rendering."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.util
 import os
 from pathlib import Path

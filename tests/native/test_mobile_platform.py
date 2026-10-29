@@ -1,4 +1,8 @@
 """Simulated OS contracts; these tests do not certify mobile device support."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from unittest.mock import patch
 from commonUtils.runtime.platform import OS, get_os, get_os_path, get_arch, Arch

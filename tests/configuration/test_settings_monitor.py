@@ -1,4 +1,8 @@
 """One change detector, weak lifetimes and completed-write notifications."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import gc
 from pathlib import Path
 from tempfile import TemporaryDirectory

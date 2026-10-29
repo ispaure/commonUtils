@@ -1,4 +1,8 @@
 """Both size measures persist, migrate, and update without reading contents."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import json
 from contextlib import closing
 from pathlib import Path

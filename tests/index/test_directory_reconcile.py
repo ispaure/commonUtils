@@ -1,4 +1,8 @@
 """Visible-folder updates remain bounded and retain immutable old read snapshots."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory

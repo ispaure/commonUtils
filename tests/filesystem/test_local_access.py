@@ -1,4 +1,8 @@
 """Raw filesystem surfaces must respect host-owned provider boundaries."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest

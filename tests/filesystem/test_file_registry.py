@@ -1,5 +1,9 @@
 """Global registration, priority, built-ins and Directory listing compatibility."""
 
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.SMOKE
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest

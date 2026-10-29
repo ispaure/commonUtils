@@ -1,4 +1,8 @@
 """Displayed byte totals drive ordering, independently of formatted labels."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import time
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase

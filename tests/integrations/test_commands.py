@@ -1,4 +1,8 @@
 """Real child-process outcomes, argument boundaries, timeouts and cancellation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 import sys
 from threading import Event, Timer

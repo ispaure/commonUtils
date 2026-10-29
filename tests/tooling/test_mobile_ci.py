@@ -1,4 +1,8 @@
 """Host checks for mobile report integrity and source packaging, without a simulator."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.util
 import json
 from pathlib import Path

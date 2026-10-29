@@ -1,4 +1,8 @@
 """Contextual row buttons never activate a file or act on replaced sources."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace as NS

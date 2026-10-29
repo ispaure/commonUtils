@@ -1,4 +1,8 @@
 """Shared stream helpers retain byte integrity and stop at cooperative boundaries."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from hashlib import sha256
 from io import BytesIO
 from threading import Event

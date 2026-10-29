@@ -1,4 +1,8 @@
 """Compact index migration, shared versions, and recovery against real SQLite."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from contextlib import closing
 import json
 import os

@@ -1,4 +1,8 @@
 """IME chrome lifetime: resizing, dismissal and independent reader ownership."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import sys
 import importlib.util
 from types import SimpleNamespace as NS

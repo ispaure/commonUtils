@@ -1,4 +1,8 @@
 """Surface batching and drawable isolation without an application palette."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from copy import deepcopy
 from types import SimpleNamespace as NS
 from unittest import TestCase

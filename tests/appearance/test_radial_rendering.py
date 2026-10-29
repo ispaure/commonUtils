@@ -1,4 +1,8 @@
 """Radial redraw cost, geometric hit testing and cursor-following hover details."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import math
 from pathlib import Path
 from unittest.mock import patch

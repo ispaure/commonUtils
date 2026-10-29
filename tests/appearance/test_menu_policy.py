@@ -1,4 +1,8 @@
 """Menu placement follows one preference for existing and future windows."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from unittest.mock import patch
 
 from commonUtils.tests.qt_test_case import QtTestCase

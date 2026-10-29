@@ -1,4 +1,8 @@
 """Explicit private modes and bounded Windows sharing retry preserve old data."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory

@@ -1,4 +1,8 @@
 """Opt-in theme, accessible palettes and active workspace tab rendering."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib
 from dataclasses import replace
 import os

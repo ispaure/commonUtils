@@ -1,4 +1,8 @@
 """Index aggregates, cached reads and incomplete recursive size semantics."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event

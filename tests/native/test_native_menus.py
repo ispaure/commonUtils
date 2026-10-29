@@ -1,4 +1,8 @@
 """Menu callbacks stay host-owned; disposal blocks stale native selections."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch

@@ -1,4 +1,8 @@
 """Inline origin adaptation preserves document identity and existing view validation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock

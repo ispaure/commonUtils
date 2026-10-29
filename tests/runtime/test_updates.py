@@ -1,4 +1,8 @@
 """Real local Git/archive transactions, private-file preservation and restart handoff."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import json
 from pathlib import Path
 import shutil

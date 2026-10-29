@@ -1,4 +1,8 @@
 """Search owners keep UI imports out of query and disk-search modules."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import subprocess
 import sys

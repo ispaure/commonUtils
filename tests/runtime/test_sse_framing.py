@@ -1,4 +1,8 @@
 """Data framing retains arbitrary byte boundaries and the existing buffer limit."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.runtime.streams.sse import SSEDataDecoder, SSERecordLimit
 

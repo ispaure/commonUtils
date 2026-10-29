@@ -1,4 +1,8 @@
 """Spool capture separates binary data, bounded diagnostics and cancellation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import sys
 import os
 import errno

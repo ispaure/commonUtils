@@ -1,4 +1,8 @@
 """Mobile identities are mocks; actual I/O below runs on the desktop test host."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 from pathlib import Path
 import subprocess

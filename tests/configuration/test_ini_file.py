@@ -1,4 +1,8 @@
 """Generic INI parsing, format retention and conflict-safe saves."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from configparser import Error as ConfigError
 from pathlib import Path
 import stat

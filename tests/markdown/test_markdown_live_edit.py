@@ -1,4 +1,8 @@
 """Live typed Markdown, selection wrapping and editor document/undo boundaries."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import unittest

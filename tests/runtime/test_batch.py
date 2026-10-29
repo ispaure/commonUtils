@@ -1,4 +1,8 @@
 """Portable batch outcomes and cancellation without importing a UI toolkit."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from threading import Event
 import unittest
 from commonUtils.runtime.operations import run_batch

@@ -1,4 +1,8 @@
 """Queued GUI refresh and automatic subscription retirement."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Thread

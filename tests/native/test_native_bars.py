@@ -1,4 +1,8 @@
 """Toolbar title clearance stays symmetric across phone and tablet layouts."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.ui.native.bars import centered_title_width
 

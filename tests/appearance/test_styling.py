@@ -1,4 +1,8 @@
 """Live font roles, Markdown code, palette contrast and per-field inheritance."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace

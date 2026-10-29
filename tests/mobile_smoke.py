@@ -3,6 +3,8 @@
 No OS mocks, GUI, subprocesses or user documents. --target host is only a desktop
 harness check and never emits a mobile success. Fixtures live in app-private temp.
 """
+
+# TEST_STAGE = TestStage.SMOKE
 import argparse
 import codecs
 import importlib

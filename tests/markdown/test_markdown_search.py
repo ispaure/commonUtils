@@ -1,4 +1,8 @@
 """Desktop search scopes, transient marks and wiki pane geometry."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt

@@ -1,5 +1,9 @@
 """Header mechanisms report facts; consuming readers decide decoder limits."""
 
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
+
 import struct
 import unittest
 

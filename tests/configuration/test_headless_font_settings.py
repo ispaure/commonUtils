@@ -1,4 +1,8 @@
 """Pure preferences must not probe Qt's font database before GUI startup."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch

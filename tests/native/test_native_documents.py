@@ -1,4 +1,8 @@
 """System export validates leaf names and keeps originals on failed stream copy."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory

@@ -81,6 +81,54 @@ and methods through their new owner paths; it does not duplicate assertions.
 
 ## Development and validation
 
+### Reusable consumer test mechanisms
+
+`commonUtils.testing` is an opt-in package for host tests and native acceptance
+drivers. Importing it loads no toolkit or application. Its modules use relative
+library imports and contain no Logistics workflows:
+
+| Module | Contract |
+| --- | --- |
+| `testing.stages` | `TestStage.SMOKE`, `REGRESSION`, `EXTENDED`, cumulative `PROFILES`, `@stage` overrides and source-only `classify`/`validate`. Each source declares one enum default; invalid or duplicate declarations fail together before imports. |
+| `testing.settings` | Shared polling, keyboard acknowledgement, screenshot and rotation defaults. Runner budgets belong to consumers. Durations are seconds; attempts and stable samples are counts. |
+| `testing.waiting` | `wait_until` returns the first truthy synchronous observation by a monotonic deadline; lazy timeout messages can describe the final state. `wait_for_assertion` retries only assertion failures and retains the final error. Other errors and cancellation propagate. |
+| `testing.waiting.settled_keyboard` | Requires the served input and visible IME to agree for consecutive samples; retries requests after instability and returns false after its explicit attempt budget. |
+| `testing.rotation.NativeRotation` | Dispatches native Toga window/Activity requests and observes acknowledgement. iOS checks the exact interface orientation; Android checks configuration and window aspect, which does not certify left/right direction on constrained firmware. `restored()` restores the original iOS pose or exact Android orientation policy after a scenario. |
+| `testing.screenshots` | Captures the composited native window, including accelerated Android content, and releases encoding resources on failure. Callers choose evidence paths and reporting. |
+| `testing.tasks.start_once` | Lazily schedules and retains one task per owner/attribute, including completion or failure, so repeated native lifecycle callbacks cannot launch duplicate checks. |
+| `testing.event_loop.close_loop` | Cancels pending tasks, reports failed finalizers, closes async generators and joins the default executor before closing an isolated fixture loop. Callers first close windows and retire external workers. Never pass a live application loop. |
+
+Consumers own app factories, credentials/backend fakes, scenario assertions,
+evidence schemas and build/device cleanup. Keep workload-specific budgets explicit
+at their owner instead of increasing shared defaults. Async wait predicates must
+be synchronous and nonblocking; these helpers do not certify native behavior when
+run against mocked bridges. The existing Qt fixture stays at
+`commonUtils.tests.qt_test_case.QtTestCase` for its established consumers.
+
+`TEST_STAGE = TestStage.REGRESSION` labels a Python module. Import the enum from
+`commonUtils.testing.stages`. `@stage(TestStage.SMOKE)` on a class or method overrides
+the default; method labels win, including inherited methods. Keep expensive soaks
+and comprehensive native journeys EXTENDED. Standalone embedded scripts may use a
+column-zero `# TEST_STAGE = TestStage.MEMBER` comment; Go/Swift/Java use `//`.
+`validate(paths)` parses source without importing tests and returns classifications,
+including locally inherited cases. Runtime `Classification.resolve(case)` covers
+imported unittest bases and generated cases. Static inventories cannot enumerate
+those dynamic cases. Consumers own root manifests, selection, execution, failure
+gates and reports; `PROFILES` supplies smoke/daily/full cumulative stage tuples.
+Library tests inherit their module default. Direct unittest discovery remains
+supported but does not itself select stages or enforce a consumer's preflight.
+
+Polling helpers reject observations or assertions that succeed after their deadline;
+keep predicates synchronous and quick. Cleanup errors propagate, so consumers must
+keep fixture files alive when worker retirement fails. The loop helper never removes
+fixture roots itself.
+
+Regression owners for these mechanisms are `tests/tooling/test_async_waiting.py`,
+`test_keyboard_acknowledgement.py`, `test_native_rotation.py`,
+`test_native_screenshots.py`, `test_test_event_loop.py` and `test_test_tasks.py`.
+
+### Fixtures and lifecycle
+
 `test_batch.py` owns portable batch outcomes with plain unittest and no toolkit
 imports. `test_operations.py` retains Qt worker/progress ownership checks. Native
 or mobile runtimes can reuse the batch suite without installing Qt or duplicating

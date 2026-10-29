@@ -1,4 +1,8 @@
 """Callback archive views retain lazy reads and explicit manifest cancellation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from zipfile import ZipInfo
 from commonUtils.archives.callbacks import CallbackArchive

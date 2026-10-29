@@ -1,4 +1,8 @@
 """Captured browser requests preserve cache/scan policy and snapshot ownership."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, Mock

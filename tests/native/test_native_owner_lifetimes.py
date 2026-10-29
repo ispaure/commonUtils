@@ -1,4 +1,8 @@
 """Native owner lifetime contracts with dummy/fake adapters, not device evidence."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import asyncio
 from importlib.util import find_spec
 import os

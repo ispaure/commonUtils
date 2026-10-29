@@ -1,4 +1,8 @@
 """Shared task progress publishes results on the GUI thread after worker shutdown."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from threading import Event

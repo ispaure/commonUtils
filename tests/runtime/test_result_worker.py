@@ -1,3 +1,7 @@
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from time import monotonic
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt

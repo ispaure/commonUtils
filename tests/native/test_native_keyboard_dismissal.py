@@ -1,4 +1,8 @@
 """Keyboard gestures preserve text controls and never consume outside taps."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import sys
 from types import SimpleNamespace as NS
 import unittest

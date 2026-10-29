@@ -1,5 +1,9 @@
 """Reusable JSON files preserve originals when serialization or replacement fails."""
 
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
+
 import json
 import os
 from pathlib import Path

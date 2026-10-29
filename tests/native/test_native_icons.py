@@ -1,4 +1,8 @@
 """Consumer artwork and retained controls remain independent of app policy."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import subprocess
 import sys
 import unittest

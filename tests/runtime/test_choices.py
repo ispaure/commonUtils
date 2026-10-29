@@ -1,4 +1,8 @@
 """Choice identity, order and string-only presentation boundaries."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 
 from commonUtils.runtime.choices import ChoiceOption, ChoiceSet

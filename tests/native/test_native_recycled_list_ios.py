@@ -1,4 +1,8 @@
 """UIKit row lifecycle checks without requiring an iOS runtime."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace

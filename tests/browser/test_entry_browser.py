@@ -1,4 +1,8 @@
 """Shared views accept opaque JSON identities and providers without disk access."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from io import BytesIO

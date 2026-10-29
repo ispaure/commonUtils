@@ -1,4 +1,8 @@
 """Discovery ordering, durable checkpoints and aggregate write amplification."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.EXTENDED
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event

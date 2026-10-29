@@ -1,4 +1,8 @@
 """Native Windows DPI sequences preserve real Qt logical window dimensions."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import ctypes
 from ctypes import wintypes
 from types import SimpleNamespace

@@ -1,4 +1,8 @@
 """ZIP writes to subprocess pipes retain correct headers on every platform."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from io import BytesIO, UnsupportedOperation
 import sys
 import unittest

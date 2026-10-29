@@ -1,4 +1,8 @@
 """Private HTML must bypass the toolkit's disk cache even above 2 MiB."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from importlib.util import find_spec
 import os
 import sys

@@ -1,4 +1,8 @@
 """Archive formats use shared file resolution and passive detail hooks."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import subprocess

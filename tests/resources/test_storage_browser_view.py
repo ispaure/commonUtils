@@ -1,4 +1,8 @@
 """Storage uses saved index data, browser navigation and shared selection."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import time
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase

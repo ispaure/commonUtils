@@ -1,4 +1,8 @@
 """Qt exports and customization hooks work across implementation components."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')

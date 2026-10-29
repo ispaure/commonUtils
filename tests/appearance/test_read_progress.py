@@ -1,4 +1,8 @@
 """Read measurement and worker-to-loop progress have no application dependencies."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import asyncio
 from contextlib import contextmanager
 from io import BytesIO

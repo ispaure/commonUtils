@@ -1,4 +1,8 @@
 """Launcher pause flags must work with macOS's bundled Bash 3.2."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import subprocess
 import shutil

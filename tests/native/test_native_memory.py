@@ -1,4 +1,8 @@
 """Native subscriptions suppress queued work after disposal or owner collection."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import gc
 from types import SimpleNamespace
 import unittest

@@ -1,4 +1,8 @@
 """Run actual Unix launchers with a controlled uv transport."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import json
 import os
 from pathlib import Path

@@ -1,4 +1,8 @@
 """The shared documentation opens as one titled, linked Markdown wiki."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import re
 import unittest

@@ -1,4 +1,8 @@
 """The browsing core uses opaque identities and needs no filesystem or UI."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.runtime.browsing import BrowseEntry, BrowseTree
 

@@ -1,4 +1,8 @@
 """Host logging settings, presentation and failure policies do not leak between instances."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.runtime.diagnostics import DebugLogger, LoggingOptions, DebugException, Severity, noninteractive_logging
 

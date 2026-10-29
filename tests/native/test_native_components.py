@@ -1,4 +1,8 @@
 """Native components have no consumer imports and retain explicit ownership."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 import importlib.util
 from pathlib import Path

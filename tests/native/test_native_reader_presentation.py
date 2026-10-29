@@ -1,4 +1,8 @@
 """Native transitions respect motion policy; slider painting uses supplied roles."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 import unittest

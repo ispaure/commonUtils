@@ -1,4 +1,8 @@
 """Key adapters keep host namespaces explicit and native imports lazy."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.abc
 import subprocess
 import sys

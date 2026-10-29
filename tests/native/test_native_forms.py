@@ -1,4 +1,8 @@
 """Form presentation preserves source text and retained field values."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('TOGA_BACKEND', 'toga_dummy')
 import unittest

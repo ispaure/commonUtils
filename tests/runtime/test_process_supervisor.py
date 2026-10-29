@@ -1,4 +1,8 @@
 """Resource ownership remains correct when worker startup or command execution fails."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from commonUtils.integrations.wrappers.cmdShellWrapper.process import ProcessSupervisor

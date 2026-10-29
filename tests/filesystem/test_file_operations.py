@@ -1,5 +1,9 @@
 """Clipboard transfer semantics preserve originals, links and existing destinations."""
 
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
+
 import errno
 from pathlib import Path
 from tempfile import TemporaryDirectory

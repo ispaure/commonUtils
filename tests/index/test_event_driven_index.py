@@ -1,4 +1,8 @@
 """Completed browsers stay idle; visits check one folder and Refresh checks deeper."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path

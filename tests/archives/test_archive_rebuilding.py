@@ -1,4 +1,8 @@
 """Member replacement preserves unrelated content, attributes, order and comments."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from io import BytesIO
 from contextlib import contextmanager
 from unittest.mock import patch

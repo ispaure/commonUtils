@@ -1,4 +1,8 @@
 """Document baselines and independently wired Markdown editing components."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import unittest
 

@@ -1,4 +1,8 @@
 """Wheel gestures scroll forms without dirtying their value controls."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 
 from PySide6.QtTest import QTest, QSignalSpy

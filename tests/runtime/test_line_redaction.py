@@ -1,4 +1,8 @@
 """Line filters retain PEM state; callers supply secrets explicitly."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.runtime.diagnostics.redaction import LineRedactor, redact
 

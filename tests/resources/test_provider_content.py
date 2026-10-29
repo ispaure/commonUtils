@@ -1,4 +1,8 @@
 """Injected content factories retain provider policy and independent lifetime."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import base64
 from contextlib import contextmanager
 from io import BytesIO

@@ -1,4 +1,8 @@
 """Assert actual pane coordinates, not merely accepted docking operations."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
 from commonUtils.ui.workspaces.workspace import Workspace

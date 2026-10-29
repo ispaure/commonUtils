@@ -1,4 +1,8 @@
 """Mixed field callbacks keep sparse overrides and reset identities independent."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from unittest.mock import patch
 

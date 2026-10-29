@@ -1,4 +1,8 @@
 """Painted icon copies survive garbage collection and update with the palette."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import gc
 import unittest
 from commonUtils.tests.qt_test_case import QtTestCase

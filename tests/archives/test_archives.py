@@ -1,4 +1,8 @@
 """Verified creation/editing and transactional, traversal-safe extraction."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from io import BytesIO
 import os
 from pathlib import Path

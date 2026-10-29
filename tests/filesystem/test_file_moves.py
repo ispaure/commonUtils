@@ -1,5 +1,9 @@
 """Run from the parent directory: python3 -m unittest discover -s commonUtils/tests."""
 
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
+
 import errno
 from pathlib import Path
 from tempfile import TemporaryDirectory

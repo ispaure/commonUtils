@@ -1,4 +1,8 @@
 """Container ownership, policy boundaries and reversible transfers with real Qt."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from unittest.mock import patch
 from shiboken6 import isValid

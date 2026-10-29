@@ -1,4 +1,8 @@
 """GIF container boundaries and dimensions without importing a UI or decoder."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import base64
 import struct
 import unittest

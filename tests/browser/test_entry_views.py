@@ -1,4 +1,8 @@
 """Unknown byte sizes stay last in both Qt sorting directions."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.ui.entry_views import value_less, label_less
 

@@ -1,4 +1,8 @@
 """Category navigation keeps page ownership and selection policy with its host."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui.settings.navigation import SettingsNavigation
 from PySide6.QtWidgets import QLineEdit, QTreeWidgetItem

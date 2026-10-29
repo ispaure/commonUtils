@@ -1,4 +1,8 @@
 """Content inventories reject changed/linked files and honor bounds/cancellation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from hashlib import sha256
 import os
 from pathlib import Path

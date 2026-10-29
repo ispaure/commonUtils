@@ -1,4 +1,8 @@
 """Reproduce a cooperative callback entered with another running-loop context."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.SMOKE
 import asyncio
 from asyncio import events
 import unittest

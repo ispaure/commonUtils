@@ -1,4 +1,8 @@
 """Offline language decisions with real profiles and installed-voice constraints."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from commonUtils.runtime.speech_language import passage_language, matching_locale
 

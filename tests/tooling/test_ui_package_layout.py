@@ -1,4 +1,8 @@
 """Grouped UI imports are direct, lazy at package level and namespace-isolated."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import subprocess
 import sys
 import unittest

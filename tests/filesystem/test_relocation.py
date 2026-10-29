@@ -1,4 +1,8 @@
 """Relocation verifies copied content and rebases links without a consumer."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import errno
 from pathlib import Path
 from tempfile import TemporaryDirectory

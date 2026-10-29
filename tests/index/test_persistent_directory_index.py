@@ -1,4 +1,8 @@
 """Durable folder checkpoints, snapshot isolation and incremental directory updates."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory

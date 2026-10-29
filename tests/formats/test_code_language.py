@@ -1,4 +1,8 @@
 """Toolkit-independent language identities and automatic/manual transitions."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from unittest.mock import patch
 

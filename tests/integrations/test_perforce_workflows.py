@@ -1,4 +1,8 @@
 """Checkout outcomes and ordering used by Blue Hole; no server or UI required."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json

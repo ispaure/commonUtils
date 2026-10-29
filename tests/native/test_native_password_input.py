@@ -1,4 +1,8 @@
 """Reveal controls preserve secrets and existing confirmation callbacks."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import unittest
 from importlib.util import find_spec
 if find_spec("toga"):

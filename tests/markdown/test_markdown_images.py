@@ -1,4 +1,8 @@
 """Animated GIF rendering, editable drops, persistence and decoder lifetime."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import base64
 import os
 from pathlib import Path

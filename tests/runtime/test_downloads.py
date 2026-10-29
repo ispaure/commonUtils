@@ -1,4 +1,8 @@
 """Verified provisioning preserves existing files on failure/cancellation."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from dataclasses import replace
 import hashlib
 from io import BytesIO

@@ -1,4 +1,8 @@
 """Native wiki is reusable without Logistics or Qt installed."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib.util
 import os
 from pathlib import Path

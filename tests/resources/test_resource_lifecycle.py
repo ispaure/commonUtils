@@ -1,4 +1,8 @@
 """Resource windows retain cooperative operations through close and resume."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from types import SimpleNamespace
 import unittest
 from commonUtils.ui.resources.lifecycle import ResourceOperations

@@ -1,4 +1,8 @@
 """Fixture lifecycle ordering, cooperative shutdown and bounded Qt waits."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor

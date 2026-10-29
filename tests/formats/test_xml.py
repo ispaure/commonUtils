@@ -1,4 +1,8 @@
 """Generic DOM XML workflows and lossless legacy field compatibility."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import os

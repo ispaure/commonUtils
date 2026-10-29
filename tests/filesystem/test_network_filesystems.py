@@ -1,4 +1,8 @@
 """Classify shares from mount metadata and keep network traversal out of indexes."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory

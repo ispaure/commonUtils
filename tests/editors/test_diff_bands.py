@@ -1,4 +1,8 @@
 """Diff metadata follows Qt paragraphs, including embedded separators."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from types import SimpleNamespace
 
 from commonUtils.tests.qt_test_case import QtTestCase

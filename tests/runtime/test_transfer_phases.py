@@ -1,4 +1,8 @@
 """Conformance checks for shared transfer phases without caller policy changes."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import errno
 import unittest
 from unittest.mock import Mock

@@ -1,4 +1,8 @@
 """File operation results preserve snapshot identity and propagate I/O errors."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
 import os
 import shutil

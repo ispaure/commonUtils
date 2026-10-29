@@ -1,4 +1,8 @@
 """Draw acknowledgements, timeout and cancellation retire native listeners."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import asyncio
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase

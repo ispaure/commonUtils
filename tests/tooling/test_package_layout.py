@@ -1,4 +1,8 @@
 """Direct package imports, isolated namespaces and library-relative data paths."""
+
+from commonUtils.testing.stages import TestStage
+
+TEST_STAGE = TestStage.REGRESSION
 import importlib
 from pathlib import Path
 import subprocess
