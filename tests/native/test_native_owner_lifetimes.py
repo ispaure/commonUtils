@@ -149,33 +149,6 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
             self.assertIs(host.window, window)
             host.uninstall()
 
-    def test_apple_resize_defers_host_mutation_and_coalesces_latest_container(self):
-        adapter = object.__new__(navigation.AppleNavigation)
-        adapter.keyboard_live = True
-        adapter.window = SimpleNamespace(app=SimpleNamespace(loop=Mock()), _impl=Mock())
-        first, latest = SimpleNamespace(), SimpleNamespace()
-        adapter.layout_window(first)
-        adapter.layout_window(latest)
-        adapter.window._impl.notify_resize.assert_not_called()
-        adapter.window.app.loop.call_soon.assert_called_once()
-        self.assertEqual((latest.top_inset, latest.bottom_inset, latest.left_inset, latest.right_inset), (0, 0, 0, 0))
-        adapter.window.app.loop.call_soon.call_args.args[0]()
-        adapter.window._impl.notify_resize.assert_called_once_with(latest)
-        self.assertIsNone(adapter._pending_resize_container)
-        adapter.layout_window(first)
-        self.assertEqual(adapter.window.app.loop.call_soon.call_count, 2)
-
-    def test_apple_queued_resize_does_not_notify_disposed_owner(self):
-        adapter = object.__new__(navigation.AppleNavigation)
-        adapter.keyboard_live = True
-        adapter.window = SimpleNamespace(app=SimpleNamespace(loop=Mock()), _impl=Mock())
-        adapter.layout_window(SimpleNamespace())
-        callback = adapter.window.app.loop.call_soon.call_args.args[0]
-        adapter.keyboard_live = False
-        callback()
-        adapter.window._impl.notify_resize.assert_not_called()
-        self.assertIsNone(adapter._pending_resize_container)
-
     def test_retired_navigation_callbacks_do_not_touch_native_objects(self):
         apple = object.__new__(navigation.AppleNavigation)
         apple.keyboard_live = False

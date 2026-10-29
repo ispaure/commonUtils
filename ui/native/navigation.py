@@ -243,20 +243,7 @@ class AppleNavigation:
         # controller during show/hide transitions. Leaf containers apply them.
         container.top_inset = container.bottom_inset = 0
         container.left_inset = container.right_inset = 0
-        # UIKit can call this while tearing down rotation/safe-area gesture
-        # state. Host resize handlers may replace native menus or controllers;
-        # run them after that native stack returns, once for the latest layout.
-        self._pending_resize_container = container
-        if not getattr(self, '_resize_scheduled', False):
-            self._resize_scheduled = True
-            self.window.app.loop.call_soon(self._notify_resize)
-
-    def _notify_resize(self):
-        self._resize_scheduled = False
-        container = self._pending_resize_container
-        self._pending_resize_container = None
-        if self.keyboard_live:
-            self.window._impl.notify_resize(container)
+        self.window._impl.notify_resize(container)
 
     def refresh_keyboard(self, notification):
         if not self.keyboard_live:
