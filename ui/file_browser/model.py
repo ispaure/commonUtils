@@ -240,8 +240,52 @@ class ByteSortModel(qt.QSortFilterProxyModel):
     def __init__(self, filesystem, parent=None):
         super().__init__(parent)
         self.filesystem = filesystem
+        self._sort_values = OrderedDict()
+        self._sort_revision = file_types.revision
+        # Invalidate before the proxy's native source-signal handlers can sort.
+        filesystem.dataChanged.connect(self._sort_data_changed)
+        for signal in (filesystem.modelAboutToBeReset, filesystem.modelReset,
+                       filesystem.rowsAboutToBeRemoved, filesystem.rowsRemoved,
+                       filesystem.layoutChanged):
+            signal.connect(self._clear_sort_values)
         self.setSourceModel(filesystem)
         self.setDynamicSortFilter(True)
+
+    def _clear_sort_values(self, *args):
+        self._sort_values.clear()
+
+    def _sort_data_changed(self, first, last, *args):
+        if not first.isValid() or not last.isValid():
+            self._clear_sort_values()
+            return
+        parent = first.parent()
+        columns = self.filesystem.columnCount(parent)
+        if (last.row() - first.row() + 1) * columns >= len(self._sort_values):
+            self._clear_sort_values()
+            return
+        for row in range(first.row(), last.row() + 1):
+            for column in range(columns):
+                index = self.filesystem.index(row, column, parent)
+                self._sort_values.pop(qt.QPersistentModelIndex(index), None)
+
+    def _sort_data(self, index):
+        if self._sort_revision != file_types.revision:
+            self._clear_sort_values()
+            self._sort_revision = file_types.revision
+        key = qt.QPersistentModelIndex(index)
+        cached = self._sort_values.get(key)
+        if cached is None:
+            from ...filesystem.traversal import natural_path_key
+            column = index.column()
+            cached = (index.data(BrowseRole.Container) if column == 0 else None,
+                      index.data(BrowseRole.SortValue) if column != 0 else None,
+                      natural_path_key(str(index.siblingAtColumn(0).data())))
+            self._sort_values[key] = cached
+            while len(self._sort_values) > 4096:
+                self._sort_values.popitem(last=False)
+        else:
+            self._sort_values.move_to_end(key)
+        return cached
 
     def mapFromSource(self, index):
         if index.isValid() and index.model() is self.filesystem:
@@ -255,17 +299,18 @@ class ByteSortModel(qt.QSortFilterProxyModel):
         return self.filesystem.data(index, BrowseRole.SortValue)
 
     def lessThan(self, left, right):
-        from ..entry_views import value_less, label_less
+        from ..entry_views import value_less
+        left_values, right_values = self._sort_data(left), self._sort_data(right)
         if left.column() == 0:
-            a, b = left.data(BrowseRole.Container), right.data(BrowseRole.Container)
+            a, b = left_values[0], right_values[0]
             if a != b:
                 return bool(a)
-        a, b = left.data(BrowseRole.SortValue), right.data(BrowseRole.SortValue)
         if left.column() != 0:
+            a, b = left_values[1], right_values[1]
             decision = value_less(a, b, descending=self.sortOrder() == qt.Qt.SortOrder.DescendingOrder)
             if decision is not None:
                 return decision
-        return label_less(str(left.siblingAtColumn(0).data()), str(right.siblingAtColumn(0).data()))
+        return left_values[2] < right_values[2]
 
 
 class _BrowserSelection(qt.QItemSelectionModel):

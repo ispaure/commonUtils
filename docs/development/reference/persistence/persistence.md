@@ -29,6 +29,11 @@ opts into bounded retries of Windows access/sharing errors (5, 32, 33); other
 errors propagate immediately. Defaults preserve existing behavior. Directory
 creation, JSON formatting and writer coordination remain caller-owned.
 
+Every permitted replacement retry repeats validation after the wait, so a
+concurrent writer cannot be overwritten using a pre-wait conflict check. Text
+publication opts into a two-second Windows sharing wait; a persistent lock still
+fails, while changed original bytes still raise a conflict and remain untouched.
+
 `persistence.locking.file_lock(path, timeout=0)` yields a boolean indicating
 exclusive advisory ownership. The parent must already exist. Contention yields
 False after the timeout; unrelated OS failures propagate. Release happens even

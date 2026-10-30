@@ -223,7 +223,8 @@ def write_text_file(path, content, *, expected=None, allow_overwrite=False):
 
     from . import atomic_write_bytes
     atomic_write_bytes(path, content, validate=check,
-                       overwrite=expected is not None or allow_overwrite)
+                       overwrite=expected is not None or allow_overwrite,
+                       replace_timeout=2)
 
 
 class TextSession:

@@ -26,6 +26,10 @@ The next event turn permits a fresh nanosecond stat; explicit
 `object_for_path()` calls still check immediately. Registry revisions invalidate
 resolved types immediately, and sort roles use the filesystem model's native
 size/date/name values without constructing a file object for every comparison.
+Sort comparisons also retain bounded per-row values and natural-name keys using
+persistent model indexes. Insertions preserve existing row keys; changed rows,
+removals, resets, layouts and registry revisions invalidate the affected values
+before the proxy sorts. This avoids repeated Python role dispatch for each pair.
 
 To open a standalone browser at a specific folder, put commonUtils on the Python
 import path, install PySide6, and run this minimal script. Replace the example path

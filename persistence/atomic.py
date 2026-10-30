@@ -90,6 +90,10 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True,
                             or time.monotonic() >= deadline):
                         raise
                     time.sleep(.02)
+                    # A reader can release the sharing lock after another
+                    # writer changed the destination. Never retry publication
+                    # against the validation performed before that wait.
+                    validate()
         else:
             rename_exclusive(staged, path)
     def cleanup():
