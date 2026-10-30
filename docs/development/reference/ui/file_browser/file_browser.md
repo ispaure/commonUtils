@@ -31,6 +31,13 @@ persistent model indexes. Insertions preserve existing row keys; changed rows,
 removals, resets, layouts and registry revisions invalidate the affected values
 before the proxy sorts. This avoids repeated Python role dispatch for each pair.
 
+Repeated filesystem notifications for the same path share one pending debounce
+batch. The browser reads index policy, filters exclusions and invalidates that
+path once while the batch timer is active. Distinct paths remain queued, and a
+later notification after the batch can request fresh reconciliation. This keeps
+large Windows file-creation bursts from repeatedly doing settings and path work
+on the GUI thread without suppressing later filesystem changes.
+
 To open a standalone browser at a specific folder, put commonUtils on the Python
 import path, install PySide6, and run this minimal script. Replace the example path
 with an existing directory:

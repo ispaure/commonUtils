@@ -321,12 +321,17 @@ class BrowserIndexing:
     def _indexed_path_changed(self, path):
         if self.stopping or self.network_location or not self.calculate_folder_sizes:
             return
-        from .index_policy import index_policy
-        if not index_policy(path=self.index_settings_path).watch_changes:
-            return
         root = self.navigation.directory
         path = Path(path)
         if root is None or (path != root and root not in path.parents):
+            return
+        # Windows can deliver one directory notification for every new file.
+        # The pending reconciliation already covers repeated changes to this
+        # path; do not reread policy or restart its timer for each notification.
+        if path in self._changed_paths and self.reconcile_debounce.isActive():
+            return
+        from .index_policy import index_policy
+        if not index_policy(path=self.index_settings_path).watch_changes:
             return
         from ...filesystem.index import directory_cache
         from ...filesystem.index.exclusions import scan_exclusions, is_excluded

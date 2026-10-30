@@ -58,6 +58,33 @@ class EventDrivenIndexTests(QtTestCase):
         paths = watcher.directories() + watcher.files()
         if paths: watcher.removePaths(paths)
 
+    def test_duplicate_watcher_burst_is_coalesced_until_reconciliation_consumes_it(self):
+        from commonUtils.ui.file_browser.index_policy import index_policy
+        self.unwatch()
+        self.browser.reconcile_debounce.stop()
+        self.browser._changed_paths.clear()
+        try:
+            with patch('commonUtils.ui.file_browser.index_policy.index_policy', wraps=index_policy) as policy, \
+                    patch.object(self.cache, 'invalidate', wraps=self.cache.invalidate) as invalidate:
+                for _ in range(505):
+                    self.browser._indexed_path_changed(str(self.root))
+                self.assertEqual(policy.call_count, 1)
+                invalidate.assert_called_once_with(self.root)
+                self.assertTrue(self.browser.reconcile_debounce.isActive())
+                self.browser._indexed_path_changed(str(self.child))
+                self.assertEqual(self.browser._changed_paths, {self.root, self.child})
+                self.assertEqual(policy.call_count, 2)
+                # Starting a reconciliation consumes the set. A subsequent
+                # change must invalidate again rather than being lost forever.
+                self.browser._changed_paths.clear()
+                self.browser._indexed_path_changed(str(self.root))
+                self.assertEqual(policy.call_count, 3)
+                self.assertEqual(invalidate.call_count, 3)
+        finally:
+            self.browser.reconcile_debounce.stop()
+            self.browser._changed_paths.clear()
+            self.browser._reconcile_pending = False
+
     def test_unchanged_totals_and_cache_notifications_do_not_reload_details(self):
         self.wait(lambda: not self.browser.busy)
         totals = self.browser.model.folder_totals
