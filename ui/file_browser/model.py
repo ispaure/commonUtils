@@ -48,6 +48,10 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
         self.network_location = False
         self.size_parents = set()
         self._items = OrderedDict()
+        self._item_checks = {}
+        self._item_check_timer = qt.QTimer(self)
+        self._item_check_timer.setSingleShot(True)
+        self._item_check_timer.timeout.connect(self._item_checks.clear)
 
     def _managed_directory(self, index):
         return bool(index.isValid() and getattr(self, 'directory_boundary', None)
@@ -64,7 +68,19 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             super().fetchMore(parent)
 
     def item(self, index):
-        return self.object_for_path(self.filePath(index))
+        # Sort/paint can request thousands of roles within one GUI event. Check
+        # each path once per turn, retaining stat precision and immediate direct
+        # path lookups instead of relying on QFileSystemModel's stale fileInfo.
+        path = Path(self.filePath(index))
+        cached = self._items.get(path)
+        if cached is not None and self._item_checks.get(path) == file_types.revision:
+            self._items.move_to_end(path)
+            return cached[1]
+        result = self.object_for_path(path)
+        self._item_checks[path] = file_types.revision
+        if not self._item_check_timer.isActive():
+            self._item_check_timer.start(0)
+        return result
 
     def object_for_path(self, path):
         path = Path(path)
@@ -73,6 +89,9 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             fingerprint = (stat.st_mtime_ns, stat.st_size, file_types.revision)
         except OSError:
             fingerprint = (None, None, file_types.revision)
+        return self._cached_object(path, fingerprint)
+
+    def _cached_object(self, path, fingerprint):
         cached = self._items.get(path)
         if cached is None or cached[0] != fingerprint:
             cached = (fingerprint, object_from_path(path))
@@ -127,6 +146,15 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                 return self.browse_identity(index)
             if role == BrowseRole.Container:
                 return self.isDir(index)
+            if role == BrowseRole.SortValue:
+                if index.column() == 1:
+                    if self.isDir(index):
+                        stats = self.folder_totals.get(Path(self.filePath(index)))
+                        return stats.size if stats is not None and not self.fileInfo(index).isSymLink() else None
+                    return self.size(index)
+                if index.column() == 3:
+                    return self.lastModified(index)
+                return self.fileName(index)
             item = self.item(index)
             if role == BrowseRole.Badge:
                 return item.browser_thumbnail_badge
@@ -136,15 +164,6 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                 return '' if isinstance(item, Directory) else item.path.suffix
             if role == BrowseRole.Revision:
                 return None
-            if role == BrowseRole.SortValue:
-                if index.column() == 1:
-                    if self.isDir(index):
-                        stats = self.folder_totals.get(item.path)
-                        return stats.size if stats is not None and not item.path.is_symlink() else None
-                    return self.size(index)
-                if index.column() == 3:
-                    return self.lastModified(index)
-                return self.fileName(index)
         if index.isValid() and role == qt.Qt.ItemDataRole.DisplayRole:
             item = self.item(index)
             if index.column() == 0:

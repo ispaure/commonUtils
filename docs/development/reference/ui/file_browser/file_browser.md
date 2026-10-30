@@ -21,6 +21,12 @@ Filesystem and sorting models also route Qt's batched `multiData()` role request
 through their Python `data()` implementations. Native delegates therefore retain
 custom filenames, recursive folder sizes and cached thumbnails on Qt 6.12.
 
+GUI role requests share a path's metadata check within the current event turn.
+The next event turn permits a fresh nanosecond stat; explicit
+`object_for_path()` calls still check immediately. Registry revisions invalidate
+resolved types immediately, and sort roles use the filesystem model's native
+size/date/name values without constructing a file object for every comparison.
+
 To open a standalone browser at a specific folder, put commonUtils on the Python
 import path, install PySide6, and run this minimal script. Replace the example path
 with an existing directory:

@@ -479,7 +479,9 @@ class BrowserFileActionTests(QtTestCase):
 
     def wait_for_visible_file(self, path):
         deadline = time.monotonic() + 5
-        model, root = self.browser.model, self.browser.tree.rootIndex()
+        model = self.browser.model
+        # The tree owns proxy indexes; QFileSystemModel requires its own parent.
+        root = model.index(str(self.root))
         while path not in {Path(model.filePath(model.index(row, 0, root))) for row in range(model.rowCount(root))}:
             self.assertLess(time.monotonic(), deadline)
             self.app.processEvents(); time.sleep(.005)
