@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 from html import unescape
+import asyncio
 import json
 import re
 
@@ -48,6 +49,10 @@ class MarkdownWikiView:
                                 on_webview_load=self.page_loaded, style=Pack(flex=1))
         self.title = toga.Label('Documentation', style=Pack(margin_bottom=8))
         self.article = toga.Box(children=[self.title, self.web], style=Pack(direction=COLUMN, flex=1))
+        from .page_loading import PageLoading
+        self.page_loading = PageLoading(self.article)
+        self._load_epoch = 0
+        self.background_loading = type(self.web._impl).__module__.startswith(('toga_iOS.', 'toga_android.'))
         from .markdown_search import MarkdownPageSearch
         self.page_search = MarkdownPageSearch(self.web, self.article, insertion_index=1)
         self.page_search.button.on_press = self.show_page_search
@@ -157,32 +162,70 @@ class MarkdownWikiView:
             self.layout()
             self.page_search.show()
 
-    def open_page(self, path, *, remember=True, linked=False, fragment=''):
+    def open_page(self, path, *, remember=True, linked=False, fragment='', _history_index=None):
         path = Path(path).resolve()
         if path not in self.catalog.pages and not (linked and path.suffix.lower() in ('.md', '.markdown')):
             self.notice.text = 'That page is outside this documentation folder or unavailable.'
             self.reading = False
             self.layout()
             return False
-        try:
-            from ...filesystem.local_access import check_local_path
-            check_local_path(path)
-            text = path.read_text(encoding='utf-8-sig')
-            options = dict(local_links=True)
-            if self.image_source_factory is not None:
-                root = documentation_root(path, self.catalog.root)
-                options['image_source'] = self.image_source_factory(path, root)
-            html = self.render(text, self.font_size, **options)
-        except (OSError, UnicodeError, ValueError) as error:
-            self.notice.text = str(error)
-            self.reading = False
-            self.layout()
+        self._load_epoch += 1
+        epoch = self._load_epoch
+        self.page_loading.start()
+        self.reading = True
+        self.layout()
+
+        def publish(result):
+            if epoch != self._load_epoch:
+                return False
+            text, html = result
+            return self._show_page(path, text, html, remember, fragment, _history_index)
+
+        def failed(error):
+            if epoch == self._load_epoch:
+                self.page_loading.finish()
+                self.notice.text = str(error)
+                self.layout()
             return False
+
+        if self.background_loading:
+            async def load():
+                try:
+                    return publish(await asyncio.to_thread(self._read_page, path))
+                except (OSError, UnicodeError, ValueError) as error:
+                    return failed(error)
+                finally:
+                    if epoch == self._load_epoch:
+                        self.page_loading.finish()
+            self.load_task = asyncio.get_event_loop().create_task(load())
+            return True
+        try:
+            return publish(self._read_page(path))
+        except (OSError, UnicodeError, ValueError) as error:
+            return failed(error)
+        finally:
+            self.page_loading.finish()
+
+    def _read_page(self, path):
+        from ...filesystem.local_access import check_local_path
+        check_local_path(path)
+        text = path.read_text(encoding='utf-8-sig')
+        options = dict(local_links=True)
+        if self.image_source_factory is not None:
+            root = documentation_root(path, self.catalog.root)
+            options['image_source'] = self.image_source_factory(path, root)
+        html = self.render(text, self.font_size, **options)
+        return text, html
+
+    def _show_page(self, path, text, html, remember, fragment, history_index):
+        self.notice.text = ''
         root = documentation_root(path, self.catalog.root)
         if root != self.catalog.root:
             self.catalog = MarkdownWiki(root)
             self.expanded.clear()
             self.search.value = ''
+        if history_index is not None:
+            self.history_index = history_index
         if remember and path != self.path:
             del self.history[self.history_index + 1:]
             self.history.append(path)
@@ -227,11 +270,7 @@ class MarkdownWikiView:
         index = self.history_index + offset
         if not 0 <= index < len(self.history):
             return False
-        if not self.open_page(self.history[index], remember=False, linked=True):
-            return False
-        self.history_index = index
-        self.update_navigation()
-        return True
+        return self.open_page(self.history[index], remember=False, linked=True, _history_index=index)
 
     def back(self, widget=None, **kwargs):
         return self.navigate_history(-1)

@@ -272,3 +272,13 @@ The tree explicitly disables drag/drop and item editing; `allow_edit` affects th
 page editor, not library structure. Native `MarkdownWikiView` uses the same
 Documentation Library label and catalog title rules. These shared viewers do not
 own notes/vault file organization; consumers implement that workflow.
+
+On iOS and Android, `MarkdownWikiView.open_page()` accepts a navigation request
+and prepares text/HTML on a worker while `page_loading` displays feedback. Its
+`load_task` can be awaited for completion. History advances only after successful
+publication; superseded reads cannot publish or clear the latest load indicator.
+Dummy-backend callers retain synchronous loading by default and can enable
+`background_loading` for scheduling tests. `PageLoading` in
+`ui.native.page_loading` is also available to provider-backed native readers.
+Desktop Markdown rendering shows a slim indeterminate bar and restores its
+temporary application busy cursor in a `finally` block, including read failures.

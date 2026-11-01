@@ -60,6 +60,12 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self._build_reading_controls(toolbar)
         self.status = StatusLine()
         layout.addWidget(self.status)
+        self.page_loading = qt.QProgressBar()
+        self.page_loading.setRange(0, 0)
+        self.page_loading.setAccessibleName('Loading page')
+        self.page_loading.setFixedHeight(8)
+        layout.insertWidget(0, self.page_loading)
+        self.page_loading.hide()
         self.back_button.clicked.connect(self.back)
         self.forward_button.clicked.connect(self.forward)
         self.back_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Left'), self)
@@ -366,6 +372,16 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
             self.history[self.history_index]['scroll'] = self.browser.verticalScrollBar().value()
 
     def _render(self, url, scroll=None):
+        qt.QApplication.setOverrideCursor(qt.Qt.CursorShape.WaitCursor)
+        try:
+            self.page_loading.show()
+            self.page_loading.repaint()
+            return self._render_page(url, scroll)
+        finally:
+            self.page_loading.hide()
+            qt.QApplication.restoreOverrideCursor()
+
+    def _render_page(self, url, scroll=None):
         path = Path(url.toLocalFile())
         try:
             if path.suffix.lower() not in ('.md', '.markdown'):

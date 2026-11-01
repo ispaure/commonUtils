@@ -18,6 +18,29 @@ class WikiViewerTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 
+    def test_page_feedback_covers_reads_history_and_failure(self):
+        with self.temporary_directory() as temporary:
+            root = Path(temporary).resolve()
+            first, second = root / 'first.md', root / 'second.md'
+            first.write_text('# First')
+            second.write_text('# Second')
+            viewer = MarkdownViewer(first, directory=root)
+            original = viewer._render_page
+            def render(*args):
+                self.assertFalse(viewer.page_loading.isHidden())
+                self.assertEqual(qt.QApplication.overrideCursor().shape(), qt.Qt.CursorShape.WaitCursor)
+                return original(*args)
+            with patch.object(viewer, '_render_page', side_effect=render):
+                self.assertTrue(viewer.open_document(second))
+                viewer.back()
+                self.assertEqual(viewer.current_path, first)
+                second.unlink()
+                viewer.forward()
+            self.assertTrue(viewer.page_loading.isHidden())
+            self.assertIsNone(qt.QApplication.overrideCursor())
+            self.assertIn('Cannot open', viewer.status.text())
+            viewer.close()
+
     def test_repopulation_retires_referenced_items_without_a_pending_reset(self):
         with self.temporary_directory() as temporary:
             root = Path(temporary).resolve()

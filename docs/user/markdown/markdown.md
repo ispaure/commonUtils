@@ -1,5 +1,10 @@
 # Reading and editing Markdown
 
+Opening a page or retracing page history shows loading feedback while the page
+is prepared. Native mobile wikis use a spinner and “Loading page…” caption;
+desktop readers use a busy cursor and a slim progress bar. The previous page
+remains visible until the replacement is ready, and failures clear the indicator.
+
 The shared Markdown reader opens local `.md` and `.markdown` documents with headings,
 links, images, tables and fenced code. It also supports local wiki-style links,
 Obsidian-style callouts and a limited YAML properties editor. It is a document
