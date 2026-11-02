@@ -1,4 +1,5 @@
 """Qt document Find/Replace presentation and cooperative worker ownership."""
+from ...search.policy import SEARCH_DEBOUNCE_MS
 from .. import pyside as qt
 from ..tasks.operation_progress import OperationProgress
 from ...search.qt_text import find_matches
@@ -71,7 +72,7 @@ class SearchPanel(qt.QWidget):
         layout.addWidget(self.task)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(400)
+        self.timer.setInterval(SEARCH_DEBOUNCE_MS)
         self.timer.timeout.connect(self._search)
         for field in (self.query, self.replacement):
             field.textChanged.connect(self.schedule)

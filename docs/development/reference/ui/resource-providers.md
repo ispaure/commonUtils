@@ -447,7 +447,7 @@ sorts natural names, numeric sizes or modified values in either direction while
 retaining containers first. `search.providers.search_resources` walks
 provider listings breadth-first, validates child scope and produces relative labels
 for nested matches. Desktop ResourceBrowser and NativeBrowser debounce searches
-for 400 ms after the last edit and run this scan on cancellable workers.
+for 300 ms after the last edit and run this scan on cancellable workers.
 The default scan visits the full subtree; callers can explicitly set max_entries.
 An optional `progress(SearchResult)` callback runs on the scanning thread with detached,
 incomplete snapshots. It publishes the first match immediately, then throttles
@@ -457,6 +457,13 @@ these matches while scanning continues and discards obsolete query results.
 An optional provider search_entries(directory, cancelled=...) iterator supplies a
 recursive listing directly; its rows must stay strictly beneath the requested
 directory. Partial or failed listings must not be presented as complete.
+Hosts can supply `list_children(folder, cancelled=...)` to restrict which files
+and subfolders participate. This replaces both provider listing paths so excluded
+folders are never traversed. With `read_text(path, cancelled=...)`, a file name
+can satisfy some terms and its text the remainder. A full name match skips the
+read. In this mode each result has a `content_match` flag indicating whether
+matching required text. A text read raising OSError or ValueError records an
+item error and scanning continues. Cancellation propagates.
 Partial results report limits or unreadable folders; credentials failures abort.
 The default search retains no durable index or file content. Hosts can pass
 `NativeBrowser(resource_search=callback)` to select a different backend. It runs

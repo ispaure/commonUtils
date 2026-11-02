@@ -12,6 +12,22 @@ are likewise bound to the native item view lifetime.
 
 ## Construction and navigation
 
+Hosts can assign `browser.directory_gate(path, resume)` to defer a folder open
+before changing the displayed directory. Return `True` to consume/defer the
+request, then call `resume()` only after approval; return `False` to continue
+immediately. The existing `directory_handler` still runs first for host routing.
+The host must let the approved path pass when its continuation reenters the
+gate, discard superseded continuations, and cancel pending decisions on close.
+`ResourceBrowser` supports the same hook, including its first asynchronous
+listing before model publication. Provider identity and browser lifetime are
+checked again before a retained listing resumes.
+
+`BrowserViews.directory_resumer` is the optional counterpart for hosts that
+retain tree-expansion or column-selection continuations; it accepts
+`(path, resume=callback)`. Without it, existing one-argument directory handlers
+retain their routing behavior. History positions commit with the displayed
+directory, so a deferred or cancelled Back/Forward request keeps the old position.
+
 The column view installs its preview before its model. On Qt 6.11+ it applies
 the native preview visibility switch only after attaching a model, avoiding
 Qt 6.12's null-model crash during construction. Earlier Qt versions retain

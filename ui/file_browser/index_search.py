@@ -1,4 +1,5 @@
 """Paged recursive name search from cached SQLite data; never scans on a query."""
+from ...search.policy import SEARCH_DEBOUNCE_MS
 from pathlib import Path
 from .. import pyside as qt
 from ..tasks.operations import Operation
@@ -59,7 +60,7 @@ class IndexSearch(qt.QWidget):
         layout.addLayout(controls)
         self.debounce = qt.QTimer(self)
         self.debounce.setSingleShot(True)
-        self.debounce.setInterval(400)
+        self.debounce.setInterval(SEARCH_DEBOUNCE_MS)
         self.debounce.timeout.connect(self.refresh)
         self.progress_poll = qt.QTimer(self)
         self.progress_poll.setInterval(1200)

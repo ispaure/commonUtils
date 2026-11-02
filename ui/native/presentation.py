@@ -11,6 +11,22 @@ def surface(widget):
     return widget
 
 
+def allow_label_to_shrink(label):
+    """Use the available row width even when the full text measures wider."""
+    import weakref
+    from travertino.size import at_least
+    label.intrinsic.width = at_least(0)
+    native_rehint = getattr(type(label._impl), 'rehint', None)
+    if native_rehint is not None:
+        reference = weakref.ref(label)
+        def rehint():
+            widget = reference()
+            if widget is not None:
+                native_rehint(widget._impl)
+                widget.intrinsic.width = at_least(0)
+        label._impl.rehint = rehint
+
+
 def list_button(button):
     from travertino.size import at_least
     # Text may truncate inside a row rather than widening the whole scroll view.

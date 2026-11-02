@@ -359,9 +359,10 @@ class MarkdownEditingMixin:
         self.replace_row.setVisible(self.edit_button.isChecked() and self.allow_edit)
         self.find_text.setFocus()
         self.find_text.selectAll()
-        self._refresh_search_highlights()
+        self.search_highlights.query_changed()
 
     def close_find(self):
+        self.search_highlights.query_timer.stop()
         self.find_bar.hide()
         self._clear_search_selection('page')
         self._refresh_search_highlights()
@@ -370,6 +371,8 @@ class MarkdownEditingMixin:
         return self.find_next(backward=True)
 
     def find_next(self, backward=False):
+        self.search_highlights.query_timer.stop()
+        self._refresh_search_highlights()
         target = self.active_editor() if self.edit_button.isChecked() else self.browser
         if not self.find_text.text():
             return False

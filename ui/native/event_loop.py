@@ -1,4 +1,5 @@
 """Bind cooperative native dispatch to its owned asyncio loop."""
+from ...search.policy import SEARCH_DEBOUNCE_SECONDS
 import asyncio
 from asyncio import events
 
@@ -29,13 +30,13 @@ def bind_cooperative_loop(loop):
 
 
 class DebouncedCallback:
-    """Coalesce native text edits on the application's loop (400 ms)."""
+    """Coalesce native text edits on the application's loop (300 ms)."""
     def __init__(self, callback):
         self.callback, self.pending = callback, None
 
     def __call__(self, *args, **kwargs):
         self.cancel()
-        self.pending = asyncio.get_event_loop().call_later(.4, self.run, args, kwargs)
+        self.pending = asyncio.get_event_loop().call_later(SEARCH_DEBOUNCE_SECONDS, self.run, args, kwargs)
 
     def run(self, args, kwargs):
         self.pending = None

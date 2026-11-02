@@ -1,5 +1,6 @@
 """Per-editor literal Find/Replace with native selection and retained drafts."""
 from ...search.text import literal_pattern
+from itertools import islice
 import toga
 from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
@@ -11,7 +12,10 @@ class EditorSearch:
         self.editor, self.container = editor, container
         self.insertion_index = insertion_index
         self.span = None
-        self.query = toga.TextInput(placeholder='Find text', on_change=DebouncedCallback(self.changed), style=Pack(flex=1, height=44))
+        self.closed = False
+        self.signature = None
+        self.debounce = DebouncedCallback(self.changed)
+        self.query = toga.TextInput(placeholder='Find text', on_change=self.debounce, style=Pack(flex=1, height=44))
         self.replacement = toga.TextInput(placeholder='Replace with', style=Pack(flex=1, height=44))
         self.case = toga.Switch('Match case', on_change=self.changed, style=Pack(height=44))
         self.notice = toga.Label('', style=Pack(font_size=12, flex=1))
@@ -25,6 +29,9 @@ class EditorSearch:
             style=Pack(direction=COLUMN, margin_bottom=8))
 
     def toggle(self, widget=None, **kwargs):
+        if self.closed:
+            return
+        self.debounce.cancel()
         view = self.container
         if self.box in view.children:
             view.remove(self.box)
@@ -36,11 +43,25 @@ class EditorSearch:
     def pattern(self):
         return literal_pattern(self.query.value, case=self.case.value)
 
+    def document_changed(self):
+        self.span = None
+        self.debounce.cancel()
+        if not self.closed and self.box in self.container.children:
+            self.debounce()
+
+    def dispose(self):
+        self.closed = True
+        self.debounce.cancel()
+
     def changed(self, widget=None, **kwargs):
+        if self.closed:
+            return
+        self.debounce.cancel()
+        self.signature = (self.query.value, self.case.value)
         self.span = None
         pattern = self.pattern()
-        count = sum(1 for _ in pattern.finditer(self.editor.value)) if pattern else 0
-        self.notice.text = f'{count} match(es)' if pattern else 'Enter text to find.'
+        count = sum(1 for _ in islice(pattern.finditer(self.editor.value), 5001)) if pattern else 0
+        self.notice.text = (f'{min(count, 5000)}' + ('+' if count > 5000 else '') + ' match(es)') if pattern else 'Enter text to find.'
 
     def next(self, widget=None, **kwargs):
         self.find()
@@ -49,6 +70,13 @@ class EditorSearch:
         self.find(backwards=True)
 
     def find(self, *, backwards=False):
+        if self.closed:
+            return
+        self.debounce.cancel()
+        signature = (self.query.value, self.case.value)
+        if signature != self.signature:
+            self.signature = signature
+            self.span = None
         pattern, text = self.pattern(), self.editor.value
         if pattern is None:
             return
@@ -85,6 +113,8 @@ class EditorSearch:
             editor._impl.native.scrollRangeToVisible(NSRange(start, end - start))
 
     def replace(self, widget=None, **kwargs):
+        if self.closed:
+            return
         pattern, text = self.pattern(), self.editor.value
         if self.span is None:
             self.find()
@@ -98,6 +128,8 @@ class EditorSearch:
         self.find()
 
     def replace_all(self, widget=None, **kwargs):
+        if self.closed:
+            return
         pattern = self.pattern()
         if pattern is None:
             return

@@ -12,6 +12,29 @@ The namespace also preserves the existing desktop `display_msg_box_ok` and
 `display_msg_box_ok_cancel` APIs. They load the desktop dialog backend only when
 called; importing the native navigation package does not load a UI toolkit.
 
+## Panning titles
+
+Use `commonUtils.ui.native.panning_title.PanningTitleLabel` for an opt-in,
+single-line Toga heading. Short text stays still. A clipped mobile title pans
+once and keeps its touch target fixed. The host owns taps, long presses and
+what appears in a location dialog. If navigation reuses a label for a different
+item with the same name, call its `restart_pan()` method to replay the title.
+
+```python
+from commonUtils.ui.native.panning_title import PanningTitleLabel
+
+folder_title = PanningTitleLabel("Project notes")
+folder_title.text = current_folder_name
+```
+
+For UIKit controls, compile `ui/native/ios/ScrollingTitle.m` into the app and
+use `apple_title_class()` from Python or `CommonUtilsPanningTitle` from
+Objective-C. The label follows the filename's reading direction and respects
+Reduce Motion and Increase Contrast. For an existing Android single-line
+`TextView`, compile `ui/native/android` and call `configure_android_title(view)`.
+Call `set_android_title_motion_suppressed(True)` for an application-wide mode
+such as E Ink. Passing `False` restores the system motion and contrast policy.
+
 ## Recycled lists
 
 `ui.native.recycled_list.RecycledList` extends Toga DetailedList with recycled
@@ -553,9 +576,16 @@ source syntax when serializing edits; animation never writes Markdown or files.
 ### Search input delay
 
 `event_loop.DebouncedCallback(callback)` coalesces native text edits on the app
-event loop and invokes the callback after 400 ms without another edit. `cancel()`
+event loop and invokes the callback after 300 ms without another edit. `cancel()`
 retires a pending callback. Native browser filename search delays both filtering
 and recursive scanning; editing cancels the previous scan immediately.
+
+`EditorSearch.document_changed()` invalidates its current span and schedules a
+recount only while Find is visible, using that same quiet period. Explicit match
+navigation applies the current query immediately and cancels a pending recount.
+Counts stop at 5,000 matches and show `5000+` beyond that; replacement operations
+still apply to the complete document. Hosts call `EditorSearch.dispose()` before
+retiring the native editor so delayed callbacks cannot read a closed control.
 
 ## Offline speech and private WebViews
 

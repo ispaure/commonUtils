@@ -1,4 +1,5 @@
 """Live provider-backed directory browsing, without filesystem indexing or caches."""
+from ...search.policy import SEARCH_DEBOUNCE_MS
 from collections import deque
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -38,6 +39,7 @@ class ResourceBrowser(qt.QWidget):
     def __init__(self, provider: DirectoryProvider, parent=None, *, directory=None, actions=(), thumbnail=None, details=None, preview=True):
         super().__init__(parent)
         self.provider = provider
+        self.directory_gate = None
         self.operations = ResourceOperations()
         self.operations.bind(provider)
         self.actions = tuple(actions)
@@ -47,6 +49,7 @@ class ResourceBrowser(qt.QWidget):
         self.navigation = SimpleNamespace(library=provider.root, directory=provider.root)
         self.history = []
         self.history_index = -1
+        self._history_target = None
         self.closing = False
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -136,7 +139,8 @@ class ResourceBrowser(qt.QWidget):
         self.tree.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
         self.tree.header().setSectionResizeMode(1, qt.QHeaderView.ResizeMode.ResizeToContents)
         self.tree.header().setSectionResizeMode(2, qt.QHeaderView.ResizeMode.ResizeToContents)
-        self.views = BrowserViews(self.model, self.tree, self)
+        self.views = BrowserViews(self.model, self.tree, self, directory_handler=self.handle_directory)
+        self.views.directory_resumer = self.handle_directory
         self.views.navigation_root = provider.root
         self.view_selector.currentIndexChanged.connect(self.views.set_mode)
         self.folder_size_button.slider.valueChanged.connect(self.views.set_icon_scale)
@@ -183,7 +187,7 @@ class ResourceBrowser(qt.QWidget):
         layout.addWidget(self.search_operation)
         self.search_timer = qt.QTimer(self)
         self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(400)
+        self.search_timer.setInterval(SEARCH_DEBOUNCE_MS)
         self.search_timer.timeout.connect(self._start_search)
         self.search_pending = False
         self._normal_tree = None
@@ -217,6 +221,9 @@ class ResourceBrowser(qt.QWidget):
             return image_thumbnail(data, size) if len(data) <= 16 * 1024 * 1024 else b''
 
     def _set_directory(self, directory, *, remember=True):
+        target, self._history_target = self._history_target, None
+        if not remember and target is not None and target[0] == directory:
+            self.history_index = target[1]
         if remember and (self.history_index < 0 or self.history[self.history_index] != directory):
             del self.history[self.history_index + 1:]
             self.history.append(directory)
@@ -235,10 +242,16 @@ class ResourceBrowser(qt.QWidget):
             return False
         directory = Path(directory)
         self.provider.relative(directory)
+        if self.handle_directory(directory, resume=lambda: self.navigate(directory, remember=remember)):
+            return False
         self.model.ensure_directory(directory)
         self._remember_listing = remember
         self._start_listing(directory, display=True)
         return True
+
+    def handle_directory(self, directory, *, resume=None):
+        return bool(self.directory_gate and self.directory_gate(
+            Path(directory), resume or (lambda: self.navigate(directory))))
 
     def _start_listing(self, directory, *, display=False):
         if self.filter.text() or self._normal_tree is not None:
@@ -265,8 +278,9 @@ class ResourceBrowser(qt.QWidget):
 
     def _history(self, offset):
         target = self.history_index + offset
-        if 0 <= target < len(self.history) and self.navigate(self.history[target], remember=False):
-            self.history_index = target
+        if 0 <= target < len(self.history):
+            self._history_target = self.history[target], target
+            self.navigate(self.history[target], remember=False)
 
     def _view_directory_changed(self, directory):
         if not self._restoring and directory is not None and directory != self.navigation.directory:
@@ -278,6 +292,16 @@ class ResourceBrowser(qt.QWidget):
             self._maybe_idle()
             return
         target = self._listing_target
+        if not error and rows is not None and self._display_listing:
+            identity = self._listing_identity
+            def resume():
+                if (self.operations.accepts(identity) and self._listing_target == target
+                        and self._listing_identity is identity and not self.closing):
+                    self._loaded(rows, error)
+            if self.handle_directory(target, resume=resume):
+                self._controls()
+                self._maybe_idle()
+                return
         if not error and rows is not None:
             selected = [index.data(BrowseRole.Identity) for index in self.views.selected_rows()]
             if self._display_listing and target != self.navigation.directory:

@@ -1,4 +1,5 @@
 """Inline documentation navigation for the shared Markdown viewer."""
+from ...search.policy import SEARCH_DEBOUNCE_MS
 from ...formats.markdown.wiki import MarkdownWiki, documentation_root
 from .. import pyside as qt
 from ..readers.reader_chrome import reader_button
@@ -49,7 +50,7 @@ class WikiPanel(qt.QWidget):
         layout.setStretch(2, 1)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(400)
+        self.timer.setInterval(SEARCH_DEBOUNCE_MS)
         self.timer.timeout.connect(self.populate)
         self.search.textChanged.connect(self.query_changed)
         self.mode.currentIndexChanged.connect(self.populate)
@@ -63,9 +64,8 @@ class WikiPanel(qt.QWidget):
     def query_changed(self):
         self.mode.setVisible(bool(self.search.text().strip()))
         self.timer.start()
-        if hasattr(self.viewer, 'search_highlights'):
-            if not self.search.text().strip():
-                self.viewer._clear_search_selection('library')
+        if not self.search.text().strip() and hasattr(self.viewer, 'search_highlights'):
+            self.viewer._clear_search_selection('library')
             self.viewer._refresh_search_highlights()
 
     def populate(self):
@@ -95,6 +95,8 @@ class WikiPanel(qt.QWidget):
         self.notice.setVisible(bool(self.notice.text()))
         self.select_path(self.viewer.current_path)
         self.tree.blockSignals(blocked)
+        if hasattr(self.viewer, 'search_highlights'):
+            self.viewer._refresh_search_highlights()
 
     def selection_changed(self, item, previous):
         if item is not None and item.data(0, qt.Qt.ItemDataRole.UserRole):

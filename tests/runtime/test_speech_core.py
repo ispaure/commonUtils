@@ -12,6 +12,55 @@ from commonUtils.runtime.speech import SpeechSession, utterances, PlaybackTimer
 
 
 class SpeechCoreTests(unittest.TestCase):
+    def test_prose_punctuation_preserves_meaning_and_source_word_ranges(self):
+        from commonUtils.runtime.speech_text import SpeechText, utf16_length, word_ranges
+        source = '😀 co\u00adoperate--please - now… "Really?!" Yes.'
+        payload = SpeechText(source)
+        self.assertEqual(payload.text, '😀 cooperate — please — now… "Really?!" Yes.')
+        for word in ('cooperate', 'please', 'now', 'Really', 'Yes'):
+            start = utf16_length(payload.text[:payload.text.index(word)])
+            mapped = payload.source_range(start, start + utf16_length(word))
+            original = source.encode('utf-16-le')[mapped[0] * 2:mapped[1] * 2].decode('utf-16-le')
+            self.assertEqual(original.replace('\u00ad', ''), word)
+        technical = "well-known non‑breaking don't l’amour 10–12 -5 −5 3.14 10 - 2 x - y --flag https://a-b.test"
+        self.assertEqual(SpeechText(technical).text, technical)
+        self.assertEqual(SpeechText('- Hello. - 5').text, '— Hello. - 5')
+        spans = list(word_ranges('One … ? ! . -- — two.'))
+        self.assertEqual(spans, [(0, 3), (17, 21)])
+        self.assertEqual(list(word_ranges('Wait…really?!Yes...now')), [(0, 4), (5, 11), (13, 16), (19, 22)])
+
+    def test_sentence_queues_keep_quotes_ellipsis_and_common_abbreviations(self):
+        text = 'Dr. A. Smith paid 3.14 in the U.S. "Really?!" Wait… Well... Yes! Next。 Done؟'
+        parts = [part for part, _, _ in utterances(text)]
+        self.assertEqual(parts, ['Dr. A. Smith paid 3.14 in the U.S. "Really?!"',
+                                 'Wait…', 'Well...', 'Yes!', 'Next。', 'Done؟'])
+        # Qt engines may request full context rather than sentence-sized queues.
+        self.assertEqual(list(utterances(text, sentence_breaks=False)), [(text, 0, len(text))])
+        self.assertEqual(list(utterances('… ?! . -- —')), [])
+
+    def test_normalized_punctuation_keeps_limits_selection_and_native_highlights(self):
+        from commonUtils.runtime.speech_text import SpeechText, utf16_length
+        text = ('😀 word--next - co\u00adoperate… "Why?!" Yes. ' * 8)
+        chunks = list(utterances(text, limit=24))
+        self.assertTrue(all(utf16_length(SpeechText(part).text) <= 24 for part, _, _ in chunks))
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        ranges = Mock()
+        session = SpeechSession(engine, on_range=ranges, on_state=Mock())
+        self.addCleanup(session.dispose)
+        source = 'Prefix 😀 word--next - co\u00adoperate… Tail'
+        start = utf16_length('Prefix 😀 ')
+        end = utf16_length(source[:source.index(' Tail')])
+        session.play(source, start, end)
+        spoken = engine.speak.call_args.args[0]
+        self.assertEqual(spoken, 'word — next — cooperate…')
+        offset = utf16_length(spoken[:spoken.index('cooperate')])
+        engine.progress(session.token, offset, offset + len('cooperate'))
+        self.assertEqual(ranges.call_args.args, (utf16_length('Prefix 😀 word--next - '), end - 1))
+        previous = ranges.call_count
+        offset = spoken.index('—')
+        engine.progress(session.token, offset, offset + 1)
+        self.assertEqual(ranges.call_count, previous)
+
     def test_prose_dash_payload_and_native_ranges_use_original_utf16_positions(self):
         from commonUtils.runtime.speech_text import utf16_length
         engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())

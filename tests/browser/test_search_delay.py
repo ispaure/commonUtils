@@ -6,6 +6,7 @@ TEST_STAGE = TestStage.REGRESSION
 import asyncio
 import time
 import unittest
+from commonUtils.search.policy import SEARCH_DEBOUNCE_MS, SEARCH_DEBOUNCE_SECONDS
 from commonUtils.ui.native.event_loop import DebouncedCallback
 
 
@@ -32,7 +33,10 @@ class QtDelayTests(unittest.TestCase):
         from PySide6.QtTest import QTest
         app = qt.QApplication.instance() or qt.QApplication([])
         field, calls = qt.QLineEdit(), []
-        qt.connect_search(field, calls.append, pass_text=True)
+        timer = qt.connect_search(field, calls.append, pass_text=True)
+        self.assertEqual(timer.interval(), 300)
+        self.assertEqual(SEARCH_DEBOUNCE_MS, 300)
+        self.assertEqual(SEARCH_DEBOUNCE_SECONDS, .3)
         field.setText('n')
         QTest.qWait(250)
         field.setText('needle')
