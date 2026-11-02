@@ -1,4 +1,5 @@
 """Widgets utilities; public API is commonUtils.ui.pyside."""
+from ...search.policy import SEARCH_DEBOUNCE_MS
 
 from . import _api
 
@@ -189,10 +190,10 @@ def create_checkbox(target: _api.QWidget, rect: _api.QRect, default_state: bool 
 
 
 def connect_search(field, callback, *, pass_text=False):
-    """Run a text-driven filter after 400 ms without another edit."""
+    """Run a text-driven filter after 300 ms without another edit."""
     timer = _api.QTimer(field)
     timer.setSingleShot(True)
-    timer.setInterval(400)
+    timer.setInterval(SEARCH_DEBOUNCE_MS)
     timer.timeout.connect(lambda: callback(field.text()) if pass_text else callback())
     field.textChanged.connect(lambda *_: timer.start())
     return timer

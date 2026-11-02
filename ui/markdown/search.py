@@ -1,5 +1,6 @@
 """Scoped, transient search marks shared by reading and editing surfaces."""
 from .. import pyside as qt
+from ...search.policy import SEARCH_DEBOUNCE_MS
 from collections.abc import Callable, Sequence
 
 _SEARCH_MARK = qt.QTextFormat.Property.UserProperty + 78
@@ -24,17 +25,18 @@ class SearchHighlights:
         self.selections = {}
         self.timer = qt.QTimer(self.parent)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(100)
+        self.timer.setInterval(SEARCH_DEBOUNCE_MS)
         self.timer.timeout.connect(self.refresh)
-        self.query.textChanged.connect(self.query_changed)
+        self.query_timer = qt.connect_search(self.query, self.query_changed)
         for widget in self.widgets:
             widget.textChanged.connect(lambda: self.timer.start())
         self.pages.currentChanged.connect(lambda: self.timer.start())
 
     def query_changed(self):
+        self.query_timer.stop()
         self.clear_selection('page')
         self.refresh()
-        if self.query.text():
+        if self.query.text() and not self.bar.isHidden():
             target = self.pages.currentWidget()
             match = target.document().find(self.query.text())
             if not match.isNull():

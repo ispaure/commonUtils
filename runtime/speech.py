@@ -2,7 +2,8 @@
 
 from bisect import bisect_left, bisect_right
 from time import monotonic
-from .speech_text import SpeechText, PROSE_DASH, dash_padding, word_ranges, utf16_length
+from .speech_text import (SpeechText, prose_dashes, dash_padding, word_ranges,
+                          utf16_length, sentence_ends, has_content)
 
 
 class PlaybackTimer:
@@ -75,16 +76,17 @@ def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_break
     """Keep browser offsets intact, including astral characters and block edges."""
     units = [0]
     budget = [0]
-    dashes = {match.start() for match in PROSE_DASH.finditer(text)}
+    dashes = {match.start(): match for match in prose_dashes(text)}
     for index, char in enumerate(text):
         units.append(units[-1] + utf16_length(char))
-        padding = sum(dash_padding(text, index)) if index in dashes else 0
+        padding = sum(dash_padding(text, index, dashes[index].end())) if index in dashes else 0
         budget.append(budget[-1] + utf16_length(char) + padding)
     left = bisect_left(units, max(0, start))
     right = bisect_left(
         units, units[-1] if end is None else min(units[-1], max(start, end))
     )
     boundaries = set(breaks)
+    sentences = set(sentence_ends(text)) if sentence_breaks else set()
     while left < right:
         while left < right and text[left].isspace():
             left += 1
@@ -93,20 +95,21 @@ def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_break
         stop = left + 1
         while stop < right and budget[stop + 1] - budget[left] <= limit:
             if units[stop] in boundaries or (
-                sentence_breaks and text[stop - 1] in ".!?。！？" and text[stop].isspace()
+                stop in sentences
             ):
                 break
             stop += 1
         if (
             stop < right
             and units[stop] not in boundaries
-            and text[stop - 1] not in ".!?。！？"
+            and stop not in sentences
             and not text[stop - 1].isspace()
         ):
             space = text.rfind(" ", left + 1, stop)
             if space >= left + (stop - left) // 2:
                 stop = space + 1
-        yield text[left:stop], units[left], units[stop]
+        if has_content(text[left:stop]):
+            yield text[left:stop], units[left], units[stop]
         left = stop
 
 

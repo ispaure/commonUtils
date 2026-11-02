@@ -23,6 +23,7 @@ class BrowserViews(qt.QStackedWidget):
     def __init__(self, model, tree, parent=None, *, directory_handler=None, storage=False, column_navigation=True):
         super().__init__(parent)
         self.directory_handler = directory_handler
+        self.directory_resumer = None
         self.model = model
         self._switching = False
         self.navigation_root = None
@@ -46,6 +47,7 @@ class BrowserViews(qt.QStackedWidget):
         for view in (tree,) + ((self.columns,) if self.columns is not None else ()):
             view.setStyleSheet('QAbstractItemView::item { padding: 3px 4px; }')
         if self.columns is not None:
+            self.columns.current_gate = self._column_directory
             self.columns.setModel(model)
             self.columns.setColumnWidths([240, 240, 240, 240])
         self.cover_queue = deque()
@@ -131,6 +133,17 @@ class BrowserViews(qt.QStackedWidget):
             self._column_selection_pending = True
             qt.QTimer.singleShot(0, self, self._finish_column_selection)
 
+    def _column_directory(self, current, previous):
+        index = self.source_index(current)
+        saved = qt.QPersistentModelIndex(current)
+        before = qt.QPersistentModelIndex(previous)
+        def resume():
+            if saved.isValid() and self.columns.currentIndex() == saved:
+                self.columns.currentChanged(qt.QModelIndex(saved), qt.QModelIndex(before))
+                self._selection(self.columns)
+        return bool(index.isValid() and index.data(BrowseRole.Container)
+                    and self._handled_directory(self.model.browse_identity(index), resume))
+
     def _column_input(self, modifiers):
         extended = bool(modifiers & (qt.Qt.KeyboardModifier.ControlModifier |
                         qt.Qt.KeyboardModifier.MetaModifier | qt.Qt.KeyboardModifier.ShiftModifier))
@@ -175,11 +188,17 @@ class BrowserViews(qt.QStackedWidget):
                 return directory
         return self.root
 
-    def _handled_directory(self, path):
+    def _handled_directory(self, path, resume=None):
+        if path is not None and resume is not None and self.directory_resumer is not None:
+            return bool(self.directory_resumer(path, resume=resume))
         return bool(path is not None and self.directory_handler and self.directory_handler(path))
 
     def _expanded(self, index):
-        if self._handled_directory(self.model.browse_identity(self.source_index(index))):
+        saved = qt.QPersistentModelIndex(index)
+        def resume():
+            if saved.isValid():
+                self.tree.expand(qt.QModelIndex(saved))
+        if self._handled_directory(self.model.browse_identity(self.source_index(index)), resume):
             self.tree.collapse(index)
 
     def _selection(self, view):

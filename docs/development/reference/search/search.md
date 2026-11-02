@@ -1,5 +1,9 @@
 # Shared search
 
+`commonUtils.search.policy` defines the shared typeahead quiet period: 300 ms
+after the last edit on desktop and native mobile. Search owners cancel stale
+work immediately and wait for this period before starting a new query.
+
 Search owns reusable query/matching and traversal mechanisms. Widgets, document
 selection, highlights, debounce timers and worker lifetime stay under `ui/`.
 Consumers choose roots, exclusions, private-storage policy and buffer snapshots.

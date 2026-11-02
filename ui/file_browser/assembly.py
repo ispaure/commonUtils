@@ -121,6 +121,7 @@ class BrowserControls:
         browser.model.directory_boundary = browser.directory_boundary
         browser.views = FileViews(browser.model, browser.tree, browser, directory_handler=browser.handle_directory,
                                column_navigation=browser.column_navigation)
+        browser.views.directory_resumer = browser.handle_directory
         browser.view_selector.buttons[2].setEnabled(browser.column_navigation)
         browser.views.selection_changed.connect(browser._selection_changed)
         browser.views.directory_changed.connect(browser.navigation.set_directory)

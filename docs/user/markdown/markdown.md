@@ -154,6 +154,14 @@ Prose dashes separate spoken words even when the document omits spaces, as in
 apostrophes and numeric ranges retain their original speech input; pronunciation
 still depends on the selected installed voice.
 
+Spaced `-` and prose `--` are treated as dashes, and invisible line-wrap hyphens
+are removed from speech. Question marks, exclamation marks, periods and ellipses
+remain available to the voice for pauses and intonation. Sentence queues keep
+closing quotes with their sentence and avoid splitting common abbreviations.
+Punctuation alone is not a highlighted word or a separate spoken passage.
+These adjustments affect speech only; the document and its selection positions
+are preserved.
+
 Playback stops when content is replaced, editing begins or the
 reader closes. Speech does not edit the file. If no engine/voice is available, the
 panel explains the problem; available voices depend on the operating system.

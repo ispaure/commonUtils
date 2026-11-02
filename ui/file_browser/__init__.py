@@ -55,6 +55,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         bind_font(self, 'browser')
         self.idle.connect(self.close)
         self.directory_handler = directory_handler
+        self.directory_gate = None
         self.directory_boundary = directory_boundary
         self.column_navigation = bool(column_navigation)
         self.services = services or {}
@@ -222,7 +223,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     def set_directory(self, directory, *, navigation_root=None):
         path = directory.path if isinstance(directory, Directory) else Path(directory)
         path = path.absolute()
-        if self.handle_directory(path):
+        if self.handle_directory(path, resume=lambda: self.set_directory(path, navigation_root=navigation_root)):
             return
         if not path.is_dir():
             raise NotADirectoryError(path)
@@ -244,8 +245,11 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             self._update_watch_paths(path, (path,))
             self.refresh_folder_totals()
 
-    def handle_directory(self, path):
-        return bool(self.directory_handler and self.directory_handler(Path(path)))
+    def handle_directory(self, path, *, resume=None):
+        path = Path(path)
+        if self.directory_handler and self.directory_handler(path):
+            return True
+        return bool(self.directory_gate and self.directory_gate(path, resume or (lambda: self.navigate(path))))
 
     def navigate(self, path):
         path = Path(path)
@@ -377,7 +381,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self._activate_item(self.model.object_for_path(path))
 
     def _activate_item(self, item):
-        if self.handle_directory(item.path if isinstance(item, Directory) else item.path.parent):
+        if self.handle_directory(item.path if isinstance(item, Directory) else item.path.parent,
+                                 resume=lambda: self._activate_item(item)):
             return
         if isinstance(item, Directory):
             self.navigate(item.path)

@@ -1,4 +1,5 @@
 """Native list/tile browser over the portable browse tree; no Qt or disk probes."""
+from ...search.policy import SEARCH_DEBOUNCE_SECONDS
 import asyncio
 import inspect
 from threading import Event
@@ -152,7 +153,7 @@ class NativeBrowser:
         self._spawn(self._apply_query(self.search_epoch, self.search_cancelled))
 
     async def _apply_query(self, epoch, cancelled):
-        await asyncio.sleep(.4)
+        await asyncio.sleep(SEARCH_DEBOUNCE_SECONDS)
         if self.closed or epoch != self.search_epoch or cancelled.is_set():
             return
         if self.folder_tree is not None:

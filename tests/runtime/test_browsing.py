@@ -155,6 +155,25 @@ class ResourceSearchTests(unittest.TestCase):
                 self.assertEqual({entry.label for entry in query_entries(entries, query)}, expected)
                 self.assertEqual({row['name'] for row in search_resources(provider, '', query).rows}, expected)
 
+    def test_document_scope_reads_only_missing_terms_and_keeps_partial_results(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from commonUtils.search.providers import search_resources
+
+        names = ['Red Turtle.md', 'Red.md', 'Unreadable.md', 'Red folder']
+        entries = [dict(name=name, path=name, directory=name == 'Red folder') for name in names]
+        provider = SimpleNamespace(relative=lambda path: path, search_entries=Mock())
+        read = Mock(side_effect=['TURTLE', ValueError('too large')])
+        result = search_resources(provider, '', 'turtle RED',
+                                  list_children=lambda path, cancelled: [] if path else entries,
+                                  read_text=read)
+        self.assertEqual([(row['name'], row['content_match']) for row in result.rows],
+                         [('Red Turtle.md', False), ('Red.md', True)])
+        self.assertEqual([call.args[0] for call in read.call_args_list], ['Red.md', 'Unreadable.md'])
+        self.assertEqual(result.errors, [('Unreadable.md', 'too large')])
+        self.assertFalse(result.complete)
+        provider.search_entries.assert_not_called()
+
     def test_recursive_matches_are_scoped_bounded_and_cancellable(self):
         from types import SimpleNamespace
         from commonUtils.search.providers import search_resources

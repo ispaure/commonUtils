@@ -66,6 +66,6 @@ UI and document picker remain future host integrations.
 ### Search input delay
 
 `connect_search(field, callback, pass_text=False)` connects a QLineEdit through
-a parent-owned, single-shot 400 ms timer. The callback receives no arguments by
+a parent-owned, single-shot 300 ms timer. The callback receives no arguments by
 default; pass_text=True supplies the latest field text. Each edit restarts the
 timer. Explicit Find/Next/Previous commands can still execute immediately.

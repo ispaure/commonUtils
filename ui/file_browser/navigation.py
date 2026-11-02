@@ -171,6 +171,7 @@ class NavigationBar(qt.QWidget):
         self.directory = None
         self.history = []
         self.position = -1
+        self._history_target = None
         self.set_directory(Path(directory) if directory is not None else self.library)
 
     def set_directory(self, path):
@@ -180,6 +181,9 @@ class NavigationBar(qt.QWidget):
                     or (path != self.library and self.library not in path.parents)):
                 return
         self.directory = path
+        target, self._history_target = self._history_target, None
+        if target is not None and target[0] == path:
+            self.position = target[1]
         if path is not None and (self.position < 0 or self.history[self.position] != path):
             self.history = self.history[:self.position + 1] + [path]
             self.position += 1
@@ -197,5 +201,5 @@ class NavigationBar(qt.QWidget):
     def _history(self, offset):
         position = self.position + offset
         if 0 <= position < len(self.history):
-            self.position = position
+            self._history_target = self.history[position], position
             self.requested.emit(self.history[position])

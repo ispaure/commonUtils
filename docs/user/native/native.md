@@ -41,6 +41,10 @@ to remember the choice after closing the document.
 
 [Embedding and packaging](../../development/reference/ui/native/native.md)
 
+An app can use a panning title for a long name in a mobile header. The text
+moves within the available width after a short pause. A title that fits stays
+still, as do titles in reduced-motion or high-contrast mode.
+
 ## Documentation
 
 A native app can show an offline Markdown wiki. The hamburger button shows folders, pages and search in narrow windows; tap it
@@ -53,7 +57,8 @@ in a filename alone may have no matching passage in the rendered page.
 
 Use the magnifying glass for **Find in this page**. Its controls sit above the
 article, separate from library search, with a current/total count and Previous/Next
-arrows that wrap. Search is literal and case-insensitive, including text across
+arrows that wrap. Typeahead search waits 300 ms after the last edit on mobile and desktop.
+Search is literal and case-insensitive, including text across
 inline formatting. **Done** removes page marks while keeping library marks until
 the library query is cleared. At most 5,000 matches per scope are highlighted;
 a count ending in `+` indicates that limit. Search changes no source text, links

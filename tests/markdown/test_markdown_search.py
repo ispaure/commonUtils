@@ -21,6 +21,31 @@ class MarkdownSearchTests(QtTestCase):
         qt.QApplication.instance().processEvents()
         return viewer, other.resolve()
 
+    def test_closing_find_before_debounce_does_not_reselect_hidden_match(self):
+        from PySide6.QtTest import QTest
+        with self.temporary_directory() as root:
+            viewer, _ = self.make_viewer(root)
+            viewer.show_find()
+            viewer.find_text.setText('needle')
+            viewer.close_find()
+            QTest.qWait(450)
+            self.assertFalse(viewer.browser.textCursor().hasSelection())
+            self.assertEqual(len(viewer.browser.extraSelections()), 0)
+            self.assertEqual(viewer.find_count.text(), '')
+
+    def test_explicit_next_during_debounce_does_not_jump_back_later(self):
+        from PySide6.QtTest import QTest
+        with self.temporary_directory() as root:
+            viewer, _ = self.make_viewer(root)
+            viewer.show_find()
+            viewer.find_text.setText('needle')
+            self.assertTrue(viewer.find_next())
+            self.assertTrue(viewer.find_next())
+            selected = viewer.browser.textCursor().selectionStart()
+            QTest.qWait(450)
+            self.assertEqual(viewer.browser.textCursor().selectionStart(), selected)
+            self.assertEqual(viewer.find_count.text(), '2 matches')
+
     def test_idle_alignment_and_scoped_search(self):
         with self.temporary_directory() as root:
             viewer, other = self.make_viewer(root)
@@ -42,6 +67,7 @@ class MarkdownSearchTests(QtTestCase):
             self.assertEqual(viewer.browser.textCursor().selectedText().lower(), 'needle')
             viewer.show_find()
             viewer.find_text.setText('Another')
+            self.wait_until(lambda: viewer.find_count.text() == '1 match')
             self.assertEqual(viewer.find_count.text(), '1 match')
             self.assertEqual(len(viewer.browser.extraSelections()), 2)
             viewer.close_find()
@@ -57,6 +83,7 @@ class MarkdownSearchTests(QtTestCase):
             viewer.set_edit_mode('source')
             viewer.show_find()
             viewer.find_text.setText('needle')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
             self.assertEqual(viewer.find_count.text(), '2 matches')
             self.assertEqual(len(viewer.editor.extraSelections()), 2)
             first = viewer.editor.textCursor().selectionStart()
@@ -74,6 +101,7 @@ class MarkdownSearchTests(QtTestCase):
             self.wait_until(lambda: len(viewer.browser.extraSelections()) == 2)
             self.assertFalse(viewer.is_modified)
             viewer.find_text.setText('absent')
+            self.wait_until(lambda: viewer.find_count.text() == '0 matches')
             self.assertEqual(viewer.find_count.text(), '0 matches')
             self.assertFalse(viewer.find_next())
 
@@ -82,6 +110,7 @@ class MarkdownSearchTests(QtTestCase):
             viewer, _ = self.make_viewer(root)
             viewer.show_find()
             viewer.find_text.setText('needle')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
             self.assertTrue(viewer.browser.textCursor().hasSelection())
             other = qt.QTextEdit.ExtraSelection()
             other.cursor = viewer.browser.textCursor()
@@ -98,6 +127,7 @@ class MarkdownSearchTests(QtTestCase):
             self.assertEqual(len(viewer.browser.extraSelections()), 1)
             viewer.show_find()
             viewer.find_text.setText('needle')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
             cursor = viewer.browser.textCursor()
             cursor.select(qt.QTextCursor.SelectionType.BlockUnderCursor)
             viewer.browser.setTextCursor(cursor)
@@ -110,6 +140,7 @@ class MarkdownSearchTests(QtTestCase):
             viewer.resize(700, 500)
             viewer.show_find()
             viewer.find_text.setText('needle')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
             qt.QApplication.instance().processEvents()
             self.assertLessEqual(viewer.minimumSizeHint().width(), 700)
             self.assertLessEqual(viewer.find_bar.geometry().right(), viewer.document_panel.width())

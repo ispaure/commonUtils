@@ -39,6 +39,7 @@ class FolderColumnView(qt.QColumnView):
     selection_input = qt.Signal(object)
     def __init__(self):
         super().__init__()
+        self.current_gate = None
         self.setIconSize(qt.QSize(16, 16))
         self.viewport().setBackgroundRole(qt.QPalette.ColorRole.Window)
         self.viewport().setAutoFillBackground(True)
@@ -74,6 +75,8 @@ class FolderColumnView(qt.QColumnView):
         return super().eventFilter(watched, event)
 
     def currentChanged(self, current, previous):
+        if self.current_gate is not None and self.current_gate(current, previous):
+            return
         super().currentChanged(current, previous)
         if hasattr(self, '_preview_requested'):
             qt.QTimer.singleShot(0, self, self._sync_preview_width)
