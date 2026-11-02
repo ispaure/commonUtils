@@ -3,7 +3,8 @@ from ..readers.layout import READER_LAYOUT
 
 
 def style_slider(slider, *, apple_color=None, palette=None, force_ltr=False, reverse_fill=False):
-    backend = type(slider._impl).__module__
+    backend = next((base.__module__ for base in type(slider._impl).__mro__
+                    if base.__module__.startswith(('toga_iOS.', 'toga_android.'))), '')
     if backend.startswith('toga_iOS.'):
         if apple_color is None:
             from .appearance import default_apple_color

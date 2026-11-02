@@ -643,8 +643,10 @@ whether E Ink or other application policy disables effects.
 
 `ui.native.sliders.style_slider(widget, apple_color=None, palette=None,
 force_ltr=False, reverse_fill=False)` paints slim tracks and circular thumbs while preserving the
-widget's full touch area. Supply semantic UIKit colors and Android palette roles
-`accent`/`border`; defaults are neutral native colors. Direction follows the
+widget's full touch area. The backend is resolved through the implementation's
+base classes, so consumer subclasses of a native slider retain the same styling.
+Supply semantic UIKit colors and Android palette roles `accent`/`border`;
+defaults are neutral native colors. Direction follows the
 platform unless explicitly forced. `reverse_fill=True` highlights the track from
 the thumb toward the maximum end, retaining the accent thumb; it does not change
 values or touch direction. Hosts using reversed values can use this for progress

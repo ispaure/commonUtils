@@ -94,6 +94,11 @@ class NativeReaderPresentationTests(unittest.TestCase):
 
     def test_apple_reverse_fill_swaps_tracks_but_preserves_accent_thumb(self):
         widget = content('toga_iOS.widgets.slider')
+        # Consumers subclass the native implementation in their own package.
+        # Styling must resolve its backend from the inherited implementation.
+        widget._impl = type('ReaderSlider', (type(widget._impl),),
+                            {'__module__': 'mobile.ios_reader_progress'})()
+        widget._impl.native = Mock()
         renderer = Mock()
         renderer.imageWithActions.side_effect = lambda draw: (draw(None), Mock())[1]
         renderer_class = Mock()
