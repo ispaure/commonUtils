@@ -332,27 +332,42 @@ class AppleNavigation:
         # A hidden tab bar alone leaves iPad's sidebar and its toggle available.
         # Temporarily use tab-only mode, retaining the user's sidebar state for
         # route/keyboard/fullscreen restoration through this same entry point.
+        changed = False
         if getattr(self, 'sidebar_used', False):
             saved = getattr(self, '_sidebar_visibility', None)
             if hidden:
                 if saved is None:
                     self._sidebar_visibility = (int(self.controller.mode),
                                                 bool(self.controller.sidebar.isHidden()))
-                self.controller.sidebar.setHidden(True)
-                self.controller.setMode(1)
+                if not self.controller.sidebar.isHidden():
+                    self.controller.sidebar.setHidden(True)
+                    changed = True
+                if int(self.controller.mode) != 1:
+                    self.controller.setMode(1)
+                    changed = True
             elif saved is not None:
                 self._sidebar_visibility = None
                 mode, sidebar_hidden = saved
-                self.controller.setMode(mode)
-                self.controller.sidebar.setHidden(sidebar_hidden)
-        if modern:
-            # UIKit also releases the tab bar's safe-area reservation.
-            self.controller.setTabBarHidden(hidden, animated=False)
-        else:
-            self.controller.tabBar.setHidden(hidden)
-        self.controller.view.setNeedsLayout()
-        self.parent.view.setNeedsLayout()
-        self.queue_keyboard_layout()
+                if int(self.controller.mode) != mode:
+                    self.controller.setMode(mode)
+                    changed = True
+                if bool(self.controller.sidebar.isHidden()) != sidebar_hidden:
+                    self.controller.sidebar.setHidden(sidebar_hidden)
+                    changed = True
+        current = self.controller.isTabBarHidden() if modern else self.controller.tabBar.isHidden()
+        if bool(current) != hidden:
+            if modern:
+                # UIKit also releases the tab bar's safe-area reservation.
+                self.controller.setTabBarHidden(hidden, animated=False)
+            else:
+                self.controller.tabBar.setHidden(hidden)
+            changed = True
+        # Fullscreen readers reassert their bar policy during every resize.
+        # An unchanged policy must not schedule another resize of its own.
+        if changed:
+            self.controller.view.setNeedsLayout()
+            self.parent.view.setNeedsLayout()
+            self.queue_keyboard_layout()
 
     def restore_keyboard_chrome(self):
         if self.keyboard_tab_visibility is not None:

@@ -143,6 +143,40 @@ class AppleKeyboardLayoutTests(unittest.TestCase):
         adapter.keyboard_frame = None
         return adapter, state
 
+    def test_reasserting_reader_bar_visibility_does_not_queue_another_resize(self):
+        for modern in (True, False):
+            adapter, state = self.adapter(modern=modern)
+            adapter.set_keyboard_tabs_hidden(modern, True)
+            self.assertTrue(state.hidden)
+            state.queued.pop()()
+            self.assertEqual(state.resizes, 1)
+            for _ in range(10):
+                adapter.set_keyboard_tabs_hidden(modern, True)
+            self.assertEqual(state.queued, [])
+            adapter.set_keyboard_tabs_hidden(modern, False)
+            self.assertFalse(state.hidden)
+            state.queued.pop()()
+            self.assertEqual(state.resizes, 2)
+            adapter.set_keyboard_tabs_hidden(modern, False)
+            self.assertEqual(state.queued, [])
+
+    def test_sidebar_reassertion_does_not_schedule_layout_but_restoration_does(self):
+        adapter, state = self.adapter()
+        adapter.sidebar_used = True
+        state.sidebar_hidden = False
+        adapter.controller.mode = 2
+        adapter.controller.setMode = lambda value: setattr(adapter.controller, 'mode', value)
+        adapter.controller.sidebar = NS(isHidden=lambda: state.sidebar_hidden,
+            setHidden=lambda value: setattr(state, 'sidebar_hidden', value))
+        adapter.set_keyboard_tabs_hidden(True, True)
+        state.queued.pop()()
+        adapter.set_keyboard_tabs_hidden(True, True)
+        self.assertEqual(state.queued, [])
+        adapter.set_keyboard_tabs_hidden(True, False)
+        self.assertEqual(adapter.controller.mode, 2)
+        self.assertFalse(state.sidebar_hidden)
+        self.assertEqual(len(state.queued), 1)
+
     def test_ipad_sidebar_and_toggle_restore_original_presentation_after_nested_hiding(self):
         for sidebar_hidden in (True, False):
             adapter, state = self.adapter()

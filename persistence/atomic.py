@@ -63,7 +63,9 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True,
         check_local_path(path)
         if requested_validate:
             requested_validate()
-    path = Path(path)
+    from ..filesystem.native_paths import native_path
+    requested_path = Path(path)
+    path = native_path(requested_path)
     mode = file_mode if file_mode is not None else (stat.S_IMODE(path.stat().st_mode) if path.exists() else None)
     staged = None
     def stage():
@@ -101,7 +103,7 @@ def atomic_write_bytes(path, content, *, validate=None, overwrite=True,
             staged.unlink(missing_ok=True)
     save_transaction(stage=stage, verify=verify, validate=validate or (lambda: None),
                      publish=publish, cleanup=cleanup)
-    return path
+    return requested_path
 
 
 def atomic_write_json(path, payload, *, ensure_ascii=False, allow_nan=False,
