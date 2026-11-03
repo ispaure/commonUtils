@@ -53,6 +53,49 @@ class ContainerTests(QtTestCase):
         self.assertEqual(sum(dock in workspace.docks for workspace in
                              [owner.main_workspace, *(w.workspace for w in owner.main_workspace.detached_windows)]), 1)
 
+    def test_destination_hosts_resolve_creation_scope_and_close_callbacks_independently(self):
+        from contextlib import contextmanager
+        from commonUtils.ui.document_host import (register_document_host, current_document_host,
+            show_document, document_is_open, host_keeps_document, document_creation_scope, close_document)
+        class Host(qt.QWidget):
+            closing = False
+            def __init__(self):
+                super().__init__()
+                self.records = {}
+                self.finished = []
+                self.scoped = []
+            def present(self, document):
+                self.records[document] = {'closed': False}
+                document.setParent(self)
+                document.show()
+            def document_close_finished(self, document, accepted):
+                self.finished.append((document, accepted))
+            @contextmanager
+            def creation_scope(self, document):
+                self.scoped.append(document)
+                yield
+        ordinary, libraries = Host(), Host()
+        ordinary.show(); libraries.show()
+        register_document_host(ordinary)
+        register_document_host(libraries, destination='library')
+        document = qt.QWidget(); document.document_destination = 'library'
+        try:
+            show_document(document)
+            self.assertIs(current_document_host(document), libraries)
+            self.assertNotIn(document, ordinary.records)
+            self.assertTrue(document_is_open(document))
+            self.assertTrue(host_keeps_document(document))
+            with document_creation_scope(document):
+                pass
+            self.assertEqual(libraries.scoped, [document])
+            self.assertIsNone(current_document_host(destination='missing'))
+            self.assertTrue(close_document(document))
+            self.assertEqual(libraries.finished, [(document, True)])
+            self.assertEqual(ordinary.finished, [])
+        finally:
+            ordinary.close(); libraries.close()
+            ordinary.deleteLater(); libraries.deleteLater()
+
     def test_browser_single_tab_cannot_detach_or_move_and_header_has_no_row(self):
         source = self.create(browser=True)
         source.add_view('first'); dock = source.active_dock

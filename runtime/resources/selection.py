@@ -23,7 +23,7 @@ class ResourceChoice:
 
 class ResourceSelection:
     def __init__(self, provider, *, mode='open', extensions=()):
-        if mode not in {'open', 'save', 'destination'}:
+        if mode not in {'open', 'save', 'destination', 'folder'}:
             raise ValueError('Unknown resource selection mode.')
         self.provider, self.mode = provider, mode
         self.extensions = tuple(extensions)
@@ -53,6 +53,11 @@ class ResourceSelection:
     def resolve(self, directory, name, *, cancelled=lambda: False):
         check_cancelled(cancelled)
         directory = self.relative(directory)
+        if self.mode == 'folder':
+            if not self.provider.entry(directory)['directory']:
+                raise ValueError('Choose a folder.')
+            check_cancelled(cancelled)
+            return directory
         name = resource_path(name)
         if not name:
             raise ValueError('Choose a file name.')

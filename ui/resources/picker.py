@@ -10,7 +10,7 @@ from ...runtime.resources.selection import ResourceSelection, ResourceChoice
 class ResourcePicker(qt.QDialog):
     def __init__(self, locations, *, parent=None, mode='open', name='', extensions=(), directory=''):
         super().__init__(parent)
-        self.setWindowTitle('Open' if mode == 'open' else 'Save As' if mode == 'save' else 'Destination')
+        self.setWindowTitle('Open' if mode == 'open' else 'Save As' if mode == 'save' else 'Choose folder' if mode == 'folder' else 'Destination')
         self.resize(800, 600)
         self.locations, self.mode, self.extensions = locations, mode, extensions
         self.active_index = 0
@@ -36,6 +36,7 @@ class ResourcePicker(qt.QDialog):
         layout.addLayout(self.content, 1)
         self.name = qt.QLineEdit(name)
         self.name.setPlaceholderText('File name')
+        self.name.setVisible(mode != 'folder')
         layout.addWidget(self.name)
         self.notice = qt.QLabel()
         self.notice.setWordWrap(True)
@@ -68,7 +69,7 @@ class ResourcePicker(qt.QDialog):
         self.release = lambda: None
         self.provider = None
         self.active_index = index
-        title = 'Open' if self.mode == 'open' else 'Save As' if self.mode == 'save' else 'Destination'
+        title = 'Open' if self.mode == 'open' else 'Save As' if self.mode == 'save' else 'Choose folder' if self.mode == 'folder' else 'Destination'
         self.setWindowTitle(title)
         try:
             self.provider, self.release = self.locations[index][1]()

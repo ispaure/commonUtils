@@ -12,6 +12,21 @@ from commonUtils.runtime.operations import MutationIncomplete
 
 
 class ResourceSelectionTests(unittest.TestCase):
+    def test_folder_selection_accepts_existing_readonly_roots_and_rejects_files_and_escape(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'nested').mkdir()
+            (root / 'file.txt').write_text('content')
+            model = ResourceSelection(LocalFiles(root), mode='folder')
+            self.assertEqual(model.resolve('', ''), '')
+            self.assertEqual(model.resolve('nested', ''), 'nested')
+            with self.assertRaisesRegex(ValueError, 'folder'):
+                model.resolve('file.txt', '')
+            with self.assertRaises(ValueError):
+                model.resolve('../outside', '')
+            with self.assertRaises(FileNotFoundError):
+                model.resolve('missing', '')
+
     def test_short_provider_reads_load_complete_text_and_enforce_total_limit(self):
         from contextlib import contextmanager
         from io import BytesIO
