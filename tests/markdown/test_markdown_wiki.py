@@ -25,6 +25,13 @@ class WikiViewerTests(QtTestCase):
             first.write_text('# First')
             second.write_text('# Second')
             viewer = MarkdownViewer(first, directory=root)
+            viewer.resize(1100, 700)
+            viewer.show()
+            self.app.processEvents()
+            self.assertFalse(viewer.wiki.up_button.isHidden())
+            self.assertIs(viewer.wiki.up_button.parentWidget(), viewer.navigation)
+            self.assertLess(viewer.navigation.geometry().right(), viewer.toc_button.x())
+            self.assertEqual(viewer.navigation_toolbar.indexOf(viewer.navigation), 0)
             original = viewer._render_page
             def render(*args):
                 self.assertFalse(viewer.page_loading.isHidden())
@@ -192,6 +199,35 @@ class WikiViewerTests(QtTestCase):
             viewer.forward_button.click()
             self.assertEqual(viewer.current_path, home)
             viewer.close()
+
+    def test_percent_encoded_local_navigation_uses_literal_fallback(self):
+        with self.temporary_directory() as temporary:
+            root = Path(temporary).resolve() / 'base%20folder'
+            root.mkdir()
+            home, literal, decoded = root / 'Home.md', root / 'Two%20Words.md', root / 'Two Words.md'
+            home.write_text('# Home')
+            literal.write_text('# Literal')
+            viewer = MarkdownViewer(home)
+            from shiboken6 import isValid
+            self.addCleanup(lambda: viewer.close() if isValid(viewer) else None)
+            viewer.follow_link(qt.QUrl('Two%20Words.md#literal'))
+            self.assertEqual(viewer.current_path, literal)
+            viewer.open_document(home)
+            absolute = qt.QUrl.fromLocalFile(str(decoded))
+            viewer.follow_link(absolute)
+            self.assertEqual(viewer.current_path, literal)
+            preview = viewer.link_preview
+            preview.show_link(absolute.toString(qt.QUrl.ComponentFormattingOption.FullyEncoded),
+                              viewer.mapToGlobal(qt.QPoint(10, 10)))
+            self.assertIn('Literal', preview.snippet.toPlainText())
+            preview.hide()
+            decoded.write_text('# Decoded')
+            viewer.open_document(home)
+            viewer.follow_link(qt.QUrl('Two%20Words.md#decoded'))
+            self.assertEqual(viewer.current_path, decoded)
+            viewer.open_document(home)
+            viewer.follow_link(qt.QUrl('Two%2520Words.md'))
+            self.assertEqual(viewer.current_path, literal)
 
     def test_relative_extensionless_pages_and_external_text_editor(self):
         with self.temporary_directory() as temporary:

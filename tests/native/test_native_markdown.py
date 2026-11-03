@@ -247,6 +247,19 @@ with TemporaryDirectory() as temporary:
     wiki.back()
     wiki.follow_link(wiki.web, '../../outside.md')
     assert wiki.path == folder / 'test.md'
+    literal, decoded = folder / 'Two%20Words.md', folder / 'Two Words.md'
+    literal.write_text('# Literal')
+    wiki.follow_link(wiki.web, 'Two%20Words.md#literal')
+    assert wiki.path == literal
+    wiki.back()
+    decoded.write_text('# Decoded')
+    wiki.follow_link(wiki.web, 'Two%20Words.md#decoded')
+    assert wiki.path == decoded
+    wiki.back()
+    wiki.follow_link(wiki.web, 'Two%2520Words.md')
+    assert wiki.path == literal
+    wiki.back()
+
     wiki.back()
     index = wiki.history_index
     (folder / 'test.md').unlink()

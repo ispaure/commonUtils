@@ -2,8 +2,13 @@
 
 Video embeds such as `![[clip.mp4]]` and `![Clip](clip.mp4)` show inline playback
 controls in desktop reading and formatted editing. Provider-backed native HTML
-readers can show the same controls through their host's media source. Playback
+readers can show the same controls through their host's media source.
+If a host-supplied image cannot load, native previews show its label and a reason
+such as a missing file, denied access, ambiguous attachment or size limit. Playback
 starts when you press Play; source mode retains the editable embed syntax.
+The position slider becomes available when the decoder reports a seekable
+duration. Focus it and use the arrow keys to seek; screen readers announce the
+Play/Pause action that is currently available.
 
 Opening a page or retracing page history shows loading feedback while the page
 is prepared. Native mobile wikis use a spinner and “Loading page…” caption;
@@ -22,7 +27,12 @@ Ordinary file-browser activation opens preview. Hold Alt/Option while opening to
 start editing, or use a host action explicitly labeled as an editor.
 
 Use Contents to jump to headings and Back/Forward to return to earlier documents
-and scroll positions. Following a Markdown link keeps the current Read/Edit mode
+and scroll positions. Desktop Back/Forward sit on the left of the toolbar, with
+Contents and the other document tools on the right. Documentation libraries also
+show Up in that group to open the parent folder's page; regular Markdown files
+show Back/Forward only.
+Hovering over a link in Read or Formatted mode shows a pointing-hand cursor.
+Following a Markdown link keeps the current Read/Edit mode
 and Formatted/Source choice. Relative links resolve beside the current document. Wiki links
 such as `[[Notes|My notes]]` target local documents; extensionless targets gain `.md`.
 A similarly named document elsewhere in a vault is not automatically discovered.
@@ -72,6 +82,8 @@ links from their syntax. The Bold, Italic, Undo and Redo icon buttons match the 
 focus a button for its label and shortcut. The **Format** icon menu beside them contains
 undo/redo, inline styles, headings, lists and quotes. **Format → Table** commands insert a table or add/remove rows and columns;
 the first row is the header. Structural table changes are undoable.
+
+Hover over the **Formatted / Source** selector for editing-mode guidance.
 
 **Source** exposes the Markdown text. Use it for exact syntax and unsupported
 extensions. Actual formatted edits can normalize spacing, list/table/fence spelling
@@ -267,3 +279,10 @@ Documentation Library uses heading titles for navigation. Its sidebar never crea
 renames or moves files, including when page editing is enabled with Alt/Option.
 Hosts that need filename-based note organization supply their own Notes Library
 workspace rather than changing documentation navigation.
+
+## Encoded local filenames
+
+Local links and images try URL-decoded names first (`%20` means a space). If that
+file is missing, the reader also tries the literal name containing `%20`. Decoding
+happens once, so `%2520` refers to a filename containing `%20`. When both spellings
+exist, the decoded name takes priority. The Markdown source stays unchanged.

@@ -11,6 +11,78 @@ from commonUtils.runtime.resources.mutations import move_resource, delete_resour
 
 
 class ResourceOperationsTests(unittest.TestCase):
+    def test_name_listing_handles_disappearance_and_rejects_folder_replacement(self):
+        from contextlib import contextmanager
+        import os
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / 'Folder'
+            folder.mkdir()
+            (folder / 'note.md').write_text('note')
+            provider = LocalFiles(root)
+            scan = os.scandir
+            @contextmanager
+            def disappearing(path):
+                with scan(path) as entries:
+                    children = list(entries)
+                (folder / 'note.md').unlink()
+                yield children
+            with patch('commonUtils.runtime.resources.local.os.scandir', side_effect=disappearing):
+                self.assertEqual(provider.list_names('Folder'), [])
+            @contextmanager
+            def replaced(path):
+                with scan(path) as entries:
+                    yield entries
+                folder.rename(root / 'Previous')
+                folder.mkdir()
+            with patch('commonUtils.runtime.resources.local.os.scandir', side_effect=replaced):
+                with self.assertRaisesRegex(ValueError, 'changed during listing'):
+                    provider.list_names('Folder')
+
+    def test_name_listing_skips_metadata_and_preserves_adapter_policy(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'Folder').mkdir()
+            (root / 'note.md').write_text('note')
+            provider = LocalFiles(root)
+            with patch.object(provider, 'entry', side_effect=AssertionError('No rich metadata')):
+                rows = provider.list_names()
+            self.assertEqual({row['path']: row['directory'] for row in rows},
+                             {'Folder': True, 'note.md': False})
+            class Filtered(LocalFiles):
+                def list(self, path='', *, cancelled=lambda: False):
+                    return [row for row in super().list(path, cancelled=cancelled) if row['directory']]
+            self.assertEqual([row['path'] for row in Filtered(root).list_names()], ['Folder'])
+            class CustomEntry(LocalFiles):
+                def entry(self, path):
+                    return dict(super().entry(path), size=123)
+            self.assertTrue(all(row['size'] == 123 for row in CustomEntry(root).list_names()))
+            self.assertEqual(next(row['size'] for row in rows if row['name'] == 'note.md'), 4)
+            from commonUtils.runtime.operations import OperationCancelled
+            with self.assertRaises(OperationCancelled):
+                provider.list_names(cancelled=lambda: True)
+            (root / 'linked').symlink_to(root / 'note.md')
+            with self.assertRaises(ValueError):
+                provider.list_names()
+            (root / 'linked').unlink()
+            import os
+            os.link(root / 'note.md', root / 'hardlink')
+            with self.assertRaises(ValueError):
+                provider.list_names()
+
+    def test_name_listing_respects_protected_descendants(self):
+        from commonUtils.filesystem.local_access import protect_local_root
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            protected = root / 'private'
+            protected.mkdir()
+            release = protect_local_root(self.id(), protected, 'Use the provider')
+            try:
+                with self.assertRaises(PermissionError):
+                    LocalFiles(root).list_names()
+            finally:
+                release()
+
     def test_nonblocking_source_does_not_create_a_truncated_local_resource(self):
         from io import BytesIO
         class WouldBlock(BytesIO):

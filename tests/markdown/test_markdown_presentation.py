@@ -22,6 +22,31 @@ from commonUtils.ui.appearance.theme import apply_theme, theme_palette, SLATE_DA
 
 
 class MarkdownPresentationTests(QtTestCase):
+    def test_video_controls_support_keyboard_seeks_without_feedback_and_match_accessibility_state(self):
+        from commonUtils.ui.markdown.videos import VideoCard
+        from PySide6.QtMultimedia import QMediaPlayer
+        from PySide6.QtTest import QTest
+        card = VideoCard(None, 'http://127.0.0.1:1/clip.mp4', '<clip>.mp4')
+        self.addCleanup(card.retire)
+        card.show()
+        self.assertFalse(card.seek.isEnabled())
+        self.assertEqual(card.seek.maximum(), 0)
+        self.assertEqual(card.status.textFormat(), qt.Qt.TextFormat.PlainText)
+        with patch.object(card.player, 'setPosition') as seek:
+            card.duration_changed(10000)
+            card.position_changed(5000)
+            seek.assert_not_called()
+            # Exercise the keyboard action even without a decoder fixture.
+            card.seek.setEnabled(True)
+            QTest.keyClick(card.seek, qt.Qt.Key.Key_Right)
+            self.assertGreater(card.seek.value(), 5000)
+            seek.assert_called_once_with(card.seek.value())
+        card.state_changed(QMediaPlayer.PlaybackState.PlayingState)
+        self.assertEqual(card.play.text(), 'Pause')
+        self.assertEqual(card.play.accessibleName(), 'Pause <clip>.mp4')
+        card.state_changed(QMediaPlayer.PlaybackState.PausedState)
+        self.assertEqual(card.play.accessibleName(), 'Play <clip>.mp4')
+
     def test_video_wiki_filename_with_hash_is_encoded_and_source_is_preserved(self):
         source = '![[clip #1.mp4]]\n'
         viewer = self.viewer(source)

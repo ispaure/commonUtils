@@ -54,6 +54,7 @@ class VideoCard(qt.QWidget):
         self.screen = VideoSurface(self)
         self.player.setVideoSink(self.screen.videoSink())
         self.url = url
+        self.label = label
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.screen, 1)
@@ -63,16 +64,41 @@ class VideoCard(qt.QWidget):
         self.play.clicked.connect(self.toggle)
         self.seek = qt.QSlider(qt.Qt.Orientation.Horizontal)
         self.seek.setAccessibleName('Video position')
-        self.seek.sliderMoved.connect(self.player.setPosition)
-        self.player.durationChanged.connect(lambda value: self.seek.setRange(0, min(value, 2147483647)))
-        self.player.positionChanged.connect(lambda value: self.seek.setValue(value) if not self.seek.isSliderDown() else None)
-        self.player.playbackStateChanged.connect(lambda state: self.play.setText('Pause' if state == QMediaPlayer.PlaybackState.PlayingState else 'Play'))
+        self.seek.setRange(0, 0)
+        self.seek.setEnabled(False)
+        self.seek.valueChanged.connect(self.player.setPosition)
+        self.player.durationChanged.connect(self.duration_changed)
+        self.player.seekableChanged.connect(lambda *_: self.update_seek())
+        self.player.positionChanged.connect(self.position_changed)
+        self.player.playbackStateChanged.connect(self.state_changed)
         self.status = qt.QLabel(label)
+        self.status.setTextFormat(qt.Qt.TextFormat.PlainText)
+        self.status.setWordWrap(True)
+        self.status.setMinimumWidth(0)
         self.player.errorOccurred.connect(lambda *_: self.status.setText(self.player.errorString()))
         controls.addWidget(self.play)
         controls.addWidget(self.seek, 1)
         layout.addLayout(controls)
         layout.addWidget(self.status)
+
+    def duration_changed(self, value):
+        with qt.QSignalBlocker(self.seek):
+            self.seek.setRange(0, max(0, min(value, 2147483647)))
+        self.update_seek()
+
+    def update_seek(self):
+        self.seek.setEnabled(self.player.isSeekable() and self.seek.maximum() > 0)
+
+    def position_changed(self, value):
+        if not self.seek.isSliderDown():
+            with qt.QSignalBlocker(self.seek):
+                self.seek.setValue(value)
+
+    def state_changed(self, state):
+        from PySide6.QtMultimedia import QMediaPlayer
+        label = 'Pause' if state == QMediaPlayer.PlaybackState.PlayingState else 'Play'
+        self.play.setText(label)
+        self.play.setAccessibleName(label + ' ' + self.label)
 
     def toggle(self):
         if self.player.source().isEmpty():

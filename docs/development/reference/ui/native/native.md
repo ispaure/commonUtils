@@ -533,11 +533,16 @@ own persistence, credential validation, background privacy and disposal policy.
 
 ## Host-supplied Markdown images
 
+Host-supplied Markdown image failures retain the escaped alt label and display
+an inline reason. Missing files, access failures, invalid images and size/budget
+errors use readable messages; returning `None` reports an unavailable, unsupported
+or disallowed path. No resource callback still renders the alt label alone.
+
 `markdown_body` and `markdown_preview` accept optional `image_source(target)`.
 The callback returns `(mime_type, bytes)` or `None`; it owns path resolution,
 permissions, revision checks and I/O. The renderer never fetches images itself.
 PNG, JPEG, WebP and GIF up to 8 MiB are embedded as data URIs; `OSError`/`ValueError`
-and unsupported data fall back to escaped alt text. Hosts must validate raster
+and unsupported data show escaped alt text with a failure reason. Hosts must validate raster
 content and bound their total I/O. An opted-in preview allows only `data:` image
 sources and has a 24 MiB output limit; the default inert preview keeps its 2 MiB
 limit and alt-text-only images. Image markup is bounded to 22 MiB per body.

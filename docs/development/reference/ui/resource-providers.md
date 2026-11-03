@@ -7,6 +7,11 @@ implementers need not inherit them.
 
 ## Directory browsing
 
+`ResourceBrowser.renamed(source, destination)` reports committed logical renames
+on the GUI thread. It fires even if the subsequent folder refresh fails; failed
+renames emit nothing. Hosts use it to update favourites and history in their own
+storage. Read-only providers do not offer the rename action.
+
 Provider rows may include `hidden: bool` for native hidden metadata. `LocalFiles`
 sets it from dot names and the filesystem's Hidden/UF_HIDDEN flags during entry
 loading. The continuous native browser also recognizes dot-prefixed leaf names

@@ -33,6 +33,7 @@ class ResourceBreadcrumbBar(BreadcrumbBar):
 class ResourceBrowser(qt.QWidget):
     activated = qt.Signal(object)
     directory_changed = qt.Signal(object)
+    renamed = qt.Signal(str, str)
     idle = qt.Signal()
     persistent_index = False
 
@@ -510,6 +511,8 @@ class ResourceBrowser(qt.QWidget):
             self.mutate(lambda cancelled: create_resource_folder(self.provider, path, cancelled=cancelled))
 
     def _rename(self, row):
+        if self.busy or self.closing or not capabilities(self.provider).rename:
+            return
         name, accepted = qt.QInputDialog.getText(self, 'Rename', 'New name:', text=row['name'])
         if accepted and name:
             from ...runtime.resources.paths import resource_path
@@ -521,7 +524,12 @@ class ResourceBrowser(qt.QWidget):
                 qt.QMessageBox.warning(self, 'Rename', str(error))
                 return
             target = '/'.join(p for p in (row['path'].rpartition('/')[0], name) if p)
-            self.mutate(lambda cancelled: rename_resource(self.provider, row['path'], target, cancelled=cancelled))
+            source, provider = row['path'], self.provider
+            def rename(cancelled):
+                rename_resource(provider, source, target, cancelled=cancelled)
+                # Notify after commit even if the following listing fails.
+                self.renamed.emit(source, target)
+            self.mutate(rename)
 
     def _delete(self, row):
         if qt.QMessageBox.question(self, 'Delete permanently',

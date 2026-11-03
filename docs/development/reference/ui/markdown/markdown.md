@@ -10,6 +10,11 @@ virtual provider paths itself. Local viewers use local file URLs. Players load
 on Play, pause when hidden, and release their decoder on retirement. Source
 editing keeps the authored syntax.
 
+Provider storage adapters can render failed image resources with
+`ui.markdown.images.prepared_image(data, reason)`. It decodes in-memory image bytes
+and returns a readable placeholder for a supplied reason or invalid image data.
+The placeholder changes only the rendered resource, preserving authored syntax.
+
 Native HTML previews accept a host-supplied `image_source` returning
 `("video/<type>", "http://127.0.0.1:<port>/<capability>")` for video targets.
 They emit inline video controls with no preload and a loopback-only media policy.
@@ -122,7 +127,10 @@ their existing contracts.
 
 Reading, callout folding and unchanged saves do not reserialize original bytes.
 Actual formatted edits use Qt's Markdown writer and can normalize or lose unsupported
-syntax. Source is the precise editing route; callout documents automatically select
+syntax. The mode selector exposes this guidance through its tooltip and accessible
+description rather than writing an informational status on entering editing.
+Entering editing does not replace existing notices with that guidance.
+Source is the precise editing route; callout documents automatically select
 it. Supported live inline/fence editing keeps typed spellings while editing; that is
 not a full extension-aware round-trip guarantee for arbitrary documents.
 
@@ -242,6 +250,18 @@ and clears the snippet. Editing widgets have no hover-preview filters.
 
 ## Wiki scopes and landing pages
 
+Desktop `MarkdownNavigation` owns the Back/Forward/optional Up button group.
+`MarkdownViewer` places it before the toolbar stretch, on the left of the row;
+document tools stay on the right. Host-supplied groups use the same left position.
+`WikiPanel` enables its Up button; ordinary file readers leave Up hidden.
+Hosts with their own document history can create the same group and call
+`viewer.place_navigation(group)` to replace the reader's visible group. The host
+owns callbacks and enabled states and can move its group to another layout when
+showing a non-Markdown document. Alt+Left/Right activate the group's buttons and
+use its construction parent as the document shortcut scope. Installing a host
+group disables the built-in group's shortcuts so hidden reader history cannot
+compete with host navigation.
+
 A conventional wiki has a `docs/docs.md` scope landing, audience subfolders and
 same-named nested pages such as `banana/banana.md`. Start pages with an H1 after
 optional YAML properties; the heading supplies the visible title. Parent pages
@@ -298,3 +318,22 @@ Dummy-backend callers retain synchronous loading by default and can enable
 `ui.native.page_loading` is also available to provider-backed native readers.
 Desktop Markdown rendering shows a slim indeterminate bar and restores its
 temporary application busy cursor in a `finally` block, including read failures.
+
+## Percent-encoded local paths
+
+`formats.markdown.link_path_names` produces a single decoded spelling followed
+by the literal spelling, without duplicates. Native/provider image sources and
+Qt local image resources exhaust decoded candidates before literal candidates.
+`formats.markdown.wiki.resolve_document_link` applies the same order to local
+document navigation and hover previews; its optional `base` is a filesystem
+directory and is never URL-decoded. Access and containment checks still apply.
+Hosts may implement `storage.open_markdown_link(target)` to receive the original
+encoded target before filesystem conversion; existing `storage.open_link` hosts
+retain their path-based dispatch.
+
+The filesystem base is preserved when resolving encoded absolute links, including
+parent folder names containing literal percent signs. Missing files permit the
+literal fallback; access or provider-path rejection does not. Qt local image
+loaders return an empty image after a denied lookup so the default loader cannot
+bypass that result. Windows absolute images on a different drive retain their
+absolute path.

@@ -394,6 +394,12 @@ def tables(frame):
 
 class MarkdownBrowser(qt.QTextBrowser):
     """Native selectable text with slim quote/callout accent rules."""
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        self.viewport().setCursor(qt.Qt.CursorShape.PointingHandCursor
+                                  if self.anchorAt(event.position().toPoint())
+                                  else qt.Qt.CursorShape.IBeamCursor)
+
     def update_reading_width(self):
         """Center a readable text measure while allowing narrow windows to wrap."""
         document = self.document()
@@ -417,6 +423,10 @@ class MarkdownBrowser(qt.QTextBrowser):
         loader = getattr(self, 'resource_loader', None)
         if loader is not None:
             return loader(kind, url)
+        from .images import local_image_resource
+        image = local_image_resource(kind, url, self.document().baseUrl())
+        if image is not None:
+            return image
         return super().loadResource(kind, url)
 
     def paintEvent(self, event):

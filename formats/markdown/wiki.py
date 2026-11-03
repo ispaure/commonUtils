@@ -145,6 +145,36 @@ def resolve_document_path(path):
     raise FileNotFoundError(f'Linked document does not exist: {path}')
 
 
+def resolve_document_link(path, *, base=None):
+    """Resolve a URL-encoded local path, falling back to its literal spelling."""
+    import os
+    from . import link_path_names
+    from ...filesystem.local_access import check_local_path
+    path = str(path)
+    if base is not None and path.startswith('/'):
+        import posixpath
+        from urllib.parse import urlsplit
+        encoded_base = urlsplit(Path(base).absolute().as_uri())
+        base_path = ('//' + encoded_base.netloc if encoded_base.netloc else '') + encoded_base.path
+        # Preserve the known filesystem base, including literal percent signs,
+        # while trying both URL spellings of the destination beneath it.
+        if os.name != 'nt' or Path(path.lstrip('/')).drive.lower() == Path(base).drive.lower():
+            path = posixpath.relpath(path, base_path)
+    for name in link_path_names(path):
+        # URL paths spell Windows drives as /C:/..., unlike filesystem paths.
+        if os.name == 'nt' and len(name) > 2 and name[0] == '/' and name[2] == ':':
+            name = name[1:]
+        candidate = Path(name) if base is None else Path(base) / name
+        check_local_path(candidate)
+        try:
+            resolved = resolve_document_path(candidate)
+        except FileNotFoundError:
+            continue
+        check_local_path(resolved)
+        return resolved
+    raise FileNotFoundError(f'Linked document does not exist: {path}')
+
+
 def documentation_root(path, fallback=None):
     """Find an explicit docs/docs.md wiki scope; retain custom roots within it.
 

@@ -1,10 +1,7 @@
 """Pointer-bound local-file snippets for Markdown reading mode."""
-from pathlib import Path
 from shiboken6 import isValid
 
 from .. import pyside as qt
-from ...filesystem.local_access import check_local_path
-from ...formats.markdown.wiki import resolve_document_path
 from ...persistence.text import likely_binary
 from ...formats.markdown import split_frontmatter
 from .extensions import reading_source
@@ -81,10 +78,12 @@ class LinkPreview(qt.QObject):
             url = qt.QUrl.fromLocalFile(str(self.viewer.current_path)).resolved(qt.QUrl(link))
             if not url.isLocalFile():
                 return
-            path = Path(url.toLocalFile())
-            check_local_path(path)
-            path = resolve_document_path(path)
-            check_local_path(path)
+            from urllib.parse import urlsplit
+            from ...formats.markdown.wiki import resolve_document_link
+            parts = urlsplit(link)
+            name = ('//' + parts.netloc if parts.netloc else '') + parts.path
+            path = (resolve_document_link(name, base=self.viewer.current_path.parent)
+                    if name else self.viewer.current_path)
             # Sniff and read one bounded prefix. Never execute code, fetch links,
             # load images, or modify the document/history to show a preview.
             with path.open('rb') as stream:

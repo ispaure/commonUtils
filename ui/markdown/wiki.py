@@ -2,7 +2,6 @@
 from ...search.policy import SEARCH_DEBOUNCE_MS
 from ...formats.markdown.wiki import MarkdownWiki, documentation_root
 from .. import pyside as qt
-from ..readers.reader_chrome import reader_button
 
 
 class WikiPanel(qt.QWidget):
@@ -10,13 +9,10 @@ class WikiPanel(qt.QWidget):
         super().__init__(viewer)
         self.viewer = viewer
         self.catalog = MarkdownWiki(directory)
-        for button, label in ((viewer.back_button, 'Back'), (viewer.forward_button, 'Forward')):
-            button.setText(label)
-            button.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self.up_button = reader_button(viewer, 'Up', icon='up')
+        self.up_button = viewer.navigation.up_button
+        self.up_button.show()
         self.up_button.setToolTip('Open the parent folder’s documentation page')
         self.up_button.clicked.connect(self.go_up)
-        viewer.navigation_toolbar.insertWidget(2, self.up_button)
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.search = qt.QLineEdit()

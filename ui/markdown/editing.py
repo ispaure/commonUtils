@@ -176,8 +176,6 @@ class MarkdownEditingMixin:
         self._update_edit_actions()
         if not enabled:
             self._render_source(self.markdown_text())
-        elif self.edit_mode.currentData() == 'formatted':
-            self.status.setText('Formatted edits normalize Markdown syntax. Source mode retains precise syntax.')
         (self.active_editor() if enabled else self.browser).setFocus()
 
     def _confirm_leave(self):

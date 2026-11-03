@@ -16,6 +16,29 @@ from commonUtils.ui.native.markdown_preview import markdown_preview
 
 
 class NativeMarkdownImageTests(unittest.TestCase):
+    def test_failures_explain_missing_access_invalid_and_oversized_images(self):
+        cases = ((FileNotFoundError('/private/path'), 'File not found'),
+                 (PermissionError('/private/path'), 'Access denied'),
+                 (ValueError('Several attachments match <photo> & name.'),
+                  'Several attachments match &lt;photo&gt; &amp; name.'))
+        for error, reason in cases:
+            with self.subTest(error=error):
+                def fail(target):
+                    raise error
+                html = markdown_preview('![Photo](photo.gif)', image_source=fail)
+                self.assertIn('Image unavailable: ' + reason, html)
+                self.assertNotIn('/private/path', html)
+                self.assertNotIn('<img', html)
+        self.image.write_bytes(b'X' * (8 * 1024 * 1024 + 65))
+        html = markdown_preview(f'![Photo]({self.target})', image_source=self.load)
+        self.assertIn('8 MiB', html)
+
+    def test_host_resolver_result_is_still_scoped_and_access_checked(self):
+        load = folder_image_source(self.provider, 'notes/page.md', root='notes',
+                                   resolve=lambda target: self.image.name)
+        with patch.object(self.provider, 'open', side_effect=AssertionError('outside read')):
+            self.assertIsNone(load('photo.gif'))
+
     def setUp(self):
         self.scope = TemporaryDirectory()
         self.addCleanup(self.scope.cleanup)
@@ -37,6 +60,39 @@ class NativeMarkdownImageTests(unittest.TestCase):
         self.assertNotIn('<img', markdown_preview(f'![Colors]({self.target})'))
         for text in (f'`![Colors]({self.target})`', f'```\n![[{self.target}]]\n```', f'\\![[{self.target}]]'):
             self.assertNotIn('<img', markdown_preview(text, image_source=self.load))
+
+    def test_percent_encoded_image_fallback_and_decoded_priority(self):
+        (self.root / 'notes/Two%20Words').mkdir()
+        raw = self.root / 'notes/Two%20Words/photo.gif'
+        raw.write_bytes(GIF + b'literal')
+        target = 'Two%20Words/photo.gif'
+        self.assertEqual(self.load(target), ('image/gif', GIF + b'literal'))
+        (self.root / 'notes/Two Words').mkdir()
+        decoded = self.root / 'notes/Two Words/photo.gif'
+        decoded.write_bytes(GIF + b'decoded')
+        self.assertEqual(self.load(target), ('image/gif', GIF + b'decoded'))
+        self.assertEqual(self.load('Two%2520Words/photo.gif'), ('image/gif', GIF + b'literal'))
+        html = markdown_preview(r'![Photo]\(Two%20Words/photo.gif)', image_source=self.load)
+        self.assertIn(base64.b64encode(GIF + b'decoded').decode(), html)
+
+    def test_decoded_attachment_image_precedes_literal_relative_image(self):
+        (self.root / 'notes/Attachments').mkdir()
+        (self.root / 'notes/Attachments/Two Words.gif').write_bytes(GIF + b'decoded')
+        (self.root / 'notes/Two%20Words.gif').write_bytes(GIF + b'literal')
+        load = folder_image_source(self.provider, 'notes/page.md', root='notes')
+        self.assertEqual(load('Two%20Words.gif'), ('image/gif', GIF + b'decoded'))
+
+    def test_rejected_decoded_image_does_not_fall_back_to_literal_name(self):
+        (self.root / 'notes/Two%20Words.gif').write_bytes(GIF + b'literal')
+        (self.root / 'notes/Two Words.gif').symlink_to(self.image)
+        with patch.object(self.provider, 'open', side_effect=AssertionError('read rejected image')):
+            self.assertIsNone(self.load('Two%20Words.gif'))
+
+    def test_encoded_extension_keeps_literal_filename_fallback(self):
+        (self.root / 'notes/photo%2Egif').write_bytes(GIF + b'literal')
+        self.assertEqual(self.load('photo%2Egif'), ('image/gif', GIF + b'literal'))
+        (self.root / 'notes/photo.gif').write_bytes(GIF + b'decoded')
+        self.assertEqual(self.load('photo%2Egif'), ('image/gif', GIF + b'decoded'))
 
     def test_root_url_query_and_link_guards(self):
         for target in ('../../escape.gif', '%2e%2e/%2e%2e/escape.gif', '/outside.gif',
@@ -73,7 +129,8 @@ class NativeMarkdownImageTests(unittest.TestCase):
             self.load(self.target)
         self.image.write_bytes(b'X' * (8 * 1024 * 1024 + 65))
         with patch.object(self.provider, 'open', side_effect=AssertionError('oversized open')):
-            self.assertIsNone(self.load(self.target))
+            with self.assertRaisesRegex(ValueError, '8 MiB'):
+                self.load(self.target)
 
     def test_library_root_and_attachment_fallbacks_stay_inside_the_library(self):
         (self.root / 'Vault/Notes').mkdir(parents=True)

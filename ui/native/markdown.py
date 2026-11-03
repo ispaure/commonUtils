@@ -12,7 +12,7 @@ from commonUtils.ui.native.event_loop import DebouncedCallback
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
-from ...formats.markdown.wiki import MarkdownWiki, resolve_document_path, documentation_root
+from ...formats.markdown.wiki import MarkdownWiki, documentation_root
 from .markdown_preview import markdown_preview
 from .inline_html import set_inline_html
 from ...formats.markdown.image_sources import local_image_source
@@ -303,11 +303,8 @@ class MarkdownWikiView:
                 self.scroll_fragment(relative.fragment)
             return False
         try:
-            from ...filesystem.local_access import check_local_path
-            candidate = (self.path.parent / unquote(relative.path)).resolve()
-            check_local_path(candidate)
-            path = resolve_document_path(candidate)
-            check_local_path(path)
+            from ...formats.markdown.wiki import resolve_document_link
+            path = resolve_document_link(relative.path, base=self.path.parent)
             if path.suffix.lower() in ('.md', '.markdown'):
                 self.open_page(path, linked=True, fragment=relative.fragment)
             elif self.open_file is not None:
