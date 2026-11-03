@@ -93,15 +93,21 @@ class InlineVideos(qt.QObject):
     def __init__(self, widget, resolve):
         super().__init__(widget)
         self.widget, self.resolve, self.cards = widget, resolve, {}
+        self.entries = None
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.refresh)
-        widget.textChanged.connect(lambda: self.timer.start(0))
+        widget.textChanged.connect(self.invalidate)
+        widget.document().baseUrlChanged.connect(lambda *_: self.invalidate())
         widget.document().documentLayout().documentSizeChanged.connect(lambda *_: self.timer.start(0))
         widget.verticalScrollBar().valueChanged.connect(lambda *_: self.timer.start(0))
         widget.horizontalScrollBar().valueChanged.connect(lambda *_: self.timer.start(0))
         widget.installEventFilter(self)
         widget.viewport().installEventFilter(self)
+
+    def invalidate(self):
+        self.entries = None
+        self.timer.start(0)
 
     def eventFilter(self, watched, event):
         if event.type() == qt.QEvent.Type.Hide:
@@ -112,6 +118,8 @@ class InlineVideos(qt.QObject):
         return False
 
     def clear(self):
+        self.timer.stop()
+        self.entries = []
         for card in self.cards.values():
             card.retire()
         self.cards.clear()
@@ -119,30 +127,34 @@ class InlineVideos(qt.QObject):
     def refresh(self):
         from .images import ResponsiveImages
         document, wanted = self.widget.document(), {}
-        block = document.begin()
-        while block.isValid():
-            iterator = block.begin()
-            while not iterator.atEnd():
-                fragment = iterator.fragment()
-                fmt = fragment.charFormat()
-                if fmt.isImageFormat() and video_target(fmt.toImageFormat().name()):
-                    image = fmt.toImageFormat()
-                    target = document.baseUrl().resolved(qt.QUrl(image.name()))
-                    source = self.resolve(target)
-                    if source:
-                        key = fragment.position(), str(source)
-                        card = self.cards.get(key)
-                        if card is None:
-                            card = VideoCard(self.widget.viewport(), str(source), Path(target.toLocalFile()).name)
-                        wanted[key] = card
-                        cursor = qt.QTextCursor(document)
-                        cursor.setPosition(fragment.position())
-                        rect = self.widget.cursorRect(cursor)
-                        size = ResponsiveImages().intrinsicSize(document, fragment.position(), fmt)
-                        card.setGeometry(rect.x(), rect.y(), round(size.width()), round(size.height()))
-                        card.setVisible(self.widget.isVisible())
-                iterator += 1
-            block = block.next()
+        if self.entries is None:
+            self.entries = []
+            block = document.begin()
+            while block.isValid():
+                iterator = block.begin()
+                while not iterator.atEnd():
+                    fragment = iterator.fragment()
+                    fmt = fragment.charFormat()
+                    if fmt.isImageFormat() and video_target(fmt.toImageFormat().name()):
+                        self.entries.append((fragment.position(), fmt))
+                    iterator += 1
+                block = block.next()
+        for position, fmt in self.entries:
+            target = document.baseUrl().resolved(qt.QUrl(fmt.toImageFormat().name()))
+            source = self.resolve(target)
+            if not source:
+                continue
+            key = position, str(source)
+            card = self.cards.get(key)
+            if card is None:
+                card = VideoCard(self.widget.viewport(), str(source), Path(target.toLocalFile()).name)
+            wanted[key] = card
+            cursor = qt.QTextCursor(document)
+            cursor.setPosition(position)
+            rect = self.widget.cursorRect(cursor)
+            size = ResponsiveImages().intrinsicSize(document, position, fmt)
+            card.setGeometry(rect.x(), rect.y(), round(size.width()), round(size.height()))
+            card.setVisible(self.widget.isVisible())
         for key, card in self.cards.items():
             if key not in wanted:
                 card.retire()
