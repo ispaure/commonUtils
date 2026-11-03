@@ -101,7 +101,11 @@ class LocalFiles:
                     raise ValueError('Linked storage is not supported.')
                 check_local_path(child.path)
                 try:
-                    info = child.stat(follow_symlinks=False)
+                    # Windows DirEntry metadata leaves st_nlink/st_ino at zero.
+                    # Query the file itself before enforcing independent-file
+                    # policy; never mistake an unknown link count for a link.
+                    info = (Path(child.path).stat(follow_symlinks=False) if os.name == 'nt'
+                            else child.stat(follow_symlinks=False))
                 except FileNotFoundError:
                     continue
                 directory = stat_module.S_ISDIR(info.st_mode)

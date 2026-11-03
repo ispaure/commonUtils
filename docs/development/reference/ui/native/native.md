@@ -219,6 +219,16 @@ content-pop recognizers. Hosts reconcile it on screen changes independently of
 bar visibility. Leaving the reader, changing controllers or uninstalling restores
 the recognizers' original enabled states; explicit Back buttons remain available.
 
+## Reader bar visibility
+
+Apple navigation bar suppression is idempotent: reasserting the same tab/sidebar
+visibility must not enqueue another keyboard-layout resize. Fullscreen readers
+reapply their bar policy during host resize; unconditional resize scheduling
+would create a self-sustaining layout loop. Real tab visibility, sidebar mode or
+sidebar visibility changes still request layout, and restoration retains the
+original presentation. `test_native_keyboard_layout.py` covers repeated hides,
+repeated restores and sidebar restoration alongside keyboard/reader ownership.
+
 ## Native image canvas
 
 `ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description=..., **kwargs)`

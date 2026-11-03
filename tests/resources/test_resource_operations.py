@@ -11,6 +11,21 @@ from commonUtils.runtime.resources.mutations import move_resource, delete_resour
 
 
 class ResourceOperationsTests(unittest.TestCase):
+    def test_windows_listing_queries_actual_link_count_instead_of_direntry_cache(self):
+        import os
+        from types import SimpleNamespace
+        from commonUtils.runtime.resources import local
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'note.md').write_text('note')
+            # Windows DirEntry.stat() omits the link count. Path.stat() must
+            # still distinguish an ordinary file from an actual hard link.
+            with patch.object(local, 'os', SimpleNamespace(name='nt', scandir=os.scandir)):
+                self.assertEqual(LocalFiles(root).list_names()[0]['size'], 4)
+                os.link(root / 'note.md', root / 'second.md')
+                with self.assertRaisesRegex(ValueError, 'independent regular'):
+                    LocalFiles(root).list_names()
+
     def test_name_listing_handles_disappearance_and_rejects_folder_replacement(self):
         from contextlib import contextmanager
         import os
