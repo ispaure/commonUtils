@@ -14,16 +14,44 @@ def video_target(target):
         return False
 
 
+class VideoSurface(qt.QWidget):
+    """Paint decoded frames consistently in native and offscreen text viewers."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        from PySide6.QtMultimedia import QVideoSink
+        self.sink = QVideoSink(self)
+        self.current_image = qt.QImage()
+        self.sink.videoFrameChanged.connect(self.frame_changed)
+
+    def videoSink(self):
+        return self.sink
+
+    def frame_changed(self, frame):
+        self.current_image = frame.toImage() if frame.isValid() else qt.QImage()
+        self.update()
+
+    def paintEvent(self, event):
+        painter = qt.QPainter(self)
+        try:
+            painter.fillRect(self.rect(), qt.QColor('black'))
+            if not self.current_image.isNull():
+                size = self.current_image.size().scaled(self.size(), qt.Qt.AspectRatioMode.KeepAspectRatio)
+                target = qt.QRect((self.width() - size.width()) // 2, (self.height() - size.height()) // 2,
+                                  size.width(), size.height())
+                painter.drawImage(target, self.current_image)
+        finally:
+            painter.end()
+
+
 class VideoCard(qt.QWidget):
     def __init__(self, parent, url, label):
         super().__init__(parent)
         from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-        from PySide6.QtMultimediaWidgets import QVideoWidget
         self.player = QMediaPlayer(self)
         self.audio = QAudioOutput(self)
         self.player.setAudioOutput(self.audio)
-        self.screen = QVideoWidget(self)
-        self.player.setVideoOutput(self.screen)
+        self.screen = VideoSurface(self)
+        self.player.setVideoSink(self.screen.videoSink())
         self.url = url
         layout = qt.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -56,6 +84,7 @@ class VideoCard(qt.QWidget):
     def retire(self):
         self.player.stop()
         self.player.setSource(qt.QUrl())
+        self.screen.current_image = qt.QImage()
         self.hide()
         self.deleteLater()
 
