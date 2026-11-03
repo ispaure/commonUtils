@@ -12,7 +12,7 @@ case "$PAUSE_ON_EXIT" in
     *) echo "ERROR: pause_on_exit must be true or false (received: $PAUSE_ON_EXIT)." >&2; exit 1 ;;
 esac
 UV_INSTALL_DIR_DEFAULT="${HOME:-}/.local/bin"
-UV_INSTALL_URL="https://astral.sh/uv/install.sh"
+UV_INSTALL_URL="https://astral.sh/uv/0.13.4/install.sh"
 
 pause_if_requested() {
     if [[ "$PAUSE_ON_EXIT" == true && -t 0 ]]; then
