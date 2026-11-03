@@ -106,7 +106,11 @@ class EntryBrowserTests(QtTestCase):
                          browser.palette().brush(qt.QPalette.ColorRole.PlaceholderText))
         opened = []
         browser.activated.connect(opened.append)
-        browser._activate(browser.model.browse_index(identity))
+        from PySide6.QtTest import QTest
+        point = browser.tree.visualRect(browser.model.browse_index(identity)).center()
+        QTest.mouseClick(browser.tree.viewport(), qt.Qt.MouseButton.LeftButton, pos=point)
+        QTest.mouseDClick(browser.tree.viewport(), qt.Qt.MouseButton.LeftButton, pos=point)
+        self.app.processEvents()
         self.assertEqual(opened, [identity])
         browser.close_search()
         self.assertEqual(browser.model.columnCount(), 3)
