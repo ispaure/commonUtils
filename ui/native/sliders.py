@@ -22,19 +22,30 @@ def _apple(native, apple_color, force_ltr, reverse_fill=False):
     from toga_iOS.libs import UIGraphicsImageRenderer, CGSize, CGRect
 
     def image(size, role, *, circle=False):
+        # A bitmap freezes dynamic UIColor at draw time. Register both native
+        # appearances so UIKit can select the correct artwork after trait changes.
+        traits_class = ObjCClass('UITraitCollection')
+        asset = ObjCClass('UIImageAsset').alloc().init()
         renderer = UIGraphicsImageRenderer.alloc().initWithSize(CGSize(size, size))
-        def draw(context):
-            apple_color(role).setFill()
-            rect = CGRect((0, 0), (size, size))
-            path = (ObjCClass('UIBezierPath').bezierPathWithOvalInRect(rect) if circle else
-                    ObjCClass('UIBezierPath').bezierPathWithRoundedRect(rect, cornerRadius=size / 2))
-            path.fill()
-        return renderer.imageWithActions(Block(draw, None, objc_id))
+        for style in (1, 2):
+            traits = traits_class.traitCollectionWithTraitsFromCollections([
+                native.traitCollection, traits_class.traitCollectionWithUserInterfaceStyle(style)])
+            def draw(context):
+                apple_color(role).resolvedColorWithTraitCollection(traits).setFill()
+                rect = CGRect((0, 0), (size, size))
+                path = (ObjCClass('UIBezierPath').bezierPathWithOvalInRect(rect) if circle else
+                        ObjCClass('UIBezierPath').bezierPathWithRoundedRect(rect, cornerRadius=size / 2))
+                path.fill()
+            rendered = renderer.imageWithActions(Block(draw, None, objc_id))
+            if not circle:
+                rendered = rendered.resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1)
+            asset.registerImage(rendered, withTraitCollection=traits)
+        return asset.imageWithTraitCollection(native.traitCollection)
 
     if force_ltr:
         native.semanticContentAttribute = 3
-    native.setMinimumTrackImage(image(READER_LAYOUT.track_extent, 'border' if reverse_fill else 'accent').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
-    native.setMaximumTrackImage(image(READER_LAYOUT.track_extent, 'accent' if reverse_fill else 'border').resizableImageWithCapInsets(UIEdgeInsets(0, 1, 0, 1), resizingMode=1), forState=0)
+    native.setMinimumTrackImage(image(READER_LAYOUT.track_extent, 'border' if reverse_fill else 'accent'), forState=0)
+    native.setMaximumTrackImage(image(READER_LAYOUT.track_extent, 'accent' if reverse_fill else 'border'), forState=0)
     native.setThumbImage(image(READER_LAYOUT.thumb_extent, 'accent', circle=True), forState=0)
 
 

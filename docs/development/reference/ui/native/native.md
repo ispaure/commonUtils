@@ -690,7 +690,9 @@ whether E Ink or other application policy disables effects.
 force_ltr=False, reverse_fill=False)` paints slim tracks and circular thumbs while preserving the
 widget's full touch area. The backend is resolved through the implementation's
 base classes, so consumer subclasses of a native slider retain the same styling.
-Supply semantic UIKit colors and Android palette roles `accent`/`border`;
+UIKit artwork registers light and dark image variants using the supplied colors,
+so existing tracks and thumbs follow native appearance changes without freezing
+the drawing context's current appearance. Supply semantic UIKit colors and Android palette roles `accent`/`border`;
 defaults are neutral native colors. Direction follows the
 platform unless explicitly forced. `reverse_fill=True` highlights the track from
 the thumb toward the maximum end, retaining the accent thumb; it does not change
