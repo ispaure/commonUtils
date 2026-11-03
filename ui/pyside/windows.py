@@ -54,6 +54,19 @@ class Window:
             if self.maximized:
                 self.dlg.showMaximized()
 
+            if _api.QApplication.platformName() == 'cocoa':
+                # Show can precede AppKit's launch/activation notifications.
+                # Select the main window after that first event-loop turn.
+                _api.QTimer.singleShot(0, self.dlg, lambda: _activate_main_window(self.dlg))
+
         else:
             raise TypeError('Wrong type for Window.dlg')
+
+
+def _activate_main_window(window):
+    app = _api.QApplication.instance()
+    if (window.isVisible() and not window.isMinimized() and not window.isActiveWindow()
+            and app.activeModalWidget() is None and app.activePopupWidget() is None):
+        window.raise_()
+        window.activateWindow()
 

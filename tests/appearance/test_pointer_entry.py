@@ -31,6 +31,7 @@ class PointerEntryTests(QtTestCase):
         self.app.processEvents()
         self.handle = self.window.windowHandle()
         self.helper = PointerEntryRecovery(self.app)
+        self.helper.timer.stop()  # Sample explicitly; timing is not the test input.
         self.addCleanup(self.helper.deleteLater)
         self.addCleanup(self.app.removeEventFilter, self.helper)
 
@@ -123,3 +124,59 @@ class PointerEntryTests(QtTestCase):
             self.app.removeEventFilter(installed)
             installed.deleteLater()
             self.app._commonutils_pointer_entry = previous
+
+    def test_missing_native_moves_recover_even_when_window_already_entered(self):
+        self.leave()
+        self.move(self.button)
+        self.assertTrue(self.window.underMouse())
+        position = self.list.viewport().mapToGlobal(qt.QPoint(20, 10))
+        # No QWindow MouseMove is sent. The old recovery could not act here.
+        with patch.object(qt.QCursor, 'pos', return_value=position):
+            self.helper.poll_pointer()
+            self.helper.poll_pointer()
+        self.assertFalse(self.button.underMouse())
+        self.assertTrue(self.list.viewport().underMouse())
+        self.assertEqual(self.list.viewport().grab().toImage().pixelColor(200, 5), qt.QColor('#ccddff'))
+        self.assertEqual(self.helper.recovered_moves, 1)
+
+    def test_healthy_native_moves_do_not_get_replayed_by_sampler(self):
+        self.move(self.button)
+        position = self.button.mapToGlobal(self.button.rect().center())
+        with patch.object(qt.QCursor, 'pos', return_value=position), \
+                patch.object(self.app, 'sendEvent', wraps=self.app.sendEvent) as send:
+            self.helper.poll_pointer()
+        send.assert_not_called()
+
+    def test_entered_window_with_missing_child_hover_is_repaired(self):
+        self.move(self.button)
+        self.button.setAttribute(qt.Qt.WidgetAttribute.WA_UnderMouse, False)
+        self.assertTrue(self.window.underMouse())
+        position = self.button.mapToGlobal(self.button.rect().center())
+        with patch.object(qt.QCursor, 'pos', return_value=position):
+            self.helper.poll_pointer()
+        self.assertTrue(self.button.underMouse())
+
+    def test_missing_native_leave_clears_hover(self):
+        self.move(self.button)
+        self.assertTrue(self.button.underMouse())
+        with patch.object(qt.QCursor, 'pos', return_value=qt.QPoint(-10000, -10000)):
+            self.helper.poll_pointer()
+        self.assertFalse(self.button.underMouse())
+        self.assertFalse(self.window.underMouse())
+
+    def test_sampler_never_interferes_with_a_drag_or_popup(self):
+        position = self.button.mapToGlobal(self.button.rect().center())
+        for method, value in (('mouseButtons', qt.Qt.MouseButton.LeftButton),
+                              ('activePopupWidget', self.button),
+                              ('applicationState', qt.Qt.ApplicationState.ApplicationInactive)):
+            with self.subTest(guard=method), patch.object(qt.QCursor, 'pos', return_value=position), \
+                    patch.object(self.app, method, return_value=value), \
+                    patch.object(self.app, 'sendEvent', wraps=self.app.sendEvent) as send:
+                self.helper.poll_pointer()
+                send.assert_not_called()
+
+    def test_sampler_stops_when_application_is_inactive(self):
+        self.helper._application_state_changed(qt.Qt.ApplicationState.ApplicationActive)
+        self.assertTrue(self.helper.timer.isActive())
+        self.helper._application_state_changed(qt.Qt.ApplicationState.ApplicationInactive)
+        self.assertFalse(self.helper.timer.isActive())

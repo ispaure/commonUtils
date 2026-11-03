@@ -52,3 +52,31 @@ class PySideAPITests(QtTestCase):
         progress.update_progress(35)
         self.assertEqual(progress.progress_bar.value(), 35)
         progress.dlg.close()
+
+    def test_cocoa_main_window_activation_waits_for_the_event_loop(self):
+        window = qt.Window('Startup', main_window=True)
+        with patch.object(qt.QApplication, 'platformName', return_value='cocoa'), \
+                patch.object(qt.QTimer, 'singleShot') as scheduled:
+            window.display_ui()
+        self.assertTrue(window.dlg.isVisible())
+        delay, context, activate = scheduled.call_args.args
+        self.assertEqual(delay, 0)
+        self.assertIs(context, window.dlg)
+        with patch.object(window.dlg, 'isActiveWindow', return_value=False), \
+                patch.object(window.dlg, 'raise_') as raised, \
+                patch.object(window.dlg, 'activateWindow') as activated:
+            activate()
+            raised.assert_called_once()
+            activated.assert_called_once()
+
+    def test_startup_activation_respects_modal_windows_and_hidden_main_window(self):
+        from commonUtils.ui.pyside.windows import _activate_main_window
+        window = qt.QMainWindow()
+        window.show()
+        with patch.object(window, 'isActiveWindow', return_value=False), \
+                patch.object(window, 'activateWindow') as activate:
+            with patch.object(self.app, 'activeModalWidget', return_value=qt.QDialog()):
+                _activate_main_window(window)
+            window.hide()
+            _activate_main_window(window)
+            activate.assert_not_called()
