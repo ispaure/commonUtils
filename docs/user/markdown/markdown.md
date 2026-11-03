@@ -1,5 +1,10 @@
 # Reading and editing Markdown
 
+Video embeds such as `![[clip.mp4]]` and `![Clip](clip.mp4)` show inline playback
+controls in desktop reading and formatted editing. Provider-backed native HTML
+readers can show the same controls through their host's media source. Playback
+starts when you press Play; source mode retains the editable embed syntax.
+
 Opening a page or retracing page history shows loading feedback while the page
 is prepared. Native mobile wikis use a spinner and “Loading page…” caption;
 desktop readers use a busy cursor and a slim progress bar. The previous page
@@ -247,7 +252,12 @@ an explicit width and height. Both forms shrink proportionally if needed to fit
 the page; smaller images stay small. The source size survives editing and saving.
 Obsidian targets may contain spaces and `#`, for example `![[photo #1.png|400]]`.
 PNG, JPEG and WebP share the same panel-width and paragraph-spacing rules as GIF.
-Code examples and escaped embeds remain literal.
+Pasted references such as `![Concept_Katia_01_SD.jpg]\(Concept_Katia_01_SD.webp)`
+also preview the destination in parentheses. The label is alt text, so its filename
+or extension need not match the image. These references use the same resource
+lookup as `![[Concept_Katia_01_SD.webp]]`, including attachment fallbacks supplied
+by a Notes Library, on desktop and mobile. Formatted editing preserves their
+original spelling. Code examples and embeds with an escaped `!` remain literal.
 
 Storage-provider documents keep their existing resource-loading policy; local file
 drops and direct GIF decoders are disabled for those documents.

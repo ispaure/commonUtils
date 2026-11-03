@@ -14,7 +14,9 @@ def image_size(label):
 
 
 def wiki_image(state, silent):
-    """Opt-in image embeds; code spans and escaped syntax stay literal."""
+    """Opt-in wiki/pasted embeds; code spans and escaped bangs stay literal."""
+    if escaped_image(state, silent):
+        return True
     if not state.src.startswith('![[', state.pos):
         return False
     end = state.src.find(']]', state.pos + 3, state.posMax)
@@ -36,6 +38,33 @@ def wiki_image(state, silent):
         token.children = [child]
     state.pos = end + 2
     return True
+
+
+def escaped_image(state, silent):
+    """Accept pasted image syntax with an escaped opening parenthesis.
+
+    Delegate destination/title validation to CommonMark, and retain the exact
+    source for formatted editors. An escaped exclamation mark stays literal.
+    """
+    from markdown_it.rules_inline.image import image
+    start = state.pos
+    if not state.src.startswith('![', start):
+        return False
+    end = state.md.helpers.parseLinkLabel(state, start + 1, False)
+    if end < 0 or not state.src.startswith('\\(', end + 1):
+        return False
+    original, maximum = state.src, state.posMax
+    state.src = original[:end + 1] + original[end + 2:]
+    state.posMax -= 1
+    try:
+        accepted = image(state, silent)
+        if accepted:
+            state.pos += 1
+            if not silent:
+                state.tokens[-1].meta['wiki_source'] = original[start:state.pos]
+        return accepted
+    finally:
+        state.src, state.posMax = original, maximum
 
 
 

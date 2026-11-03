@@ -82,6 +82,8 @@ class NativeMarkdownImageTests(unittest.TestCase):
         load = folder_image_source(self.provider, 'Vault/Notes/read.md', root='Vault')
         self.assertEqual(load('photo.GIF'), ('image/gif', GIF))
         self.assertEqual(load('Attachments/photo.GIF'), ('image/gif', GIF))
+        for source in ('![Caption.jpg](photo.GIF)', r'![Caption.jpg]\(photo.GIF)', '![[photo.GIF]]'):
+            self.assertIn('<img', markdown_preview(source, image_source=load))
         (self.root / 'Vault/Notes/photo.GIF').write_bytes(GIF + b'local')
         self.assertEqual(load('photo.GIF'), ('image/gif', GIF + b'local'))
         (self.root / 'Vault/.obsidian').mkdir()
@@ -95,5 +97,6 @@ class NativeMarkdownImageTests(unittest.TestCase):
         from commonUtils.formats.markdown.images import image_targets
         text = ('![[two colors #1.PNG|900x600]]\n\n'
                 '![Reference][photo]\n\n[photo]: <images/with space.webp> "Title"\n\n'
+                r'![Concept_Katia_01_SD.jpg]\(Concept_Katia_01_SD.webp)' + '\n\n'
                 '`![[code.png]]`\n\n```\n![[fenced.png]]\n```\n')
-        self.assertEqual(image_targets(text), ('two%20colors%20%231.PNG', 'images/with%20space.webp'))
+        self.assertEqual(image_targets(text), ('two%20colors%20%231.PNG', 'images/with%20space.webp', 'Concept_Katia_01_SD.webp'))
