@@ -25,11 +25,17 @@ app.exec()
 On macOS, initialization also installs `ui.pyside.pointer_entry` recovery for
 missing native window-entry events at startup or activation. It defers a pointer
 check until show/activation finishes and repairs an orphaned QWindow mouse move
-through Qt's normal Enter dispatch. It only runs when the visible active window
-has no entry state and hit testing puts the pointer in that window. Pressed
+through Qt's normal Enter dispatch. A 100 ms sampler runs only while the application
+is active and forwards movement when the cursor position differs from the
+last delivered Qt move or the enabled widget under it still lacks entry state.
+This also covers native move delivery stopping while the
+window already reports entry. Missing native leaves clear the previous hovered
+window. Hit testing must put the pointer in a visible active window. Pressed
 buttons, mouse grabs, popups, other modal windows and inactive applications are
 excluded. It neither moves the cursor nor changes focus. Other Qt backends are
-unchanged. `tests/appearance/test_pointer_entry.py` exercises missing entry,
+unchanged. `Window.display_ui()` separately queues one main-window activation on
+Cocoa after showing; it does not repeatedly reclaim focus or override modal UI.
+`tests/appearance/test_pointer_entry.py` exercises missing entry and native moves,
 button/list painting, subsequent transitions, deferred activation and the guards;
 synthetic event coverage does not prove every native AppKit startup ordering.
 
