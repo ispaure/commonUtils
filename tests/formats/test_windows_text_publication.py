@@ -75,15 +75,21 @@ class SharingRecoveryTests(unittest.TestCase):
 class NativeSharingTests(unittest.TestCase):
     def test_atomic_publication_supports_extended_length_destination(self):
         from commonUtils.filesystem.native_paths import native_path
+        import shutil
         with TemporaryDirectory() as temporary:
             folder = Path(temporary) / ('nested-' * 15) / ('nested-' * 15)
-            native_path(folder).mkdir(parents=True)
-            path = folder / ('record-' * 10 + '.json')
-            self.assertGreater(len(str(path)), 260)
-            self.assertEqual(atomic.atomic_write_bytes(path, b'first'), path)
-            atomic.atomic_write_bytes(path, b'updated')
-            self.assertEqual(native_path(path).read_bytes(), b'updated')
-            self.assertEqual(len(list(native_path(folder).iterdir())), 1)
+            try:
+                native_path(folder).mkdir(parents=True)
+                path = folder / ('record-' * 10 + '.json')
+                self.assertGreater(len(str(path)), 260)
+                self.assertEqual(atomic.atomic_write_bytes(path, b'first'), path)
+                atomic.atomic_write_bytes(path, b'updated')
+                self.assertEqual(native_path(path).read_bytes(), b'updated')
+                self.assertEqual(len(list(native_path(folder).iterdir())), 1)
+            finally:
+                # Cleanup must use the same extended paths even on hosts with
+                # the machine-wide long-path registry switch disabled.
+                shutil.rmtree(native_path(folder.parent), ignore_errors=False)
 
     def test_actual_reader_handle_release_allows_save(self):
         self.publication_case(change=False)
