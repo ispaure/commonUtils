@@ -14,6 +14,11 @@ from commonUtils.ui.native.markdown_preview import markdown_preview
 
 
 class NativeMarkdownTests(unittest.TestCase):
+    def test_wiki_links_remain_inside_headings(self):
+        html = markdown_preview('# # [[Art]]\n\n# # [[Tech]]', local_links=True)
+        self.assertIn('<h1 id="art"># <a href="Art">Art</a></h1>', html)
+        self.assertIn('<h1 id="tech"># <a href="Tech">Tech</a></h1>', html)
+
     def test_host_supplied_images_are_opt_in_and_cannot_inject_markup(self):
         calls = []
         def image(target):
