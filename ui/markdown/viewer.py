@@ -17,6 +17,7 @@ from .links import render_links
 from .tables import TableEditing
 from .live_edit import SourceMarkdownEdit, FormattedMarkdownEdit
 from .images import AnimatedImages
+from .navigation import MarkdownNavigation
 from ...formats.markdown import split_frontmatter
 
 
@@ -68,11 +69,8 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.page_loading.hide()
         self.back_button.clicked.connect(self.back)
         self.forward_button.clicked.connect(self.forward)
-        self.back_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Left'), self)
-        self.forward_shortcut = qt.QShortcut(qt.QKeySequence('Alt+Right'), self)
-        for shortcut, callback in ((self.back_shortcut, self.back), (self.forward_shortcut, self.forward)):
-            shortcut.setContext(qt.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            shortcut.activated.connect(callback)
+        self.back_shortcut = self.navigation.back_shortcut
+        self.forward_shortcut = self.navigation.forward_shortcut
         self.search_highlights = SearchHighlights(
             self, (self.browser, self.editor, self.formatted_editor), self.pages,
             self.find_text, self.find_bar, self.find_count,
@@ -105,19 +103,19 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.navigation_toolbar = toolbar
         self.workspace_controls = toolbar
         toolbar.setSpacing(READER_SPACING)
-        self.back_button = reader_button(self, 'Back', icon='previous')
-        self.forward_button = reader_button(self, 'Forward', icon='next')
+        self.navigation = MarkdownNavigation(self)
+        self.back_button = self.navigation.back_button
+        self.forward_button = self.navigation.forward_button
         self.back_button.setToolTip('Previous document or heading (Alt+Left)')
         self.forward_button.setToolTip('Next document or heading (Alt+Right)')
         self.location = qt.QLabel(self)
         self.location.hide()
         self.location.setTextFormat(qt.Qt.TextFormat.PlainText)
         self.location.setTextInteractionFlags(qt.Qt.TextInteractionFlag.TextSelectableByMouse)
-        toolbar.addWidget(self.back_button)
-        toolbar.addWidget(self.forward_button)
         self.document_title = ReaderLabel('Markdown', self)
         self.document_title.setAlignment(qt.Qt.AlignmentFlag.AlignCenter)
         self.document_title.hide()
+        toolbar.addWidget(self.navigation)
         toolbar.addStretch(1)
         self.edit_button = reader_button(self, 'Edit Markdown', icon='edit')
         self.edit_button.setCheckable(True)
@@ -130,7 +128,9 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.edit_mode.addItem('Formatted', 'formatted')
         self.edit_mode.addItem('Source', 'source')
         self.edit_mode.setAccessibleName('Markdown editing mode')
-        self.edit_mode.setToolTip('Edit the formatted document or its Markdown source')
+        guidance = 'Formatted edits normalize Markdown syntax. Source mode retains precise syntax.'
+        self.edit_mode.setToolTip(guidance)
+        self.edit_mode.setAccessibleDescription(guidance)
         self.edit_mode.currentIndexChanged.connect(self._change_edit_mode)
         self.edit_mode.hide()
         toolbar.addWidget(self.edit_mode)
@@ -140,6 +140,12 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         toolbar.addWidget(self.toc_button)
         layout.addLayout(toolbar)
         return toolbar
+
+    def place_navigation(self, navigation):
+        """Place host-owned history controls at the left of the document row."""
+        self.navigation.setVisible(navigation is self.navigation)
+        self.navigation.set_shortcuts_enabled(navigation is self.navigation)
+        self.navigation_toolbar.insertWidget(0, navigation)
 
     def _build_document_views(self, storage):
         self.browser = MarkdownBrowser()
@@ -474,19 +480,24 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
             return
         if self.current_path is None:
             return
+        original = url.toString(qt.QUrl.ComponentFormattingOption.FullyEncoded)
         base = qt.QUrl.fromLocalFile(str(self.current_path))
         url = base.resolved(url)
         if not url.isLocalFile():
             self.status.setText(f'Unsupported link: {url.toString()}')
             return
+        if (self.storage is not None and qt.QUrl(original).path()
+                and Path(url.toLocalFile()) != self.current_path
+                and hasattr(self.storage, 'open_markdown_link')):
+            self.storage.open_markdown_link(original)
+            return
         if self.storage is None:
             try:
-                from ...filesystem.local_access import check_local_path
-                from ...formats.markdown.wiki import resolve_document_path
-                candidate = Path(url.toLocalFile())
-                check_local_path(candidate)
-                candidate = resolve_document_path(candidate)
-                check_local_path(candidate)
+                from ...formats.markdown.wiki import resolve_document_link
+                from urllib.parse import urlsplit
+                parts = urlsplit(original)
+                name = ('//' + parts.netloc if parts.netloc else '') + parts.path
+                candidate = resolve_document_link(name, base=self.current_path.parent) if name else self.current_path
                 if candidate.suffix.lower() not in ('.md', '.markdown'):
                     from ..text_editor import open_text_file
                     open_text_file(candidate, self.window())

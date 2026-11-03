@@ -78,6 +78,44 @@ class LocalFiles:
             rows.append(self.entry('/'.join(p for p in (path, child.name) if p)))
         return sorted(rows, key=lambda row: (not row['directory'], row['name'].casefold()))
 
+    def list_names(self, path='', *, cancelled=lambda: False):
+        """Unsorted child names/types/sizes, without timestamp or revision formatting.
+
+        Adapted listings retain their filtering and logical namespace by using
+        their existing list implementation. No document content is opened.
+        """
+        if (type(self).list is not LocalFiles.list or type(self)._physical is not LocalFiles._physical
+                or type(self)._guard is not LocalFiles._guard or type(self).entry is not LocalFiles.entry
+                or type(self)._locate is not LocalFiles._locate or type(self).relative is not LocalFiles.relative):
+            return [dict(name=row['name'], path=row['path'], directory=row['directory'], size=row['size'])
+                    for row in self.list(path, cancelled=cancelled)]
+        path = self.relative(path)
+        folder = self._locate(path)
+        before = folder.stat(follow_symlinks=False)
+        from ...filesystem.local_access import check_local_path
+        rows = []
+        with os.scandir(folder) as entries:
+            for child in entries:
+                check_cancelled(cancelled)
+                if child.is_symlink() or (hasattr(Path, 'is_junction') and Path(child.path).is_junction()):
+                    raise ValueError('Linked storage is not supported.')
+                check_local_path(child.path)
+                try:
+                    info = child.stat(follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                directory = stat_module.S_ISDIR(info.st_mode)
+                if not directory and (not stat_module.S_ISREG(info.st_mode) or info.st_nlink != 1):
+                    raise ValueError('Choose an independent regular file or folder.')
+                rows.append(dict(name=child.name, path=self.relative('/'.join(p for p in (path, child.name) if p)),
+                                 directory=directory, size=info.st_size))
+        check_cancelled(cancelled)
+        self._guard(folder)
+        after = folder.stat(follow_symlinks=False)
+        if (before.st_dev, before.st_ino, before.st_mode) != (after.st_dev, after.st_ino, after.st_mode):
+            raise ValueError('Folder changed during listing. Try again.')
+        return rows
+
     @contextmanager
     def open(self, path):
         with self._locate(path).open('rb') as stream:

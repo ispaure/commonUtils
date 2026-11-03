@@ -50,6 +50,16 @@ recovery and the lifetime of private sources.
 
 ## Cache-backed local filename search
 
+`LocalFiles.list_names(path, cancelled=...)` returns unsorted immediate child
+`name`, `path`, `directory` and filesystem `size` rows without opening content or constructing rich
+metadata. Ordinary local storage uses `scandir` with cancellation, raw-storage
+access checks, and link/special/hard-link rejection. Subclasses overriding listing,
+physical mapping, guards, entry projection or path resolution fall back to their
+existing `list` policy. Callers own
+recursive traversal, filtering, limits and lifetime; results are not cached.
+Files removed before their stat are skipped, and replacement of the listed
+directory during enumeration fails the snapshot.
+
 `search.indexed.IndexedLocalSearch(database, eligible=...)` composes the directory
 index with resource-provider results. The host explicitly admits physical local
 adapters and supplies the database location. Private, session-only and remote

@@ -10,6 +10,69 @@ from ...formats.markdown.images import image_size, escaped_image
 from .syntax import FENCE_OPEN, fence_close
 
 
+def prepared_image(data, reason=''):
+    """Decode prepared bytes or show the preparation/decoder failure."""
+    if reason:
+        return failed_image(reason)
+    image = qt.QImage.fromData(data) if data else qt.QImage()
+    return failed_image('Invalid or unsupported image data.') if data and image.isNull() else image
+
+
+def failed_image(reason):
+    """Readable in-memory placeholder; the document retains its image syntax."""
+    image = qt.QImage(480, 100, qt.QImage.Format.Format_ARGB32)
+    palette = qt.QApplication.palette()
+    image.fill(palette.color(qt.QPalette.ColorRole.Base))
+    painter = qt.QPainter(image)
+    painter.setPen(palette.color(qt.QPalette.ColorRole.Text))
+    painter.drawText(image.rect().adjusted(10, 8, -10, -8),
+                     qt.Qt.TextFlag.TextWordWrap, 'Image unavailable: ' + reason)
+    painter.end()
+    return image
+
+
+def local_image_path(url, base):
+    """Keep local image lookup consistent with native/provider Markdown loaders."""
+    import posixpath
+    from ...formats.markdown import link_path_names
+    resolved = base.resolved(url)
+    if not resolved.isLocalFile():
+        return None
+    parent = Path(base.toLocalFile())
+    if not base.path().endswith('/'):
+        parent = parent.parent
+    encoded = qt.QUrl.ComponentFormattingOption.FullyEncoded
+    base_path = qt.QUrl.fromLocalFile(str(parent.absolute())).path(encoded)
+    cross_volume = (os.name == 'nt'
+                    and Path(resolved.toLocalFile()).anchor.casefold() != parent.anchor.casefold())
+    if cross_volume:
+        name = ('//' + resolved.host() if resolved.host() else '') + resolved.path(encoded)
+        if not resolved.host() and len(name) > 2 and name[0] == '/' and name[2] == ':':
+            name = name[1:]
+    else:
+        name = posixpath.relpath(resolved.path(encoded), base_path)
+    for name in link_path_names(name):
+        candidate = Path(name) if cross_volume else parent / name
+        try:
+            check_local_path(candidate)
+            if candidate.is_file():
+                return candidate
+        except (OSError, ValueError):
+            return None
+    return None
+
+
+def local_image_resource(kind, url, base):
+    if kind == qt.QTextDocument.ResourceType.ImageResource:
+        path = local_image_path(url, base)
+        if path is not None:
+            return qt.QImage(str(path))
+        if base.resolved(url).isLocalFile():
+            # Do not let Qt's default loader bypass a denied local lookup.
+            return qt.QImage()
+    return None
+
+
 class ImageDropMixin:
     """Insert references without copying files or Qt's transient clipboard images."""
     image_base = None
@@ -95,7 +158,9 @@ class AnimatedImages(qt.QObject):
                         name = fragment.charFormat().toImageFormat().name()
                         url = document.baseUrl().resolved(qt.QUrl(name))
                         if url.isLocalFile() and Path(url.toLocalFile()).suffix.lower() == '.gif':
-                            wanted[name] = url.toLocalFile()
+                            path = local_image_path(qt.QUrl(name), document.baseUrl())
+                            if path is not None:
+                                wanted[name] = str(path)
                     iterator += 1
                 block = block.next()
         for name, (path, movie) in list(self.movies.items()):

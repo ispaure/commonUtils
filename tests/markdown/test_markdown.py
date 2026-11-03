@@ -39,6 +39,19 @@ class MarkdownTests(QtTestCase):
         self.addCleanup(self.viewer.deleteLater)
         self.app.processEvents()
 
+    def test_editing_guidance_does_not_replace_status_messages(self):
+        self.viewer.status.clear()
+        self.viewer.set_edit_mode('formatted')
+        self.viewer.set_editing(True)
+        self.assertEqual(self.viewer.status.text(), '')
+        self.assertIn('normalize Markdown syntax', self.viewer.edit_mode.toolTip())
+        self.assertEqual(self.viewer.edit_mode.accessibleDescription(), self.viewer.edit_mode.toolTip())
+        message = 'Cannot save: storage unavailable.'
+        self.viewer.status.setText(message)
+        self.viewer.set_editing(False)
+        self.viewer.set_editing(True)
+        self.assertEqual(self.viewer.status.text(), message)
+
     def test_new_markdown_window_starts_untitled_and_editable(self):
         window = open_markdown(None, allow_edit=True)
         self.assertIsNone(window.viewer.current_path)
@@ -136,14 +149,22 @@ class MarkdownTests(QtTestCase):
         self.assertIn('details-1', anchors)
 
     def test_back_forward_anchor_navigation_and_branching_history(self):
+        self.assertTrue(self.viewer.navigation.up_button.isHidden())
+        self.assertLess(self.viewer.navigation.geometry().right(), self.viewer.toc_button.x())
+        self.assertEqual(self.viewer.navigation_toolbar.indexOf(self.viewer.navigation), 0)
         self.viewer.follow_link(qt.QUrl('second%20page.MD'))
         self.viewer.follow_link(qt.QUrl('#details'))
         self.assertEqual(len(self.viewer.history), 3)
-        self.viewer.back()
+        from PySide6.QtTest import QTest
+        self.viewer.activateWindow()
+        self.viewer.browser.setFocus()
+        self.app.processEvents()
+        QTest.keyClick(self.viewer.browser, qt.Qt.Key.Key_Left, qt.Qt.KeyboardModifier.AltModifier)
+        QTest.keyRelease(self.viewer.browser, qt.Qt.Key.Key_Alt)
         self.assertEqual(self.viewer.history_index, 1)
-        self.viewer.back()
+        self.viewer.back_button.click()
         self.assertEqual(self.viewer.current_path, self.first.resolve())
-        self.viewer.forward()
+        self.viewer.forward_button.click()
         self.assertEqual(self.viewer.current_path, self.second.resolve())
         self.viewer.open_document(self.first)
         self.assertFalse(self.viewer.forward_button.isEnabled())

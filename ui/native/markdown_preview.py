@@ -6,6 +6,7 @@ from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
 from ...formats.markdown.images import image_size, wiki_image
+from ...formats.markdown.image_sources import image_failure_reason
 
 _ALIAS = re.compile(r'\[\[([^]\n|]+)(?:\|([^]\n]+))?\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
 
@@ -30,7 +31,9 @@ def _alias(state, silent):
 
 def embedded_image(target, alt, image_source=None):
     """Render host-supplied raster bytes; never fetch a URL or open a path here."""
+    reason = ''
     if image_source is not None:
+        reason = 'Image not found, unsupported, or outside the allowed folder.'
         try:
             image = image_source(target)
             if image is not None:
@@ -60,9 +63,10 @@ def embedded_image(target, alt, image_source=None):
                 style += ';vertical-align:middle'
                 encoded = base64.b64encode(data).decode('ascii')
                 return f'<img src="data:{mime};base64,{encoded}" alt="{escape(caption, quote=True)}"{dimensions} style="{style}">'
-        except (OSError, ValueError):
-            pass
-    return '<span class="image-alt">' + escape(alt) + '</span>'
+        except (OSError, ValueError) as error:
+            reason = image_failure_reason(error)
+    label = alt + (' — Image unavailable: ' + reason if reason else '')
+    return '<span class="image-alt">' + escape(label) + '</span>'
 
 
 def markdown_body(text, *, local_links=False, image_source=None):
@@ -126,7 +130,7 @@ def markdown_body(text, *, local_links=False, image_source=None):
         rendered = embedded_image(token.attrGet('src') or '', renderer.renderInlineAsText(token.children or [], options, env), image_source)
         image_bytes += len(rendered)
         if image_bytes > 22 * 1024 * 1024:
-            return embedded_image('', token.content)
+            return '<span class="image-alt">' + escape(token.content + ' — Image unavailable: Images exceed the preview output budget.') + '</span>'
         return rendered
 
     def table_open(renderer, items, index, options, env):

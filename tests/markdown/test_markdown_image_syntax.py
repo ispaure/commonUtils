@@ -4,12 +4,67 @@ from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
 import unittest
+import os
 from commonUtils.formats.markdown.images import image_size
 from commonUtils.ui.native.markdown_preview import markdown_preview
 from commonUtils.tests.formats.test_gif_headers import GIF
 
 
 class MarkdownImageSyntaxTests(unittest.TestCase):
+    def test_qt_image_resources_use_decoded_then_literal_paths(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from commonUtils.ui import pyside as qt
+        from commonUtils.ui.markdown.images import local_image_path, local_image_resource
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'base%20folder'
+            root.mkdir()
+            literal, decoded = root / 'Two%20Words.gif', root / 'Two Words.gif'
+            literal.write_bytes(GIF)
+            base = qt.QUrl.fromLocalFile(str(root / 'Home.md'))
+            target = qt.QUrl('Two%20Words.gif')
+            self.assertEqual(local_image_path(target, base), literal)
+            self.assertEqual(local_image_path(base.resolved(target), base), literal)
+            self.assertFalse(local_image_resource(qt.QTextDocument.ResourceType.ImageResource, target, base).isNull())
+            decoded.write_bytes(GIF)
+            self.assertEqual(local_image_path(target, base), decoded)
+            self.assertEqual(local_image_path(qt.QUrl('Two%2520Words.gif'), base), literal)
+
+    def test_qt_denied_decoded_image_cannot_use_literal_or_default_loader(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from commonUtils.ui import pyside as qt
+        from commonUtils.ui.markdown.images import local_image_resource
+        from commonUtils.filesystem.local_access import protect_local_root
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            literal, decoded = root / 'Two%20Words.gif', root / 'Two Words.gif'
+            literal.write_bytes(GIF)
+            decoded.write_bytes(GIF)
+            release = protect_local_root(object(), decoded, 'Private image')
+            try:
+                image = local_image_resource(qt.QTextDocument.ResourceType.ImageResource,
+                                             qt.QUrl('Two%20Words.gif'),
+                                             qt.QUrl.fromLocalFile(str(root / 'Home.md')))
+                self.assertIsNotNone(image)
+                self.assertTrue(image.isNull())
+            finally:
+                release()
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows drive paths')
+    def test_qt_absolute_image_on_another_drive(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from commonUtils.ui import pyside as qt
+        from commonUtils.ui.markdown.images import local_image_path
+        with TemporaryDirectory() as temporary:
+            image = Path(temporary) / 'Two%20Words.gif'
+            image.write_bytes(GIF)
+            drive = 'Y:' if image.drive.upper() == 'Z:' else 'Z:'
+            base = qt.QUrl.fromLocalFile(drive + '/notes/Home.md')
+            target = qt.QUrl.fromLocalFile(str(image.with_name('Two Words.gif')))
+            self.assertEqual(local_image_path(target, base), image)
+
     def test_pasted_image_uses_destination_and_preserves_literal_contexts(self):
         from commonUtils.formats.markdown.images import image_targets
         source = r'![Concept_Katia_01_SD.jpg]\(Concept_Katia_01_SD.webp)'

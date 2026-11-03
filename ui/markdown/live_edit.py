@@ -35,6 +35,7 @@ class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
         self.setDocument(self._live_document)
         self.animated_images = AnimatedImages(self)
         self._pressed_link = None
+        self.setMouseTracking(True)
         self._highlighter = LivePreviewHighlighter(self)
         self._wrapped_selection = None
         self.table_actions = ()
@@ -177,25 +178,36 @@ class FormattedMarkdownEdit(ImageDropMixin, qt.QTextEdit):
         if event.type() == qt.QEvent.Type.PaletteChange and hasattr(self, '_highlighter'):
             self._highlighter.refresh_cursor()
 
+    def _link_at(self, point, modifiers):
+        if modifiers & (qt.Qt.KeyboardModifier.ShiftModifier | qt.Qt.KeyboardModifier.AltModifier):
+            return None
+        cursor = self.cursorForPosition(point)
+        block = cursor.block()
+        if any(first.position() <= block.position() <=
+               (last.position() if last else self.document().characterCount())
+               for first, last, _, _ in fenced_regions(self.document())):
+            return None
+        offset = cursor.positionInBlock()
+        modified = modifiers & (qt.Qt.KeyboardModifier.ControlModifier | qt.Qt.KeyboardModifier.MetaModifier)
+        for span in link_spans(block.text(), reference_destinations(self.toPlainText())):
+            start, end = ((span.start, span.end) if modified else (span.content_start, span.content_end))
+            if _units(block.text()[:start]) <= offset < _units(block.text()[:end]):
+                return qt.QUrl(span.target)
+        return None
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        target = self._link_at(event.position().toPoint(), event.modifiers())
+        self.viewport().setCursor(qt.Qt.CursorShape.PointingHandCursor if target is not None
+                                  else qt.Qt.CursorShape.IBeamCursor)
+
     def mousePressEvent(self, event):
         self._pressed_link = None
-        if (event.button() == qt.Qt.MouseButton.LeftButton and not event.modifiers() &
-                (qt.Qt.KeyboardModifier.ShiftModifier | qt.Qt.KeyboardModifier.AltModifier)):
-            cursor = self.cursorForPosition(event.position().toPoint())
-            block = cursor.block()
-            in_code = any(first.position() <= block.position() <=
-                          (last.position() if last else self.document().characterCount())
-                          for first, last, _, _ in fenced_regions(self.document()))
-            if not in_code:
-                offset = cursor.positionInBlock()
-                for span in link_spans(block.text(), reference_destinations(self.toPlainText())):
-                    modified = event.modifiers() & (qt.Qt.KeyboardModifier.ControlModifier |
-                                                    qt.Qt.KeyboardModifier.MetaModifier)
-                    start, end = ((span.start, span.end) if modified else
-                                  (span.content_start, span.content_end))
-                    if _units(block.text()[:start]) <= offset < _units(block.text()[:end]):
-                        self._pressed_link = (qt.QUrl(span.target), event.position().toPoint())
-                        break
+        if event.button() == qt.Qt.MouseButton.LeftButton:
+            point = event.position().toPoint()
+            target = self._link_at(point, event.modifiers())
+            if target is not None:
+                self._pressed_link = (target, point)
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):

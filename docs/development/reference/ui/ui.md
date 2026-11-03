@@ -22,6 +22,17 @@ window.show()
 app.exec()
 ```
 
+On macOS, initialization also installs `ui.pyside.pointer_entry` recovery for
+missing native window-entry events at startup or activation. It defers a pointer
+check until show/activation finishes and repairs an orphaned QWindow mouse move
+through Qt's normal Enter dispatch. It only runs when the visible active window
+has no entry state and hit testing puts the pointer in that window. Pressed
+buttons, mouse grabs, popups, other modal windows and inactive applications are
+excluded. It neither moves the cursor nor changes focus. Other Qt backends are
+unchanged. `tests/appearance/test_pointer_entry.py` exercises missing entry,
+button/list painting, subsequent transitions, deferred activation and the guards;
+synthetic event coverage does not prove every native AppKit startup ordering.
+
 ## Reusable file browser
 
 Start with the [complete browser window example](features/features.md#runnable-example-add-a-menu-action-to-a-browser).

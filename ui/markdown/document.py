@@ -29,6 +29,10 @@ class LiveMarkdownDocument(qt.QTextDocument):
         loader = getattr(self, 'resource_loader', None)
         if loader is not None:
             return loader(kind, url)
+        from .images import local_image_resource
+        image = local_image_resource(kind, url, self.baseUrl())
+        if image is not None:
+            return image
         return super().loadResource(kind, url)
 
     def toMarkdown(self, *args, **kwargs):

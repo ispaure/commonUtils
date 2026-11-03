@@ -481,3 +481,11 @@ relative raster images through a rooted provider, enforce byte/dimension budgets
 and recheck revisions and access before returning cached image bytes. Native
 Markdown presentation consumes them; portable note libraries can use them without
 importing the UI package.
+
+The optional `resolve(target)` callback on `folder_image_source` makes host path
+resolution authoritative, including precedence and ambiguity errors. Its result
+is a provider-relative path, rechecked against the configured root and hidden-path
+policy before reading. Existing revision, byte and dimension checks still apply.
+Size and render-budget failures raise `ValueError`; absent or disallowed paths
+without a resolver return `None`. `image_failure_reason(error)` maps resource
+errors to readable messages and omits OS paths from `OSError` messages.
