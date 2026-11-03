@@ -16,6 +16,18 @@ from commonUtils.ui.native.markdown_preview import markdown_preview
 
 
 class NativeMarkdownImageTests(unittest.TestCase):
+    def test_caller_image_budget_is_per_render_and_keeps_the_default(self):
+        load = folder_image_source(self.provider, 'notes/page.md', max_total_bytes=2 * len(GIF))
+        (self.root / 'notes/budget.gif').write_bytes(GIF)
+        self.assertEqual(load('budget.gif'), ('image/gif', GIF))
+        self.assertEqual(load('budget.gif'), ('image/gif', GIF))
+        with self.assertRaisesRegex(ValueError, 'preview budget'):
+            load('budget.gif')
+        fresh = folder_image_source(self.provider, 'notes/page.md', max_total_bytes=2 * len(GIF))
+        self.assertEqual(fresh('budget.gif'), ('image/gif', GIF))
+        with self.assertRaises(ValueError):
+            folder_image_source(self.provider, 'notes/page.md', max_total_bytes=0)
+
     def test_failures_explain_missing_access_invalid_and_oversized_images(self):
         cases = ((FileNotFoundError('/private/path'), 'File not found'),
                  (PermissionError('/private/path'), 'Access denied'),

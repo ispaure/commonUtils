@@ -75,6 +75,24 @@ index search; applications own refresh scheduling and provider eligibility.
 
 ## Streamed mutations
 
+`move_resource` first tries exclusive filesystem rename across ordinary local
+roots, so moving a large file between separately rooted folders on one volume
+does not stream or duplicate its bytes. `LocalFiles.local_move_path(path)` returns
+a guarded physical path only for ordinary, unmapped providers with default rename
+policy. Providers overriding rename must explicitly implement this hook to opt in
+and enforce their own restrictions. Inventories, capabilities, overlap checks and
+cancellation still run before publication. An `EXDEV` result uses the verified
+streaming transfer instead; conflicts and other rename errors preserve the source.
+
+The optional `move_resource(..., progress=callback)` receives keyword snapshots:
+`phase`, `done`, `total`, `files` and `total_files`. Copy and verification totals
+are phase-specific; verification reads both logical byte streams. `total=None`
+means indeterminate work, including native encrypted writes which may report
+physical output bytes. These must not be presented as a logical-byte percentage.
+Callbacks execute on the worker thread; UI callers coalesce them onto their loop
+and discard late updates after completion or cancellation. Measured streams retain
+native descriptor/rewrap hooks, avoiding plaintext buffers for large crypt moves.
+
 Local file creation and mutation verification use the shared bounded stream
 helpers. A read returning `None` raises `BlockingIOError` rather than completing
 with truncated content. Failed local creation removes its own new file; failed

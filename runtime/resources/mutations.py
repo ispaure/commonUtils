@@ -6,8 +6,8 @@ from .paths import resource_path, resource_name
 from .provider import require_capability, WritableDirectoryProvider
 from ..operations import check_cancelled, MutationResult, MutationIncomplete
 from ..streams import iter_chunks
-from ...persistence.publication import mutation_lock, save_transaction
-from ...persistence.transfers import verify_unchanged, cleanup_published
+from ...persistence.publication import mutation_lock, save_transaction, rename_exclusive
+from ...persistence.transfers import verify_unchanged, cleanup_published, try_rename
 
 
 def inventory(provider: WritableDirectoryProvider, path, *, cancelled=lambda: False):
@@ -62,22 +62,29 @@ def delete_resource(provider: WritableDirectoryProvider, path, *, cancelled=lamb
         return MutationResult(source_state='removed', removed_paths=tuple(removed))
 
 
-def _digest(provider, path, cancelled):
+def _digest(provider, path, cancelled, progress=None):
     digest = sha256()
     with provider.open(path) as stream:
         for chunk in iter_chunks(stream, cancelled=cancelled):
             digest.update(chunk)
+            if progress is not None:
+                progress(len(chunk))
     return digest.digest()
 
 
-def move_resource(source: WritableDirectoryProvider, path, destination: WritableDirectoryProvider, target, *, cancelled=lambda: False):
+def move_resource(source: WritableDirectoryProvider, path, destination: WritableDirectoryProvider, target, *, cancelled=lambda: False, progress=None):
     """Stage, verify, publish without overwriting, then remove unchanged source.
 
     A failure after publication can leave both copies; it never rolls back a
     verified destination. Cancellation during deletion can leave remaining source
     entries. No plaintext temporary file is required by this operation.
     """
+    def report(phase, done=0, total=None, files=0, total_files=0):
+        if progress is not None:
+            progress(phase=phase, done=done, total=total, files=files, total_files=total_files)
+
     with mutation_lock:
+        report('Preparing move')
         path, target = source.relative(path), destination.relative(target)
         if not path or not target:
             raise ValueError('Storage roots cannot be moved or replaced.')
@@ -106,8 +113,29 @@ def move_resource(source: WritableDirectoryProvider, path, destination: Writable
         require_capability(destination, 'rename')
         require_capability(destination, 'delete')
         rows = inventory(source, path, cancelled=cancelled)
+        files = sum(not row['directory'] for row in rows.values())
+        size = sum(row['size'] for row in rows.values() if not row['directory'])
+        # Separate browse roots can still refer to the same filesystem. Preserve
+        # the inode instead of streaming (and hashing) a potentially huge file.
+        from .local import LocalFiles
+        if isinstance(source, LocalFiles) and isinstance(destination, LocalFiles):
+            origin = source.local_move_path(path)
+            output = destination.local_move_path(target)
+            if origin is not None and output is not None:
+                if origin == output or origin in output.parents or output in origin.parents:
+                    raise ValueError('Overlapping source and destination cannot be transferred.')
+                if output.exists():
+                    raise FileExistsError('Destination already exists.')
+                check_cancelled(cancelled)
+                if try_rename(origin, output, rename=rename_exclusive):
+                    return MutationResult(destination_published=True, source_state='removed')
         temporary = '/'.join(p for p in (target.rpartition('/')[0], '.transfer-' + uuid4().hex) if p)
         created = False
+        copied = verified = completed_files = 0
+        def verifying(count):
+            nonlocal verified
+            verified += count
+            report('Verifying', verified, size * 2, completed_files, files)
         try:
             for relative, row in rows.items():
                 check_cancelled(cancelled)
@@ -115,15 +143,45 @@ def move_resource(source: WritableDirectoryProvider, path, destination: Writable
                 if row['directory']:
                     destination.mkdir(output)
                 else:
+                    before_file = copied
+                    native_copy = getattr(destination, 'private', False)
+                    report('Encrypting and copying' if native_copy else 'Copying',
+                           copied, None if native_copy else size, completed_files, files)
                     with source.open(row['path']) as stream:
-                        destination.create_file(output, stream, cancelled=cancelled)
+                        # Range/decryption streams expose the logical length;
+                        # provider metadata can describe the ciphertext size.
+                        logical_size = getattr(stream, 'size', row['size'])
+                        if type(logical_size) is not int or logical_size < 0:
+                            logical_size = row['size']
+                        size += logical_size - row['size']
+                        if progress is None:
+                            destination.create_file(output, stream, cancelled=cancelled)
+                        else:
+                            from ..streams.progress import ReadingStream
+                            # Native descriptor/rewrap paths bypass read(); their
+                            # provider can report physical output without claiming
+                            # a logical-byte percentage for encrypted data.
+                            def measured_copy(done, total):
+                                nonlocal copied
+                                copied = before_file + done
+                                report('Encrypting and copying' if native_copy else 'Copying',
+                                       copied, None if native_copy else size, completed_files, files)
+                            measured = ReadingStream(stream, measured_copy, logical_size)
+                            measured.crypt_transfer = callable(getattr(stream, 'transfer_source', None))
+                            measured.transfer_progress = lambda done: report(
+                                'Encrypting and copying', done, None, completed_files, files)
+                            destination.create_file(output, measured, cancelled=cancelled)
                     created = True
-                    if _digest(source, row['path'], cancelled) != _digest(destination, output, cancelled):
+                    report('Verifying', verified, size * 2, completed_files, files)
+                    if _digest(source, row['path'], cancelled, verifying) != _digest(destination, output, cancelled, verifying):
                         raise ValueError('Destination verification failed; source preserved.')
+                    completed_files += 1
+                    copied = before_file + logical_size
                 created = True
             verify_unchanged(rows, lambda: inventory(source, path, cancelled=cancelled),
                              message='Source changed during transfer; source preserved.')
             check_cancelled(cancelled)
+            report('Publishing destination', files=completed_files, total_files=files)
             destination.rename(temporary, target)
             created = False
             result = cleanup_published(
@@ -132,6 +190,7 @@ def move_resource(source: WritableDirectoryProvider, path, destination: Writable
             return MutationResult(True, result.source_state, result.removed_paths)
         finally:
             if created:
+                report('Cleaning up temporary files', files=completed_files, total_files=files)
                 delete_resource(destination, temporary)
 
 

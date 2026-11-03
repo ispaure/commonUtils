@@ -3,6 +3,7 @@ from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
 import unittest
+import errno
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -11,6 +12,75 @@ from commonUtils.runtime.resources.mutations import move_resource, delete_resour
 
 
 class ResourceOperationsTests(unittest.TestCase):
+    def test_streamed_move_reports_copy_and_verification_bytes_and_preserves_native_transfer_hook(self):
+        from contextlib import contextmanager
+        import io
+        class Source(LocalFiles):
+            def entry(self, path):
+                row = super().entry(path)
+                if not row['directory']:
+                    row['size'] += 48  # Synthetic ciphertext header overhead.
+                return row
+            @contextmanager
+            def open(self, path):
+                data = (self.root / path).read_bytes()
+                stream = io.BytesIO(data)
+                stream.size = len(data)
+                stream.transfer_source = lambda: 'native-source'
+                yield stream
+            def local_move_path(self, path):
+                return None
+        class Target(LocalFiles):
+            def create_file(self, path, stream, **kwargs):
+                self.native_hook = stream.crypt_transfer and stream.transfer_source()
+                super().create_file(path, stream, **kwargs)
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'source').mkdir()
+            (root / 'target').mkdir()
+            source, target = Source(root / 'source'), Target(root / 'target')
+            (source.root / 'video').write_bytes(b'x' * (1024 * 1024 + 1))
+            values = []
+            move_resource(source, 'video', target, 'video', progress=lambda **value: values.append(value))
+            copied = [value for value in values if value['phase'] == 'Copying']
+            verified = [value for value in values if value['phase'] == 'Verifying']
+            self.assertEqual(copied[-1]['done'], 1024 * 1024 + 1)
+            self.assertEqual(verified[-1]['done'], 2 * (1024 * 1024 + 1))
+            self.assertEqual(verified[-1]['done'], verified[-1]['total'])
+            self.assertEqual(target.native_hook, 'native-source')
+            self.assertEqual(values[-1]['phase'], 'Publishing destination')
+
+    def test_cross_root_local_move_preserves_inode_and_never_opens_streams(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'received').mkdir()
+            (root / 'movies').mkdir()
+            source, target = LocalFiles(root / 'received'), LocalFiles(root)
+            original = source.root / 'video.mkv'
+            original.write_bytes(b'video')
+            inode = original.stat().st_ino
+            with patch.object(source, 'open', side_effect=AssertionError('No streaming')), \
+                    patch.object(target, 'create_file', side_effect=AssertionError('No copying')):
+                move_resource(source, 'video.mkv', target, 'movies/video.mkv')
+            self.assertFalse(original.exists())
+            self.assertEqual((root / 'movies/video.mkv').stat().st_ino, inode)
+
+    def test_cross_root_local_move_preserves_conflicts_and_honors_custom_rename_policy(self):
+        class Guarded(LocalFiles):
+            def rename(self, source, destination):
+                raise PermissionError('Custom policy')
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'received').mkdir()
+            source, target = LocalFiles(root / 'received'), LocalFiles(root)
+            (source.root / 'video').write_bytes(b'source')
+            (root / 'video').write_bytes(b'existing')
+            with self.assertRaises(FileExistsError):
+                move_resource(source, 'video', target, 'video')
+            self.assertEqual((root / 'video').read_bytes(), b'existing')
+            self.assertEqual((source.root / 'video').read_bytes(), b'source')
+            self.assertIsNone(Guarded(source.root).local_move_path('video'))
+
     def test_windows_listing_queries_actual_link_count_instead_of_direntry_cache(self):
         import os
         from types import SimpleNamespace
@@ -159,7 +229,9 @@ class ResourceOperationsTests(unittest.TestCase):
             def corrupt(path, stream, **kwargs):
                 original_create(path, stream, **kwargs)
                 (b.root / path).write_bytes(b'bad')
-            with patch.object(b, 'create_file', side_effect=corrupt):
+            with patch.object(b, 'create_file', side_effect=corrupt), patch(
+                    'commonUtils.runtime.resources.mutations.rename_exclusive',
+                    side_effect=OSError(errno.EXDEV, 'Different filesystem')):
                 with self.assertRaisesRegex(ValueError, 'verification'):
                     move_resource(a, 'note', b, 'copy')
             self.assertFalse(list(b.root.iterdir()))
@@ -259,7 +331,9 @@ class ResourceOperationsTests(unittest.TestCase):
                 if calls: raise OSError('injected cleanup failure')
                 remove(path, revision)
                 calls.append(path)
-            with patch.object(source, 'remove_empty', side_effect=interrupted):
+            with patch.object(source, 'remove_empty', side_effect=interrupted), patch(
+                    'commonUtils.runtime.resources.mutations.rename_exclusive',
+                    side_effect=OSError(errno.EXDEV, 'Different filesystem')):
                 with self.assertRaises(MutationIncomplete) as caught:
                     move_resource(source, 'folder', target, 'saved')
             result = caught.exception.result
@@ -294,7 +368,9 @@ class ResourceOperationsTests(unittest.TestCase):
             (root / 'a').mkdir(); (root / 'b').mkdir()
             source, target = LocalFiles(root / 'a'), LocalFiles(root / 'b')
             (source.root / 'note').write_bytes(b'original')
-            with patch.object(source, 'remove_empty', side_effect=PermissionError('denied')):
+            with patch.object(source, 'remove_empty', side_effect=PermissionError('denied')), patch(
+                    'commonUtils.runtime.resources.mutations.rename_exclusive',
+                    side_effect=OSError(errno.EXDEV, 'Different filesystem')):
                 with self.assertRaises(MutationIncomplete) as caught:
                     move_resource(source, 'note', target, 'saved')
             self.assertTrue(caught.exception.result.destination_published)
