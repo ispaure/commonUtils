@@ -115,5 +115,8 @@ class NativeReaderPresentationTests(unittest.TestCase):
                 colors.reset_mock()
                 sliders.style_slider(widget, apple_color=colors, force_ltr=True, reverse_fill=reverse)
                 self.assertEqual([call.args[0] for call in colors.call_args_list],
-                                 ['border', 'accent', 'accent'] if reverse else ['accent', 'border', 'accent'])
+                                 ['border', 'border', 'accent', 'accent', 'accent', 'accent'] if reverse
+                                 else ['accent', 'accent', 'border', 'border', 'accent', 'accent'])
+                self.assertEqual(colors.return_value.resolvedColorWithTraitCollection.call_count, 6)
+                colors.return_value.resolvedColorWithTraitCollection.reset_mock()
                 self.assertEqual(widget._impl.native.semanticContentAttribute, 3)
