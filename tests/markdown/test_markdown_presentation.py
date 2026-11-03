@@ -22,6 +22,15 @@ from commonUtils.ui.appearance.theme import apply_theme, theme_palette, SLATE_DA
 
 
 class MarkdownPresentationTests(QtTestCase):
+    def test_video_wiki_filename_with_hash_is_encoded_and_source_is_preserved(self):
+        source = '![[clip #1.mp4]]\n'
+        viewer = self.viewer(source)
+        block = viewer.browser.document().begin()
+        fragment = block.begin().fragment()
+        self.assertTrue(fragment.charFormat().isImageFormat())
+        self.assertEqual(fragment.charFormat().toImageFormat().name(), 'clip%20%231.mp4')
+        self.assertEqual(viewer.markdown_text(), source)
+
     def test_heading_links_keep_heading_size_and_navigation(self):
         viewer = self.viewer('# # [[Art]]\n\n# # [[Tech]]\n\nOrdinary text\n')
         document = viewer.browser.document()
