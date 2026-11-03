@@ -6,13 +6,28 @@ from . import pyside as qt
 from shiboken6 import isValid
 
 
-def register_document_host(host):
-    qt.QApplication.instance()._commonutils_document_host = weakref.ref(host)
-
-
-def current_document_host():
+def register_document_host(host, *, destination='documents'):
+    """Register a weak host for an application-defined document destination."""
     app = qt.QApplication.instance()
-    reference = getattr(app, '_commonutils_document_host', None)
+    hosts = getattr(app, '_commonutils_document_hosts', None)
+    if hosts is None:
+        hosts = app._commonutils_document_hosts = {}
+    hosts[destination] = weakref.ref(host)
+    if destination == 'documents':
+        app._commonutils_document_host = weakref.ref(host)
+
+
+def current_document_host(window=None, *, destination=None):
+    """Resolve an explicit destination or the origin document's destination.
+
+    Unregistered destinations remain standalone; they never fall into another host.
+    Existing callers without a destination keep the default document host.
+    """
+    app = qt.QApplication.instance()
+    destination = destination or getattr(window, 'document_destination', 'documents')
+    reference = getattr(app, '_commonutils_document_hosts', {}).get(destination)
+    if destination == 'documents':
+        reference = getattr(app, '_commonutils_document_host', reference)
     host = reference() if reference else None
     return host if host is not None and isValid(host) else None
 
@@ -23,13 +38,13 @@ def document_creation_scope(origin):
     Hosts may provide creation_scope(origin); standalone consumers need no hook.
     Resolve the origin at completion, so a moved document follows its live owner.
     """
-    host = current_document_host()
+    host = current_document_host(origin)
     scope = getattr(host, 'creation_scope', None)
     return scope(origin) if scope is not None else nullcontext()
 
 
 def show_document(window, *, detached=False, allow_new_tabs=True):
-    host = current_document_host()
+    host = current_document_host(window)
     if host is not None and host.window().isVisible() and not host.closing:
         if detached or not allow_new_tabs:
             host.present(window, detached=detached, allow_new_tabs=allow_new_tabs)
@@ -45,7 +60,7 @@ def show_document(window, *, detached=False, allow_new_tabs=True):
 def document_is_open(window):
     if not isValid(window):
         return False
-    host = current_document_host()
+    host = current_document_host(window)
     if host is not None and window in host.records:
         return not host.records[window]['closed']
     return window.isVisible()
@@ -53,7 +68,7 @@ def document_is_open(window):
 
 def host_keeps_document(window):
     """An origin view may close while the main host retains its document."""
-    host = current_document_host()
+    host = current_document_host(window)
     return bool(host is not None and not host.closing and window in host.records
                 and not host.records[window]['closed'])
 
@@ -88,7 +103,7 @@ def close_document(window):
 
 
 def _close_finished(window, accepted):
-    host = current_document_host()
+    host = current_document_host(window)
     callback = getattr(host, "document_close_finished", None)
     if callback is not None:
         callback(window, accepted)

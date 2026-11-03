@@ -487,3 +487,17 @@ chunked processing. Header count, safe names and unencrypted/regular-file checks
 precede use. Opening/reading rejects changed source revisions. It requires neither
 Qt, native mobile bridges, image libraries nor password ZIP dependencies. Format
 policy and image decode limits remain host-owned.
+
+
+## Selecting an existing folder
+
+`ResourceSelection(provider, mode='folder')` validates the current contained
+folder and returns its provider-relative path, including the empty root. It
+requires directory metadata, not file creation or mutation capabilities. Files,
+missing folders and paths outside the provider remain invalid. Cancellation is
+checked before and after validation.
+
+`ResourcePicker` and `choose_resource` accept the same mode. Folder mode hides
+the filename input and confirms the currently browsed directory; hosts retain
+storage selection, provider leases and worker shutdown through the normal picker
+lifecycle. Open, Save As and destination-file modes keep their existing semantics.

@@ -55,6 +55,25 @@ class EntryBrowserTests(QtTestCase):
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 
+    def test_folder_picker_confirms_current_directory_without_a_filename(self):
+        from commonUtils.runtime.resources.local import LocalFiles
+        with self.temporary_directory() as temporary:
+            root = Path(temporary)
+            (root / 'folder').mkdir()
+            released = []
+            picker = ResourcePicker([('Local', lambda: (LocalFiles(root), lambda: released.append(True)))],
+                                    mode='folder', directory='folder')
+            picker.show()
+            self.wait_until(lambda: picker.browser is not None and not picker.browser.busy)
+            self.assertFalse(picker.name.isVisible())
+            picker.choose()
+            self.wait_until(lambda: picker.choice is not None)
+            self.assertEqual(picker.choice.path, 'folder')
+            self.assertEqual(released, [])
+            picker.choice.close()
+            self.assertEqual(released, [True])
+            picker.deleteLater()
+
     def test_provider_columns_and_readable_local_modified_dates(self):
         from datetime import datetime
         from commonUtils.filesystem import format_datetime

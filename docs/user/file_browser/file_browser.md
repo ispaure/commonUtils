@@ -212,3 +212,10 @@ and does not display the managed folder's underlying files.
 ## Provider-backed folder browsing
 
 Applications can also present a provider-backed browser. It uses the same compact navigation buttons and clickable folder breadcrumbs with a filterable Name/Date Modified/Size list (in that order), tile view and column navigation. The Size slider adjusts icons and tiles. Its optional Preview panel shows file information and host-supplied metadata on the right in list/tile view or in the final column. Modified dates use local time in the same readable format as local files, for example **Feb 11, 2026 at 6:45 PM**. Missing or invalid dates show **—**. Provider browsers omit storage maps. Open/Save As dialogs omit Preview and keep an application-supplied storage selector at the top. The dialog title begins with **🕵️ Private -** when its selected provider declares private storage. Session-only text editor titles also use that prefix and retain it after Save As. Provider thumbnails stay in memory; missing or locked covers use generic icons. Two visible thumbnails can load at once, and closing waits for both workers.
+
+
+## Choosing a folder
+
+Applications can present the storage browser in folder mode. Choose a storage
+location, navigate into the folder and confirm it. This mode selects the current
+folder and has no filename field; it does not create or overwrite a file.

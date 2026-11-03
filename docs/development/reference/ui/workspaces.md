@@ -154,3 +154,18 @@ and application close/transfer policy. A failed or cancelled drag must
 retain the source pane, its document state and worker owners. Focused tests cover
 compatibility, tab limits, cancellation, header ownership and close retirement;
 native floating-window/menu behavior additionally requires a real Qt host.
+
+
+## Document destinations
+
+`register_document_host(host, destination='documents')` registers a weak host for
+an application-defined destination. Documents may declare `document_destination`
+to select it. `current_document_host(window)` resolves that document's owner;
+`current_document_host(destination='name')` resolves an explicit owner. Existing
+calls without an argument retain the default host. An unregistered destination
+opens standalone rather than falling into another destination.
+
+Presentation, `document_creation_scope(origin)`, open/retained checks and close
+completion callbacks resolve the same destination. Hosts own records, feature
+admission, session identity and navigation. Registration does not impose a feature
+registry or persistence policy on consumers.
