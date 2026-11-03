@@ -22,6 +22,25 @@ from commonUtils.ui.appearance.theme import apply_theme, theme_palette, SLATE_DA
 
 
 class MarkdownPresentationTests(QtTestCase):
+    def test_heading_links_keep_heading_size_and_navigation(self):
+        viewer = self.viewer('# # [[Art]]\n\n# # [[Tech]]\n\nOrdinary text\n')
+        document = viewer.browser.document()
+        block = document.begin()
+        while block.isValid():
+            if block.blockFormat().headingLevel():
+                iterator = block.begin()
+                sizes = []
+                while not iterator.atEnd():
+                    fragment = iterator.fragment()
+                    if fragment.isValid():
+                        font = fragment.charFormat().font().resolve(document.defaultFont())
+                        sizes.append(qt.QFontMetricsF(font).height())
+                    iterator += 1
+                self.assertGreater(min(sizes), qt.QFontMetricsF(document.defaultFont()).height() * 1.5)
+            block = block.next()
+        self.assertIn('Art.md', viewer.browser.toHtml())
+        self.assertEqual(viewer.markdown_text(), '# # [[Art]]\n\n# # [[Tech]]\n\nOrdinary text\n')
+
     @classmethod
     def setUpClass(cls):
         cls.app = qt.QApplication.instance() or qt.QApplication([])

@@ -1,5 +1,8 @@
 # Markdown integration
 
+Reading headings apply their font size to every inline fragment, including wiki
+links and ordinary links. Link targets and authored Markdown remain unchanged.
+
 Use `MarkdownViewer` for embedding and `MarkdownWindow` / `open_markdown` for a
 standalone or document-hosted window. They render Markdown with Qt without a web
 engine. See the [user guide](../../../../user/markdown/markdown.md) for reading, editing, YAML properties,
