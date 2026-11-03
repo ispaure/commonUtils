@@ -82,8 +82,10 @@ class VideoCard(qt.QWidget):
             self.player.play()
 
     def retire(self):
+        from PySide6.QtMultimedia import QVideoFrame
         self.player.stop()
         self.player.setSource(qt.QUrl())
+        self.screen.videoSink().setVideoFrame(QVideoFrame())
         self.screen.current_image = qt.QImage()
         self.hide()
         self.deleteLater()
