@@ -1,6 +1,6 @@
 """Inline native video controls over reserved rich-text image positions."""
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from .. import pyside as qt
 
@@ -9,7 +9,8 @@ VIDEO_SUFFIXES = {'.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.mpg', '.mpe
 
 def video_target(target):
     try:
-        return Path(urlsplit(target).path).suffix.lower() in VIDEO_SUFFIXES
+        return (Path(target).suffix.lower() in VIDEO_SUFFIXES or
+                Path(unquote(urlsplit(target).path)).suffix.lower() in VIDEO_SUFFIXES)
     except ValueError:
         return False
 
