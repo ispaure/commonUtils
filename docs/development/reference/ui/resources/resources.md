@@ -34,3 +34,15 @@ Use the existing resource operation/lifecycle tests and consumer picker/editor
 checks when changing these contracts; native dialog checks require a real Qt host.
 
 [Shared UI guide](../ui.md)
+
+## Provider search presentation
+
+`ResourceBrowser(..., path_label=None)` uses Name, Type, Size and Path columns for
+recursive results. The optional callback formats a logical provider-relative path;
+it must be inexpensive and must not read document bodies. The default joins the
+provider root and relative path. Path cells use the placeholder-text palette role;
+Name shows only the basename. `ProviderEntryModel.set_search_mode()` also supplies
+this projection for hosts that filter already-listed remote entries. Clearing
+recursive search restores the normal Name/Date Modified/Size columns and snapshot.
+Native provider search likewise shows basenames while retaining full activation
+identities in row payloads.

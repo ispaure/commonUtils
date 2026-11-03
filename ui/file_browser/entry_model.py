@@ -184,14 +184,41 @@ class EntryModel(qt.QAbstractItemModel):
 
 class ProviderEntryModel(EntryModel):
     """Convert provider paths into identities without opening them on disk."""
-    def __init__(self, provider, parent=None, *, thumbnail=None):
+    def __init__(self, provider, parent=None, *, thumbnail=None, path_label=None):
         self.provider = provider
         self.thumbnail = thumbnail
+        self.path_label = path_label or (lambda path: str(provider.root / path))
+        self.search_results = False
         super().__init__(BrowseEntry(provider.root, provider.root.name or str(provider.root), True),
                          (BrowseColumn('name', 'Name'), BrowseColumn('modified', 'Date Modified'),
                           BrowseColumn('size', 'Size', 'bytes')), parent)
+        self.normal_columns = self.columns
+
+    def search_columns(self, enabled):
+        return ((BrowseColumn('name', 'Name'), BrowseColumn('type', 'Type'),
+                 BrowseColumn('size', 'Size', 'bytes'), BrowseColumn('path', 'Path'))
+                if enabled else self.normal_columns)
+
+    def set_search_mode(self, enabled):
+        if enabled == self.search_results:
+            return
+        self.beginResetModel()
+        self.search_results = enabled
+        self.columns = self.search_columns(enabled)
+        self.endResetModel()
 
     def data(self, index, role=qt.Qt.ItemDataRole.DisplayRole):
+        identity = self.browse_identity(index)
+        if self.search_results and identity is not None:
+            entry = self.tree.entries[identity]
+            key = self.columns[index.column()].key
+            relative = entry.payload.get('path', '') if entry.payload else ''
+            if key == 'path' and role == qt.Qt.ItemDataRole.ForegroundRole:
+                return qt.QApplication.palette().brush(qt.QPalette.ColorRole.PlaceholderText)
+            if key in {'name', 'type', 'path'} and role in {qt.Qt.ItemDataRole.DisplayRole,
+                    qt.Qt.ItemDataRole.ToolTipRole, BrowseRole.SortValue}:
+                return (Path(relative).name if key == 'name' else self.path_label(relative) if key == 'path'
+                        else 'Folder' if entry.container else Path(relative).suffix.lstrip('.').upper() or 'File')
         value = super().data(index, role)
         if (role == qt.Qt.ItemDataRole.DisplayRole and index.isValid()
                 and self.columns[index.column()].key == 'modified'):
