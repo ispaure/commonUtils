@@ -170,6 +170,14 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
             self.browser.resource_loader = storage.load_resource
             self.formatted_editor.document().resource_loader = storage.load_resource
         self.formatted_editor.setAccessibleName('Formatted Markdown editor')
+        from .videos import InlineVideos
+        def video_source(url):
+            if storage is not None:
+                loader = getattr(storage, 'video_source', None)
+                return loader(url) if loader is not None else None
+            return url.toString() if url.isLocalFile() and Path(url.toLocalFile()).is_file() else None
+        self.browser.inline_videos = InlineVideos(self.browser, video_source)
+        self.formatted_editor.inline_videos = InlineVideos(self.formatted_editor, video_source)
         self.formatted_editor.document().contentsChanged.connect(self._formatted_changed)
         self.formatted_editor.undoAvailable.connect(lambda available: self._update_edit_actions())
         self.formatted_editor.redoAvailable.connect(lambda available: self._update_edit_actions())
@@ -559,6 +567,8 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
             self._fit_diagrams()
 
     def closeEvent(self, event):
+        self.browser.inline_videos.clear()
+        self.formatted_editor.inline_videos.clear()
         self.speech.stop()
         if self._diagram_renderer:
             self._diagram_renderer.cancel()

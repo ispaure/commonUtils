@@ -47,7 +47,7 @@ class MarkdownImageSizeTests(QtTestCase):
             self.assertFalse(self.editor.document().isUndoAvailable())
 
     def test_explicit_wiki_and_markdown_dimensions_survive_resize_and_edit(self):
-        for source in ('![[large.png|400]]', '![Caption|400](large.png)', '![400](large.png)',
+        for source in ('![[large.png|400]]', '![Caption|400](large.png)', r'![Caption.jpg|400]\(large.png)', '![400](large.png)',
                        '![[large.png|400x100]]', '![Caption|400x100](large.png)'):
             with self.subTest(source=source):
                 self.editor.resize(700, 400)
@@ -68,7 +68,12 @@ class MarkdownImageSizeTests(QtTestCase):
                 self.assertEqual(self.editor.document().toMarkdown().strip(), source)
 
     def test_wiki_images_in_read_and_edit_modes_keep_animation_and_source(self):
-        source = '![[animated.gif|400]]'
+        self.check_animated_embed('![[animated.gif|400]]')
+
+    def test_pasted_images_in_read_and_edit_modes_keep_animation_and_source(self):
+        self.check_animated_embed(r'![Caption.jpg|400]\(animated.gif)')
+
+    def check_animated_embed(self, source):
         path = self.root / 'note.md'
         path.write_text(source)
         viewer = MarkdownViewer(path, allow_edit=True)

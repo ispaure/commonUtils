@@ -10,6 +10,19 @@ from commonUtils.tests.formats.test_gif_headers import GIF
 
 
 class MarkdownImageSyntaxTests(unittest.TestCase):
+    def test_pasted_image_uses_destination_and_preserves_literal_contexts(self):
+        from commonUtils.formats.markdown.images import image_targets
+        source = r'![Concept_Katia_01_SD.jpg]\(Concept_Katia_01_SD.webp)'
+        calls = []
+        html = markdown_preview(source, image_source=lambda path: calls.append(path) or ('image/gif', GIF))
+        self.assertEqual(calls, ['Concept_Katia_01_SD.webp'])
+        self.assertIn('<img', html)
+        self.assertIn('alt="Concept_Katia_01_SD.jpg"', html)
+        self.assertEqual(image_targets(source), ('Concept_Katia_01_SD.webp',))
+        for literal in ('`' + source + '`', '```\n' + source + '\n```', '\\' + source, '    ' + source):
+            self.assertFalse(image_targets(literal))
+            self.assertNotIn('<img', markdown_preview(literal, image_source=lambda path: ('image/gif', GIF)))
+
     def test_width_height_and_caption(self):
         for text, expected in [('Caption|400', ('Caption', 400, None)), ('400', ('', 400, None)),
                                ('Caption|400x200', ('Caption', 400, 200)), ('400x200', ('', 400, 200)),

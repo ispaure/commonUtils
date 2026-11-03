@@ -3,6 +3,19 @@
 Reading headings apply their font size to every inline fragment, including wiki
 links and ordinary links. Link targets and authored Markdown remain unchanged.
 
+Inline video embeds (`![[clip.mp4]]` or `![Clip](clip.mp4)`) reserve a native
+player in Qt reading and formatted editing. A storage adapter can implement
+`video_source(QUrl)` to return a revocable playback URL; the widget never opens
+virtual provider paths itself. Local viewers use local file URLs. Players load
+on Play, pause when hidden, and release their decoder on retirement. Source
+editing keeps the authored syntax.
+
+Native HTML previews accept a host-supplied `image_source` returning
+`("video/<type>", "http://127.0.0.1:<port>/<capability>")` for video targets.
+They emit inline video controls with no preload and a loopback-only media policy.
+The host owns stream lifetime, access checks and cleanup; previews never fetch
+an authored external video URL.
+
 Use `MarkdownViewer` for embedding and `MarkdownWindow` / `open_markdown` for a
 standalone or document-hosted window. They render Markdown with Qt without a web
 engine. See the [user guide](../../../../user/markdown/markdown.md) for reading, editing, YAML properties,

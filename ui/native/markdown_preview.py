@@ -35,6 +35,17 @@ def embedded_image(target, alt, image_source=None):
             image = image_source(target)
             if image is not None:
                 mime, data = image
+                if mime.startswith('video/') and isinstance(data, str):
+                    url = urlsplit(data)
+                    if url.scheme != 'http' or url.hostname != '127.0.0.1' or not url.port or url.username or url.password:
+                        raise ValueError('Invalid embedded video transport.')
+                    caption, width, height = image_size(alt)
+                    dimensions = f' width="{width}"' if width else ''
+                    if height:
+                        dimensions += f' height="{height}"'
+                    return ('<video controls playsinline preload="none" aria-label="' + escape(caption, quote=True)
+                            + '" src="' + escape(data, quote=True) + '"' + dimensions
+                            + ' style="max-width:100%;height:auto">' + escape(caption) + '</video>')
                 if mime not in {'image/png', 'image/jpeg', 'image/webp', 'image/gif'} or not isinstance(data, bytes) or len(data) > 8 * 1024 * 1024:
                     raise ValueError('Invalid embedded image.')
                 caption, width, height = image_size(alt)
@@ -137,7 +148,7 @@ def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", im
     body = markdown_body(text, local_links=local_links, image_source=image_source)
     policy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
     if image_source is not None:
-        policy += "; img-src data:"
+        policy += "; img-src data:; media-src http://127.0.0.1:*"
     result = ('<!doctype html><html><head><meta charset="utf-8">'
             f'<meta http-equiv="Content-Security-Policy" content="{policy}">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'

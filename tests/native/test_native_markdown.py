@@ -14,6 +14,15 @@ from commonUtils.ui.native.markdown_preview import markdown_preview
 
 
 class NativeMarkdownTests(unittest.TestCase):
+    def test_video_embeds_use_only_host_supplied_loopback_transport(self):
+        source = lambda target: ('video/mp4', 'http://127.0.0.1:43210/capability/video.mp4')
+        html = markdown_preview('![[potato.mp4]]\n\n`![[literal.mp4]]`', image_source=source)
+        self.assertEqual(html.count('<video '), 1)
+        self.assertIn('controls playsinline preload="none"', html)
+        self.assertIn('media-src http://127.0.0.1:*', html)
+        self.assertNotIn('<video ', markdown_preview('![[potato.mp4]]',
+            image_source=lambda target: ('video/mp4', 'https://example.com/video.mp4')))
+
     def test_wiki_links_remain_inside_headings(self):
         html = markdown_preview('# # [[Art]]\n\n# # [[Tech]]', local_links=True)
         self.assertIn('<h1 id="art"># <a href="Art">Art</a></h1>', html)

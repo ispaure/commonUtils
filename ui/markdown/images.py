@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 from .. import pyside as qt
 from ...filesystem.local_access import check_local_path
-from ...formats.markdown.images import image_size
+from ...formats.markdown.images import image_size, escaped_image
 from .syntax import FENCE_OPEN, fence_close
 
 
@@ -144,6 +144,7 @@ class AnimatedImages(qt.QObject):
 WIKI_IMAGE_SOURCE = int(qt.QTextFormat.Property.UserProperty) + 703
 _WIKI_IMAGE = re.compile(r'(?<![\\!])!\[\[([^]\n|]+)(?:\|([^]\n]+))?\]\]')
 _CODE = re.compile(r'(?<!`)(`+)(?!`)(.*?)\1(?!`)')
+_ESCAPED_IMAGE_START = re.compile(r'(?<![\\!])!\[')
 
 
 def prepare_wiki_images(markdown):
@@ -152,6 +153,7 @@ def prepare_wiki_images(markdown):
     while prefix in markdown:
         prefix += 'z'
     tokens, lines, fence = {}, [], None
+    parser = None
     for line in markdown.splitlines(keepends=True):
         content = re.sub(r'^(?: {0,3}>[ \t]?)+', '', line).rstrip('\r\n')
         opening = FENCE_OPEN.fullmatch(content)
@@ -172,13 +174,43 @@ def prepare_wiki_images(markdown):
             if any(start <= match.start() < end for start, end in code):
                 return match[0]
             target = match[1].strip()
-            if Path(target).suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.tif', '.tiff'):
+            from .videos import video_target
+            if not video_target(target) and Path(target).suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.tif', '.tiff'):
                 return match[0]
             key = f'{prefix}{len(tokens)}z'
             suffix = match[2] or ''
             alt = target + '|' + suffix if image_size(suffix)[1] is not None else (suffix or target)
             tokens[key] = (match[0], alt)
             return f'![{key}]({quote(target, safe="/:%")})'
+        # Parse compatibility images with the same rule as native/mobile and
+        # resource collection. Placeholders preserve their source on export.
+        cursor, chunks = 0, []
+        candidates = _ESCAPED_IMAGE_START.finditer(line) if '\\(' in line else ()
+        for match in candidates:
+            if match.start() < cursor or any(start <= match.start() < end for start, end in code):
+                continue
+            if parser is None:
+                from markdown_it import MarkdownIt
+                parser = MarkdownIt('commonmark', {'html': False})
+                parser.inline.ruler.before('image', 'escaped_image', escaped_image)
+            children = parser.parseInline(line[match.start():])[0].children or []
+            if not children or children[0].type != 'image':
+                continue
+            token = children[0]
+            original = token.meta.get('wiki_source')
+            if not original:
+                continue
+            key = f'{prefix}{len(tokens)}z'
+            tokens[key] = original, token.content
+            title = token.attrGet('title')
+            suffix = (' "' + title.replace('"', '\\"') + '"') if title else ''
+            chunks.extend((line[cursor:match.start()], f'![{key}]({token.attrGet("src")}{suffix})'))
+            cursor = match.start() + len(original)
+        chunks.append(line[cursor:])
+        # Wiki embeds retain their own code-span positions in the original line.
+        if cursor:
+            line = ''.join(chunks)
+            code = [(match.start(), match.end()) for match in _CODE.finditer(line)]
         lines.append(_WIKI_IMAGE.sub(replace, line))
     return ''.join(lines), tokens
 
@@ -209,6 +241,10 @@ def configure_images(document, tokens=None):
                 if original:
                     fmt.setProperty(WIKI_IMAGE_SOURCE, original[0])
                     fmt.setProperty(qt.QTextFormat.Property.ImageAltText, original[1])
+                from .videos import video_target
+                if video_target(fmt.name()):
+                    fmt.setWidth(480)
+                    fmt.setHeight(320)
                 changes.append((fragment.position(), fragment.length(), responsive_image_format(fmt)))
             iterator += 1
         block = block.next()
