@@ -83,7 +83,8 @@ class MarkdownSearchTests(QtTestCase):
             viewer.set_edit_mode('source')
             viewer.show_find()
             viewer.find_text.setText('needle')
-            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches'
+                            and viewer.editor.textCursor().hasSelection())
             self.assertEqual(viewer.find_count.text(), '2 matches')
             self.assertEqual(len(viewer.editor.extraSelections()), 2)
             first = viewer.editor.textCursor().selectionStart()
@@ -110,7 +111,8 @@ class MarkdownSearchTests(QtTestCase):
             viewer, _ = self.make_viewer(root)
             viewer.show_find()
             viewer.find_text.setText('needle')
-            self.wait_until(lambda: viewer.find_count.text() == '2 matches')
+            self.wait_until(lambda: viewer.find_count.text() == '2 matches'
+                            and viewer.browser.textCursor().hasSelection())
             self.assertTrue(viewer.browser.textCursor().hasSelection())
             other = qt.QTextEdit.ExtraSelection()
             other.cursor = viewer.browser.textCursor()
