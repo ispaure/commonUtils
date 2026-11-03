@@ -10,10 +10,30 @@ import subprocess
 import sys
 import unittest
 
-from commonUtils.ui.native.markdown_preview import markdown_preview
+from commonUtils.ui.native.markdown_preview import markdown_preview, MarkdownPreviewLimits
 
 
 class NativeMarkdownTests(unittest.TestCase):
+    def test_explicit_preview_limits_keep_independent_source_html_and_image_bounds(self):
+        from dataclasses import replace
+        from commonUtils.ui.native.markdown_preview import markdown_body
+        limits = MarkdownPreviewLimits(source_bytes=8, html_bytes=8192, image_html_bytes=1024, lazy_images=True)
+        self.assertIn('<p>éééé</p>', markdown_preview('éééé', limits=limits))
+        with self.assertRaisesRegex(ValueError, 'source'):
+            markdown_preview('ééééa', limits=limits)
+        with self.assertRaisesRegex(ValueError, 'rendered'):
+            markdown_preview('abc', limits=replace(limits, html_bytes=16))
+        limits = replace(limits, source_bytes=1024)
+        source = lambda target: ('image/png', b'fixture')
+        html = markdown_body('![photo](photo.png)', image_source=source, limits=limits)
+        self.assertIn('loading="lazy" decoding="async"', html)
+        self.assertNotIn('<img', markdown_body('![photo](photo.png)', image_source=source,
+            limits=replace(limits, image_html_bytes=1)))
+        self.assertNotIn('loading="lazy"', markdown_body('![photo](photo.png)', image_source=source))
+        for bad in (0, -1, True, 1.5):
+            with self.assertRaises(ValueError):
+                replace(limits, source_bytes=bad)
+
     def test_video_embeds_use_only_host_supplied_loopback_transport(self):
         source = lambda target: ('video/mp4', 'http://127.0.0.1:43210/capability/video.mp4')
         html = markdown_preview('![[potato.mp4]]\n\n`![[literal.mp4]]`', image_source=source)

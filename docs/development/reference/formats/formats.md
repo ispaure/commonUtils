@@ -476,7 +476,9 @@ covers transitions, bounded detection and catalogue identities;
 ## Provider-backed Markdown images
 
 `formats.markdown.image_sources` owns `folder_image_source(provider, document)`
-and `local_image_source(document, root)`. These toolkit-free callbacks resolve
+and `local_image_source(document, root)`. The folder source accepts an optional
+positive integer `max_total_bytes` aggregate raster budget (default 16 MiB),
+keeping per-image byte and dimension checks in place. These toolkit-free callbacks resolve
 relative raster images through a rooted provider, enforce byte/dimension budgets
 and recheck revisions and access before returning cached image bytes. Native
 Markdown presentation consumes them; portable note libraries can use them without

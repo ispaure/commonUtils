@@ -1,5 +1,6 @@
 """Bounded offline Markdown, with escaped HTML and no external resources."""
 import base64
+from dataclasses import dataclass
 from html import escape
 import re
 from urllib.parse import quote, urlsplit
@@ -9,6 +10,23 @@ from ...formats.markdown.images import image_size, wiki_image
 from ...formats.markdown.image_sources import image_failure_reason
 
 _ALIAS = re.compile(r'\[\[([^]\n|]+)(?:\|([^]\n]+))?\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
+
+
+@dataclass(frozen=True)
+class MarkdownPreviewLimits:
+    """Caller-owned bounds; defaults retain the small-preview contract."""
+    source_bytes: int = 1024 * 1024
+    html_bytes: int = 24 * 1024 * 1024
+    image_html_bytes: int = 22 * 1024 * 1024
+    lazy_images: bool = False
+
+    def __post_init__(self):
+        for value in (self.source_bytes, self.html_bytes, self.image_html_bytes):
+            if type(value) is not int or value <= 0:
+                raise ValueError('Markdown preview byte limits must be positive integers.')
+
+
+DEFAULT_LIMITS = MarkdownPreviewLimits()
 
 
 def _alias(state, silent):
@@ -29,7 +47,7 @@ def _alias(state, silent):
     return True
 
 
-def embedded_image(target, alt, image_source=None):
+def embedded_image(target, alt, image_source=None, *, lazy=False):
     """Render host-supplied raster bytes; never fetch a URL or open a path here."""
     reason = ''
     if image_source is not None:
@@ -62,22 +80,24 @@ def embedded_image(target, alt, image_source=None):
                         style += f';aspect-ratio:{width}/{height}'
                 style += ';vertical-align:middle'
                 encoded = base64.b64encode(data).decode('ascii')
-                return f'<img src="data:{mime};base64,{encoded}" alt="{escape(caption, quote=True)}"{dimensions} style="{style}">'
+                loading = ' loading="lazy" decoding="async"' if lazy else ''
+                return f'<img src="data:{mime};base64,{encoded}" alt="{escape(caption, quote=True)}"{dimensions}{loading} style="{style}">'
         except (OSError, ValueError) as error:
             reason = image_failure_reason(error)
     label = alt + (' — Image unavailable: ' + reason if reason else '')
     return '<span class="image-alt">' + escape(label) + '</span>'
 
 
-def markdown_body(text, *, local_links=False, image_source=None):
+def markdown_body(text, *, local_links=False, image_source=None, limits=None):
     """Render CommonMark with tables/strikethrough and opt-in local wiki links.
 
     HTML is escaped and external links remain inert. Images show alt text unless
     the host supplies an image_source callback returning (MIME type, bytes).
     The pure-Python parser is shared by all native hosts, including chat.
     """
-    if len(text.encode('utf-8')) > 1024 * 1024:
-        raise ValueError('Preview is limited to 1 MiB.')
+    limits = DEFAULT_LIMITS if limits is None else limits
+    if len(text.encode('utf-8')) > limits.source_bytes:
+        raise ValueError(f'Preview source exceeds the {limits.source_bytes / (1024 * 1024):g} MiB limit.')
     parser = MarkdownIt('commonmark', {'html': False, 'maxNesting': 32}).enable(['table', 'strikethrough'])
     parser.inline.ruler.before('link', 'wiki_alias', _alias)
     if image_source is not None:
@@ -127,9 +147,10 @@ def markdown_body(text, *, local_links=False, image_source=None):
     def image(renderer, items, index, options, env):
         nonlocal image_bytes
         token = items[index]
-        rendered = embedded_image(token.attrGet('src') or '', renderer.renderInlineAsText(token.children or [], options, env), image_source)
+        rendered = embedded_image(token.attrGet('src') or '', renderer.renderInlineAsText(token.children or [], options, env), image_source,
+                                  lazy=limits.lazy_images)
         image_bytes += len(rendered)
-        if image_bytes > 22 * 1024 * 1024:
+        if image_bytes > limits.image_html_bytes:
             return '<span class="image-alt">' + escape(token.content + ' — Image unavailable: Images exceed the preview output budget.') + '</span>'
         return rendered
 
@@ -145,11 +166,11 @@ def markdown_body(text, *, local_links=False, image_source=None):
     return parser.renderer.render(tokens, parser.options, {})
 
 
-def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", image_source=None):
+def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", image_source=None, limits=None):
     size = int(font_size)
     if not 12 <= size <= 32:
         raise ValueError('Invalid preview font size.')
-    body = markdown_body(text, local_links=local_links, image_source=image_source)
+    body = markdown_body(text, local_links=local_links, image_source=image_source, limits=limits)
     policy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
     if image_source is not None:
         policy += "; img-src data:; media-src http://127.0.0.1:*"
@@ -165,7 +186,7 @@ def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", im
             '.table-scroll{max-width:100%;overflow-x:auto;margin:1em 0}table{border-collapse:collapse;width:100%;font-size:.95em}'
             'th,td{border:1px solid GrayText;padding:.55em .7em;min-width:6em;vertical-align:top}th{font-weight:600;background:color-mix(in srgb,currentColor 8%,transparent)}'
             '</style></head><body>' + body + '</body></html>')
-    limit = (24 if image_source is not None else 2) * 1024 * 1024
+    limit = limits.html_bytes if limits is not None else (24 if image_source is not None else 2) * 1024 * 1024
     if len(result.encode('utf-8')) > limit:
         raise ValueError('The rendered preview exceeds its size limit; preview a smaller document.')
     return result

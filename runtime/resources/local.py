@@ -162,6 +162,18 @@ class LocalFiles:
             target = self._guard(self._physical(destination, original.is_dir()))
             rename_exclusive(original, target)
 
+    def local_move_path(self, path):
+        """Opt ordinary, unmapped storage into cross-root exclusive rename.
+
+        Providers with custom rename policy must explicitly implement this hook
+        and enforce that policy when returning a guarded physical path.
+        """
+        if (self.private or self.storage_namespace != 'local'
+                or type(self)._physical is not LocalFiles._physical
+                or type(self).rename is not LocalFiles.rename):
+            return None
+        return self._locate(path)
+
     def remove_empty(self, path, revision):
         with mutation_lock:
             if not self.relative(path):

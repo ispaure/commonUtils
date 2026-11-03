@@ -1,12 +1,15 @@
 """Bounded provider-backed raster images for native Markdown readers/editors."""
 
-def folder_image_source(provider, document, *, root=None, resolve=None):
+def folder_image_source(provider, document, *, root=None, resolve=None, max_total_bytes=16 * 1024 * 1024):
     """Resolve relative images, with optional library-root/attachment fallbacks."""
     import posixpath
     from urllib.parse import urlsplit
     from . import link_path_names
     from ...formats.image_headers import image_header, gif_header
     MAX_IMAGE = 8 * 1024 * 1024
+    if type(max_total_bytes) is not int or max_total_bytes <= 0:
+        raise ValueError('Image preview byte budget must be a positive integer.')
+    budget_message = f'Images exceed the {max_total_bytes / (1024 * 1024):g} MiB preview budget.'
     used = 0
     cache = {}
     parent = posixpath.dirname(provider.relative(document))
@@ -24,8 +27,8 @@ def folder_image_source(provider, document, *, root=None, resolve=None):
 
     def load(target):
         nonlocal used
-        if used >= 16 * 1024 * 1024:
-            raise ValueError('Images exceed the 16 MiB preview budget.')
+        if used >= max_total_bytes:
+            raise ValueError(budget_message)
         parsed = urlsplit(target)
         if parsed.scheme or parsed.netloc or parsed.query:
             return None
@@ -68,14 +71,14 @@ def folder_image_source(provider, document, *, root=None, resolve=None):
         # Recheck cached entries too: another scene can revoke credentials.
         if before.get('size', 0) > MAX_IMAGE + 64:
             raise ValueError('Image exceeds the 8 MiB size limit.')
-        if used + max(0, before.get('size', 0) - 64) > 16 * 1024 * 1024:
-            raise ValueError('Images exceed the 16 MiB preview budget.')
+        if used + max(0, before.get('size', 0) - 64) > max_total_bytes:
+            raise ValueError(budget_message)
         if path in cache:
             revision, image = cache[path]
             if revision != before:
                 raise ValueError('Image changed while rendering Markdown.')
-            if used + len(image[1]) > 16 * 1024 * 1024:
-                raise ValueError('Images exceed the 16 MiB preview budget.')
+            if used + len(image[1]) > max_total_bytes:
+                raise ValueError(budget_message)
             used += len(image[1])
             return image
         with provider.open(path) as stream:
@@ -89,8 +92,8 @@ def folder_image_source(provider, document, *, root=None, resolve=None):
         if (header.width > 8192 or header.height > 8192
                 or header.width * header.height > 16_000_000):
             raise ValueError('Image dimensions exceed the mobile 16-megapixel limit.')
-        if used + len(data) > 16 * 1024 * 1024:
-            raise ValueError('Images exceed the 16 MiB preview budget.')
+        if used + len(data) > max_total_bytes:
+            raise ValueError(budget_message)
         used += len(data)
         mime = 'image/' + header.format
         image = mime, data

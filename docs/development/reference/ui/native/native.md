@@ -549,6 +549,14 @@ errors use readable messages; returning `None` reports an unavailable, unsupport
 or disallowed path. No resource callback still renders the alt label alone.
 
 `markdown_body` and `markdown_preview` accept optional `image_source(target)`.
+Both also accept an explicit `limits=MarkdownPreviewLimits(...)` profile. Its
+positive integer fields bound UTF-8 source bytes (`source_bytes`), final renderer
+HTML (`html_bytes`, for `markdown_preview`) and encoded image markup
+(`image_html_bytes`). The defaults are 1 MiB, 24 MiB and 22 MiB; when no profile
+is supplied, the historical 2 MiB HTML bound still applies without an image
+source. `lazy_images=True` requests lazy loading and asynchronous image decoding;
+it does not change byte accounting or guarantee a device memory ceiling. Hosts
+own larger profiles and any additional bounds after decorating the output.
 The callback returns `(mime_type, bytes)` or `None`; it owns path resolution,
 permissions, revision checks and I/O. The renderer never fetches images itself.
 PNG, JPEG, WebP and GIF up to 8 MiB are embedded as data URIs; `OSError`/`ValueError`
@@ -574,7 +582,9 @@ shared resolver for folder-backed native readers/editors. It accepts a rooted
 provider with `relative`, `entry` and `open` methods; paths resolve relative to
 the document's provider key. All reads stay behind that provider, with revision
 and access rechecks (including cached resources), no plaintext image files, an
-8 MiB/16 megapixel per-image limit and a 16 MiB per-render byte budget. Encoded
+8 MiB/16 megapixel per-image limit and a 16 MiB per-render byte budget. Hosts can
+override only the aggregate budget with positive integer `max_total_bytes`;
+each new source receives its own budget. Encoded
 spaces, `#` and percent signs are decoded only in the URL path. Network URLs,
 absolute paths, root escapes and linked local files are rejected. PNG/JPEG/WebP
 use the existing header probe; GIF uses the complete bounded container probe.

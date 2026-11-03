@@ -156,7 +156,10 @@ comparison separately checks membership and all file revisions. `open` returns t
 logical byte stream; `create_file` writes its logical input in the backend format.
 
 Moves within an identical storage namespace use atomic no-replace rename.
-Cross-provider moves stage a tree, compare SHA-256 of logical file contents, verify
+Compatible ordinary local providers also use exclusive rename across browse roots
+on the same filesystem, through the guarded `local_move_path` hook described in
+the [resource contracts](../runtime/resources/resources.md#streamed-mutations).
+Other cross-provider moves stage a tree, compare SHA-256 of logical file contents, verify
 source membership/revisions, publish without replacing an existing destination,
 and only then remove the source. Empty folders are included. Save As uses the same
 verified staging discipline with `expected_revision=None` (create only); ordinary
