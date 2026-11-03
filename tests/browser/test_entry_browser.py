@@ -96,11 +96,20 @@ class EntryBrowserTests(QtTestCase):
         rows = browser.model.tree.entries
         identity = provider.root / 'folder/nested-note.txt'
         self.assertIn(identity, rows)
+        self.assertEqual([browser.model.headerData(i, qt.Qt.Orientation.Horizontal) for i in range(4)],
+                         ['Name', 'Type', 'Size', 'Path'])
+        index = browser.model.browse_index(identity)
+        self.assertEqual(index.data(), 'nested-note.txt')
+        self.assertEqual(index.siblingAtColumn(1).data(), 'TXT')
+        self.assertEqual(index.siblingAtColumn(3).data(), str(identity))
+        self.assertEqual(index.siblingAtColumn(3).data(qt.Qt.ItemDataRole.ForegroundRole),
+                         browser.palette().brush(qt.QPalette.ColorRole.PlaceholderText))
         opened = []
         browser.activated.connect(opened.append)
         browser._activate(browser.model.browse_index(identity))
         self.assertEqual(opened, [identity])
         browser.close_search()
+        self.assertEqual(browser.model.columnCount(), 3)
         self.assertEqual(browser.tree.topLevelItemCount(), 3)
         browser.stop()
         self.wait_until(lambda: not browser.busy)

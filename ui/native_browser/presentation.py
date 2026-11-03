@@ -190,7 +190,9 @@ class NativeBrowser:
             if len(result.rows) != published or finished:
                 root = provider.root / provider.relative(directory)
                 tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
-                tree.set_children(root, provider_entries(provider, result.rows))
+                from pathlib import PurePosixPath
+                tree.set_children(root, provider_entries(provider,
+                    [dict(row, name=PurePosixPath(row['path']).name) for row in result.rows]))
                 self.set_tree(tree)
                 published = len(result.rows)
             elif finished and not result.rows:
