@@ -328,6 +328,10 @@ class BrowserFileActionTests(QtTestCase):
             QTest.keyClicks(editor, f'Renamed-{mode}')
             QTest.keyClick(editor, qt.Qt.Key.Key_Return); self.wait()
             self.assertFalse(path.exists()); self.assertEqual(next_path.read_text(), 'original')
+            # QFileSystemModel publishes the renamed row and selection asynchronously.
+            self.wait_until(lambda: self.browser.selected_object is not None and
+                            self.browser.selected_object.path == next_path and
+                            self.browser.heading.text() == next_path.name)
             self.assertEqual(self.browser.selected_object.path, next_path)
             self.assertEqual(self.browser.heading.text(), next_path.name)
             path = next_path
