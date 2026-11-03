@@ -1,5 +1,7 @@
 # Project launchers
 
+When uv is missing, the launchers install uv 0.13.4 from versioned official installers. Existing working uv installations are reused.
+
 Platform launch scripts bootstrap the consuming Python project. Projects select and configure a launcher; this folder does not install a global commonUtils package.
 
 macOS `.command`, Linux `.sh` and Windows `.bat` scripts share the launcher contract. See [project setup](#use-it-in-a-project).

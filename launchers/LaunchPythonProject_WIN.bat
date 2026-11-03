@@ -38,7 +38,7 @@ if /I "%PAUSE_ON_EXIT%"=="true" (
     echo ERROR: pause_on_exit must be true or false ^(received: %PAUSE_ON_EXIT%^).
     exit /b 1
 )
-set "UV_INSTALL_URL=https://astral.sh/uv/install.ps1"
+set "UV_INSTALL_URL=https://astral.sh/uv/0.13.4/install.ps1"
 
 if not defined PROJECT_ROOT (
     echo ERROR: Project root argument is missing. This shared launcher must be called by a project launcher.
