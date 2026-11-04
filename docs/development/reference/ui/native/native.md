@@ -83,6 +83,25 @@ row gutter plus a 2 dp gap outside the rows before its separately reserved scrol
 renderer scale on Retina devices. Generic browsing composition and its lifecycle
 are described in the [native browser guide](../native_browser/native_browser.md).
 
+### Android tree rows
+
+Android recycling can also present an indented tree without constructing Toga
+controls per item. Set `tree_actions` on the `RecycledList` to a controller with
+`toggle(row)`, `start_drag(row)`, `can_drop(row)`, `drop(row)`, `end_drag()` and an
+opaque `drag_token`. Boolean drag callbacks run synchronously; `toggle` owns any
+async scheduling. Rows add `tree_depth`, `tree_expanded` (`None` hides disclosure,
+otherwise a boolean), and `tree_landing`. An optional `tree_landing_icon` supplies
+the folder-page glyph. Landing titles are underlined. Native cells own disclosure,
+actions, indentation and local icon drags; only visible cells are created.
+
+Callbacks reject replaced generations, disabled lists and source publication.
+Replacing/clearing a source ends its drag and scrubs attached/recycled private
+labels, images and callbacks. Clip data contains only the host's opaque token;
+the controller owns authorization and the actual mutation. Ordinary lists retain
+their existing row layout. This optional tree presentation is Android-specific;
+consumers choose their existing presentation on other platforms.
+
+
 ## Configurable navigation
 
 `NativeNavigationHost(items, state=None, on_select=None, prefer_sidebar=True)`
@@ -640,7 +659,18 @@ handlers retain Toga's idempotent event contract.
 `clear_private_content()` retires callbacks, clears the live document and disposes
 the native view idempotently. Unsupported backends fail closed. Callers choose
 HTML byte limits and supply navigation, resource and credential-validity policy.
-The component does not sanitize HTML or authorize arbitrary URLs.
+The component does not sanitize HTML or authorize arbitrary URLs. It does not
+install screenshot/recording protection, obscure app-switcher previews or stop
+speech when the app backgrounds. Those are consumer window/session policies.
+The Android configuration disables WebView debugging process-wide; account for
+that effect when embedding ordinary and private views in one host.
+
+For playback authorization, set `SpeechSession.can_speak` to the host's current
+document/session guard; its default permits playback. Retiring a document should
+stop or dispose its session explicitly. `stop()` invalidates utterance tokens and
+clears retained text while permitting reuse; `dispose()` also closes the engine
+and detaches session callbacks. Neither substitutes for a host background/privacy
+transition. See [portable and Qt playback](../readers/readers.md#portable-playback-and-the-qt-adapter).
 
 Consumer host regressions and mocked native disposal cover these adapters.
 Physical speech, WebView storage behavior and platform accessibility still need

@@ -30,8 +30,9 @@ maintenance pass, completion criteria and validation scope.
 
 ## Platform support
 
-Windows, macOS and Linux retain their existing APIs. iOS and Android have an
-incremental infrastructure foundation, not device-verified application support.
+Windows, macOS and Linux retain their existing APIs. iOS and Android have portable
+runtime mechanisms and optional Toga/native components. Their availability does
+not establish device acceptance for a consumer application.
 See the [compatibility audit and deployment blockers](mobile-foundation.md).
 
 [Mobile test guide](mobile-testing.md): manually run the embedded Android/iOS

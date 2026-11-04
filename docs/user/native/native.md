@@ -124,3 +124,16 @@ area. Collapsing advanced fields hides them while preserving entered values.
 When the application hides destination controls for reading or typing, iPad's
 sidebar and toggle hide along with the tab bar. Returning restores the prior
 sidebar presentation. The document's own navigation remains host-controlled.
+
+## Read aloud and private documents
+
+When the host offers native read aloud, usable voices come from the system's
+installed offline voices. If none matches the language, install an appropriate
+system voice or choose an offered voice in the host. The host controls language
+detection, playback controls and whether speech may continue when a document
+closes or the app goes into the background.
+
+A host can opt into a private document view that avoids the ordinary HTML file
+cache. This does not itself prevent screenshots, screen recording or app-switcher
+previews. The host owns those protections, navigation restrictions and when to
+clear a document. Use its privacy guidance for the actual application policy.
