@@ -307,6 +307,20 @@ class NativeBrowser:
         if entry.properties.get('modified'):
             fields.append(('Modified', entry.properties['modified']))
         self._fields(fields)
+        if self.thumbnail and not entry.container:
+            image = toga.ImageView(style=Pack(width=160, height=160))
+            epoch, cancelled = self.epoch, self.cancelled
+            def publish(data):
+                if self.selected == entry.identity and epoch == self.epoch:
+                    image.image = toga.Image(src=data)
+                    if image.parent is None:
+                        self.info.add(image)
+            cached = self.icons.get((entry.identity, entry.revision))
+            if cached:
+                publish(cached)
+            else:
+                self._spawn(self.work.thumbnail(entry, self.thumbnail, publish,
+                    epoch=epoch, cancelled=cancelled))
         if self.details and not entry.container:
             epoch, cancelled = self.epoch, self.cancelled
             task = asyncio.create_task(asyncio.to_thread(self.details, entry.payload, cancelled.is_set))

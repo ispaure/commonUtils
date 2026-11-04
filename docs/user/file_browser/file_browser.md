@@ -18,6 +18,11 @@ selection-detail loading. Column view uses its own final details column; size ma
 use a ranked entry list instead. Optional previews depend on file type and installed
 application features; opening a file may use an application-supplied reader.
 
+Local image files show thumbnails in tiles and the information preview when the
+installed decoder supports their format, including supported texture formats on
+desktop. Network mounts and virtual/cloud locations do not receive automatic
+image previews. Unsupported, unreadable or oversized images keep their file icon.
+
 Hidden files and folders use muted grey text in these views and cached search
 results. Dot-prefixed names are muted on every desktop platform, along with
 Windows entries marked Hidden and macOS entries carrying the native hidden flag.

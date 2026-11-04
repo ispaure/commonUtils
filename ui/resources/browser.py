@@ -13,7 +13,7 @@ from ..file_browser.controls import navigation_button, ViewModeSelector, FolderS
 from ..file_browser.entry_model import ProviderEntryModel, ProviderTree
 from ..file_browser.model import ByteSortModel, _BrowserSelection
 from ..file_browser.views import BrowserViews
-from ..file_browser.thumbnails import image_thumbnail
+from ..file_browser.thumbnails import local_image_thumbnail
 from ...runtime.browsing import BrowseRole
 from ...runtime.operations import check_cancelled
 from ...filesystem import format_size
@@ -215,12 +215,10 @@ class ResourceBrowser(qt.QWidget):
             check_cancelled(cancelled)
             if loader:
                 return loader(path, size, cancelled)
-            if Path(path).suffix.lower() not in {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'} or not hasattr(provider, 'open'):
+            from ...filesystem.image_previews import local_provider_image
+            if not local_provider_image(provider, path):
                 return b''
-            with provider.open(path) as stream:
-                data = stream.read(16 * 1024 * 1024 + 1)
-            check_cancelled(cancelled)
-            return image_thumbnail(data, size) if len(data) <= 16 * 1024 * 1024 else b''
+            return local_image_thumbnail(provider.root / provider.relative(path), size, cancelled)
 
     def _set_directory(self, directory, *, remember=True):
         target, self._history_target = self._history_target, None

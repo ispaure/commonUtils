@@ -259,3 +259,21 @@ Mobile consumers use [NativeBrowser](../native_browser/native_browser.md), which
 list/tile views over the same portable tree and provider-row conversion through
 Toga, rather than importing Qt widgets. Backend-specific presentation stays separate
 while source identities, metadata rows, revisions and mutation contracts are shared.
+
+## Local image previews
+
+`filesystem.image_previews` owns image suffix eligibility and delegates mount
+classification to `filesystem.network.is_network_location`. Provider fallback
+requires `LocalFiles`; virtual paths are never probed on disk. Qt filesystem tiles,
+provider tiles and information panels reuse `thumbnails.local_image_thumbnail` on
+their existing workers. Explicit format thumbnail hooks retain precedence.
+
+Inputs are limited to 16 MiB and 16 megapixels; Qt's installed image plugins decide
+which raster/texture formats decode. Corrupt, missing, inaccessible or unsupported
+inputs return an empty thumbnail and preserve the file icon. The loader checks the
+location again when queued work executes and respects cancellation. Native hosts
+can use `local_native_image` for bounded, header-validated PNG/JPEG/WebP/GIF data or
+supply a local resizing bridge. Native information previews share the row loader
+and reject results after navigation, selection changes or shutdown. Recycled tiles
+keep a generic icon until image decoding succeeds. All caches remain in memory
+and use the existing generation, revision and eviction lifecycle.

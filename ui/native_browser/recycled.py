@@ -462,7 +462,13 @@ class RecycledBrowser(NativeBrowser):
 
     def _tile_card(self, entry):
         preview = toga.ImageView(style=Pack(width=96, height=96)) if self.thumbnail and not entry.container else self.presentation.entry_icon(entry.container)
-        image_box = toga.Box(children=[preview], style=Pack(height=96, align_items='center', justify_content='center'))
+        fallback = self.presentation.entry_icon(entry.container) if self.thumbnail and not entry.container else preview
+        image_box = toga.Box(children=[fallback], style=Pack(height=96, align_items='center', justify_content='center'))
+        def show_thumbnail(image):
+            preview.image = image
+            if preview.parent is not image_box:
+                image_box.clear()
+                image_box.add(preview)
         button = toga.Button(entry.payload.get('display_name') or PurePosixPath(entry.label).name,
             on_press=partial(self._select_pressed, entry), style=Pack(height=44))
         button.browser_hidden = hidden_entry(entry)
@@ -473,7 +479,7 @@ class RecycledBrowser(NativeBrowser):
         task = None
         cached = self.icons.get((entry.identity, entry.revision))
         if cached and self.thumbnail and not entry.container:
-            preview.image = toga.Image(src=cached)
+            show_thumbnail(toga.Image(src=cached))
         elif self.thumbnail and not entry.container:
             browser, epoch = self, self.epoch
             class Target:
@@ -484,7 +490,7 @@ class RecycledBrowser(NativeBrowser):
                 def image(self, image):
                     if (not cancelled.is_set() and not browser.closed and browser.epoch == epoch
                             and entry.identity in browser._tile_cards):
-                        preview.image = image
+                        show_thumbnail(image)
             task = self.work.spawn(self._load_thumbnail(entry, Target(), epoch, cancelled), loop=self._loop)
         self._tile_cards[entry.identity] = entry, card, button, cancelled, task
         self.buttons[entry.identity] = button
