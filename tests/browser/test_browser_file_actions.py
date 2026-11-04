@@ -6,6 +6,8 @@ TEST_STAGE = TestStage.REGRESSION
 
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+from collections import deque
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event
@@ -18,6 +20,28 @@ from commonUtils.ui import pyside as qt
 from commonUtils.ui.file_browser import FileBrowser
 from commonUtils.ui.file_browser.file_actions import clipboard_files, set_clipboard_files
 from commonUtils.filesystem import BrowserAction
+
+
+def _rename_failure_message(browser, old_path, new_path, mode, events):
+    """Report only opaque path classes and flags, never paths or widget text."""
+    def classify(path):
+        if path is None:
+            return 'none'
+        return 'old' if path == old_path else 'new' if path == new_path else 'other'
+    selected = browser.selected_object
+    rows = browser.views.selected_rows()
+    model_path = (Path(browser.model.filePath(rows[0])) if len(rows) == 1 else None)
+    state = dict(mode=mode, preview_enabled=browser._preview_enabled(),
+        selected_path=classify(getattr(selected, 'path', None)),
+        model_path=classify(model_path) if len(rows) <= 1 else 'other',
+        heading_matches_expected=browser.heading.text() == new_path.name,
+        old_exists=old_path.exists(), new_exists=new_path.exists(),
+        busy=browser.busy, folder_busy=browser.folder_busy,
+        index_pending=bool(browser.folder_pending or browser._reconcile_pending
+                           or browser.index_search.busy
+                           or getattr(browser.views, '_column_selection_pending', False)),
+        signals=list(events))
+    return 'Renamed selection did not settle: ' + json.dumps(state, sort_keys=True)
 
 
 class BrowserFileActionTests(QtTestCase):
@@ -318,6 +342,20 @@ class BrowserFileActionTests(QtTestCase):
         self.assertTrue((self.folder / self.file.name).exists())
 
     def test_rename_from_menu_edits_basename_in_place_in_every_view(self):
+        events = deque(maxlen=64)
+        observed_at = time.monotonic()
+        def observe(signal, name):
+            def record(*args):
+                # Never inspect a model or pump events from a signal observer.
+                events.append((name, round(time.monotonic() - observed_at, 4)))
+            signal.connect(record)
+            self.addCleanup(signal.disconnect, record)
+        observe(self.browser.model.fileRenamed, 'fileRenamed')
+        observe(self.browser.model.dataChanged, 'dataChanged')
+        observe(self.browser.views.selection_changed, 'viewSelection')
+        for index, view in enumerate(self.browser.views.navigation_views):
+            observe(view.selectionModel().selectionChanged, f'selection{index}')
+            observe(view.selectionModel().currentChanged, f'current{index}')
         path = self.file
         for mode in (0, 1, 2):
             self.browser.view_selector.setCurrentIndex(mode); self.app.processEvents()
@@ -329,9 +367,17 @@ class BrowserFileActionTests(QtTestCase):
             QTest.keyClick(editor, qt.Qt.Key.Key_Return); self.wait()
             self.assertFalse(path.exists()); self.assertEqual(next_path.read_text(), 'original')
             # QFileSystemModel publishes the renamed row and selection asynchronously.
+            waiting_at = time.monotonic()
+            def failure_message():
+                # wait_until evaluates messages each poll. Inspect native state
+                # only after its unchanged default5s deadline has elapsed.
+                if time.monotonic() - waiting_at < 5:
+                    return 'Renamed selection did not settle'
+                return _rename_failure_message(self.browser, path, next_path, mode, events)
             self.wait_until(lambda: self.browser.selected_object is not None and
                             self.browser.selected_object.path == next_path and
-                            self.browser.heading.text() == next_path.name)
+                            self.browser.heading.text() == next_path.name,
+                            message=failure_message)
             self.assertEqual(self.browser.selected_object.path, next_path)
             self.assertEqual(self.browser.heading.text(), next_path.name)
             path = next_path
