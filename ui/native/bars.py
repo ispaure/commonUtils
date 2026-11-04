@@ -92,8 +92,15 @@ def apple_bar_title(text, width, actions, *, color=None, reference=None):
 
 
 
+def android_title_insets(width, leading_count, trailing_count, *, size=48):
+    """Allocate the actual control gutters, retaining one title touch target."""
+    leading = leading_count * size
+    trailing = min(trailing_count * size, max(0, width - leading - size))
+    return leading, trailing
+
+
 def android_bar(context, leading, trailing, *, native_control=lambda button: button._impl.native):
-    """Mount existing controls once, reserving symmetric space around title/status.
+    """Mount existing controls once, reserving actual control space around title/status.
 
     The caller retains controls and owns detaching Toga parents and assigning
     window/app ownership through native_control before the native mount.
@@ -121,7 +128,8 @@ def android_bar(context, leading, trailing, *, native_control=lambda button: but
     titles.addView(label, LinearLayout.LayoutParams(-1, -2))
     titles.addView(status, LinearLayout.LayoutParams(-1, -2))
     params = FrameLayout.LayoutParams(-1, -1)
-    params.leftMargin = params.rightMargin = max(len(leading), len(buttons)) * size
+    params.leftMargin = len(leading) * size
+    params.rightMargin = len(buttons) * size
     root.addView(titles, params)
     for group, gravity in ((leading, Gravity.START), (buttons, Gravity.END)):
         native_group = LinearLayout(context)

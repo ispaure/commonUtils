@@ -759,7 +759,9 @@ Collapsed controls stay alive and retain their values.
 label relative to its window (or explicit `reference`), with an explicit color.
 Only action groups in the same row constrain title width. `android_bar` returns
 (root, title, status), mounting controls returned by `native_control` and reserving
-symmetric title clearance. Hosts retain controls and own routes, privacy, status
+title clearance for the actual leading and trailing control counts.
+`android_title_insets` retains a title touch target while bounding a scrollable
+trailing action group on narrow displays. Hosts retain controls and own routes, privacy, status
 messages, fullscreen behavior, release and window/app assignment.
 
 ## Desktop-native message boxes
