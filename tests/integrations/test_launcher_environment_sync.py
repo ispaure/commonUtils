@@ -8,11 +8,13 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import time
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 LAUNCHERS = Path(__file__).resolve().parents[2] / 'launchers'
 FAKE_UV = r'''
@@ -52,6 +54,120 @@ if status:
 separator = sys.argv.index('--')
 raise SystemExit(subprocess.run(sys.argv[separator + 1:]).returncode)
 '''
+
+
+WINDOWS = os.name == 'nt'
+# This diagnostic child queries one owned executable. It never terminates owners,
+# reads process command lines, or changes Restart Manager state beyond its session.
+LOCK_OWNERS = r"""
+import ctypes as c,json,sys
+from ctypes import wintypes as w
+class Process(c.Structure):
+    _fields_=[('pid',w.DWORD),('started',w.FILETIME)]
+class Info(c.Structure):
+    _fields_=[('process',Process),('app',w.WCHAR*256),('service',w.WCHAR*64),
+              ('kind',w.UINT),('status',w.ULONG),('session',w.DWORD),('restartable',w.BOOL)]
+r=c.WinDLL('rstrtmgr',use_last_error=True)
+for name,arguments in {
+ 'RmStartSession':[c.POINTER(w.DWORD),w.DWORD,w.LPWSTR],
+ 'RmRegisterResources':[w.DWORD,w.UINT,c.POINTER(w.LPCWSTR),w.UINT,c.POINTER(Process),w.UINT,c.POINTER(w.LPCWSTR)],
+ 'RmGetList':[w.DWORD,c.POINTER(w.UINT),c.POINTER(w.UINT),c.POINTER(Info),c.POINTER(w.DWORD)],
+ 'RmEndSession':[w.DWORD]}.items():
+    getattr(r,name).argtypes=arguments;getattr(r,name).restype=w.DWORD
+session=w.DWORD();status=r.RmStartSession(c.byref(session),0,c.create_unicode_buffer(33))
+result={'query_error':status}
+if status==0:
+    try:
+        status=r.RmRegisterResources(session,1,(w.LPCWSTR*1)(sys.argv[1]),0,None,0,None)
+        result={'query_error':status}
+        if status==0:
+            needed,count,reasons=w.UINT(),w.UINT(),w.DWORD()
+            status=r.RmGetList(session,c.byref(needed),c.byref(count),None,c.byref(reasons))
+            result={'query_error':status,'needed':needed.value}
+            if status==0:result={'query_error':0,'owners':[]}
+            elif status==234 and 0<needed.value<=32:
+                count.value=needed.value;rows=(Info*count.value)()
+                status=r.RmGetList(session,c.byref(needed),c.byref(count),rows,c.byref(reasons))
+                result={'query_error':status}
+                if status==0:result['owners']=[{'pid':x.process.pid,
+                    'creation_time':(x.process.started.dwHighDateTime<<32)|x.process.started.dwLowDateTime}
+                    for x in rows[:count.value]]
+    finally:r.RmEndSession(session)
+print(json.dumps(result))
+"""
+
+
+def fixture_lock_owners(target):
+    result = subprocess.run([sys.executable, '-I', '-c', LOCK_OWNERS, str(target)],
+                            capture_output=True, text=True, timeout=3)
+    if result.returncode or len(result.stdout) > 16384:
+        raise ValueError('Bounded lock diagnostic failed')
+    return json.loads(result.stdout)
+
+
+def fixture_interpreter_identity(root, target):
+    root, target = Path(root).absolute(), Path(target).absolute()
+    expected = root / '.venv/Scripts/python.exe'
+    if target != expected or root.resolve() != root:
+        raise ValueError('Cleanup target is not the owned fixture interpreter')
+    paths = (root, root / '.venv', root / '.venv/Scripts', expected)
+    infos = []
+    for path in (*root.parents, *paths):
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
+            raise ValueError('Cleanup must not follow a link or junction')
+        if not (stat.S_ISREG(info.st_mode) if path == expected else stat.S_ISDIR(info.st_mode)):
+            raise ValueError('Unexpected fixture path type')
+        if path in paths:
+            infos.append((info.st_dev, info.st_ino))
+    return tuple(infos)
+
+
+def cleanup_windows_fixture(temporary):
+    """Bound only transient Windows locks on this fixture's own interpreter."""
+    try:
+        temporary.cleanup()
+        return
+    except PermissionError as original:
+        if not WINDOWS or getattr(original, 'winerror', None) not in (5, 32, 33) or not original.filename:
+            raise
+        try:
+            identity = fixture_interpreter_identity(temporary.name, original.filename)
+        except (OSError, ValueError):
+            raise original
+        try:
+            evidence = fixture_lock_owners(original.filename)
+        except Exception as diagnostic_error:
+            evidence = {'diagnostic_error': type(diagnostic_error).__name__}
+        note = json.dumps({'winerror': original.winerror, 'resource_owners': evidence}, sort_keys=True)
+        original.add_note('Owned launcher interpreter first cleanup failure: ' + note)
+        print('Owned launcher interpreter first cleanup failure: ' + note, file=sys.stderr, flush=True)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            try:
+                if fixture_interpreter_identity(temporary.name, original.filename) != identity:
+                    raise ValueError('Fixture identity changed')
+                temporary.cleanup()
+                if Path(temporary.name).exists():
+                    raise ValueError('Fixture cleanup did not remove its root')
+                print('Owned launcher interpreter cleanup: removed after transient lock', file=sys.stderr, flush=True)
+                return
+            except PermissionError as retry:
+                if retry.filename != original.filename or getattr(retry, 'winerror', None) not in (5, 32, 33):
+                    raise original from retry
+            except (OSError, ValueError) as failure:
+                raise original from failure
+            time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+        raise original
+
+
+@contextmanager
+def windows_fixture_directory():
+    temporary = TemporaryDirectory(prefix='launcher café & (literal)! ')
+    try:
+        yield temporary.name
+    finally:
+        cleanup_windows_fixture(temporary)
 
 
 def run_windows_batch(arguments, **options):
@@ -250,10 +366,112 @@ class WindowsLauncherDiagnosticSourceTests(unittest.TestCase):
                 self.assertNotRegex(unquoted, r'[&|<>()"]')
 
 
+class WindowsFixtureCleanupTests(unittest.TestCase):
+    def fixture(self):
+        root = Path(self.enterContext(TemporaryDirectory())).resolve()
+        target = root / '.venv/Scripts/python.exe'
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b'owned executable fixture')
+        return root, target
+
+    def locked(self, target):
+        error = PermissionError(13, 'fixture is locked', str(target))
+        error.winerror = 5
+        return error
+
+    def test_transient_owned_interpreter_lock_is_diagnosed_before_actual_removal(self):
+        root, target = self.fixture()
+        error = self.locked(target)
+        cleanup = Mock(side_effect=[error, lambda: None])
+        def attempt():
+            if cleanup.call_count == 0:
+                cleanup()
+            else:
+                cleanup()
+                shutil.rmtree(root)
+        temporary = type('Owned', (), {'name': str(root), 'cleanup': staticmethod(attempt)})()
+        with patch(__name__ + '.WINDOWS', True), patch(__name__ + '.fixture_lock_owners', return_value={'owners': [{'pid': 7}]}) as diagnose:
+            cleanup_windows_fixture(temporary)
+        diagnose.assert_called_once_with(str(target))
+        self.assertFalse(root.exists())
+        self.assertEqual(cleanup.call_count, 2)
+        self.assertIn('"pid": 7', error.__notes__[0])
+
+    def test_permanent_lock_preserves_original_error_and_evidence(self):
+        root, target = self.fixture()
+        original = self.locked(target)
+        cleanup = Mock(side_effect=original)
+        temporary = type('Owned', (), {'name': str(root), 'cleanup': cleanup})()
+        with patch(__name__ + '.WINDOWS', True), patch(__name__ + '.fixture_lock_owners', side_effect=TimeoutError), \
+                patch(__name__ + '.time.monotonic', side_effect=[0, 0, 1, 4]), patch(__name__ + '.time.sleep'):
+            with self.assertRaises(PermissionError) as raised:
+                cleanup_windows_fixture(temporary)
+        self.assertIs(raised.exception, original)
+        self.assertIn('TimeoutError', original.__notes__[0])
+        self.assertTrue(target.is_file())
+
+    def test_unowned_path_and_symlink_are_never_retried_or_diagnosed(self):
+        root, target = self.fixture()
+        outside = root / 'other.exe'
+        outside.write_bytes(b'preserve')
+        for failed in (outside, target):
+            with self.subTest(path=failed.name):
+                if failed == target:
+                    target.unlink()
+                    try:
+                        target.symlink_to(outside)
+                    except (OSError, NotImplementedError):
+                        continue  # Exact outside-path case still runs on hosts without symlink privileges.
+                error = self.locked(failed)
+                cleanup = Mock(side_effect=error)
+                temporary = type('Owned', (), {'name': str(root), 'cleanup': cleanup})()
+                with patch(__name__ + '.WINDOWS', True), patch(__name__ + '.fixture_lock_owners') as diagnose:
+                    with self.assertRaises(PermissionError) as raised:
+                        cleanup_windows_fixture(temporary)
+                self.assertIs(raised.exception, error)
+                self.assertEqual(cleanup.call_count, 1)
+                diagnose.assert_not_called()
+                self.assertEqual(outside.read_bytes(), b'preserve')
+
+    def test_other_platforms_or_error_codes_keep_normal_cleanup_failure(self):
+        root, target = self.fixture()
+        for windows, code in ((False, 5), (True, 87)):
+            with self.subTest(windows=windows, code=code):
+                error = self.locked(target)
+                error.winerror = code
+                cleanup = Mock(side_effect=error)
+                temporary = type('Owned', (), {'name': str(root), 'cleanup': cleanup})()
+                with patch(__name__ + '.WINDOWS', windows), patch(__name__ + '.fixture_lock_owners') as diagnose:
+                    with self.assertRaises(PermissionError) as raised:
+                        cleanup_windows_fixture(temporary)
+                self.assertIs(raised.exception, error)
+                self.assertEqual(cleanup.call_count, 1)
+                diagnose.assert_not_called()
+
+    def test_lock_diagnostic_has_fixed_stdlib_child_and_timeout(self):
+        result = type('Result', (), {'returncode': 0, 'stdout': '{"owners": []}'})()
+        with patch.object(subprocess, 'run', return_value=result) as run:
+            self.assertEqual(fixture_lock_owners('literal owned path'), {'owners': []})
+        self.assertEqual(run.call_args.args[0], [sys.executable, '-I', '-c', LOCK_OWNERS, 'literal owned path'])
+        self.assertEqual(run.call_args.kwargs, dict(capture_output=True, text=True, timeout=3))
+
+    def test_replaced_fixture_identity_stops_before_second_cleanup(self):
+        root, target = self.fixture()
+        error = self.locked(target)
+        cleanup = Mock(side_effect=error)
+        temporary = type('Owned', (), {'name': str(root), 'cleanup': cleanup})()
+        with patch(__name__ + '.WINDOWS', True), patch(__name__ + '.fixture_lock_owners', return_value={}), \
+                patch(__name__ + '.fixture_interpreter_identity', side_effect=[('original',), ('replaced',)]):
+            with self.assertRaises(PermissionError) as raised:
+                cleanup_windows_fixture(temporary)
+        self.assertIs(raised.exception, error)
+        self.assertEqual(cleanup.call_count, 1)
+
+
 @unittest.skipUnless(os.name == 'nt' and shutil.which('uv.exe'), 'Native Windows and an existing uv.exe are required')
 class WindowsEnvironmentSyncTests(unittest.TestCase):
     def test_actual_batch_wrapper_uses_owned_python_and_literal_metacharacter_path(self):
-        with TemporaryDirectory(prefix='launcher café & (literal)! ') as temporary:
+        with windows_fixture_directory() as temporary:
             root = Path(temporary).resolve()
             (root / '.python-version').write_text(sys.version.split()[0])
             (root / 'pyproject.toml').write_text('[project]\nname="fixture"\nversion="0.0.0"\nrequires-python=">=3.10"\ndependencies=[]\n')
