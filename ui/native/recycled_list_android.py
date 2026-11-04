@@ -41,10 +41,50 @@ class AndroidFileList(Widget):
                 if impl is not None and generation == impl.generation:
                     impl.interface.on_primary_action(row=impl.interface.data[index])
 
+        class TreeListener(dynamic_proxy(FileListView.TreeListener)):
+            def onToggle(self, index, generation):
+                current = owner()
+                if current is not None:
+                    target = current.tree_row(index, generation)
+                    if target is not None:
+                        target[0].toggle(target[1])
+
+            def onStartDrag(self, index, generation):
+                current = owner()
+                target = current.tree_row(index, generation) if current is not None else None
+                return bool(target is not None and target[0].start_drag(target[1]))
+
+            def onCanDrop(self, index, generation):
+                current = owner()
+                target = current.tree_row(index, generation) if current is not None else None
+                return bool(target is not None and target[0].can_drop(target[1]))
+
+            def onDrop(self, index, generation):
+                current = owner()
+                target = current.tree_row(index, generation) if current is not None else None
+                return bool(target is not None and target[0].drop(target[1]))
+
+            def onEndDrag(self, generation):
+                current = owner()
+                if current is not None and generation == current.generation:
+                    actions = getattr(current.interface, 'tree_actions', None)
+                    if actions is not None:
+                        actions.end_drag()
+
+        self.tree_listener = TreeListener()
+        self.native.setTreeListener(self.tree_listener)
         self.listener = Listener()
         self.native.setListener(self.listener)
         self.generation = 0
         self.refresh_palette()
+
+    def tree_row(self, index, generation):
+        if (generation == self.generation and self.interface.enabled and not self.interface.updating
+                and 0 <= index < len(self.interface.data)):
+            actions = getattr(self.interface, 'tree_actions', None)
+            if actions is not None:
+                return actions, self.interface.data[index]
+        return None
 
     def refresh_palette(self):
         from android.graphics import Color
@@ -57,11 +97,20 @@ class AndroidFileList(Widget):
              colors['accent'], colors['border'])], appearance.high_contrast())
 
     def change_source(self, source):
+        actions = getattr(self.interface, 'tree_actions', None)
+        if actions is not None:
+            actions.end_drag()
         self.generation += 1
         self.native.setObserveRows(bool(getattr(self.interface, 'observe_rows', False)))
         self.native.setRowKind(getattr(self.interface, 'row_kind', 'File'))
         self.native.setRows([row.title for row in source], [row.subtitle for row in source],
                             [row.folder for row in source], self.generation)
+        if actions is not None:
+            icon = getattr(self.interface, 'tree_landing_icon', None)
+            self.native.setTreeRows([int(getattr(row, 'tree_depth', 0)) for row in source],
+                [-1 if getattr(row, 'tree_expanded', None) is None else int(row.tree_expanded) for row in source],
+                [bool(getattr(row, 'tree_landing', False)) for row in source],
+                icon._impl.native if icon is not None else None, actions.drag_token)
         self.native.setHiddenRows([bool(getattr(row, 'hidden', False)) for row in source])
         folder, item = (self.interface.appearance.icon(kind) for kind in (True, False))
         self.native.setIcons(folder._impl.native if folder is not None else None,
