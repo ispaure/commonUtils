@@ -5,6 +5,7 @@ from commonUtils.testing.stages import TestStage
 TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 from threading import Event
@@ -17,6 +18,24 @@ from commonUtils.ui.file_browser.model import BrowserTree, ByteSortModel, _Brows
 from commonUtils.ui.file_browser.views import BrowserViews
 from commonUtils.ui.resources.browser import ResourceBrowser
 from commonUtils.ui.resources.picker import ResourcePicker
+
+
+@contextmanager
+def no_browser_stat(message):
+    from commonUtils.configuration.monitor import settings_monitor
+    monitor = settings_monitor()
+    with monitor._lock:
+        settings_paths = set(monitor._stamps)
+    real_stat = Path.stat
+    def stat(path, *args, **kwargs):
+        # Configuration polling is independent of browser resource access, and
+        # continues while these tests process Qt events. All other stat calls
+        # remain forbidden, including attempts to interpret opaque identities.
+        if path not in settings_paths:
+            raise AssertionError(message)
+        return real_stat(path, *args, **kwargs)
+    with patch.object(Path, 'stat', stat):
+        yield
 
 
 def picture():
@@ -199,7 +218,7 @@ class EntryBrowserTests(QtTestCase):
         def metadata(row, cancelled):
             threads.append(qt.QThread.currentThread())
             return [('Metadata', BrowserDetails((('Title', 'Private title'),), picture()))]
-        with patch.object(Path, 'stat', side_effect=AssertionError('Provider preview queried disk')):
+        with no_browser_stat('Provider preview queried disk'):
             browser = ResourceBrowser(provider, details=metadata)
             self.addCleanup(browser.deleteLater)
             browser.resize(1100, 600)
@@ -267,7 +286,7 @@ class EntryBrowserTests(QtTestCase):
 
     def test_json_identities_custom_columns_and_all_three_views_without_stat(self):
         root, folder, species = ('taxonomy', 0), 42, ('species', 'lion')
-        with patch.object(Path, 'stat', side_effect=AssertionError('A JSON view queried disk')):
+        with no_browser_stat('A JSON view queried disk'):
             model = EntryModel(BrowseEntry(root, 'Animal kingdom', True),
                 [BrowseColumn('name', 'Species'), BrowseColumn('habitat', 'Habitat')])
             model.set_children(root, [BrowseEntry(folder, 'Mammals', True)])
@@ -302,7 +321,7 @@ class EntryBrowserTests(QtTestCase):
 
     def test_provider_columns_load_children_on_worker_and_tiles_use_memory_thumbnail(self):
         provider = MemoryProvider()
-        with patch.object(Path, 'stat', side_effect=AssertionError('Virtual browsing queried disk')):
+        with no_browser_stat('Virtual browsing queried disk'):
             browser = ResourceBrowser(provider)
             self.addCleanup(browser.deleteLater)
             browser.resize(850, 500)
