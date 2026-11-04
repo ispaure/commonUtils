@@ -128,8 +128,8 @@ def android_bar(context, leading, trailing, *, native_control=lambda button: but
     titles.addView(label, LinearLayout.LayoutParams(-1, -2))
     titles.addView(status, LinearLayout.LayoutParams(-1, -2))
     params = FrameLayout.LayoutParams(-1, -1)
-    params.leftMargin = len(leading) * size
-    params.rightMargin = len(buttons) * size
+    params.setMarginStart(len(leading) * size)
+    params.setMarginEnd(len(buttons) * size)
     root.addView(titles, params)
     for group, gravity in ((leading, Gravity.START), (buttons, Gravity.END)):
         native_group = LinearLayout(context)
