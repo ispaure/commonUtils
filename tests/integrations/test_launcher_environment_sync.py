@@ -12,6 +12,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 LAUNCHERS = Path(__file__).resolve().parents[2] / 'launchers'
 FAKE_UV = r'''
@@ -51,6 +52,12 @@ if status:
 separator = sys.argv.index('--')
 raise SystemExit(subprocess.run(sys.argv[separator + 1:]).returncode)
 '''
+
+
+def run_windows_batch(arguments, **options):
+    command = subprocess.list2cmdline(arguments)
+    # Pass a raw command string so Popen cannot CRT-escape CMD's inner quotes.
+    return subprocess.run(f'cmd.exe /d /v:off /s /c "{command}"', **options)
 
 
 @unittest.skipUnless(shutil.which('bash') and os.name != 'nt', 'Actual Bash launchers require Unix')
@@ -191,6 +198,31 @@ class UnixEnvironmentSyncTests(unittest.TestCase):
         self.assertNotIn(b'\n', raw.replace(b'\r\n', b''))
 
 
+class WindowsBatchInvocationTests(unittest.TestCase):
+    def test_cmd_receives_one_raw_command_with_literal_path_quotes(self):
+        batch = r'C:\checkout café & (literal)!\LaunchPythonProject_WIN.bat'
+        root = r'C:\Temp\launcher café & (literal)! probe'
+        config = root + r'\config.ini'
+        environment = {'literal': 'MUST_NOT_EXPAND', 'FAKE_WRAPPER_STATUS': '37'}
+        options = dict(env=environment, capture_output=True, text=True, timeout=60)
+        with patch.object(subprocess, 'run') as run:
+            result = run_windows_batch([batch, root, config, 'false'], **options)
+        run.assert_called_once()
+        self.assertIs(result, run.return_value)
+        raw_command = run.call_args.args[0]
+        # A list would undergo a second CRT serialization before CreateProcess,
+        # inserting backslashes before the quotes that CMD needs to see literally.
+        self.assertIsInstance(raw_command, str)
+        prefix = 'cmd.exe /d /v:off /s /c "'
+        self.assertTrue(raw_command.startswith(prefix), raw_command)
+        self.assertTrue(raw_command.endswith('"'), raw_command)
+        payload = raw_command[len(prefix):-1]  # CMD /s removes only the outer pair.
+        self.assertEqual(payload, f'"{batch}" "{root}" "{config}" false')
+        self.assertNotIn('\\"', raw_command)
+        self.assertEqual(run.call_args.kwargs, options)
+        self.assertIs(run.call_args.kwargs['env'], environment)
+
+
 class WindowsLauncherDiagnosticSourceTests(unittest.TestCase):
     def test_path_diagnostics_do_not_turn_literal_paths_into_cmd_syntax(self):
         # This source guard checks CMD metacharacter exposure, not native CMD
@@ -232,8 +264,9 @@ class WindowsEnvironmentSyncTests(unittest.TestCase):
             config.write_text('[Launch]\nsource_dir=.\nlaunch_file=launch\nenvironment_sync_wrapper=' + wrapper.name + '\n')
             trace = root / 'trace.jsonl'
             env = dict(os.environ, LAUNCHER_TRACE=str(trace), FAKE_WRAPPER_STATUS='37', literal='MUST_NOT_EXPAND')
-            command = subprocess.list2cmdline([str(LAUNCHERS / 'LaunchPythonProject_WIN.bat'), str(root), str(config), 'false'])
-            result = subprocess.run(['cmd.exe', '/d', '/c', command], env=env, capture_output=True, text=True, timeout=60)
+            result = run_windows_batch([str(LAUNCHERS / 'LaunchPythonProject_WIN.bat'),
+                                        str(root), str(config), 'false'],
+                                       env=env, capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
             rows = [json.loads(line) for line in trace.read_text().splitlines()]
             argv = rows[-1]['argv']
