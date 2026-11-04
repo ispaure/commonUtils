@@ -64,7 +64,13 @@ def _new_file_cell():
                     from .recycled_tree_ios import layout
                     layout(self)
         _file_cell_type = CommonUtilsFileCell
-    return _file_cell_type.alloc().initWithStyle(
+    cell = _file_cell_type.alloc()
+    # Rubicon stores `object` properties in py_object-backed ivars. UIKit's
+    # zeroed memory is NULL, not Python None; initialize before UIKit can enter
+    # layout or before the binder inspects any optional tree control.
+    for name in ('tree_owner', 'tree_row', 'tree_disclosure', 'tree_drag', 'tree_drop', 'tree_icon_tap'):
+        setattr(cell, name, None)
+    return cell.initWithStyle(
         UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
 
 

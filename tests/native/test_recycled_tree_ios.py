@@ -59,6 +59,20 @@ class IOSTreeTests(unittest.TestCase):
             self.actions.toggle.assert_called_once()
             restore()
 
+    def test_delegate_identity_is_ready_before_native_initialization_or_attachment(self):
+        class Delegate:
+            @classmethod
+            def alloc(cls):
+                return cls()
+
+            def init(self):
+                self.initial = self.owner(), self.row, self.cell
+                return self
+
+        cell = object()
+        delegate = self.module._new_delegate(Delegate, self.interface, self.row, cell=cell)
+        self.assertEqual(delegate.initial, (self.interface, self.row, cell))
+
     def test_drag_payload_is_opaque_and_restricted_to_the_application(self):
         delegate = self.module.TreeDrag()
         delegate.owner, delegate.row = self.owner, self.row

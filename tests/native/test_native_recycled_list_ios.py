@@ -59,6 +59,43 @@ class IOSFileListLifecycleTests(unittest.TestCase):
     def bind(self):
         return self.controller.tableView_cellForRowAtIndexPath_(self.table, self.index)
 
+    def test_python_backed_cell_properties_are_initialized_before_uikit_can_read_them(self):
+        import ctypes
+        namespace = self.controller.tableView_cellForRowAtIndexPath_.__globals__
+        names = ('tree_owner', 'tree_row', 'tree_disclosure', 'tree_drag', 'tree_drop', 'tree_icon_tap')
+
+        class NativeProperty:
+            def __set_name__(self, owner, name):
+                self.name = name
+
+            def __get__(self, instance, owner):
+                if instance is None:
+                    return self
+                # Rubicon's object-property getter unboxes py_object-backed
+                # ivars. An unassigned, zeroed slot raises PyObject-is-NULL.
+                return instance.__dict__.get(self.name, ctypes.py_object()).value
+
+            def __set__(self, instance, value):
+                instance.__dict__[self.name] = ctypes.py_object(value)
+
+        class Cell:
+            @classmethod
+            def alloc(cls):
+                return cls()
+
+            def initWithStyle(self, style, *, reuseIdentifier):
+                # UIKit may enter layout during initialization, before the
+                # factory returns to the binder. All optional fields must be
+                # Python None already, not an Objective-C NULL pointer.
+                self.initial = {name: getattr(self, name) for name in names}
+                return self
+
+        bridge = SimpleNamespace(send_super=Mock(), objc_property=lambda kind: NativeProperty())
+        with patch.dict(namespace, {'UITableViewCell': Cell, '_file_cell_type': None}), \
+                patch.dict('sys.modules', {'rubicon.objc': bridge}):
+            cell = namespace['_new_file_cell']()
+        self.assertEqual(cell.initial, dict.fromkeys(names))
+
     def test_hidden_text_and_selected_text_reset_when_a_cell_is_reused(self):
         self.row.hidden = True
         self.bind()
