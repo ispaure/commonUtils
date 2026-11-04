@@ -74,3 +74,44 @@ The first three shared-launcher arguments are the project root, config file and
 pause flag. Additional arguments are forwarded to the Python launch file. Root
 wrappers must pass their argument list as separate arguments (`"$@"` on Bash,
 `%*` on Windows). Launch-file exit codes are returned to the caller.
+
+## Optional environment synchronization wrapper
+
+A project that needs an atomic guard around dependency synchronization may set a
+project-relative Python script in either launch configuration layer:
+
+```ini
+[Launch]
+environment_sync_wrapper = tooling_bootstrap/sync.py
+```
+
+An absent or explicitly empty value keeps the original direct `uv sync` behavior.
+Configured scripts must exist and be readable; absolute paths and parent traversal
+are rejected before synchronization or environment creation. Remove the setting
+or restore the script if this validation fails.
+
+After the normal Python availability check, the launcher uses the project's own
+`.venv/bin/python` (Windows: `.venv\Scripts\python.exe`) to invoke the script:
+
+```text
+PYTHON WRAPPER sync --project-root PROJECT_ROOT --venv VENV_ROOT -- UV sync FLAGS
+```
+
+Each value is a separate literal argument. `UV` is the resolved uv executable, and
+`FLAGS` preserves the launcher's existing options: `--locked --no-python-downloads`
+on macOS, with `--no-dev` additionally on Linux and Windows. The working directory
+is the configured source directory. The wrapper must execute the argv after `--`
+as an argument list, preserve its exit status, and return before application launch.
+The launcher stops on any nonzero wrapper exit and returns that status.
+
+On first launch, an absent or empty environment is initialized with
+`uv venv --no-python-downloads VENV_ROOT` from the source directory, honoring the
+same Python selection and `.python-version` as normal synchronization. This creates
+only the interpreter environment; the wrapper must use the standard library until
+it runs dependency synchronization. A nonempty environment missing its interpreter
+is preserved and rejected; repair that environment explicitly rather than expecting
+the launcher to clear it.
+
+The consuming project owns the wrapper's guard, any explicitly enrolled restore
+steps, and their failure policy. A project not enrolled in those steps should still
+run the original uv argv. The shared launchers do not select or install project SDKs.
