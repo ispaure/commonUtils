@@ -1,6 +1,6 @@
 """Give every Qt test ownership of its windows and background workers."""
 
-from time import monotonic, sleep
+from time import monotonic
 from tempfile import TemporaryDirectory
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Lock
@@ -9,9 +9,11 @@ import unittest
 import os
 import sys
 import gc
+import traceback
 from pathlib import Path
 
 from commonUtils.ui import pyside as qt
+from PySide6.QtTest import QTest
 from shiboken6 import isValid
 
 
@@ -94,12 +96,38 @@ class QtTestCase(unittest.TestCase):
                 app.processEvents()
                 if drain_deferred:
                     app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+            check_callbacks = getattr(self, '_check_callback_errors', None)
+            if check_callbacks is not None and not getattr(self, '_releasing_windows', False):
+                check_callbacks()
             if condition():
                 return
             self.assertLess(monotonic(), deadline, message() if callable(message) else message)
-            sleep(.005)
+            # Native browser/decoder callbacks need a real Qt event-loop turn,
+            # not just processEvents followed by a blocked GUI thread.
+            try:
+                QTest.qWait(5)
+            except Exception:
+                # PySide can propagate a callback failure out of qWait rather
+                # than send it to sys.excepthook. Queue it through the same
+                # path so shutdown still retires the remaining resources.
+                record = getattr(self, '_record_callback_error', None)
+                if record is None:
+                    raise
+                record(*sys.exc_info())
 
     def run(self, result=None):
+        callback_errors = []
+        def callback_failed(kind, value, trace):
+            callback_errors.append(''.join(traceback.format_exception(kind, value, trace)))
+        def check_callbacks():
+            errors = callback_errors[:]
+            callback_errors.clear()
+            self.assertFalse(errors, 'Unhandled Qt callback exception(s):\n' + '\n'.join(errors))
+        # Register first so this assertion runs after widget/worker cleanup too.
+        self.addCleanup(check_callbacks)
+        self.enterContext(patch.object(self, '_record_callback_error', callback_failed, create=True))
+        self.enterContext(patch.object(self, '_check_callback_errors', check_callbacks, create=True))
+        self.enterContext(patch.object(sys, 'excepthook', callback_failed))
         app = qt.QApplication.instance()
         if app is None:
             app = QtTestCase._test_app = qt.QApplication([])
@@ -120,6 +148,12 @@ class QtTestCase(unittest.TestCase):
         return super().run(result)
 
     def _release_windows(self, existing):
+        # Report callback errors after retirement; they must not interrupt the
+        # cleanup of other widgets or leave worker-owned files open.
+        with patch.object(self, '_releasing_windows', True, create=True):
+            self._release_window_resources(existing)
+
+    def _release_window_resources(self, existing):
         app = qt.QApplication.instance()
         if app is None:
             return

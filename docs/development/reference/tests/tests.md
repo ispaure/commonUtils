@@ -19,6 +19,17 @@ literals cannot declare stages and duplicate declarations remain errors.
 The offscreen Qt fixture uses Helvetica on macOS to avoid missing `Sans Serif`
 alias lookup; Windows retains its explicit system-font fixtures.
 
+`QtTestCase` gives native browser and decoder callbacks event-loop turns while
+waiting. Unhandled Python exceptions from Qt callbacks fail the owning case,
+including exceptions during cleanup; the fixture restores the prior exception
+hook afterward. Normal waits report such exceptions immediately instead of consuming
+their timeout. Retirement defers callback reporting until widgets and workers have
+been released, including callback failures propagated directly out of Qt's wait API.
+`tests/tooling/test_qt_test_case.py` checks this behavior with real timer callbacks.
+Shared resource-picker navigation and text-editor publication/conflict coverage
+lives in `tests/resources/test_resource_editor_ui.py`; consumer launchers and
+document workflows remain in their application's suite.
+
 ## Native filesystem notifications
 
 Qt browser/watcher tests need access to the operating system's filesystem
