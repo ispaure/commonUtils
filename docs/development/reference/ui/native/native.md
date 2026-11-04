@@ -103,6 +103,9 @@ the controller owns authorization and the actual mutation. Ordinary lists retain
 their existing row layout. UIKit uses reusable native disclosure buttons, label
 indentation/attributed landing titles, and application-local drag/drop delegates.
 The native adapter owns cell reuse; the controller owns file identity and policy.
+Python-backed Objective-C cell fields are assigned Python `None` before native
+initialization, and drag/drop delegates receive their identity before attachment.
+Zeroed UIKit ivars are NULL pointers, which Rubicon cannot unbox as Python objects.
 
 
 ## Configurable navigation

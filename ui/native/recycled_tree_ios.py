@@ -14,6 +14,14 @@ def current(owner, row):
     return (interface, actions) if actions is not None and actions.current(row) else None
 
 
+def _new_delegate(kind, interface, row, *, cell=None):
+    delegate = kind.alloc()
+    delegate.owner, delegate.row = weakref.ref(interface), row
+    if cell is not None:
+        delegate.cell = cell
+    return delegate.init()
+
+
 class TreeDisclosure(ObjCClass('UIButton')):
     owner = objc_property(object)
     row = objc_property(object)
@@ -126,7 +134,9 @@ def bind(interface, cell, row):
     cell.indentationLevel = 0
     expanded = getattr(row, 'tree_expanded', None)
     if expanded is not None and cell.tree_disclosure is None:
-        button = TreeDisclosure.alloc().initWithFrame(CGRect((0, 0), (44, interface.appearance.row_height)))
+        button = TreeDisclosure.alloc()
+        button.owner, button.row = weakref.ref(interface), row
+        button = button.initWithFrame(CGRect((0, 0), (44, interface.appearance.row_height)))
         button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(22)
         button.addTarget(button, action=SEL('toggle:'), forControlEvents=1 << 6)
         cell.contentView.addSubview(button)
@@ -161,13 +171,13 @@ def bind(interface, cell, row):
     cell.imageView.image = image._impl.native if image is not None else None
     cell.imageView.userInteractionEnabled = True
     if cell.tree_drag is None:
-        delegate = TreeDrag.alloc().init()
+        delegate = _new_delegate(TreeDrag, interface, row)
         interaction = ObjCClass('UIDragInteraction').alloc().initWithDelegate(delegate)
         interaction.enabled = True
         cell.imageView.addInteraction(interaction)
         cell.tree_drag = (interaction, delegate)
     if cell.tree_drop is None:
-        delegate = TreeDrop.alloc().init()
+        delegate = _new_delegate(TreeDrop, interface, row, cell=cell)
         interaction = ObjCClass('UIDropInteraction').alloc().initWithDelegate(delegate)
         cell.addInteraction(interaction)
         cell.tree_drop = (interaction, delegate)
