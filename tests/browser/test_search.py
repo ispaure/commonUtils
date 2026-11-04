@@ -9,6 +9,7 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
+from commonUtils.search.files import search_files
 from commonUtils.search.text import contains_text, literal_pattern
 
 
@@ -49,3 +50,37 @@ assert not any(name.startswith(('PySide6.QtWidgets', 'commonUtils.ui')) for name
             self.assertEqual(path.read_text(), 'disk content')
             self.assertFalse(search_files([root], [], 'disk', max_file_size=2).hits)
             self.assertFalse(search_files([root], [], 'draft', buffers={path: 'long draft'}, max_file_size=2).hits)
+
+
+class SearchFilesTests(unittest.TestCase):
+    def test_masks_case_words_regex_exclusions_unicode_and_live_buffers(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            py, txt = root / 'code.py', root / 'notes.txt'
+            py.write_text('😀 target target_other\nTARGET\n')
+            txt.write_text('target\n')
+            (root / 'binary.py').write_bytes(b'target\x00')
+            (root / 'ignored').mkdir()
+            (root / 'ignored' / 'skip.py').write_text('target\n')
+            result = search_files([root], ['ignored'], 'target', '*.py', whole=True)
+            self.assertEqual(len(result.hits), 2)
+            self.assertEqual(result.files, 1)
+            self.assertEqual((result.hits[0].line, result.hits[0].column, result.hits[0].start), (1, 2, 3))
+            self.assertEqual(len(search_files([root], ['ignored'], 'target', '*.py', case=True, whole=True).hits), 1)
+            self.assertEqual(len(search_files([root], ['ignored'], r'targ\w+', '*.py', regex=True).hits), 3)
+            result = search_files([root], [], 'live', '*.txt', buffers={txt: 'unsaved live\n'})
+            self.assertEqual(result.hits[0].path, txt)
+            self.assertEqual(result.hits[0].column, 8)
+            self.assertEqual(txt.read_text(), 'target\n')
+            with self.assertRaises(ValueError):
+                search_files([root], [], '(', regex=True)
+            self.assertFalse(search_files([root], [], 'target', cancelled=lambda: True).hits)
+            self.assertTrue(search_files([root], [], 'target', limit=1).limited)
+
+    def test_excluded_directory_prefix_also_excludes_unsaved_buffers(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = root / 'src' / 'generated' / 'nested' / 'new.py'
+            result = search_files([root], ['src/generated'], 'target',
+                                  buffers={path: 'target'})
+            self.assertFalse(result.hits)
