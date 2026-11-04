@@ -40,6 +40,23 @@ class CommandCaptureTests(unittest.TestCase):
         with self.assertRaises(OperationCancelled):
             self.command(source, cancelled=lambda: True)
 
+    def test_completed_child_survives_a_late_supervisor_poll(self):
+        from commonUtils.integrations.wrappers.cmdShellWrapper import capture
+        enter = capture.ProcessSupervisor.__enter__
+        def completed_before_poll(supervisor):
+            result = enter(supervisor)
+            supervisor.child.wait(timeout=10)
+            return result
+        # Model a descheduled parent resuming after its budget, after the child
+        # already exited. Keep real output capture and process cleanup.
+        with patch.object(capture.ProcessSupervisor, '__enter__', completed_before_poll), \
+                patch.object(capture, 'monotonic', side_effect=[0, 4]):
+            result = self.command("import sys; sys.stdout.buffer.write(b'complete'); sys.stderr.write('diagnostic'); sys.exit(7)",
+                                  timeout=3)
+        self.assertEqual(result.returncode, 7)
+        self.assertEqual(result.stdout, b'complete')
+        self.assertEqual(result.stderr, b'diagnostic')
+
     def test_input_is_binary_and_environment_is_explicit(self):
         result = self.command('import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())', input_data=b'\0payload')
         self.assertEqual(result.stdout, b'\0payload')

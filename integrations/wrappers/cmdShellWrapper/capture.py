@@ -94,7 +94,11 @@ def run_captured(
                 if write_errors:
                     raise write_errors[0]
                 if timeout and monotonic() - started > timeout:
-                    raise CommandTimeout("Command timed out.")
+                    # A descheduled supervisor can resume after a short command
+                    # has already exited. Do not discard its completed output.
+                    # An inherited stdin pipe can still leave a writer blocked.
+                    if process.poll() is None or writer is not None and writer.is_alive():
+                        raise CommandTimeout("Command timed out.")
                 try:
                     code = process.wait(timeout=0.05)
                 except subprocess.TimeoutExpired:
