@@ -69,6 +69,23 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         self.assertEqual(self.cell.textLabel.textColor, 'text')
         self.assertEqual(self.cell.textLabel.highlightedTextColor, 'text')
 
+    def test_tree_selection_rejects_retired_cell_before_dispatch(self):
+        self.interface.tree_actions = object()
+        self.interface.on_select = Mock()
+        self.cell.tree_owner, self.cell.tree_row = lambda: self.interface, self.row
+        self.table.cellForRowAtIndexPath.return_value = self.cell
+        check = Mock(return_value=None)
+        with patch.dict('sys.modules', {'commonUtils.ui.native.recycled_tree_ios':
+                                        SimpleNamespace(current=check)}):
+            self.controller.tableView_didSelectRowAtIndexPath_(self.table, self.index)
+            self.interface.on_select.assert_not_called()
+            check.return_value = (self.interface, self.interface.tree_actions)
+            self.controller.tableView_didSelectRowAtIndexPath_(self.table, self.index)
+            self.interface.on_select.assert_called_once_with()
+            self.table.cellForRowAtIndexPath.return_value = None
+            self.controller.tableView_didSelectRowAtIndexPath_(self.table, self.index)
+            self.interface.on_select.assert_called_once()
+
     def test_rows_without_icons_clear_recycled_images_without_reserving_an_extra_icon_slot(self):
         self.row.icon = None
         self.interface.appearance.icon_size = 32
