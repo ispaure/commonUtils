@@ -99,6 +99,8 @@ call :ReadLaunchConfig launch_file LAUNCH_FILE_VALUE
 if errorlevel 1 goto :ConfigReadFailed
 call :ReadLaunchConfig ensure_user_dir ENSURE_USER_DIR
 if errorlevel 1 goto :ConfigReadFailed
+call :ReadLaunchConfig environment_sync_wrapper ENVIRONMENT_SYNC_WRAPPER_VALUE
+if errorlevel 1 goto :ConfigReadFailed
 
 if not defined SOURCE_DIR_VALUE (
     echo ERROR: source_dir is missing or empty in [Launch] in:
@@ -132,6 +134,9 @@ if /I "%LAUNCH_FILE_VALUE:~-3%"==".py" (
 for %%I in ("%PROJECT_ROOT%\%SOURCE_DIR_VALUE%") do set "SOURCE_DIR=%%~fI"
 set "VENV_DIR=%PROJECT_ROOT%\.venv"
 set "LAUNCH_PATH=%SOURCE_DIR%\%LAUNCH_FILE_VALUE%.py"
+
+call :ValidateEnvironmentSyncWrapper
+if errorlevel 1 exit /b 1
 
 if not exist "%SOURCE_DIR%\." (
     echo ERROR: Configured source_dir does not exist or is not a directory:
@@ -200,7 +205,7 @@ if not exist "%SOURCE_DIR%\uv.lock" (
 )
 
 echo Synchronizing the project environment from uv.lock...
-"%UV_EXE%" sync --locked --no-dev --no-python-downloads
+call :SyncEnvironment
 set "SYNC_STATUS=%ERRORLEVEL%"
 if not "%SYNC_STATUS%"=="0" (
     popd
@@ -238,6 +243,35 @@ exit /b %LAUNCH_STATUS%
 :ConfigReadFailed
 call :Pause
 exit /b 1
+
+rem Wrapper values stay in environment variables: CALL never reparses paths
+rem or argv containing percent signs, ampersands or other shell metacharacters.
+:ValidateEnvironmentSyncWrapper
+set "ENVIRONMENT_SYNC_WRAPPER="
+if not defined ENVIRONMENT_SYNC_WRAPPER_VALUE exit /b 0
+set "ENVIRONMENT_SYNC_WRAPPER=%PROJECT_ROOT%\%ENVIRONMENT_SYNC_WRAPPER_VALUE:/=\%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$value=$env:ENVIRONMENT_SYNC_WRAPPER_VALUE; if ([IO.Path]::IsPathRooted($value) -or (($value -split '[\\/]') -contains '..')) { Write-Error 'environment_sync_wrapper must be project-relative without parent traversal.'; exit 1 }; if (-not (Test-Path -LiteralPath $env:ENVIRONMENT_SYNC_WRAPPER -PathType Leaf)) { Write-Error 'Environment sync wrapper is missing.'; exit 1 }; try { $stream=[IO.File]::OpenRead($env:ENVIRONMENT_SYNC_WRAPPER); $stream.Dispose() } catch { Write-Error 'Environment sync wrapper is not readable.'; exit 1 }"
+exit /b %ERRORLEVEL%
+
+:SyncEnvironment
+if defined ENVIRONMENT_SYNC_WRAPPER goto SyncEnvironmentWithWrapper
+"%UV_EXE%" sync --locked --no-dev --no-python-downloads
+exit /b %ERRORLEVEL%
+
+:SyncEnvironmentWithWrapper
+set "ENVIRONMENT_SYNC_PYTHON=%VENV_DIR%\Scripts\python.exe"
+if exist "%ENVIRONMENT_SYNC_PYTHON%" goto RunEnvironmentSyncWrapper
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path -LiteralPath $env:VENV_DIR) { if (@(Get-ChildItem -LiteralPath $env:VENV_DIR -Force).Count -ne 0) { Write-Error 'Environment sync wrapper requires a usable .venv Python; the nonempty environment was preserved.'; exit 1 } }"
+if errorlevel 1 exit /b 1
+"%UV_EXE%" venv --no-python-downloads "%VENV_DIR%"
+if errorlevel 1 exit /b %ERRORLEVEL%
+if not exist "%ENVIRONMENT_SYNC_PYTHON%" (
+    echo ERROR: Environment sync wrapper Python is missing.
+    exit /b 1
+)
+:RunEnvironmentSyncWrapper
+"%ENVIRONMENT_SYNC_PYTHON%" "%ENVIRONMENT_SYNC_WRAPPER%" sync --project-root "%PROJECT_ROOT%" --venv "%VENV_DIR%" -- "%UV_EXE%" sync --locked --no-dev --no-python-downloads
+exit /b %ERRORLEVEL%
 
 :GenerateInitialLockfile
 echo uv.lock was not found. Generating the initial lockfile...

@@ -264,9 +264,11 @@ require_command tr
 SOURCE_DIR_VALUE=""
 LAUNCH_FILE_VALUE=""
 ENSURE_USER_DIR=""
+ENVIRONMENT_SYNC_WRAPPER_VALUE=""
 read_launch_value source_dir SOURCE_DIR_VALUE
 read_launch_value launch_file LAUNCH_FILE_VALUE
 read_launch_value ensure_user_dir ENSURE_USER_DIR
+read_launch_value environment_sync_wrapper ENVIRONMENT_SYNC_WRAPPER_VALUE
 
 [[ -n "$SOURCE_DIR_VALUE" ]] || fail "source_dir is missing or empty in [Launch] in $CONFIG_FILE."
 [[ -n "$LAUNCH_FILE_VALUE" ]] || fail "launch_file is missing or empty in [Launch] in $CONFIG_FILE."
@@ -284,6 +286,16 @@ esac
 SOURCE_DIR="$(resolve_from_project_root "$SOURCE_DIR_VALUE")"
 VENV_DIR="$PROJECT_ROOT/.venv"
 LAUNCH_PATH="$SOURCE_DIR/$LAUNCH_FILE_VALUE.py"
+
+ENVIRONMENT_SYNC_WRAPPER=""
+if [[ -n "$ENVIRONMENT_SYNC_WRAPPER_VALUE" ]]; then
+    [[ "$ENVIRONMENT_SYNC_WRAPPER_VALUE" != /* ]] || fail "environment_sync_wrapper must be relative to the project root."
+    case "/$ENVIRONMENT_SYNC_WRAPPER_VALUE/" in
+        */../*) fail "environment_sync_wrapper may not contain '..'." ;;
+    esac
+    ENVIRONMENT_SYNC_WRAPPER="$(resolve_from_project_root "$ENVIRONMENT_SYNC_WRAPPER_VALUE")"
+    check_regular_readable_file "$ENVIRONMENT_SYNC_WRAPPER" "Environment sync wrapper"
+fi
 
 [[ -d "$SOURCE_DIR" ]] || fail "Configured source_dir does not exist: $SOURCE_DIR"
 [[ -r "$SOURCE_DIR" ]] || fail "Configured source_dir is not readable: $SOURCE_DIR"
@@ -346,7 +358,25 @@ if [[ ! -e "$SOURCE_DIR/uv.lock" ]]; then
 fi
 
 info "Synchronizing the project environment from uv.lock..."
-if ! uv sync --locked --no-python-downloads; then
+if [[ -n "$ENVIRONMENT_SYNC_WRAPPER" ]]; then
+    ENVIRONMENT_SYNC_PYTHON="$VENV_DIR/bin/python"
+    if [[ ! -f "$ENVIRONMENT_SYNC_PYTHON" || ! -x "$ENVIRONMENT_SYNC_PYTHON" ]]; then
+        # Bootstrap only an absent/empty environment. Preserve an invalid
+        # nonempty environment rather than clearing project-owned state.
+        for environment_entry in "$VENV_DIR"/* "$VENV_DIR"/.[!.]* "$VENV_DIR"/..?*; do
+            if [[ -e "$environment_entry" || -L "$environment_entry" ]]; then
+                fail "Environment sync wrapper requires a usable .venv Python; the nonempty environment was preserved."
+            fi
+        done
+        uv venv --no-python-downloads "$VENV_DIR"
+        bootstrap_status=$?
+        [[ $bootstrap_status -eq 0 ]] || fail "Could not bootstrap the environment sync wrapper's Python." "$bootstrap_status"
+    fi
+    [[ -f "$ENVIRONMENT_SYNC_PYTHON" && -x "$ENVIRONMENT_SYNC_PYTHON" ]] || fail "Environment sync wrapper Python is missing: $ENVIRONMENT_SYNC_PYTHON"
+    "$ENVIRONMENT_SYNC_PYTHON" "$ENVIRONMENT_SYNC_WRAPPER" sync --project-root "$PROJECT_ROOT" --venv "$VENV_DIR" -- "$(command -v uv)" sync --locked --no-python-downloads
+    sync_status=$?
+    [[ $sync_status -eq 0 ]] || fail "Environment sync wrapper failed with exit code $sync_status." "$sync_status"
+elif ! uv sync --locked --no-python-downloads; then
     fail "uv sync failed. pyproject.toml and uv.lock may be out of sync, a dependency may not support this macOS/Python/CPU architecture, the network may be unavailable, or the existing .venv may be invalid. See uv's error output above."
 fi
 
