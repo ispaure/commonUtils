@@ -209,6 +209,15 @@ def _bind_file_cell(interface, cell, index):
 
 class FileTableController(TogaTableViewController):
     @objc_method
+    def tableView_didSelectRowAtIndexPath_(self, tableView, indexPath):
+        if getattr(self.interface, 'tree_actions', None) is not None:
+            from .recycled_tree_ios import current
+            cell = tableView.cellForRowAtIndexPath(indexPath)
+            if cell is None or current(cell.tree_owner, cell.tree_row) is None:
+                return
+        self.interface.on_select()
+
+    @objc_method
     def gestureRecognizerShouldBegin_(self, gesture) -> bool:
         return (self.interface.enabled and self.impl.primary_action_enabled
                 and getattr(self.interface, 'menu_provider', None) is None)
@@ -335,7 +344,7 @@ class IOSFileList(DetailedList):
         # Cells from a hidden/detached tree may still be retained by UIKit.
         # Scrub every cell bound to the old tree before publishing its successor.
         cells = getattr(self, '_tree_cells', {})
-        for cell in cells.values():
+        for cell in list(cells.values()):
             from .recycled_tree_ios import clear
             cell.textLabel.text = cell.detailTextLabel.text = ''
             cell.imageView.image = None
