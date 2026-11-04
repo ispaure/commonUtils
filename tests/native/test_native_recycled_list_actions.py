@@ -59,12 +59,12 @@ class FileRowActionTests(unittest.TestCase):
         button.selectRow_(button)
         self.interface.on_primary_action.assert_called_once_with(row=self.row)
 
-    def test_compact_accessory_retains_48_point_hit_area(self):
+    def test_accessory_reserves_48_point_target_without_filename_overlap(self):
         button = self.cell.accessoryView
-        self.assertEqual(button.frame, ((0, 0), (28, 48)))
-        for x in (-20, 0, 14, 28):
+        self.assertEqual(button.frame, ((0, 0), (48, 48)))
+        for x in (0, 14, 28, 47, 48):
             self.assertTrue(button.pointInside_withEvent_(NS(x=x, y=24), None))
-        for x, y in ((-21, 24), (29, 24), (14, -1), (14, 49)):
+        for x, y in ((-1, 24), (49, 24), (14, -1), (14, 49)):
             self.assertFalse(button.pointInside_withEvent_(NS(x=x, y=y), None))
 
     def test_filename_reclaims_uikit_gutter_without_entering_visible_button(self):

@@ -76,11 +76,10 @@ def _bind_actions(interface, cell, row):
 
             @objc_method
             def pointInside_withEvent_(self, point: CGPoint, event: ObjCInstance) -> bool:
-                # Give the dots priority over the end of the filename, retaining
-                # a row-height-wide target without reserving that much text space.
+                # Keep the hit area inside the reserved accessory slot so it
+                # cannot overlap the filename or a neighboring row.
                 bounds = self.bounds
-                inset = max(0, float(bounds.size.height) - float(bounds.size.width))
-                return (-inset <= point.x <= float(bounds.size.width)
+                return (0 <= point.x <= float(bounds.size.width)
                         and 0 <= point.y <= float(bounds.size.height))
 
             @objc_method
@@ -94,7 +93,7 @@ def _bind_actions(interface, cell, row):
     button = cell.accessoryView
     if button is None:
         height = interface.appearance.row_height
-        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (min(28, height), height)))
+        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (height, height)))
         button.setTitle('⋯', forState=0)
         button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
         button.addTarget(button, action=SEL('selectRow:'), forControlEvents=1 << 6)

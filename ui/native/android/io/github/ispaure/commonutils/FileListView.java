@@ -277,7 +277,7 @@ public final class FileListView extends ListView {
         }
 
         @Override public boolean dispatchTouchEvent(MotionEvent event) {
-            // The expanded dots target wins over the end of the filename.
+            // The action owns a full row-height-wide slot, separate from the filename.
             if (contextActions && FileListView.this.isEnabled() && actionTouch != null
                     && actionTouch.onTouchEvent(event)) return true;
             return super.dispatchTouchEvent(event);
@@ -328,7 +328,7 @@ public final class FileListView extends ListView {
                 holder.actions.setMinimumWidth(0);
                 holder.actions.setFocusable(false);
                 holder.actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(Math.min(28, rowHeight)), -1));
+                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(rowHeight), -1));
                 row.action = holder.actions;
                 row.setTag(holder);
                 recycled = row;
