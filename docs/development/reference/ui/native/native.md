@@ -83,23 +83,26 @@ row gutter plus a 2 dp gap outside the rows before its separately reserved scrol
 renderer scale on Retina devices. Generic browsing composition and its lifecycle
 are described in the [native browser guide](../native_browser/native_browser.md).
 
-### Android tree rows
+### Mobile tree rows
 
-Android recycling can also present an indented tree without constructing Toga
+Android and UIKit recycling can present an indented tree without constructing Toga
 controls per item. Set `tree_actions` on the `RecycledList` to a controller with
 `toggle(row)`, `start_drag(row)`, `can_drop(row)`, `drop(row)`, `end_drag()` and an
-opaque `drag_token`. Boolean drag callbacks run synchronously; `toggle` owns any
+opaque `drag_token`. UIKit also calls `current(row)` to verify the consumer's
+active scope before native disclosure or drag/drop callbacks. Boolean drag callbacks run synchronously; `toggle` owns any
 async scheduling. Rows add `tree_depth`, `tree_expanded` (`None` hides disclosure,
 otherwise a boolean), and `tree_landing`. An optional `tree_landing_icon` supplies
 the folder-page glyph. Landing titles are underlined. Native cells own disclosure,
 actions, indentation and local icon drags; only visible cells are created.
 
-Callbacks reject replaced generations, disabled lists and source publication.
+Callbacks reject replaced generations/row identities, disabled lists and source publication.
 Replacing/clearing a source ends its drag and scrubs attached/recycled private
-labels, images and callbacks. Clip data contains only the host's opaque token;
+labels, images and callbacks. UIKit tracks bound cells so source retirement also
+scrubs cells retained by a hidden/detached table. Clip data contains only the host's opaque token;
 the controller owns authorization and the actual mutation. Ordinary lists retain
-their existing row layout. This optional tree presentation is Android-specific;
-consumers choose their existing presentation on other platforms.
+their existing row layout. UIKit uses reusable native disclosure buttons, label
+indentation/attributed landing titles, and application-local drag/drop delegates.
+The native adapter owns cell reuse; the controller owns file identity and policy.
 
 
 ## Configurable navigation
