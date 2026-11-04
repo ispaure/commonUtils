@@ -262,9 +262,16 @@ class NativeSpeech:
         setup. Treat Apple readiness like Android's existing asynchronous init;
         attach delegates and publish the result only on the app loop.
         """
-        self.ready, self.error = False, ''
+        self.ready, self.error, self._apple_expired = False, '', False
+        self._apple_deadline = self.loop.call_later(12, self._apple_initialization_expired)
         self._apple_initialization = self.loop.run_in_executor(None, self._apple_resources)
         self._apple_initialization.add_done_callback(self._apple_initialized)
+
+    def _apple_initialization_expired(self):
+        self._apple_deadline = None
+        if not self.closed:
+            self._apple_expired = True
+            self.error = 'Speech engine did not start. Check system speech settings and refresh voices.'
 
     @staticmethod
     def _apple_resources():
@@ -289,13 +296,17 @@ class NativeSpeech:
             raise
 
     def _apple_initialized(self, future):
+        deadline = getattr(self, '_apple_deadline', None)
+        if deadline is not None:
+            deadline.cancel()
+            self._apple_deadline = None
         try:
             native, voices, default = future.result()
         except Exception:
-            if not self.closed:
+            if not self.closed and not self._apple_expired:
                 self.error = 'Speech engine unavailable. Install an offline system voice.'
             return
-        if self.closed:
+        if self.closed or self._apple_expired:
             # A discovery timeout/close must not revive the engine or retain a
             # late synthesizer. Never cancel an executor future and lose its result.
             native.delegate = None
@@ -364,6 +375,10 @@ class NativeSpeech:
     def close(self):
         if not self.closed:
             self.closed = True
+            deadline = getattr(self, '_apple_deadline', None)
+            if deadline is not None:
+                deadline.cancel()
+                self._apple_deadline = None
             self.ready = False
             self.voices = {}
             # Retire presentation owners even if a native shutdown raises.

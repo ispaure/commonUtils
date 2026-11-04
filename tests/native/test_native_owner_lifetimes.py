@@ -201,8 +201,8 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
 
     def test_apple_initialization_is_async_and_late_close_releases_synthesizer(self):
         from threading import Event
-        for close_early in (False, True):
-            with self.subTest(close_early=close_early):
+        for disposition in ('ready', 'closed', 'expired'):
+            with self.subTest(disposition=disposition):
                 loop = asyncio.new_event_loop()
                 entered, release = Event(), Event()
                 native, voice, delegate_type = Mock(), object(), Mock()
@@ -219,12 +219,15 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
                         engine.apple()
                         self.assertFalse(engine.ready)
                         loop.run_until_complete(asyncio.to_thread(entered.wait, 2))
-                        if close_early:
+                        if disposition == 'closed':
                             engine.close()
+                        elif disposition == 'expired':
+                            engine._apple_initialization_expired()
+                            self.assertIn('did not start', engine.error)
                         release.set()
                         loop.run_until_complete(engine._apple_initialization)
                         loop.run_until_complete(asyncio.sleep(0))
-                        if close_early:
+                        if disposition != 'ready':
                             self.assertFalse(engine.ready)
                             self.assertFalse(engine.voices)
                             self.assertIsNone(native.delegate)
