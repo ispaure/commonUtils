@@ -1,6 +1,6 @@
 """Give every Qt test ownership of its windows and background workers."""
 
-from time import monotonic
+from time import monotonic, sleep
 from tempfile import TemporaryDirectory
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Lock
@@ -117,6 +117,9 @@ class QtTestCase(unittest.TestCase):
             # Native browser/decoder callbacks need a real Qt event-loop turn,
             # not just processEvents followed by a blocked GUI thread.
             self._dispatch_qt(QTest.qWait, 5)
+            # Some bindings keep the GIL throughout native event waits. Give
+            # Python workers a turn too, including during cooperative shutdown.
+            sleep(.001)
 
     def run(self, result=None):
         callback_errors = []
