@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 import gc
+import sys
 from weakref import finalize
 
 from shiboken6 import isValid
@@ -118,6 +119,56 @@ class QtFixtureTests(unittest.TestCase):
             case.wait_until(lambda: False, timeout=.01, message='specific operation stalled')
         with self.assertRaises(ValueError):
             case.wait_until(lambda: True, timeout=0)
+
+    def test_callback_exceptions_fail_the_case_in_body_and_cleanup_and_restore_hook(self):
+        original = sys.excepthook
+        for during_cleanup in (False, True):
+            with self.subTest(during_cleanup=during_cleanup):
+                class Probe(QtTestCase):
+                    def runTest(self):
+                        def exercise():
+                            called = []
+                            def broken_callback():
+                                called.append(True)
+                                raise RuntimeError('callback sentinel')
+                            qt.QTimer.singleShot(0, broken_callback)
+                            self.wait_until(lambda: called)
+                        if during_cleanup:
+                            self.addCleanup(exercise)
+                        else:
+                            exercise()
+                result = unittest.TestResult()
+                Probe().run(result)
+                self.assertEqual(len(result.failures), 1, result.errors)
+                self.assertIn('Unhandled Qt callback exception', result.failures[0][1])
+                self.assertIn('callback sentinel', result.failures[0][1])
+                self.assertEqual(result.errors, [])
+                self.assertIs(sys.excepthook, original)
+
+    def test_callback_failure_during_retirement_does_not_abandon_the_window(self):
+        class Window(qt.QWidget):
+            ready = False
+
+            def prepare_close(self):
+                if not self.ready:
+                    self.ready = True
+                    def broken_callback():
+                        raise RuntimeError('retirement callback sentinel')
+                    qt.QTimer.singleShot(0, broken_callback)
+                    return False
+                return True
+
+        class Probe(QtTestCase):
+            def runTest(self):
+                self.window = Window()
+
+        probe = Probe()
+        result = unittest.TestResult()
+        probe.run(result)
+        self.assertEqual(len(result.failures), 1, result.errors)
+        self.assertIn('retirement callback sentinel', result.failures[0][1])
+        self.assertEqual(result.errors, [])
+        self.assertFalse(isValid(probe.window))
 
     def test_close_event_can_initiate_thread_shutdown(self):
         class Window(qt.QWidget):
