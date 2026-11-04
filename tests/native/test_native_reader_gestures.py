@@ -3,12 +3,27 @@
 from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
+import importlib.util
+from pathlib import Path
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from commonUtils.ui.native.chrome import NavigationChrome
+
+
+def image_canvas_fixture():
+    """Load production methods without requiring Toga in the desktop suite."""
+    source = Path(__file__).resolve().parents[2] / 'ui/native/image_canvas.py'
+    spec = importlib.util.spec_from_file_location('commonUtils.ui.native._reader_gesture_fixture', source)
+    module = importlib.util.module_from_spec(spec)
+    toga = ModuleType('toga')
+    toga.ImageView = object
+    # Keep the fake and this module out of the canonical native module cache.
+    with patch.dict(sys.modules, {'toga': toga}):
+        spec.loader.exec_module(module)
+    return module
 
 
 class Gesture:
@@ -34,7 +49,7 @@ class Navigation:
 
 class NativeReaderGestureTests(unittest.TestCase):
     def test_apple_target_normalizes_real_location_and_preserves_programmatic_toggle(self):
-        from commonUtils.ui.native import image_canvas
+        image_canvas = image_canvas_fixture()
         from unittest.mock import Mock
         class NativeBase:
             def __init_subclass__(cls, **kwargs):
@@ -56,7 +71,7 @@ class NativeReaderGestureTests(unittest.TestCase):
         interface.toggle_controls.assert_called_once_with()
 
     def test_image_tap_coordinates_consumption_and_letterbox_fallback(self):
-        from commonUtils.ui.native.image_canvas import ImageCanvas
+        ImageCanvas = image_canvas_fixture().ImageCanvas
         from unittest.mock import Mock
         toggle, tap = Mock(), Mock(return_value=True)
         image = SimpleNamespace(image=object(), on_tap=tap, toggle_controls=toggle)
