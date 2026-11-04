@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -188,6 +189,33 @@ class UnixEnvironmentSyncTests(unittest.TestCase):
         raw = (LAUNCHERS / 'LaunchPythonProject_WIN.bat').read_bytes()
         self.assertIn(b'\r\n', raw)
         self.assertNotIn(b'\n', raw.replace(b'\r\n', b''))
+
+
+class WindowsLauncherDiagnosticSourceTests(unittest.TestCase):
+    def test_path_diagnostics_do_not_turn_literal_paths_into_cmd_syntax(self):
+        # This source guard checks CMD metacharacter exposure, not native CMD
+        # execution. The Windows integration below remains the acceptance test.
+        source = (LAUNCHERS / 'LaunchPythonProject_WIN.bat').read_text()
+        path_variables = {'PROJECT_ROOT', 'CONFIG_FILE', 'SOURCE_DIR', 'VENV_DIR',
+                          'LAUNCH_PATH', 'CHECK_PATH', 'CHECK_FILE', 'UV_EXE',
+                          'UV_INSTALL_DIR', 'UV_INSTALLER_FILE', 'ENSURE_USER_PATH',
+                          'ENSURE_USER_DIR', 'LAUNCH_FILE_VALUE'}
+        variable = re.compile(r'%([A-Z_]+)(?::[^%]*)?%')
+        diagnostics = [line.strip() for line in source.splitlines()
+                       if line.lstrip().lower().startswith('echo ')
+                       and any(match[1] in path_variables for match in variable.finditer(line))]
+        self.assertTrue(diagnostics)
+        self.assertTrue(any('%PROJECT_ROOT%' in line for line in diagnostics))
+        literal_path = r'C:\launcher café & (literal)! %literal%'
+        for line in diagnostics:
+            with self.subTest(diagnostic=line):
+                expanded = variable.sub(lambda match: literal_path if match[1] in path_variables
+                                        else 'fixed-label', line)
+                # Quoted spans and caret-escaped characters are literal in CMD.
+                # Any remaining grouping, command or redirection token is unsafe
+                # when CMD parses the entire parenthesized diagnostic block.
+                unquoted = re.sub(r'"[^"\r\n]*"|\^.', '', expanded)
+                self.assertNotRegex(unquoted, r'[&|<>()"]')
 
 
 @unittest.skipUnless(os.name == 'nt' and shutil.which('uv.exe'), 'Native Windows and an existing uv.exe are required')
