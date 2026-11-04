@@ -172,3 +172,9 @@ Process creation raises `CommandStartError`, elapsed deadlines raise
 common authorization/password/token assignments in complete diagnostic text. It is
 best effort, cannot recognize every secret, and cannot safely redact credentials
 split across arbitrary streaming chunks. Discard output for sensitive commands.
+
+A delayed supervisor poll accepts an already-exited child's output even when the
+elapsed command deadline has passed. A still-running child or an unfinished stdin
+writer remains subject to that deadline; process-tree cleanup and cancellation
+retain their existing behavior. `test_command_capture.py` covers delayed polling,
+running-child timeouts and inherited stdin handles.
