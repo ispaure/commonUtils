@@ -170,6 +170,34 @@ class QtFixtureTests(unittest.TestCase):
         self.assertEqual(result.errors, [])
         self.assertFalse(isValid(probe.window))
 
+    def test_direct_event_dispatch_failures_still_retire_windows(self):
+        for method in ('processEvents', 'sendPostedEvents'):
+            with self.subTest(method=method):
+                class Probe(QtTestCase):
+                    def runTest(self):
+                        self.window = qt.QWidget()
+                probe = Probe()
+                original = getattr(qt.QApplication, method)
+                failed = []
+                def dispatch(*args):
+                    if getattr(probe, '_releasing_windows', False) and not failed:
+                        failed.append(True)
+                        raise RuntimeError('direct dispatch sentinel')
+                    return original(*args)
+                result = unittest.TestResult()
+                try:
+                    with patch.object(qt.QApplication, method, side_effect=dispatch):
+                        probe.run(result)
+                    self.assertEqual(result.errors, [])
+                    self.assertEqual(len(result.failures), 1)
+                    self.assertIn('direct dispatch sentinel', result.failures[0][1])
+                    self.assertFalse(isValid(probe.window))
+                finally:
+                    if isValid(probe.window):
+                        probe.window.close()
+                        probe.window.deleteLater()
+                        self.app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+
     def test_close_event_can_initiate_thread_shutdown(self):
         class Window(qt.QWidget):
             def __init__(self):

@@ -75,6 +75,18 @@ class _QtTemporaryDirectory(TemporaryDirectory):
 
 
 class QtTestCase(unittest.TestCase):
+    def _dispatch_qt(self, callback, *args):
+        try:
+            return callback(*args)
+        except Exception:
+            # PySide may propagate a native callback failure directly rather
+            # than send it to sys.excepthook. Keep both paths under the same
+            # case ownership and finish retirement before reporting failures.
+            record = getattr(self, '_record_callback_error', None)
+            if record is None:
+                raise
+            record(*sys.exc_info())
+
     def temporary_directory(self, **kwargs):
         """TemporaryDirectory-compatible scope, also safe for addCleanup fixtures.
 
@@ -93,9 +105,9 @@ class QtTestCase(unittest.TestCase):
         app = qt.QApplication.instance()
         while True:
             if app:
-                app.processEvents()
+                self._dispatch_qt(app.processEvents)
                 if drain_deferred:
-                    app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
+                    self._dispatch_qt(app.sendPostedEvents, None, qt.QEvent.Type.DeferredDelete)
             check_callbacks = getattr(self, '_check_callback_errors', None)
             if check_callbacks is not None and not getattr(self, '_releasing_windows', False):
                 check_callbacks()
@@ -104,16 +116,7 @@ class QtTestCase(unittest.TestCase):
             self.assertLess(monotonic(), deadline, message() if callable(message) else message)
             # Native browser/decoder callbacks need a real Qt event-loop turn,
             # not just processEvents followed by a blocked GUI thread.
-            try:
-                QTest.qWait(5)
-            except Exception:
-                # PySide can propagate a callback failure out of qWait rather
-                # than send it to sys.excepthook. Queue it through the same
-                # path so shutdown still retires the remaining resources.
-                record = getattr(self, '_record_callback_error', None)
-                if record is None:
-                    raise
-                record(*sys.exc_info())
+            self._dispatch_qt(QTest.qWait, 5)
 
     def run(self, result=None):
         callback_errors = []
@@ -208,8 +211,8 @@ class QtTestCase(unittest.TestCase):
             if isValid(window):
                 capture_futures(window)
                 window.deleteLater()
-        app.sendPostedEvents(None, qt.QEvent.Type.DeferredDelete)
-        app.processEvents()
+        self._dispatch_qt(app.sendPostedEvents, None, qt.QEvent.Type.DeferredDelete)
+        self._dispatch_qt(app.processEvents)
         self.wait_until(lambda: all(future.done() for future in futures),
                         message='Executor tasks did not finish after Qt owner destruction')
         # Signal/callback cycles can retain wrappers after their C++ widgets die.
