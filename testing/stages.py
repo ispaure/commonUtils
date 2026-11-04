@@ -69,8 +69,12 @@ def classify(path):
 
     if path.suffix == '.py':
         tree = ast.parse(source, filename=str(path))
-        comments = '\n'.join(t.string for t in tokenize.generate_tokens(io.StringIO(source).readline)
-                             if t.type == tokenize.COMMENT and t.start[1] == 0)
+        # Most Python tests declare the stage in code. Tokenize only possible
+        # comment declarations; still reject duplicates and ignore string literals.
+        comments = ''
+        if re.search(r'^#\s*TEST_STAGE\s*=', source, re.M):
+            comments = '\n'.join(t.string for t in tokenize.generate_tokens(io.StringIO(source).readline)
+                                 if t.type == tokenize.COMMENT and t.start[1] == 0)
     else:
         comments = source
     declarations = re.findall(r'^(?:#|//)\s*TEST_STAGE\s*=\s*TestStage\.(\w+)\s*$', comments, re.M)

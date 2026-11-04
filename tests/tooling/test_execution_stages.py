@@ -72,3 +72,10 @@ class Derived(Base): pass
             for name, marker in [('test.py', '#'), ('sample_test.go', '//'), ('SampleTests.swift', '//')]:
                 result = classify(self.source(root, marker + ' TEST_STAGE = TestStage.SMOKE\n', name))
                 self.assertIs(result.default, TestStage.SMOKE)
+
+    def test_comment_fast_path_preserves_duplicate_and_string_literal_handling(self):
+        with TemporaryDirectory() as root:
+            with self.assertRaisesRegex(ValueError, 'exactly one'):
+                classify(self.source(root, 'TEST_STAGE = TestStage.SMOKE\n# TEST_STAGE = TestStage.SMOKE\n'))
+            result = classify(self.source(root, 'TEST_STAGE = TestStage.SMOKE\n"""\n# TEST_STAGE = TestStage.EXTENDED\n"""\n'))
+            self.assertIs(result.default, TestStage.SMOKE)
