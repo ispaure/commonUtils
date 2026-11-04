@@ -47,12 +47,22 @@ def _layout_action_labels(cell):
 def _new_file_cell():
     global _file_cell_type
     if _file_cell_type is None:
-        from rubicon.objc import send_super
+        from rubicon.objc import send_super, objc_property
         class CommonUtilsFileCell(UITableViewCell):
+            tree_owner = objc_property(object)
+            tree_row = objc_property(object)
+            tree_disclosure = objc_property(object)
+            tree_drag = objc_property(object)
+            tree_drop = objc_property(object)
+            tree_icon_tap = objc_property(object)
+
             @objc_method
             def layoutSubviews(self) -> None:
                 send_super(__class__, self, 'layoutSubviews')
                 _layout_action_labels(self)
+                if self.tree_owner is not None:
+                    from .recycled_tree_ios import layout
+                    layout(self)
         _file_cell_type = CommonUtilsFileCell
     return _file_cell_type.alloc().initWithStyle(
         UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
@@ -191,6 +201,10 @@ def _bind_file_cell(interface, cell, index):
     interface.row_visible(index)
     # A cached visible-row callback may have supplied its image synchronously.
     cell.imageView.image = row.icon._impl.native if row.icon is not None else None
+    if getattr(interface, 'tree_actions', None) is not None:
+        from .recycled_tree_ios import bind
+        interface._impl._tree_cells[cell.ptr.value] = cell
+        bind(interface, cell, row)
 
 
 class FileTableController(TogaTableViewController):
@@ -223,6 +237,9 @@ class FileTableController(TogaTableViewController):
         cell.imageView.image = None
         cell.accessibilityLabel = ''
         _clear_actions(cell)
+        if getattr(cell, 'tree_owner', None) is not None:
+            from .recycled_tree_ios import clear
+            clear(cell)
 
     @objc_method
     def tableView_willDisplayCell_forRowAtIndexPath_(self, tableView, cell, indexPath):
@@ -289,6 +306,7 @@ class IOSFileList(DetailedList):
         self.native_controller = FileTableController.alloc().init()
         self.native_controller.interface = self.interface
         self.native_controller.impl = self
+        self._tree_cells = {}
         self.native = self.native_controller.tableView
         # The destination container already lays out below the navigation bar.
         # A retained parent table can inherit UIKit's full bar inset during a
@@ -311,6 +329,20 @@ class IOSFileList(DetailedList):
         self.add_constraints()
 
     def prepare_source_change(self):
+        actions = getattr(self.interface, 'tree_actions', None)
+        if actions is not None:
+            actions.end_drag()
+        # Cells from a hidden/detached tree may still be retained by UIKit.
+        # Scrub every cell bound to the old tree before publishing its successor.
+        cells = getattr(self, '_tree_cells', {})
+        for cell in cells.values():
+            from .recycled_tree_ios import clear
+            cell.textLabel.text = cell.detailTextLabel.text = ''
+            cell.imageView.image = None
+            cell.accessibilityLabel = ''
+            _clear_actions(cell)
+            clear(cell)
+        cells.clear()
         # Inspect visible cells before the interface replaces its source. Asking
         # UIKit for them afterward can bind old indexes against the new source.
         if self.native.window is None:
