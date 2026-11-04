@@ -96,13 +96,18 @@ class ArchiveWorkspaceTests(unittest.TestCase):
         path = self.make_zip()
         out = self.root / 'out'
         observed = []
-        replace = extraction.os.replace
+        publish = extraction.rename_exclusive
         def observe(source, destination):
+            self.assertEqual(Path(destination), out)
+            self.assertEqual((Path(source) / 'source/hello.txt').read_text(), 'Hello, archive!')
+            self.assertEqual((Path(source) / 'source/nested/notes.md').read_text(), '# Notes\n')
+            self.assertTrue((Path(source) / 'source/empty').is_dir())
             observed.append(out.exists())
-            return replace(source, destination)
-        with patch.object(extraction.os, 'replace', side_effect=observe):
+            return publish(source, destination)
+        with patch.object(extraction, 'rename_exclusive', side_effect=observe) as publication:
             backend.extract(path, out)
-        self.assertFalse(any(observed), 'A partial extraction was publicly visible')
+        publication.assert_called_once()
+        self.assertEqual(observed, [False], 'A partial extraction was publicly visible')
         self.assertEqual((out / 'source/hello.txt').read_text(), 'Hello, archive!')
         self.assertFalse(list(self.root.glob('.logistics-extract-*')))
 
