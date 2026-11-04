@@ -53,7 +53,7 @@ if not defined CONFIG_FILE (
 
 if not exist "%PROJECT_ROOT%\." (
     echo ERROR: Project root directory does not exist or is not accessible:
-    echo   %PROJECT_ROOT%
+    echo   "%PROJECT_ROOT%"
     call :Pause
     exit /b 1
 )
@@ -61,13 +61,13 @@ for %%I in ("%PROJECT_ROOT%") do set "PROJECT_ROOT=%%~fI"
 
 if not exist "%CONFIG_FILE%" (
     echo ERROR: Launch config does not exist:
-    echo   %CONFIG_FILE%
+    echo   "%CONFIG_FILE%"
     call :Pause
     exit /b 1
 )
 for %%F in ("%CONFIG_FILE%") do if %%~zF EQU 0 (
     echo ERROR: Launch config is empty:
-    echo   %CONFIG_FILE%
+    echo   "%CONFIG_FILE%"
     call :Pause
     exit /b 1
 )
@@ -104,13 +104,13 @@ if errorlevel 1 goto :ConfigReadFailed
 
 if not defined SOURCE_DIR_VALUE (
     echo ERROR: source_dir is missing or empty in [Launch] in:
-    echo   %CONFIG_FILE%
+    echo   "%CONFIG_FILE%"
     call :Pause
     exit /b 1
 )
 if not defined LAUNCH_FILE_VALUE (
     echo ERROR: launch_file is missing or empty in [Launch] in:
-    echo   %CONFIG_FILE%
+    echo   "%CONFIG_FILE%"
     call :Pause
     exit /b 1
 )
@@ -126,7 +126,7 @@ if errorlevel 1 exit /b 1
 
 if /I "%LAUNCH_FILE_VALUE:~-3%"==".py" (
     echo ERROR: launch_file must omit the .py extension.
-    echo   Use: %LAUNCH_FILE_VALUE:~0,-3%
+    echo   Use: "%LAUNCH_FILE_VALUE:~0,-3%"
     call :Pause
     exit /b 1
 )
@@ -140,14 +140,14 @@ if errorlevel 1 exit /b 1
 
 if not exist "%SOURCE_DIR%\." (
     echo ERROR: Configured source_dir does not exist or is not a directory:
-    echo   %SOURCE_DIR%
+    echo   "%SOURCE_DIR%"
     call :Pause
     exit /b 1
 )
 
 if exist "%VENV_DIR%" if not exist "%VENV_DIR%\." (
     echo ERROR: The virtual-environment path exists but is not a directory:
-    echo   %VENV_DIR%
+    echo   "%VENV_DIR%"
     call :Pause
     exit /b 1
 )
@@ -185,7 +185,7 @@ set "UV_PROJECT_ENVIRONMENT=%VENV_DIR%"
 pushd "%SOURCE_DIR%" >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Could not change to source_dir:
-    echo   %SOURCE_DIR%
+    echo   "%SOURCE_DIR%"
     call :Pause
     exit /b 1
 )
@@ -219,12 +219,12 @@ if not "%SYNC_STATUS%"=="0" (
 if not exist "%VENV_DIR%\." (
     popd
     echo ERROR: uv sync completed without creating the expected virtual environment:
-    echo   %VENV_DIR%
+    echo   "%VENV_DIR%"
     call :Pause
     exit /b 1
 )
 
-echo Launching: %LAUNCH_FILE_VALUE%.py
+echo Launching: "%LAUNCH_FILE_VALUE%.py"
 "%UV_EXE%" run --locked --no-sync --no-python-downloads python "%LAUNCH_PATH%" %LAUNCH_ARGUMENTS%
 set "LAUNCH_STATUS=%ERRORLEVEL%"
 popd
@@ -234,7 +234,7 @@ if "%LAUNCH_STATUS%"=="0" (
     echo Process has ended.
 ) else (
     echo ERROR: Python launch file exited with code %LAUNCH_STATUS%:
-    echo   %LAUNCH_PATH%
+    echo   "%LAUNCH_PATH%"
 )
 
 call :Pause
@@ -286,14 +286,14 @@ if not "%LOCK_STATUS%"=="0" (
 )
 if not exist "%SOURCE_DIR%\uv.lock" (
     echo ERROR: uv lock completed without creating the expected file:
-    echo   %SOURCE_DIR%\uv.lock
+    echo   "%SOURCE_DIR%\uv.lock"
     call :Pause
     exit /b 1
 )
 call :RequireReadableNonEmptyFile "%SOURCE_DIR%\uv.lock" uv.lock
 if errorlevel 1 exit /b 1
 echo Created initial lockfile:
-echo   %SOURCE_DIR%\uv.lock
+echo   "%SOURCE_DIR%\uv.lock"
 exit /b 0
 
 :RequireRelativePath
@@ -306,13 +306,13 @@ if not defined CHECK_PATH (
 )
 if "%CHECK_PATH:~1,1%"==":" (
     echo ERROR: %CHECK_LABEL% must be a relative path, not a drive-qualified path:
-    echo   %CHECK_PATH%
+    echo   "%CHECK_PATH%"
     call :Pause
     exit /b 1
 )
 if "%CHECK_PATH:~0,1%"=="\" (
     echo ERROR: %CHECK_LABEL% must be a relative path, not a rooted or UNC path:
-    echo   %CHECK_PATH%
+    echo   "%CHECK_PATH%"
     call :Pause
     exit /b 1
 )
@@ -323,13 +323,13 @@ set "CHECK_FILE=%~1"
 set "CHECK_LABEL=%~2"
 if not exist "%CHECK_FILE%" (
     echo ERROR: %CHECK_LABEL% is missing:
-    echo   %CHECK_FILE%
+    echo   "%CHECK_FILE%"
     call :Pause
     exit /b 1
 )
 for %%F in ("%CHECK_FILE%") do if %%~zF EQU 0 (
     echo ERROR: %CHECK_LABEL% is empty:
-    echo   %CHECK_FILE%
+    echo   "%CHECK_FILE%"
     call :Pause
     exit /b 1
 )
@@ -343,12 +343,12 @@ if defined UV_EXE (
     "%UV_EXE%" --version >nul 2>&1
     if errorlevel 1 (
         echo ERROR: uv was found but could not run successfully:
-        echo   %UV_EXE%
+        echo   "%UV_EXE%"
         call :Pause
         exit /b 1
     )
     echo Using uv at:
-    echo   %UV_EXE%
+    echo   "%UV_EXE%"
     "%UV_EXE%" --version
     exit /b 0
 )
@@ -368,12 +368,12 @@ if exist "%UV_EXE%" (
     "%UV_EXE%" --version >nul 2>&1
     if errorlevel 1 (
         echo ERROR: uv exists in the commonUtils installation directory but could not run successfully:
-        echo   %UV_EXE%
+        echo   "%UV_EXE%"
         call :Pause
         exit /b 1
     )
     echo Using uv at:
-    echo   %UV_EXE%
+    echo   "%UV_EXE%"
     "%UV_EXE%" --version
     exit /b 0
 )
@@ -384,7 +384,7 @@ if not exist "%UV_INSTALL_DIR%\." (
     mkdir "%UV_INSTALL_DIR%" >nul 2>&1
     if errorlevel 1 (
         echo ERROR: Could not create the per-user uv installation directory:
-        echo   %UV_INSTALL_DIR%
+        echo   "%UV_INSTALL_DIR%"
         call :Pause
         exit /b 1
     )
@@ -406,7 +406,7 @@ if errorlevel 1 (
 
 if not exist "%UV_INSTALLER_FILE%" (
     echo ERROR: The uv installer download reported success, but no installer file was created:
-    echo   %UV_INSTALLER_FILE%
+    echo   "%UV_INSTALLER_FILE%"
     call :Pause
     exit /b 1
 )
@@ -419,7 +419,7 @@ for %%F in ("%UV_INSTALLER_FILE%") do if %%~zF EQU 0 (
 
 set "UV_NO_MODIFY_PATH=1"
 echo Installing uv for the current user into:
-echo   %UV_INSTALL_DIR%
+echo   "%UV_INSTALL_DIR%"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%UV_INSTALLER_FILE%"
 set "UV_INSTALL_STATUS=%ERRORLEVEL%"
 del /q "%UV_INSTALLER_FILE%" >nul 2>&1
@@ -432,7 +432,7 @@ if not "%UV_INSTALL_STATUS%"=="0" (
 set "UV_EXE=%UV_INSTALL_DIR%\uv.exe"
 if not exist "%UV_EXE%" (
     echo ERROR: uv installation reported success, but uv.exe was not found at the expected location:
-    echo   %UV_EXE%
+    echo   "%UV_EXE%"
     call :Pause
     exit /b 1
 )
@@ -440,12 +440,12 @@ if not exist "%UV_EXE%" (
 "%UV_EXE%" --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: uv.exe was installed but could not run successfully:
-    echo   %UV_EXE%
+    echo   "%UV_EXE%"
     call :Pause
     exit /b 1
 )
 echo Using uv at:
-echo   %UV_EXE%
+echo   "%UV_EXE%"
 "%UV_EXE%" --version
 exit /b 0
 
@@ -454,7 +454,7 @@ set "WRITE_TEST=%PROJECT_ROOT%\.commonutils_write_test_%RANDOM%_%RANDOM%.tmp"
 >"%WRITE_TEST%" echo write-test
 if errorlevel 1 (
     echo ERROR: The project root is not writable, so .venv cannot be created there:
-    echo   %PROJECT_ROOT%
+    echo   "%PROJECT_ROOT%"
     call :Pause
     exit /b 1
 )
@@ -475,7 +475,7 @@ if "%ENSURE_USER_DIR%"==".." (
     exit /b 1
 )
 if not "%ENSURE_USER_DIR:..\=%"=="%ENSURE_USER_DIR%" (
-    echo ERROR: ensure_user_dir may not contain '..\': %ENSURE_USER_DIR%
+    echo ERROR: ensure_user_dir may not contain '..\': "%ENSURE_USER_DIR%"
     call :Pause
     exit /b 1
 )
@@ -483,11 +483,11 @@ set "ENSURE_USER_PATH=%USERPROFILE%\%ENSURE_USER_DIR%"
 if exist "%ENSURE_USER_PATH%\." exit /b 0
 
 echo Creating user directory:
-echo   %ENSURE_USER_PATH%
+echo   "%ENSURE_USER_PATH%"
 mkdir "%ENSURE_USER_PATH%" >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Could not create configured user directory:
-    echo   %ENSURE_USER_PATH%
+    echo   "%ENSURE_USER_PATH%"
     call :Pause
     exit /b 1
 )
@@ -500,7 +500,7 @@ for /f "usebackq tokens=* delims=" %%V in ("%SOURCE_DIR%\.python-version") do (
 )
 if not defined PYTHON_REQUEST (
     echo ERROR: .python-version does not contain a Python version request:
-    echo   %SOURCE_DIR%\.python-version
+    echo   "%SOURCE_DIR%\.python-version"
     call :Pause
     exit /b 1
 )
