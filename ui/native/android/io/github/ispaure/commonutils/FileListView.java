@@ -1,6 +1,8 @@
 package io.github.ispaure.commonutils;
 
 import android.content.Context;
+import android.content.ClipData;
+import android.view.DragEvent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -29,6 +31,28 @@ public final class FileListView extends ListView {
         void onActivate(int index, int generation);
         void onVisible(int index, int generation);
         void onContext(int index, int generation);
+    }
+
+    /** Optional tree interaction; indices are valid only for their source generation. */
+    public interface TreeListener {
+        void onToggle(int index, int generation);
+        boolean onStartDrag(int index, int generation);
+        boolean onCanDrop(int index, int generation);
+        boolean onDrop(int index, int generation);
+        void onEndDrag(int generation);
+    }
+    private TreeListener treeListener;
+    private int[] depths = new int[0], disclosures = new int[0];
+    private boolean[] landingRows = new boolean[0];
+    private Bitmap landingIcon;
+    private String dragToken;
+    public void setTreeListener(TreeListener value) { treeListener = value; }
+    public void setTreeRows(int[] indent, int[] expanded, boolean[] landing, Bitmap icon, String token) {
+        if (indent.length != titles.length || expanded.length != titles.length || landing.length != titles.length)
+            throw new IllegalArgumentException("Tree metadata must match the current rows");
+        depths = indent; disclosures = expanded; landingRows = landing;
+        landingIcon = icon; dragToken = token;
+        rows.notifyDataSetChanged();
     }
 
     private Listener listener;
@@ -156,6 +180,8 @@ public final class FileListView extends ListView {
         subtitles = descriptions;
         folders = directories;
         hiddenRows = new boolean[names.length];
+        depths = new int[0]; disclosures = new int[0]; landingRows = new boolean[0];
+        landingIcon = null; dragToken = null;
         generation = revision;
         thumbnails.clear();
         clearChoices();
@@ -185,7 +211,7 @@ public final class FileListView extends ListView {
         if (visible >= 0 && visible < getChildCount()) {
             Holder holder = (Holder) getChildAt(visible).getTag();
             holder.preview = image != null;
-            holder.icon.setImageBitmap(image != null ? image : (folders[index] ? folderIcon : fileIcon));
+            holder.icon.setImageBitmap(image != null ? image : defaultIcon(index));
             paint(getChildAt(visible), isItemChecked(index));
         }
     }
@@ -202,6 +228,32 @@ public final class FileListView extends ListView {
     }
 
     public int getCreatedRowCount() { return createdRows; }
+
+    private Holder visibleHolder(int index, int revision) {
+        if (revision != generation) return null;
+        int child = index - getFirstVisiblePosition();
+        if (child < 0 || child >= getChildCount()) return null;
+        Holder holder = (Holder) getChildAt(child).getTag();
+        return holder != null && holder.index == index && holder.revision == revision ? holder : null;
+    }
+
+    /** Current visible controls only; never exposes a recycled or replaced row. */
+    public View getRowTitleView(int index, int revision) {
+        Holder holder = visibleHolder(index, revision);
+        return holder == null ? null : holder.title;
+    }
+    public View getRowActionView(int index, int revision) {
+        Holder holder = visibleHolder(index, revision);
+        return holder == null ? null : holder.actions;
+    }
+    public View getRowDisclosureView(int index, int revision) {
+        Holder holder = visibleHolder(index, revision);
+        return holder == null ? null : holder.disclosure;
+    }
+    public View getRowIconView(int index, int revision) {
+        Holder holder = visibleHolder(index, revision);
+        return holder == null ? null : holder.icon;
+    }
 
     public int getVerticalPosition() {
         View first = getChildAt(0);
@@ -232,7 +284,14 @@ public final class FileListView extends ListView {
     private void scrub(View view) {
         Holder holder = (Holder) view.getTag();
         if (holder == null) return;
+        holder.index = -1;
         holder.title.setText("");
+        if (holder.disclosure != null) {
+            holder.disclosure.setOnClickListener(null);
+            holder.disclosure.setContentDescription("");
+        }
+        holder.icon.setOnLongClickListener(null);
+        view.setOnDragListener(null);
         holder.subtitle.setText("");
         holder.icon.setImageDrawable(null);
         holder.actions.setOnClickListener(null);
@@ -249,13 +308,15 @@ public final class FileListView extends ListView {
         holder.title.setTextColor(foreground);
         holder.subtitle.setTextColor(selected ? foreground : mutedColor);
         holder.actions.setTextColor(selected ? foreground : accentColor);
+        if (holder.disclosure != null) holder.disclosure.setTextColor(selected ? foreground : accentColor);
         if (holder.preview) holder.icon.clearColorFilter();
         else holder.icon.setColorFilter(selected ? foreground : accentColor);
     }
 
     private static final class Holder {
         ImageView icon;
-        TextView title, subtitle, actions;
+        TextView title, subtitle, actions, disclosure;
+        int index = -1, revision;
         boolean preview, hidden;
     }
 
@@ -282,6 +343,16 @@ public final class FileListView extends ListView {
                     && actionTouch.onTouchEvent(event)) return true;
             return super.dispatchTouchEvent(event);
         }
+    }
+
+    private boolean validTreeRow(Holder holder, int index, int revision) {
+        return isEnabled() && treeListener != null && holder.revision == revision && revision == generation
+                && holder.index == index && index >= 0 && index < titles.length;
+    }
+
+    private Bitmap defaultIcon(int index) {
+        return index < landingRows.length && landingRows[index] && landingIcon != null
+                ? landingIcon : folders[index] ? folderIcon : fileIcon;
     }
 
     private final class Rows extends BaseAdapter {
@@ -333,15 +404,73 @@ public final class FileListView extends ListView {
                 row.setTag(holder);
                 recycled = row;
             } else holder = (Holder) recycled.getTag();
+            holder.index = position;
+            holder.revision = generation;
+            int depth = position < depths.length ? Math.max(0, Math.min(32, depths[position])) : 0;
+            recycled.setPadding(dp(8 + depth * 12), 0, dp(4), 0);
+            int expanded = position < disclosures.length ? disclosures[position] : -1;
+            boolean landing = position < landingRows.length && landingRows[position];
+            if (expanded >= 0 && holder.disclosure == null) {
+                holder.disclosure = new Button(getContext(), null, android.R.attr.borderlessButtonStyle);
+                holder.disclosure.setTextSize(22);
+                holder.disclosure.setPadding(0, 0, 0, 0);
+                holder.disclosure.setMinWidth(0);
+                holder.disclosure.setMinimumWidth(0);
+                holder.disclosure.setFocusable(false);
+                ((LinearLayout) recycled).addView(holder.disclosure, 1,
+                        new LinearLayout.LayoutParams(dp(32), -1));
+            }
+            final int treeRevision = generation;
+            final Holder bound = holder;
+            if (holder.disclosure != null) {
+                holder.disclosure.setVisibility(expanded < 0 ? View.GONE : View.VISIBLE);
+                holder.disclosure.setText(expanded == 1 ? "⌄" : "›");
+                holder.disclosure.setContentDescription((expanded == 1 ? "Collapse " : "Expand ") + titles[position]);
+                holder.disclosure.setOnClickListener(view -> {
+                    if (validTreeRow(bound, position, treeRevision) && expanded >= 0)
+                        treeListener.onToggle(bound.index, bound.revision);
+                });
+            }
+            holder.title.setPaintFlags(landing ? holder.title.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG
+                    : holder.title.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);
+            holder.icon.setOnLongClickListener(depths.length == 0 ? null : view -> {
+                if (!validTreeRow(bound, position, treeRevision) || dragToken == null
+                        || !treeListener.onStartDrag(bound.index, bound.revision)) return false;
+                boolean started = view.startDragAndDrop(ClipData.newPlainText(dragToken, ""),
+                        new View.DragShadowBuilder(view), null, 0);
+                if (!started && treeListener != null) treeListener.onEndDrag(generation);
+                return started;
+            });
+            recycled.setOnDragListener(depths.length == 0 ? null : (view, event) -> {
+                if (!validTreeRow(bound, position, treeRevision)) return false;
+                if (event.getAction() == DragEvent.ACTION_DRAG_ENDED) {
+                    treeListener.onEndDrag(bound.revision);
+                    paint(view, isItemChecked(bound.index));
+                    return true;
+                }
+                if (dragToken == null || event.getClipDescription() == null
+                        || !dragToken.contentEquals(event.getClipDescription().getLabel())) return false;
+                if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) return true;
+                if (!folders[bound.index]) return false;
+                if (event.getAction() == DragEvent.ACTION_DRAG_ENTERED
+                        || event.getAction() == DragEvent.ACTION_DRAG_LOCATION) {
+                    paint(view, treeListener.onCanDrop(bound.index, bound.revision));
+                } else if (event.getAction() == DragEvent.ACTION_DROP) {
+                    return treeListener.onDrop(bound.index, bound.revision);
+                } else if (event.getAction() == DragEvent.ACTION_DRAG_EXITED) {
+                    paint(view, isItemChecked(bound.index));
+                }
+                return true;
+            });
             holder.title.setText(titles[position]);
             holder.hidden = position < hiddenRows.length && hiddenRows[position];
             holder.subtitle.setText(subtitles[position]);
             holder.subtitle.setVisibility(subtitles[position].isEmpty() ? View.GONE : View.VISIBLE);
             holder.icon.setImageBitmap(thumbnails.get(position,
-                    folders[position] ? folderIcon : fileIcon));
+                    defaultIcon(position)));
             holder.preview = thumbnails.get(position) != null;
             holder.actions.setVisibility(contextActions ? View.VISIBLE : View.GONE);
-            holder.actions.setContentDescription("Select " + titles[position]);
+            holder.actions.setContentDescription((depths.length > 0 ? "Actions for " : "Select ") + titles[position]);
             final int revision = generation;
             holder.actions.setOnClickListener(view -> {
                 if (contextActions && FileListView.this.isEnabled() && generation == revision && listener != null) {
