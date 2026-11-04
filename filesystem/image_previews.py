@@ -18,9 +18,14 @@ def local_image(path):
 
 
 def local_provider_image(provider, path):
-    """Virtual/cloud identities must never be interpreted as physical paths."""
+    """Only public local providers qualify for automatic filesystem previews.
+
+    Private LocalFiles subclasses need explicit credential-scoped thumbnail
+    loaders; their apparent physical paths must never enter this fallback.
+    """
     from ..runtime.resources.local import LocalFiles
-    return isinstance(provider, LocalFiles) and local_image(provider.root / provider.relative(path))
+    return (isinstance(provider, LocalFiles) and not getattr(provider, 'private', False)
+            and local_image(provider.root / provider.relative(path)))
 
 
 def local_native_image(provider, path, cancelled=lambda: False):
