@@ -11,6 +11,14 @@ without a visible window. A **dummy-backend** mobile test checks host-side behav
 without the native controls. Native acceptance runs on the actual supported
 platform; none of the first three proves the last.
 
+## Host runner overhead
+
+Python stage classification skips tokenization when no top-level stage comment
+could be present. Candidate comments still pass through the tokenizer, so string
+literals cannot declare stages and duplicate declarations remain errors.
+The offscreen Qt fixture uses Helvetica on macOS to avoid missing `Sans Serif`
+alias lookup; Windows retains its explicit system-font fixtures.
+
 ## Native filesystem notifications
 
 Qt browser/watcher tests need access to the operating system's filesystem

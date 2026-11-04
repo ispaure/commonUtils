@@ -104,6 +104,9 @@ class QtTestCase(unittest.TestCase):
         if app is None:
             app = QtTestCase._test_app = qt.QApplication([])
         _load_windows_test_fonts(app)
+        if sys.platform == 'darwin' and qt.QApplication.platformName() == 'offscreen':
+            # macOS has Helvetica; avoid resolving Qt's missing Sans Serif alias.
+            app.setFont(qt.QFont('Helvetica'))
         existing = set(app.topLevelWidgets()) if app else set()
         if app:
             palette, stylesheet, font = app.palette(), app.styleSheet(), app.font()
