@@ -33,6 +33,22 @@ class Navigation:
 
 
 class NativeReaderGestureTests(unittest.TestCase):
+    def test_image_tap_coordinates_consumption_and_letterbox_fallback(self):
+        from commonUtils.ui.native.image_canvas import ImageCanvas
+        from unittest.mock import Mock
+        toggle, tap = Mock(), Mock(return_value=True)
+        image = SimpleNamespace(image=object(), on_tap=tap, toggle_controls=toggle)
+        ImageCanvas.tap(image, .2, .8)
+        tap.assert_called_once_with(.2, .8)
+        toggle.assert_not_called()
+        tap.return_value = False
+        ImageCanvas.tap(image, .3, .7)
+        toggle.assert_called_once_with()
+        tap.reset_mock()
+        ImageCanvas.tap(image, -.1, .7)
+        tap.assert_not_called()
+        self.assertEqual(toggle.call_count, 2)
+
     def test_both_pop_gestures_disabled_and_original_states_restored(self):
         navigation = Navigation()
         host = SimpleNamespace(adapter=SimpleNamespace(navigation=[navigation], navigation_for=lambda destination: navigation),

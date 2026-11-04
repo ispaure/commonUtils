@@ -100,6 +100,8 @@ def apple_scroll_class():
                     return False
                 if gesture not in self.owner.swipes and gesture != self.owner.tap:
                     return True
+                if gesture == self.owner.tap and self.owner.interface.on_tap is not None:
+                    return True
                 if gesture in self.owner.swipes and self.owner.interface.page_swipes_at_edges:
                     return True
                 x = touch.locationInView(self).x
@@ -135,7 +137,11 @@ def apple_scroll_class():
             @objc_method
             def toggleControls_(self, gesture) -> None:
                 if self.owner is not None:
-                    self.owner.interface.toggle_controls()
+                    owner = self.owner
+                    point = gesture.locationInView(owner.picture)
+                    size = owner.picture.bounds.size
+                    if size.width > 0 and size.height > 0:
+                        owner.interface.tap(point.x / size.width, point.y / size.height)
 
             @objc_method
             def pageSwipe_(self, gesture) -> None:
@@ -182,6 +188,7 @@ def apple_backend(interface):
                 self.swipes.append(gesture)
             self.tap = ObjCClass('UITapGestureRecognizer').alloc().initWithTarget(self.native, action=SEL('toggleControls:'))
             self.tap.delegate = self.native
+            self.tap.allowedTouchTypes = [0]  # direct finger, excluding Pencil
             self.native.addGestureRecognizer(self.tap)
             for gesture in self.swipes:
                 self.tap.requireGestureRecognizerToFail(gesture)
@@ -352,6 +359,8 @@ def android_backend(interface):
                     owner.interface.page(direction)
                 def toggleControls(self):
                     owner.interface.toggle_controls()
+                def tap(self, x, y):
+                    owner.interface.tap(x, y)
                 def magnifierZoom(self, value):
                     owner.interface.request_magnifier_zoom(value)
             self.listener = Listener()
@@ -370,7 +379,7 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
-    def __init__(self, *args, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
+    def __init__(self, *args, on_page=None, on_toggle=None, on_tap=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
         if page_axis not in ('horizontal', 'vertical'):
             raise ValueError('page_axis must be horizontal or vertical')
         self.page_axis = page_axis
@@ -383,6 +392,7 @@ class ImageCanvas(toga.ImageView):
         self.page_swipes_at_edges = page_swipes_at_edges
         self.on_page = on_page
         self.on_toggle = on_toggle
+        self.on_tap = on_tap
         super().__init__(*args, **kwargs)
 
     def _create(self):
@@ -436,6 +446,13 @@ class ImageCanvas(toga.ImageView):
         if self.on_page is not None and self.image is not None and self.zoom_scale <= 1.05:
             self.on_page(direction)
 
+    def tap(self, x, y):
+        """A recognized finger tap in image coordinates; True consumes it."""
+        if self.image is not None and 0 <= x <= 1 and 0 <= y <= 1:
+            if self.on_tap is not None and self.on_tap(x, y):
+                return
+        self.toggle_controls()
+
     def toggle_controls(self):
         if self.on_toggle is not None:
             self.on_toggle()
@@ -466,7 +483,7 @@ class ImageCanvas(toga.ImageView):
     def dispose(self):
         """Retire callbacks and native gesture ownership before dropping a page."""
         self.magnifier_enabled = False
-        self.on_page = self.on_toggle = self.on_magnifier_zoom = None
+        self.on_page = self.on_toggle = self.on_tap = self.on_magnifier_zoom = None
         self.image = None
         if hasattr(self._impl, 'picture'):
             self._impl.native.delegate = None
