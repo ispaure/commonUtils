@@ -138,6 +138,9 @@ def apple_scroll_class():
             def toggleControls_(self, gesture) -> None:
                 if self.owner is not None:
                     owner = self.owner
+                    if gesture is None:
+                        owner.interface.toggle_controls()
+                        return
                     point = gesture.locationInView(owner.picture)
                     size = owner.picture.bounds.size
                     if size.width > 0 and size.height > 0:

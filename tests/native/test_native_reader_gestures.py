@@ -33,6 +33,28 @@ class Navigation:
 
 
 class NativeReaderGestureTests(unittest.TestCase):
+    def test_apple_target_normalizes_real_location_and_preserves_programmatic_toggle(self):
+        from commonUtils.ui.native import image_canvas
+        from unittest.mock import Mock
+        class NativeBase:
+            def __init_subclass__(cls, **kwargs):
+                pass
+        objc = SimpleNamespace(ObjCClass=lambda name: NativeBase, ObjCProtocol=lambda name: object(),
+            objc_method=lambda method: method, objc_property=lambda *args, **kwargs: None, objc_id=object)
+        with patch.dict(sys.modules, {'rubicon.objc': objc,
+                'rubicon.objc.runtime': SimpleNamespace(send_super=Mock())}), \
+                patch.object(image_canvas, '_scroll_class', None):
+            target = image_canvas.apple_scroll_class()()
+        picture = SimpleNamespace(bounds=SimpleNamespace(size=SimpleNamespace(width=200, height=400)))
+        interface = SimpleNamespace(tap=Mock(), toggle_controls=Mock())
+        target.owner = SimpleNamespace(picture=picture, interface=interface)
+        gesture = SimpleNamespace(locationInView=lambda view: SimpleNamespace(x=50, y=300))
+        target.toggleControls_(gesture)
+        interface.tap.assert_called_once_with(.25, .75)
+        interface.toggle_controls.assert_not_called()
+        target.toggleControls_(None)
+        interface.toggle_controls.assert_called_once_with()
+
     def test_image_tap_coordinates_consumption_and_letterbox_fallback(self):
         from commonUtils.ui.native.image_canvas import ImageCanvas
         from unittest.mock import Mock
