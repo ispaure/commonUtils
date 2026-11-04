@@ -290,6 +290,8 @@ public final class FileListView extends ListView {
             holder.disclosure.setOnClickListener(null);
             holder.disclosure.setContentDescription("");
         }
+        holder.icon.setOnClickListener(null);
+        holder.icon.setClickable(false);
         holder.icon.setOnLongClickListener(null);
         view.setOnDragListener(null);
         holder.subtitle.setText("");
@@ -418,7 +420,7 @@ public final class FileListView extends ListView {
                 holder.disclosure.setMinimumWidth(0);
                 holder.disclosure.setFocusable(false);
                 ((LinearLayout) recycled).addView(holder.disclosure, 1,
-                        new LinearLayout.LayoutParams(dp(32), -1));
+                        new LinearLayout.LayoutParams(dp(44), -1));
             }
             final int treeRevision = generation;
             final Holder bound = holder;
@@ -431,6 +433,24 @@ public final class FileListView extends ListView {
                         treeListener.onToggle(bound.index, bound.revision);
                 });
             }
+            // Folder icons share disclosure behavior, including landing-page folders.
+            // Reset the listener and geometry when a cell is recycled into a file.
+            holder.icon.setOnClickListener(expanded < 0 ? null : view -> {
+                if (validTreeRow(bound, position, treeRevision))
+                    treeListener.onToggle(bound.index, bound.revision);
+            });
+            holder.icon.setClickable(expanded >= 0);
+            holder.icon.setContentDescription(expanded < 0 ? null :
+                    (expanded == 1 ? "Collapse " : "Expand ") + titles[position]);
+            holder.icon.setImportantForAccessibility(expanded < 0 ?
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO : View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            holder.icon.setLayoutParams(new LinearLayout.LayoutParams(
+                    dp(expanded < 0 ? iconSize : Math.max(32, iconSize)),
+                    dp(expanded < 0 ? iconSize : rowHeight)));
+            holder.icon.setPadding(expanded < 0 ? 0 : dp(Math.max(0, (32 - iconSize) / 2)),
+                    expanded < 0 ? 0 : dp(Math.max(0, (rowHeight - iconSize) / 2)),
+                    expanded < 0 ? 0 : dp(Math.max(0, (32 - iconSize) / 2)),
+                    expanded < 0 ? 0 : dp(Math.max(0, (rowHeight - iconSize) / 2)));
             holder.title.setPaintFlags(landing ? holder.title.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG
                     : holder.title.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);
             holder.icon.setOnLongClickListener(depths.length == 0 ? null : view -> {
