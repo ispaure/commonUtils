@@ -74,13 +74,21 @@ class ResourcePreview(qt.QObject):
         browser.cover.setMinimumSize(96, 96)
         browser.cover.setMaximumHeight(120)
         browser.message.clear()
-        if not self.loader or row['directory']:
+        from ...filesystem.image_previews import local_provider_image
+        local_image = not row['directory'] and local_provider_image(browser.provider, row['path'])
+        if row['directory'] or not (self.loader or local_image):
             return
         self.busy = True
         self.cancelled = Event()
         epoch, cancelled = self.epoch, self.cancelled
         browser.message.setText('Loading information…')
-        self.operation = Operation(lambda: self.loader(row, cancelled.is_set), self)
+        def read():
+            from .thumbnails import local_image_thumbnail
+            thumbnail = (local_image_thumbnail(browser.provider.root / row['path'], (640, 880), cancelled.is_set)
+                         if local_image else b'')
+            details = self.loader(row, cancelled.is_set) if self.loader else ()
+            return thumbnail, details
+        self.operation = Operation(read, self)
         self.operation.completed.connect(lambda result, error: self._loaded(epoch, result, error))
         self.operation.finished.connect(self._finished)
         self.operation.start()
@@ -90,7 +98,10 @@ class ResourcePreview(qt.QObject):
             return
         browser = self.browser
         browser.message.setText(error)
-        for title, details in result or ():
+        thumbnail, panels = result or (b'', ())
+        if thumbnail:
+            browser.cover_pixmap.loadFromData(thumbnail)
+        for title, details in panels:
             browser.tabs.addTab(DetailsPanel(details.fields), title)
             if details.message:
                 browser.message.setText(details.message)

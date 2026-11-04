@@ -52,6 +52,36 @@ class MemoryProvider:
 
 
 class EntryBrowserTests(QtTestCase):
+    def test_generic_image_preview_requires_local_provider_and_appears_in_information(self):
+        from tempfile import TemporaryDirectory
+        from commonUtils.runtime.resources.local import LocalFiles
+        from commonUtils.filesystem.image_previews import local_native_image
+        virtual = MemoryProvider()
+        browser = ResourceBrowser(virtual)
+        try:
+            with patch.object(virtual, 'open', side_effect=AssertionError('Cloud image read')):
+                self.assertEqual(browser._thumbnail('image.png', (32, 32), lambda: False), b'')
+        finally:
+            browser.stop()
+            self.wait_until(lambda: not browser.busy)
+            browser.close()
+        with TemporaryDirectory() as directory:
+            provider = LocalFiles(directory)
+            path = provider.root / 'image.png'
+            path.write_bytes(picture())
+            self.assertEqual(local_native_image(provider, 'image.png'), picture())
+            browser = ResourceBrowser(provider)
+            browser.show()
+            try:
+                self.wait_until(lambda: not browser.busy)
+                browser.views.select_source(browser.model.browse_index(path))
+                self.wait_until(lambda: not browser.busy and not browser.cover_pixmap.isNull())
+                self.assertEqual(browser.cover_pixmap.toImage().pixelColor(0, 0), qt.QColor('orange'))
+            finally:
+                browser.stop()
+                self.wait_until(lambda: not browser.busy)
+                browser.close()
+
     def setUp(self):
         self.app = qt.QApplication.instance() or qt.QApplication([])
 

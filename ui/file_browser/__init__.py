@@ -449,7 +449,11 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
                     fields.extend(self.folder_fields(item, stats))
                 if stats.skipped:
                     fields.append(('Excluded links / unreadable items', stats.skipped))
-        return BrowserDetails(tuple(fields))
+        thumbnail = b''
+        if not isinstance(item, Directory):
+            from .thumbnails import local_image_thumbnail
+            thumbnail = local_image_thumbnail(item.path, (640, 880))
+        return BrowserDetails(tuple(fields), thumbnail=thumbnail)
 
     def load(self, item, *, preserve=False):
         if self.busy:

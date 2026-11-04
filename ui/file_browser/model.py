@@ -159,7 +159,13 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
             if role == BrowseRole.Badge:
                 return item.browser_thumbnail_badge
             if role == BrowseRole.Thumbnail:
-                return (lambda size, cancelled: item.browser_thumbnail(size)) if item.browser_has_thumbnail else None
+                if item.browser_has_thumbnail:
+                    return lambda size, cancelled: item.browser_thumbnail(size)
+                from ...filesystem.image_previews import local_image
+                if not isinstance(item, Directory) and local_image(item.path):
+                    from .thumbnails import local_image_thumbnail
+                    return lambda size, cancelled: local_image_thumbnail(item.path, size, cancelled)
+                return None
             if role == BrowseRole.Suffix:
                 return '' if isinstance(item, Directory) else item.path.suffix
             if role == BrowseRole.Revision:

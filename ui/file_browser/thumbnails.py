@@ -126,3 +126,34 @@ def image_thumbnail(data, size):
     output.open(qt.QIODevice.OpenModeFlag.WriteOnly)
     image.save(output, 'PNG')
     return bytes(output.data())
+
+
+def local_image_thumbnail(path, size, cancelled=lambda: False):
+    """Read/decode one bounded local image on a worker; failures keep file icons.
+
+    Recheck location at execution time, since a queued item may have moved or a
+    symlink may now target a network mount. Never create a persistent image cache.
+    """
+    from pathlib import Path
+    from stat import S_ISREG
+    from ...filesystem.image_previews import local_image, MAX_IMAGE_BYTES
+    from ...filesystem.local_access import check_local_path
+    from ...runtime.operations import check_cancelled
+    check_cancelled(cancelled)
+    if not local_image(path):
+        return b''
+    try:
+        check_local_path(path)
+        info = Path(path).stat()
+        if not S_ISREG(info.st_mode) or info.st_size > MAX_IMAGE_BYTES:
+            return b''
+        with Path(path).open('rb') as stream:
+            data = stream.read(MAX_IMAGE_BYTES + 1)
+        check_cancelled(cancelled)
+        if len(data) > MAX_IMAGE_BYTES:
+            return b''
+        thumbnail = image_thumbnail(data, size)
+        check_cancelled(cancelled)
+        return thumbnail
+    except (OSError, ValueError):
+        return b''
