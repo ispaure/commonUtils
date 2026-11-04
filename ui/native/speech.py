@@ -256,34 +256,63 @@ class NativeSpeech:
             )
 
     def apple(self):
-        self.native_word_events = True
-        delegate_class = _apple_delegate_class()
+        """Prepare Apple's speech services without blocking the native UI loop.
+
+        Newer system speech services may synchronously wait for their own async
+        setup. Treat Apple readiness like Android's existing asynchronous init;
+        attach delegates and publish the result only on the app loop.
+        """
+        self.ready, self.error = False, ''
+        self._apple_initialization = self.loop.run_in_executor(None, self._apple_resources)
+        self._apple_initialization.add_done_callback(self._apple_initialized)
+
+    @staticmethod
+    def _apple_resources():
+        import ctypes
+        ctypes.CDLL("/System/Library/Frameworks/AVFoundation.framework/AVFoundation")
         from rubicon.objc import ObjCClass
 
-        self.native = ObjCClass("AVSpeechSynthesizer").alloc().init()
-        self.native.usesApplicationAudioSession = True
-        self.delegate = delegate_class.alloc().init()
-        self.delegate.owner = self
-        self.native.delegate = self.delegate
+        native = ObjCClass("AVSpeechSynthesizer").alloc().init()
+        try:
+            native.usesApplicationAudioSession = True
+            installed = ObjCClass("AVSpeechSynthesisVoice").speechVoices
+            voices = {str(voice.language) + " · " + str(voice.name): voice
+                      for voice in (installed() if callable(installed) else installed)}
+            default = ObjCClass("AVSpeechSynthesisVoice").voiceWithLanguage(None)
+            label = next((label for label, voice in voices.items()
+                          if default is not None and str(voice.identifier) == str(default.identifier)),
+                         next(iter(voices), ""))
+            return native, voices, label
+        except BaseException:
+            native.delegate = None
+            native.stopSpeakingAtBoundary(0)
+            raise
+
+    def _apple_initialized(self, future):
+        try:
+            native, voices, default = future.result()
+        except Exception:
+            if not self.closed:
+                self.error = 'Speech engine unavailable. Install an offline system voice.'
+            return
+        if self.closed:
+            # A discovery timeout/close must not revive the engine or retain a
+            # late synthesizer. Never cancel an executor future and lose its result.
+            native.delegate = None
+            native.stopSpeakingAtBoundary(0)
+            return
+        self.native, self.voices, self.default_voice = native, voices, default
+        self.native_word_events = True
         self.utterance = None
-        voices = ObjCClass("AVSpeechSynthesisVoice").speechVoices
-        for voice in voices() if callable(voices) else voices:
-            self.voices[str(voice.language) + " · " + str(voice.name)] = voice
-        default = ObjCClass("AVSpeechSynthesisVoice").voiceWithLanguage(None)
-        self.default_voice = next(
-            (
-                label
-                for label, voice in self.voices.items()
-                if default is not None
-                and str(voice.identifier) == str(default.identifier)
-            ),
-            next(iter(self.voices), ""),
-        )
-        self.ready = bool(self.voices)
-        if not self.ready:
-            self.error = (
-                "No installed voice. Add a system voice in Spoken Content settings."
-            )
+        try:
+            self.delegate = _apple_delegate_class().alloc().init()
+            self.delegate.owner = self
+            self.native.delegate = self.delegate
+            self.ready = bool(voices)
+            if not self.ready:
+                self.error = 'No installed voice. Add a system voice in Spoken Content settings.'
+        except Exception:
+            self.error = 'Speech engine unavailable. Install an offline system voice.'
 
     def voice_for_language(self, language, preferred=''):
         from ...runtime.speech_language import matching_locale

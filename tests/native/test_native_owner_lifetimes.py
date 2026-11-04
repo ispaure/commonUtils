@@ -199,6 +199,46 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         adapter.select_current_tab()
         self.assertTrue(adapter.host.changing)
 
+    def test_apple_initialization_is_async_and_late_close_releases_synthesizer(self):
+        from threading import Event
+        for close_early in (False, True):
+            with self.subTest(close_early=close_early):
+                loop = asyncio.new_event_loop()
+                entered, release = Event(), Event()
+                native, voice, delegate_type = Mock(), object(), Mock()
+                def resources():
+                    entered.set()
+                    if not release.wait(5):
+                        raise TimeoutError('Apple initialization fixture not released')
+                    return native, {'Default': voice}, 'Default'
+                engine = NativeSpeech(loop)
+                engine.backend = 'toga_iOS.speech'
+                try:
+                    with patch.object(engine, '_apple_resources', side_effect=resources), \
+                            patch('commonUtils.ui.native.speech._apple_delegate_class', return_value=delegate_type):
+                        engine.apple()
+                        self.assertFalse(engine.ready)
+                        loop.run_until_complete(asyncio.to_thread(entered.wait, 2))
+                        if close_early:
+                            engine.close()
+                        release.set()
+                        loop.run_until_complete(engine._apple_initialization)
+                        loop.run_until_complete(asyncio.sleep(0))
+                        if close_early:
+                            self.assertFalse(engine.ready)
+                            self.assertFalse(engine.voices)
+                            self.assertIsNone(native.delegate)
+                            native.stopSpeakingAtBoundary.assert_called_once_with(0)
+                        else:
+                            self.assertTrue(engine.ready)
+                            self.assertEqual(engine.default_voice, 'Default')
+                            self.assertIs(engine.voices['Default'], voice)
+                finally:
+                    release.set()
+                    engine.close()
+                    loop.run_until_complete(loop.shutdown_default_executor())
+                    loop.close()
+
     def test_android_voice_refresh_drops_stale_rows_and_prefers_system_default(self):
         engine = object.__new__(NativeSpeech)
         engine.closed = False
