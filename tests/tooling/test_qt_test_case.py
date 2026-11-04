@@ -4,9 +4,12 @@ from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
 from pathlib import Path
+from collections import deque
+import ctypes
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Event, Thread
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
@@ -119,6 +122,68 @@ class QtFixtureTests(unittest.TestCase):
             case.wait_until(lambda: False, timeout=.01, message='specific operation stalled')
         with self.assertRaises(ValueError):
             case.wait_until(lambda: True, timeout=0)
+
+    def test_wait_cooperates_with_python_worker_and_queued_delivery_when_native_wait_holds_gil(self):
+        # Controlled dispatch contract, independent of the installed Qt wrapper's
+        # GIL policy. Existing timer/deletion cases cover real Qt dispatch.
+        from commonUtils.tests.qt_test_case import QTest
+        if sys.platform == 'win32':
+            native = ctypes.PyDLL('kernel32').Sleep
+            native.argtypes, native.restype = [ctypes.c_uint32], None
+            def native_wait(milliseconds):
+                native(milliseconds)
+        else:
+            native = ctypes.PyDLL(None).usleep
+            native.argtypes, native.restype = [ctypes.c_uint], ctypes.c_int
+            def native_wait(milliseconds):
+                native(milliseconds * 1000)
+        queue, events = deque(), []
+        ready, admitted, finished, delivered, stopped = (Event() for _ in range(5))
+        progress = []
+        class Dispatch:
+            def processEvents(self):
+                while queue:
+                    queue.popleft()()
+        dispatch = Dispatch()
+        def accept():
+            events.append('gui-delivery')
+            delivered.set()
+        directory = self.enterContext(TemporaryDirectory())
+        fixture = Path(directory) / 'worker-input'
+        fixture.write_text('owned worker fixture')
+        def work():
+            ready.set()
+            admitted.wait()
+            for _ in range(1000):
+                if stopped.is_set():
+                    break
+                fixture.stat()
+                progress.append(True)
+            events.append('worker-return')
+            finished.set()
+            queue.append(accept)
+        worker = Thread(target=work, name='qt-wait-fairness-fixture')
+        worker.start()
+        original_interval = sys.getswitchinterval()
+        try:
+            self.assertTrue(ready.wait(2))
+            def admit():
+                events.append('gui-admission')
+                admitted.set()
+            queue.append(admit)
+            sys.setswitchinterval(30)
+            with patch.object(qt.QApplication, 'instance', return_value=dispatch), \
+                    patch.object(QTest, 'qWait', side_effect=native_wait):
+                QtTestCase().wait_until(lambda: finished.is_set() and delivered.is_set())
+            self.assertEqual(len(progress), 1000)
+            self.assertEqual(events, ['gui-admission', 'worker-return', 'gui-delivery'])
+        finally:
+            sys.setswitchinterval(original_interval)
+            stopped.set()
+            admitted.set()
+            worker.join(2)
+            dispatch.processEvents()
+            self.assertFalse(worker.is_alive(), 'Owned Python worker outlived fairness fixture')
 
     def test_callback_exceptions_fail_the_case_in_body_and_cleanup_and_restore_hook(self):
         original = sys.excepthook
