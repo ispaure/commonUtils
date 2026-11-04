@@ -39,32 +39,6 @@ class CustomFile(File):
 
 
 class BrowserTests(QtTestCase):
-    def test_local_image_thumbnail_in_tiles_and_file_information(self):
-        from commonUtils.runtime.browsing import BrowseRole
-        from commonUtils.ui.file_browser.thumbnails import local_image_thumbnail
-        path = self.root / 'texture.PNG'
-        image = qt.QImage(80, 40, qt.QImage.Format.Format_ARGB32)
-        image.fill(qt.QColor('magenta'))
-        self.assertTrue(image.save(str(path)))
-        self.wait_until(lambda: self.browser.model.index(str(path)).isValid())
-        loader = self.browser.model.index(str(path)).data(BrowseRole.Thumbnail)
-        self.assertIsNotNone(loader)
-        data = loader((32, 32), lambda: False)
-        decoded = qt.QImage.fromData(data)
-        self.assertEqual((decoded.width(), decoded.height()), (32, 16))
-        self.browser.load(File(path))
-        self.wait()
-        self.assertFalse(self.browser.cover_pixmap.isNull())
-        self.assertEqual(self.browser.cover_pixmap.toImage().pixelColor(0, 0), qt.QColor('magenta'))
-        with patch('commonUtils.filesystem.network.is_network_location', return_value=True), \
-                patch.object(Path, 'open', side_effect=AssertionError('Network image opened')):
-            self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
-        path.write_bytes(b'broken image')
-        self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
-        path.unlink()
-        self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
-        self.assertEqual(local_image_thumbnail(self.path, (32, 32)), b'')
-
     def test_stop_retains_a_running_details_worker_and_rejects_its_late_publication(self):
         from threading import Event
         started, release = Event(), Event()
@@ -848,3 +822,51 @@ class BrowserTests(QtTestCase):
         self.assertEqual(self.browser.model.folder_totals, saved)
         details = self.browser._generic_details(Directory(self.root), None)
         self.assertIn(('Total size', 'Not calculated'), details.fields)
+
+
+class LocalImagePreviewTests(QtTestCase):
+    """Image decoding does not depend on background directory indexing."""
+    def setUp(self):
+        self.root = Path(self.temporary_directory().name)
+        self.path = self.root / 'note.txt'
+        self.path.write_text('Text')
+        self.browser = FileBrowser(self.root, calculate_folder_sizes=False)
+        self.browser.show()
+        self.addCleanup(self.browser.close)
+        self.wait()
+
+    def wait(self):
+        self.wait_until(lambda: not self.browser.busy and not self.browser.views.cover_busy)
+
+    def test_local_image_thumbnail_in_tiles_and_file_information(self):
+        from commonUtils.runtime.browsing import BrowseRole
+        from commonUtils.ui.file_browser.thumbnails import local_image_thumbnail
+        path = self.root / 'texture.PNG'
+        image = qt.QImage(80, 40, qt.QImage.Format.Format_ARGB32)
+        image.fill(qt.QColor('magenta'))
+        self.assertTrue(image.save(str(path)))
+        self.wait_until(lambda: self.browser.model.index(str(path)).isValid())
+        loader = self.browser.model.index(str(path)).data(BrowseRole.Thumbnail)
+        self.assertIsNotNone(loader)
+        data = loader((32, 32), lambda: False)
+        decoded = qt.QImage.fromData(data)
+        self.assertEqual((decoded.width(), decoded.height()), (32, 16))
+        self.browser.load(File(path))
+        self.wait()
+        self.assertFalse(self.browser.cover_pixmap.isNull())
+        self.assertEqual(self.browser.cover_pixmap.toImage().pixelColor(0, 0), qt.QColor('magenta'))
+        covers = self.browser.views.covers
+        covers.requested.add(path)
+        covers.complete(path, data)
+        index = self.browser.model.index(str(path))
+        self.browser.model.dataChanged.emit(index, index, [])
+        self.assertNotIn(path, covers.icons)
+        self.assertNotIn(path, covers.requested)
+        with patch('commonUtils.filesystem.network.is_network_location', return_value=True), \
+                patch.object(Path, 'open', side_effect=AssertionError('Network image opened')):
+            self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
+        path.write_bytes(b'broken image')
+        self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
+        path.unlink()
+        self.assertEqual(local_image_thumbnail(path, (32, 32)), b'')
+        self.assertEqual(local_image_thumbnail(self.path, (32, 32)), b'')
