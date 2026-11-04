@@ -57,6 +57,21 @@ class CommandCaptureTests(unittest.TestCase):
         self.assertEqual(result.stdout, b'complete')
         self.assertEqual(result.stderr, b'diagnostic')
 
+    def test_cancellation_after_child_exit_still_wins_over_completed_output(self):
+        from commonUtils.integrations.wrappers.cmdShellWrapper import capture
+        stop = Event()
+        enter = capture.ProcessSupervisor.__enter__
+        def cancelled_before_poll(supervisor):
+            result = enter(supervisor)
+            self.assertEqual(supervisor.child.wait(timeout=10), 0)
+            stop.set()
+            return result
+        with patch.object(capture.ProcessSupervisor, '__enter__', cancelled_before_poll), \
+                patch.object(capture, 'monotonic', side_effect=[0, 4]):
+            with self.assertRaises(OperationCancelled):
+                self.command("import sys; sys.stdout.buffer.write(b'complete')",
+                             timeout=3, cancelled=stop.is_set)
+
     def test_input_is_binary_and_environment_is_explicit(self):
         result = self.command('import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())', input_data=b'\0payload')
         self.assertEqual(result.stdout, b'\0payload')
@@ -107,10 +122,24 @@ class CommandCaptureTests(unittest.TestCase):
     def test_orphaned_stdin_holder_is_killed_when_parent_has_already_exited(self):
         source = ("import subprocess, sys; subprocess.Popen([sys.executable, '-c', "
                   "'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(10)'])")
-        started = monotonic()
-        with self.assertRaises(CommandTimeout):
-            self.command(source, input_data=b'x' * 1048576, timeout=.2)
-        self.assertLess(monotonic() - started, 5)
+        from commonUtils.integrations.wrappers.cmdShellWrapper import capture
+        enter = capture.ProcessSupervisor.__enter__
+        polling_started = []
+        def parent_exited_before_poll(supervisor):
+            result = enter(supervisor)
+            self.assertEqual(supervisor.child.wait(timeout=10), 0)
+            polling_started.append(monotonic())
+            return result
+        before = set(threads())
+        # Guarantee the parent has exited before the deadline check: only its
+        # descendant's inherited stdin keeps the supervised writer blocked.
+        with patch.object(capture.ProcessSupervisor, '__enter__', parent_exited_before_poll), \
+                patch.object(capture, 'monotonic', side_effect=[0, 4]):
+            with self.assertRaises(CommandTimeout):
+                self.command(source, input_data=b'x' * 1048576, timeout=3)
+        self.assertLess(monotonic() - polling_started[0], 5)
+        self.assertFalse([thread for thread in set(threads()) - before
+                          if thread.name == 'command-capture-stdin'])
 
     def test_input_writer_error_is_propagated_and_child_is_retired(self):
         from commonUtils.integrations.wrappers.cmdShellWrapper import capture
