@@ -1,8 +1,11 @@
 # Mobile compatibility foundation
 
-This is infrastructure, not an iOS/Android port or a mobile UI. Desktop contracts
-remain Windows, macOS and Linux. Mobile assertions are simulated unless explicitly
-recorded as device-verified below. No mobile device validation has been performed.
+This page records the portability foundation and its original acceptance scope.
+The library now also supplies optional [Toga/native components](reference/ui/native/native.md)
+and [native browsing](reference/ui/native_browser/native_browser.md); it is not a
+standalone mobile application. Qt widgets remain desktop components. Historical
+hosted emulator/Simulator results below cover the foundation harness, not current
+physical-device acceptance or every native component.
 
 ## Compatibility audit
 
@@ -50,10 +53,12 @@ References: [CPython platform identifiers](https://docs.python.org/3/library/sys
 - Supply app-private storage roots and document-provider/security-scoped access;
   Android content URIs are not pathlib paths. Validate permissions, atomic saves,
   encodings, ZIP/EPUB/CBZ handling and SQLite on actual devices.
-- Implement and verify mobile adapters for document selection, external URLs,
-  lifecycle/background work and any supported process operations.
-- Select a mobile UI framework and port only needed presentation components in a
-  future project. Qt desktop widgets are not certified for either mobile OS.
+- Verify native document selection in the consuming host. External URLs,
+  lifecycle/background work and any process operations need their own supported
+  mobile adapters; desktop capability guards do not enable them.
+- For native presentation, select the consumer's Toga backend and package the
+  required shared Java/Apple components. Validate only the components actually
+  embedded by that host. Qt desktop widgets are not certified for either mobile OS.
 - Validate sandbox entitlements, signing, packaging, distribution and recovery
   after suspension/termination. Verify desktop native integrations on Windows and
   Linux in addition to the local macOS regressions.
@@ -72,8 +77,9 @@ Command entry points, application/URI launchers, directory opening and default
 text editing reject mobile requests with `UnsupportedCapabilityError` before
 side effects. The UI facade/native dialogs and explicit PySide import reject
 mobile desktop UI use before Qt initialization; existing Qt file-dialog exports
-remain part of that desktop-only facade. A mobile host must supply presentation
-and document-selection adapters in future work. Critical diagnostics still raise
+remain part of that desktop-only facade. A mobile host must explicitly select
+native presentation and document-selection adapters; the desktop facade does not
+redirect to them. Critical diagnostics still raise
 `DebugException` on mobile without attempting a desktop popup. Windows console
 ANSI initialization is deferred until logging, preserving import-only use.
 
@@ -101,6 +107,9 @@ archive programs and process-based index owners) still require separate review
 when selected for a mobile application. No global override claims them supported.
 
 ## Validation evidence
+
+These are historical foundation results, not a fresh run against the current
+checkout. Keep the recorded revisions and dates when assessing their scope.
 
 The baseline commonUtils suite passed on the local macOS host: 717 tests, two
 platform skips. Five-platform detection/capability matrices use mocks. Fresh

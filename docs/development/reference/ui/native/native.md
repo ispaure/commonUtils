@@ -659,7 +659,18 @@ handlers retain Toga's idempotent event contract.
 `clear_private_content()` retires callbacks, clears the live document and disposes
 the native view idempotently. Unsupported backends fail closed. Callers choose
 HTML byte limits and supply navigation, resource and credential-validity policy.
-The component does not sanitize HTML or authorize arbitrary URLs.
+The component does not sanitize HTML or authorize arbitrary URLs. It does not
+install screenshot/recording protection, obscure app-switcher previews or stop
+speech when the app backgrounds. Those are consumer window/session policies.
+The Android configuration disables WebView debugging process-wide; account for
+that effect when embedding ordinary and private views in one host.
+
+For playback authorization, set `SpeechSession.can_speak` to the host's current
+document/session guard; its default permits playback. Retiring a document should
+stop or dispose its session explicitly. `stop()` invalidates utterance tokens and
+clears retained text while permitting reuse; `dispose()` also closes the engine
+and detaches session callbacks. Neither substitutes for a host background/privacy
+transition. See [portable and Qt playback](../readers/readers.md#portable-playback-and-the-qt-adapter).
 
 Consumer host regressions and mocked native disposal cover these adapters.
 Physical speech, WebView storage behavior and platform accessibility still need

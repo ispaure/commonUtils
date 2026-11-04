@@ -28,11 +28,13 @@ module paths. The root import does not initialize a GUI or install optional soft
 | Capability | Additional dependency or prerequisite |
 | --- | --- |
 | Qt widgets and workers | PySide6 and a graphical session for interactive use; one QApplication |
-| ZIP payload operations | pyzipper; metadata-only archive imports remain lazy |
+| Plain ZIP read/write | Python standard library `zipfile`; no pyzipper required |
+| Encrypted ZIP read/write | Optional pyzipper, loaded only for encrypted access |
 | External archive extraction | patool (import name patoolib), with appropriate native extractors |
 | Syntax highlighting | Optional Pygments; plain code editing does not require a lexer |
 | Markdown diagrams | Optional local `mmdc` executable, invoked only on request |
-| Read aloud | QtTextToSpeech plus an available native speech engine/voice |
+| Desktop Qt read aloud | QtTextToSpeech plus an available native speech engine/voice |
+| Native mobile controls and speech | Consumer-selected Toga backend, packaged shared native sources and installed offline system voices; see [native components](reference/ui/native/native.md) |
 | EXIF wrapper | piexif |
 | Platform/application adapters | Their target applications or system commands; consult [integrations](reference/integrations/integrations.md) |
 
