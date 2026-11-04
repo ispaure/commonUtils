@@ -199,6 +199,57 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         adapter.select_current_tab()
         self.assertTrue(adapter.host.changing)
 
+    def test_android_voice_refresh_drops_stale_rows_and_prefers_system_default(self):
+        engine = object.__new__(NativeSpeech)
+        engine.closed = False
+        engine.voices = {'Stale': object()}
+        engine.native, engine.progress_listener = Mock(), Mock()
+        def voice(name):
+            result = Mock()
+            result.getName.return_value = name
+            result.getLocale.return_value.toLanguageTag.return_value = 'en-US'
+            result.getFeatures.return_value = None
+            result.isNetworkConnectionRequired.return_value = False
+            return result
+        selected, default = voice('Selected'), voice('System')
+        engine.native.getVoices.return_value.toArray.return_value = [selected, default]
+        engine.native.getVoice.return_value = selected
+        engine.native.getDefaultVoice.return_value = default
+        with patch.dict(sys.modules, {'android.media': SimpleNamespace(AudioAttributes=Mock())}):
+            engine.load_android_voices(0)
+        self.assertEqual(engine.default_voice, 'en-US · System')
+        self.assertNotIn('Stale', engine.voices)
+        self.assertTrue(engine.ready)
+
+    def test_missing_saved_voice_uses_system_default_at_playback(self):
+        engine = object.__new__(NativeSpeech)
+        default = object()
+        engine.closed, engine.ready = False, True
+        engine.backend = 'toga_android.speech'
+        engine.voices, engine.default_voice = {'Default': default}, 'Default'
+        engine.native = Mock()
+        engine.native.setVoice.return_value = engine.native.setSpeechRate.return_value = engine.native.speak.return_value = 0
+        engine.speak('Text', 'Removed', 1.0, 'token')
+        engine.native.setVoice.assert_called_once_with(default)
+        engine.native.speak.assert_called_once_with('Text', 0, None, 'token')
+
+    def test_android_rejected_voice_refreshes_and_retries_system_default(self):
+        engine = object.__new__(NativeSpeech)
+        removed, default = object(), object()
+        engine.closed, engine.ready = False, True
+        engine.backend = 'toga_android.speech'
+        engine.voices, engine.default_voice = {'Removed': removed}, 'Removed'
+        engine.native = Mock()
+        engine.native.setVoice.side_effect = [-1, 0]
+        engine.native.setSpeechRate.return_value = engine.native.speak.return_value = 0
+        def refresh(status):
+            engine.voices, engine.default_voice = {'Default': default}, 'Default'
+        with patch.object(engine, 'load_android_voices', side_effect=refresh) as load:
+            engine.speak('Text', 'Removed', 1.0, 'token')
+            load.assert_called_once_with(0)
+        self.assertEqual([call.args[0] for call in engine.native.setVoice.call_args_list], [removed, default])
+        engine.native.speak.assert_called_once()
+
     def test_speech_close_releases_presentation_owners_even_when_native_stop_fails(self):
         class Receiver:
             def callback(self, *args):

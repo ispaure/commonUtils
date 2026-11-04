@@ -187,6 +187,9 @@ class NativeSpeech:
             return
         from android.media import AudioAttributes
 
+        self.voices.clear()
+        self.default_voice = ""
+        self.ready, self.error = False, ""
         self.native.setAudioAttributes(
             AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -230,7 +233,7 @@ class NativeSpeech:
         # Also ask for the selected/default voice: an engine's enumeration may
         # be empty or incomplete. Apply the same offline/install checks to both.
         defaults = []
-        for getter in (self.native.getVoice, self.native.getDefaultVoice):
+        for getter in (self.native.getDefaultVoice, self.native.getVoice):
             try:
                 candidate = getter()
                 label = offer(candidate)
@@ -294,15 +297,22 @@ class NativeSpeech:
         return next((label for label in self.voices if locales[label] == tag), '')
 
     def speak(self, text, voice, speed, token):
-        if self.closed or not self.ready or voice not in self.voices:
+        if self.closed or not self.ready or not self.voices:
             raise RuntimeError("An installed offline voice is required.")
+        voice = voice if voice in self.voices else self.default_voice
+        if voice not in self.voices:
+            voice = next(iter(self.voices))
         self.token = token
         if self.backend.startswith("toga_android."):
-            if (
-                self.native.setVoice(self.voices[voice]) != 0
-                or self.native.setSpeechRate(speed) != 0
-            ):
-                raise RuntimeError("Voice unavailable.")
+            if self.native.setVoice(self.voices[voice]) != 0:
+                # Installed data can disappear after this engine enumerated it.
+                # Re-enumerate to discard stale handles and use the system default.
+                self.load_android_voices(0)
+                fallback = self.voices.get(self.default_voice)
+                if fallback is None or self.native.setVoice(fallback) != 0:
+                    raise RuntimeError("No installed offline system voice is available.")
+            if self.native.setSpeechRate(speed) != 0:
+                raise RuntimeError("Speech rate unavailable.")
             if self.native.speak(text, 0, None, token) != 0:
                 raise RuntimeError("Speech engine failed.")
         else:
