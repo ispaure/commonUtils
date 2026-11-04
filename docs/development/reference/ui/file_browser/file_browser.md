@@ -264,7 +264,11 @@ while source identities, metadata rows, revisions and mutation contracts are sha
 
 `filesystem.image_previews` owns image suffix eligibility and delegates mount
 classification to `filesystem.network.is_network_location`. Provider fallback
-requires `LocalFiles`; virtual paths are never probed on disk. Qt filesystem tiles,
+requires `LocalFiles` with a false `private` flag, including subclasses. Private
+providers are rejected before path resolution, mount probes, metadata reads or
+content reads. Hosts may still supply explicit credential-scoped, RAM-only domain
+thumbnail loaders; those loaders retain precedence over the generic filesystem
+fallback. Virtual paths are never probed on disk. Qt filesystem tiles,
 provider tiles and information panels reuse `thumbnails.local_image_thumbnail` on
 their existing workers. Explicit format thumbnail hooks retain precedence.
 
