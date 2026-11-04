@@ -354,3 +354,7 @@ Readiness and delegate attachment are published on the app loop. Closing during
 initialization keeps readiness false and retires a late synthesizer instead of
 reviving the engine; discovery consumers retain their existing bounded readiness
 wait and unavailable-voice feedback.
+
+Apple speech initialization reports an actionable error after twelve seconds if the
+system service does not return. Closed or expired engines discard late native
+results, and discovery never waits on the UI thread.
