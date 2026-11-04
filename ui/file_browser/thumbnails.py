@@ -22,8 +22,18 @@ class CoverModel(ByteSortModel):
         self.epoch = 0
         self.snapshots = {}
         source.modelReset.connect(self.clear_cache)
+        source.dataChanged.connect(self._source_changed)
         if hasattr(source, 'snapshot_changed'):
             source.snapshot_changed.connect(self._snapshot_changed)
+
+    def _source_changed(self, first, last, roles=()):
+        """Retire cached and in-flight covers when their source row changes."""
+        source = self.sourceModel()
+        for identity in tuple(self.requested | self.icons.keys()):
+            index = source.browse_index(identity)
+            if (index.isValid() and index.parent() == first.parent()
+                    and first.row() <= index.row() <= last.row()):
+                self.invalidate(identity)
 
     def clear_cache(self):
         self.epoch += 1
