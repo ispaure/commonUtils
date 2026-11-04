@@ -253,7 +253,7 @@ repeated restores and sidebar restoration alongside keyboard/reader ownership.
 
 ## Native image canvas
 
-`ImageCanvas(image=None, on_page=None, on_toggle=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description=..., **kwargs)`
+`ImageCanvas(image=None, on_page=None, on_toggle=None, on_tap=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description=..., **kwargs)`
 extends Toga ImageView. It fits and centers an image, bounds zoom to 1–6, allows
 pan while zoomed, and emits left/right paging callbacks at fit scale. It does not
 load files, determine page order, decrypt content or save positions. Supply a
@@ -261,6 +261,13 @@ description appropriate to the consumer's content. Set `page_axis='vertical'`
 at construction for up/down paging (up emits +1, down emits -1); the default
 horizontal axis retains left/right paging. Both axes retain tap, pinch/pan and
 hold-lens arbitration, and page swipes require fit scale.
+`on_tap(x, y)` optionally receives a recognized direct-finger tap as normalized
+image coordinates (top-left origin), including native zoom, pan and centering.
+Return True to consume the tap; otherwise the existing on_toggle callback runs.
+Letterbox taps retain that fallback. Movement, multitouch and hold recognition
+remain owned by native gesture arbitration; Pencil/stylus input never calls
+on_tap. Android hosts must compile the updated ImageCanvasView callback bridge.
+Disposal clears on_tap with the other callbacks.
 Set `page_swipes_at_edges=True` to accept Apple paging swipes within the outer
 24 points too. The host must also reserve paging through `chrome.set_page_swipes`
 to prevent navigation pop gestures from competing; tap edge filtering is retained.

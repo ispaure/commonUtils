@@ -22,13 +22,14 @@ public final class ImageCanvasView extends AppCompatImageView {
     public interface PageListener {
         void page(int direction);
         void toggleControls();
+        default void tap(float x, float y) { toggleControls(); }
         default void magnifierZoom(int percent) {}
     }
     private PageListener listener;
     private final Matrix matrix = new Matrix();
     private final ScaleGestureDetector detector;
     private float zoom = 1, base = 1, lastX, lastY, startX, startY;
-    private boolean multiplePointers, verticalPaging;
+    private boolean multiplePointers, verticalPaging, moved, finger;
     public void setVerticalPaging(boolean value) { verticalPaging = value; }
     private boolean magnifierEnabled, lensActive, lensConsumed, touchActive;
     private int magnifierZoom = 190;
@@ -248,7 +249,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         float density = getResources().getDisplayMetrics().density;
         if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
             dismissMagnifier();
-            multiplePointers = lensConsumed = false;
+            multiplePointers = lensConsumed = moved = false;
+            finger = event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER;
             touchActive = true;
             startX = lastX = event.getX(); startY = lastY = event.getY();
             if (zoom <= 1.05f && (startX < 24*density || startX > getWidth()-24*density)) {
@@ -263,7 +265,10 @@ public final class ImageCanvasView extends AppCompatImageView {
             dismissMagnifier();
         }
         float slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-        if (!lensActive && (Math.abs(event.getX()-startX) > slop || Math.abs(event.getY()-startY) > slop)) removeCallbacks(hold);
+        if (Math.abs(event.getX()-startX) > slop || Math.abs(event.getY()-startY) > slop) {
+            moved = true;
+            if (!lensActive) removeCallbacks(hold);
+        }
         detector.onTouchEvent(event);
         if (event.getActionMasked() == MotionEvent.ACTION_MOVE && !detector.isInProgress() && zoom > 1.05f && !lensActive) {
             matrix.postTranslate(event.getX()-lastX, event.getY()-lastY);
@@ -274,7 +279,18 @@ public final class ImageCanvasView extends AppCompatImageView {
             float threshold = Math.max(32*density, Math.min(80*density, getWidth()*.12f));
             float along = verticalPaging ? dy : dx, across = verticalPaging ? dx : dy;
             if (!lensConsumed && !multiplePointers && zoom <= 1.05f && Math.abs(along) > threshold && Math.abs(along) > Math.abs(across)*1.5f && listener != null) listener.page(along < 0 ? 1 : -1);
-            else if (!lensConsumed && !multiplePointers && Math.abs(dx) < 12*density && Math.abs(dy) < 12*density) performClick();
+            else if (!lensConsumed && !multiplePointers && !moved && Math.abs(dx) < 12*density && Math.abs(dy) < 12*density) {
+                Drawable image = getDrawable();
+                Matrix inverse = new Matrix();
+                if (finger && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER
+                    && (event.getFlags() & MotionEvent.FLAG_CANCELED) == 0
+                    && event.getEventTime()-event.getDownTime() < 600
+                    && listener != null && image != null && matrix.invert(inverse)) {
+                    float[] point = {event.getX()-getPaddingLeft(), event.getY()-getPaddingTop()};
+                    inverse.mapPoints(point);
+                    listener.tap(point[0]/image.getIntrinsicWidth(), point[1]/image.getIntrinsicHeight());
+                } else performClick();
+            }
             touchActive = false;
             dismissMagnifier();
             getParent().requestDisallowInterceptTouchEvent(false);
