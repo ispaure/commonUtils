@@ -103,6 +103,11 @@ on macOS, with `--no-dev` additionally on Linux and Windows. The working directo
 is the configured source directory. The wrapper must execute the argv after `--`
 as an argument list, preserve its exit status, and return before application launch.
 The launcher stops on any nonzero wrapper exit and returns that status.
+Windows passes the project-root directory with a terminal `\.` component so a
+trailing separator from a top-level BAT wrapper cannot escape the closing quote
+when Python parses its command line. The wrapper resolves it to the same directory.
+Native consumer coverage must invoke the top-level wrapper, as well as the shared
+launcher directly; the two paths supply different root argument spellings.
 
 On first launch, an absent or empty environment is initialized with
 `uv venv --no-python-downloads VENV_ROOT` from the source directory, honoring the

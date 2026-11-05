@@ -270,7 +270,8 @@ if not exist "%ENVIRONMENT_SYNC_PYTHON%" (
     exit /b 1
 )
 :RunEnvironmentSyncWrapper
-"%ENVIRONMENT_SYNC_PYTHON%" "%ENVIRONMENT_SYNC_WRAPPER%" sync --project-root "%PROJECT_ROOT%" --venv "%VENV_DIR%" -- "%UV_EXE%" sync --locked --no-dev --no-python-downloads
+rem A terminal dot prevents a trailing root backslash from escaping CPython's closing quote.
+"%ENVIRONMENT_SYNC_PYTHON%" "%ENVIRONMENT_SYNC_WRAPPER%" sync --project-root "%PROJECT_ROOT%\." --venv "%VENV_DIR%" -- "%UV_EXE%" sync --locked --no-dev --no-python-downloads
 exit /b %ERRORLEVEL%
 
 :GenerateInitialLockfile

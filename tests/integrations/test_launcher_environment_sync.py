@@ -207,8 +207,8 @@ class UnixEnvironmentSyncTests(unittest.TestCase):
             trace = root / 'trace.jsonl'
             env = dict(os.environ, HOME=str(root), PATH=str(binaries) + os.pathsep + os.environ['PATH'],
                        LAUNCHER_TRACE=str(trace), FAKE_OS='Darwin' if 'MAC' in name else 'Linux')
-            def run(**overrides):
-                return subprocess.run(['bash', str(LAUNCHERS / name), str(root), str(config), 'false',
+            def run(*, root_suffix='', **overrides):
+                return subprocess.run(['bash', str(LAUNCHERS / name), str(root) + root_suffix, str(config), 'false',
                     'space value', 'literal&value', '$(not-executed)', 'quote"value'],
                     cwd='/', env=dict(env, **overrides), text=True, capture_output=True, timeout=20)
             yield root, source, wrapper, uv, trace, run
@@ -235,6 +235,19 @@ class UnixEnvironmentSyncTests(unittest.TestCase):
                 self.assertEqual(invoked['argv'], [str(wrapper), 'sync', '--project-root', str(root), '--venv', str(root / '.venv'), '--', str(uv), *flags])
                 self.assertEqual([x['kind'] for x in rows if x['kind'] in ('wrapper', 'app')], ['wrapper', 'app'])
                 self.assertEqual(rows[-1], dict(kind='app', argv=['space value', 'literal&value', '$(not-executed)', 'quote"value']))
+
+    def test_posix_trailing_root_preserves_sync_arguments(self):
+        for name in self.names():
+            with self.subTest(platform=name), self.fixture(name) as (root, _, _, _, trace, run):
+                result = run(root_suffix='/')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                argv = next(row['argv'] for row in self.events(trace) if row['kind'] == 'wrapper')
+                self.assertEqual(argv[:2], ['sync', '--project-root'])
+                self.assertEqual(Path(argv[2]).resolve(), root)
+                self.assertEqual(argv[3], '--venv')
+                self.assertEqual(Path(argv[4]).resolve(), root / '.venv')
+                self.assertEqual(argv[5], '--')
+                self.assertEqual(self.events(trace)[-1]['kind'], 'app')
 
     def test_wrapper_failure_preserves_exit_and_prevents_sync_and_application(self):
         for name in self.names():
@@ -511,6 +524,8 @@ class WindowsEnvironmentSyncTests(unittest.TestCase):
             self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
             rows = [json.loads(line) for line in trace.read_text().splitlines()]
             argv = rows[-1]['argv']
-            self.assertEqual(argv[:6], ['sync', '--project-root', str(root), '--venv', str(root / '.venv'), '--'])
+            self.assertEqual(argv[:2], ['sync', '--project-root'])
+            self.assertEqual(Path(argv[2]).resolve(), root)
+            self.assertEqual(argv[3:6], ['--venv', str(root / '.venv'), '--'])
             self.assertEqual(argv[7:], ['sync', '--locked', '--no-dev', '--no-python-downloads'])
             self.assertTrue((root / '.venv/Scripts/python.exe').is_file())
