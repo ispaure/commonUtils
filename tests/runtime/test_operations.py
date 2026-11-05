@@ -38,8 +38,12 @@ class OperationProgressTests(QtTestCase):
             results.append((value, error))
         self.progress.completed.connect(done)
         self.progress.start(lambda report, cancelled: 'first')
+        worker = self.progress.operation
         self.wait()
+        self.assertIsNone(worker.callback)
+        self.assertIsNone(worker.result)
         self.progress.start(lambda report, cancelled: 'second')
+        self.assertIs(self.progress.operation, worker)
         self.wait()
         self.assertEqual(results, [('first', ''), ('second', '')])
         self.assertEqual(self.progress.bar.maximum(), 1000)

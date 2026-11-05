@@ -20,6 +20,7 @@ class OperationProgress(StatusFooter):
         self.busy = False
         self.cancelled = Event()
         self.operation = None
+        self._worker = None
         self._result = (None, '')
         self.bar = qt.QProgressBar()
         self.bar.setMaximumWidth(140)
@@ -54,9 +55,15 @@ class OperationProgress(StatusFooter):
                 last_report = now
                 self.progress_changed.emit(done, total, message)
         try:
-            self.operation = Operation(lambda: work(report, self.cancelled.is_set), self)
-            self.operation.completed.connect(self._remember_result)
-            self.operation.finished.connect(self._finished)
+            self.operation = self._worker
+            if self.operation is None:
+                # Reuse the Qt wrapper across jobs. Recreating it repeatedly
+                # can crash inside PySide's metadata lookup on Windows.
+                self.operation = Operation(None, self)
+                self.operation.completed.connect(self._remember_result)
+                self.operation.finished.connect(self._finished)
+                self._worker = self.operation
+            self.operation.callback = lambda: work(report, self.cancelled.is_set)
             self.operation.start()
         except Exception as error:
             self._remember_result(None, _format_error(error))
@@ -80,7 +87,11 @@ class OperationProgress(StatusFooter):
         self.message.setText(f'Operation failed: {error}' if error else
                              'Cancelled.' if cancelled else 'Finished.')
         if operation is not None:
-            operation.deleteLater()
+            operation.callback = None
+            operation.result = None
+            operation.error = None
+            if operation is not self._worker:
+                operation.deleteLater()
         self.completed.emit(*self._result)
 
     def _progress(self, done, total, message):
