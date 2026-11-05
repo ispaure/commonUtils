@@ -34,6 +34,7 @@ public final class ImageCanvasView extends AppCompatImageView {
     public void setVerticalPaging(boolean value) { verticalPaging = value; }
     private boolean magnifierEnabled, lensActive, lensConsumed, touchActive;
     private int magnifierZoom = 190;
+    private int magnifierMinimum = 150, magnifierMaximum = 250, magnifierStep = 20;
     private PopupWindow lensControls;
     private Button lensLess, lensMore;
     private int lensControlZoom = -1;
@@ -93,15 +94,26 @@ public final class ImageCanvasView extends AppCompatImageView {
         return new RectF(left, top, right, top + 33*density);
     }
     public int getMagnifierZoom() { return magnifierZoom; }
+    public void setMagnifierRange(int minimum, int maximum, int step) {
+        if (minimum <= 0 || maximum <= minimum || step <= 0 || (maximum - minimum) % step != 0
+                || magnifierZoom < minimum || magnifierZoom > maximum || (magnifierZoom - minimum) % step != 0)
+            throw new IllegalArgumentException("Choose a range that includes the current magnifier zoom.");
+        magnifierMinimum = minimum;
+        magnifierMaximum = maximum;
+        magnifierStep = step;
+        lensControlZoom = -1;
+        updateLensControls();
+    }
     public void setMagnifierZoom(int value) {
-        if (value < 150 || value > 250 || (value-150)%20 != 0)
-            throw new IllegalArgumentException("Magnifier zoom must be 150–250%, in 20% steps.");
+        if (value < magnifierMinimum || value > magnifierMaximum || (value - magnifierMinimum) % magnifierStep != 0)
+            throw new IllegalArgumentException("Choose a supported magnifier zoom.");
         magnifierZoom = value;
         updateLensControls();
         invalidate();
     }
     private void changeMagnifierZoom(int direction) {
-        int value = Math.max(150, Math.min(250, magnifierZoom + 20*direction));
+        int value = Math.max(magnifierMinimum, Math.min(magnifierMaximum,
+            magnifierZoom + magnifierStep * direction));
         if (value == magnifierZoom) return;
         if (listener != null) listener.magnifierZoom(value);
         else setMagnifierZoom(value);
@@ -147,9 +159,10 @@ public final class ImageCanvasView extends AppCompatImageView {
         if (lensControls == null) return;
         if (lensControlZoom != magnifierZoom) {
             lensControlZoom = magnifierZoom;
-            lensLess.setEnabled(magnifierZoom > 150); lensMore.setEnabled(magnifierZoom < 250);
-            lensLess.setAlpha(magnifierZoom > 150 ? 1f : .4f);
-            lensMore.setAlpha(magnifierZoom < 250 ? 1f : .4f);
+            lensLess.setEnabled(magnifierZoom > magnifierMinimum);
+            lensMore.setEnabled(magnifierZoom < magnifierMaximum);
+            lensLess.setAlpha(magnifierZoom > magnifierMinimum ? 1f : .4f);
+            lensMore.setAlpha(magnifierZoom < magnifierMaximum ? 1f : .4f);
         }
         RectF rect = lensControlsBounds();
         int[] origin = new int[2]; getLocationOnScreen(origin);

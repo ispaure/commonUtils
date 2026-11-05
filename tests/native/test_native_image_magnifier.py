@@ -131,6 +131,18 @@ class AppleLensTests(unittest.TestCase):
         backend.hide_magnifier()
         self.assertIsNone(backend.lens_more)
 
+    def test_custom_range_updates_buttons_at_the_same_zoom(self):
+        backend = self.backend
+        backend.interface.magnifier_zoom = 250
+        backend.show_magnifier(self.gesture())
+        backend.lens_more.setEnabled.assert_called_with(False)
+        backend.interface.magnifier_levels = range(150, 301, 10)
+        backend.show_magnifier(self.gesture())
+        backend.lens_more.setEnabled.assert_called_with(True)
+        backend.interface.magnifier_zoom = 300
+        backend.show_magnifier(self.gesture())
+        backend.lens_more.setEnabled.assert_called_with(False)
+
     def test_detached_or_disabled_canvas_cannot_show_a_lens(self):
         backend = self.backend
         backend.interface.magnifier_enabled = False
@@ -158,6 +170,19 @@ class MagnifierSettingTests(unittest.TestCase):
         self.assertEqual(view.magnifier_zoom, 150)
         for value in (149, 151, 200, 251, '190', 190.0):
             with self.assertRaises(ValueError):view.request_magnifier_zoom(value)
+
+    def test_configuring_a_range_retains_zoom_and_updates_the_native_backend(self):
+        view = self.view
+        view._impl.set_magnifier_range = Mock()
+        view.configure_magnifier(150, 300, 10)
+        view._impl.set_magnifier_range.assert_called_once_with(150, 300, 10)
+        self.assertEqual(view.magnifier_zoom, 190)
+        view.on_magnifier_zoom.assert_not_called()
+        for bounds in ((150, 300, 0), (150, 300, 20), (200, 300, 10)):
+            with self.assertRaises(ValueError):
+                view.configure_magnifier(*bounds)
+        view.change_magnifier_zoom(1)
+        self.assertEqual(view.magnifier_zoom, 200)
 
     def test_host_can_reject_a_failed_save_without_changing_native_zoom(self):
         view = self.view

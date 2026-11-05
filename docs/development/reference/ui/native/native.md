@@ -300,6 +300,10 @@ including pending Android movement callbacks.
 return `False` to reject a failed host save. Assigning `magnifier_zoom` updates a
 visible lens without firing the callback. `change_magnifier_zoom(direction)` steps
 once and `request_magnifier_zoom(percent)` requests an explicit supported level.
+A host can call `configure_magnifier(minimum, maximum, step)` to set an inclusive
+range. Both endpoints must be positive and align to the step, and the current
+zoom must remain valid. The same levels drive assignment and both native buttons.
+Android hosts using custom levels must compile the matching Java bridge.
 The host owns persistence and synchronization across canvases. A second finger
 away from the buttons still cancels the lens for ordinary image pinch zoom. Disabling the property, replacing the image, resizing,
 detaching or disposing clears the overlay and pending hold. Hosts own eligibility

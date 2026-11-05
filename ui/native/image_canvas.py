@@ -253,7 +253,8 @@ def apple_backend(interface):
             left, right, top = magnifier_controls_geometry(
                 rect.size.width, rect.size.height, x, y, width)
             scale = percent / 100 * float(self.native.zoomScale)
-            layout = (width, height, size.width, size.height, scale, percent)
+            levels = getattr(self.interface, 'magnifier_levels', MAGNIFIER_ZOOMS)
+            layout = (width, height, size.width, size.height, scale, percent, levels[0], levels[-1])
             if self.lens_layout != layout:
                 self.lens_layout = layout
                 self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
@@ -262,8 +263,8 @@ def apple_backend(interface):
                 self.lens_picture.frame = CGRect(
                     (width / 2 - source.x * scale, height / 2 - source.y * scale),
                     (size.width * scale, size.height * scale))
-                self.lens_less.setEnabled(percent > 150)
-                self.lens_more.setEnabled(percent < 250)
+                self.lens_less.setEnabled(percent > levels[0])
+                self.lens_more.setEnabled(percent < levels[-1])
             else:
                 # Dragging only translates existing layers. Setting UIImageView
                 # and UIButton frames repeatedly schedules layout/content work.
@@ -374,6 +375,9 @@ def android_backend(interface):
         def set_magnifier_enabled(self, enabled):
             self.native.setMagnifierEnabled(enabled)
 
+        def set_magnifier_range(self, minimum, maximum, step):
+            self.native.setMagnifierRange(minimum, maximum, step)
+
         def set_magnifier_zoom(self, value):
             self.native.setMagnifierZoom(value)
 
@@ -384,6 +388,7 @@ def android_backend(interface):
 
 
 class ImageCanvas(toga.ImageView):
+    magnifier_levels = MAGNIFIER_ZOOMS
     def __init__(self, *args, on_page=None, on_toggle=None, on_tap=None, page_swipes_at_edges=False, magnifier_enabled=False, magnifier_zoom=190, on_magnifier_zoom=None, page_axis='horizontal', description='Image. Pinch to zoom; swipe at fit size to change images.', **kwargs):
         if page_axis not in ('horizontal', 'vertical'):
             raise ValueError('page_axis must be horizontal or vertical')
@@ -419,22 +424,37 @@ class ImageCanvas(toga.ImageView):
         if setter is not None:
             setter(self._magnifier_enabled)
 
+    def configure_magnifier(self, minimum, maximum, step):
+        """Set the host's inclusive zoom range, retaining the current zoom."""
+        if (any(type(value) is not int for value in (minimum, maximum, step))
+                or minimum <= 0 or maximum <= minimum or step <= 0
+                or (maximum - minimum) % step):
+            raise ValueError('Choose a positive, evenly spaced magnifier zoom range.')
+        levels = range(minimum, maximum + 1, step)
+        if self.magnifier_zoom not in levels:
+            raise ValueError('The magnifier range must include the current zoom.')
+        setter = getattr(self._impl, 'set_magnifier_range', None)
+        if setter is not None:
+            setter(minimum, maximum, step)
+        self.magnifier_levels = levels
+        self.magnifier_zoom = self.magnifier_zoom
+
     @property
     def magnifier_zoom(self):
         return self._magnifier_zoom
 
     @magnifier_zoom.setter
     def magnifier_zoom(self, value):
-        if type(value) is not int or value not in MAGNIFIER_ZOOMS:
-            raise ValueError('Magnifier zoom must be 150–250%, in 20% steps.')
+        if type(value) is not int or value not in self.magnifier_levels:
+            raise ValueError('Choose a supported magnifier zoom.')
         self._magnifier_zoom = value
         setter = getattr(self._impl, 'set_magnifier_zoom', None)
         if setter is not None:
             setter(value)
 
     def request_magnifier_zoom(self, value):
-        if type(value) is not int or value not in MAGNIFIER_ZOOMS:
-            raise ValueError('Magnifier zoom must be 150–250%, in 20% steps.')
+        if type(value) is not int or value not in self.magnifier_levels:
+            raise ValueError('Choose a supported magnifier zoom.')
         if value == self.magnifier_zoom:
             return False
         if self.on_magnifier_zoom is not None and self.on_magnifier_zoom(self, value) is False:
@@ -443,8 +463,9 @@ class ImageCanvas(toga.ImageView):
         return True
 
     def change_magnifier_zoom(self, direction):
-        index = MAGNIFIER_ZOOMS.index(self.magnifier_zoom)
-        return self.request_magnifier_zoom(MAGNIFIER_ZOOMS[max(0, min(len(MAGNIFIER_ZOOMS)-1,
+        levels = self.magnifier_levels
+        index = levels.index(self.magnifier_zoom)
+        return self.request_magnifier_zoom(levels[max(0, min(len(levels)-1,
             index + (1 if direction > 0 else -1)))])
 
     def page(self, direction):
