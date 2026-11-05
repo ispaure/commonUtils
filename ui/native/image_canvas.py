@@ -22,10 +22,10 @@ def magnifier_geometry(view_width, view_height, thumb_x, thumb_y):
     return x, y, width, height, sample_x, sample_y
 
 
-def magnifier_controls_geometry(view_width, view_height, x, y, width, height=140):
-    """33-point bottom-corner controls, clamped to the reader viewport."""
+def magnifier_controls_geometry(view_width, view_height, x, y, width):
+    """33-point upper-corner controls, clamped to the reader viewport."""
     clamp_x = lambda value: max(0, min(value, view_width - 33))
-    return clamp_x(x - 6), clamp_x(x + width - 27), max(0, min(y + height - 24, view_height - 33))
+    return clamp_x(x - 6), clamp_x(x + width - 27), max(0, min(y - 9, view_height - 33))
 
 
 def apple_lens_class():
@@ -251,14 +251,14 @@ def apple_backend(interface):
             # Separate sibling controls can extend beyond the rounded lens;
             # clamp to the reader viewport so edge holds keep both reachable.
             left, right, top = magnifier_controls_geometry(
-                rect.size.width, rect.size.height, x, y, width, height)
+                rect.size.width, rect.size.height, x, y, width)
             scale = percent / 100 * float(self.native.zoomScale)
             layout = (width, height, size.width, size.height, scale, percent)
             if self.lens_layout != layout:
                 self.lens_layout = layout
                 self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
-                self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
-                self.lens_more.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
+                self.lens_more.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
+                self.lens_less.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
                 self.lens_picture.frame = CGRect(
                     (width / 2 - source.x * scale, height / 2 - source.y * scale),
                     (size.width * scale, size.height * scale))
@@ -268,8 +268,8 @@ def apple_backend(interface):
                 # Dragging only translates existing layers. Setting UIImageView
                 # and UIButton frames repeatedly schedules layout/content work.
                 self.lens.center = CGPoint(rect.origin.x + x + width / 2, rect.origin.y + y + height / 2)
-                self.lens_less.center = CGPoint(rect.origin.x + left + 16.5, rect.origin.y + top + 16.5)
-                self.lens_more.center = CGPoint(rect.origin.x + right + 16.5, rect.origin.y + top + 16.5)
+                self.lens_more.center = CGPoint(rect.origin.x + left + 16.5, rect.origin.y + top + 16.5)
+                self.lens_less.center = CGPoint(rect.origin.x + right + 16.5, rect.origin.y + top + 16.5)
                 self.lens_picture.center = CGPoint(width / 2 + (size.width / 2 - source.x) * scale,
                                                     height / 2 + (size.height / 2 - source.y) * scale)
 

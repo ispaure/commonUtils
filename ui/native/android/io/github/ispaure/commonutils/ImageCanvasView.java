@@ -89,7 +89,7 @@ public final class ImageCanvasView extends AppCompatImageView {
         RectF lens = lensBounds();
         float left = Math.max(0, lens.left - 6*density);
         float right = Math.min(getWidth(), lens.right + 6*density);
-        float top = Math.max(0, Math.min(lens.bottom - 24*density, getHeight() - 33*density));
+        float top = Math.max(0, Math.min(lens.top - 9*density, getHeight() - 33*density));
         return new RectF(left, top, right, top + 33*density);
     }
     public int getMagnifierZoom() { return magnifierZoom; }
@@ -127,8 +127,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         lensMore.setContentDescription("Increase magnifier zoom");
         lensLess.setOnClickListener(view -> changeMagnifierZoom(-1));
         lensMore.setOnClickListener(view -> changeMagnifierZoom(1));
-        bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.TOP));
-        bar.addView(lensMore, new FrameLayout.LayoutParams(side, side, Gravity.RIGHT | Gravity.TOP));
+        bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.RIGHT | Gravity.TOP));
+        bar.addView(lensMore, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.TOP));
         RectF rect = lensControlsBounds();
         lensControls = new PopupWindow(bar, Math.round(rect.width()), side, false);
         lensControls.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
