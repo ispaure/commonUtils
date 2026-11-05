@@ -116,10 +116,17 @@ class QtFixtureTests(unittest.TestCase):
     def test_wait_delivers_timers_and_reports_timeout(self):
         case = QtTestCase()
         ready = []
+        checks = []
+
+        def ready_after_poll():
+            checks.append(True)
+            return len(checks) == 2
+
+        case.wait_until(ready_after_poll, message=lambda: self.fail('Unexpected diagnostic read'))
         qt.QTimer.singleShot(0, lambda: ready.append(True))
         case.wait_until(lambda: ready, message='timer never arrived')
         with self.assertRaisesRegex(AssertionError, 'specific operation stalled'):
-            case.wait_until(lambda: False, timeout=.01, message='specific operation stalled')
+            case.wait_until(lambda: False, timeout=.01, message=lambda: 'specific operation stalled')
         with self.assertRaises(ValueError):
             case.wait_until(lambda: True, timeout=0)
 

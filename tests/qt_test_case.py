@@ -113,7 +113,8 @@ class QtTestCase(unittest.TestCase):
                 check_callbacks()
             if condition():
                 return
-            self.assertLess(monotonic(), deadline, message() if callable(message) else message)
+            if monotonic() >= deadline:
+                self.fail(message() if callable(message) else message)
             # Native browser/decoder callbacks need a real Qt event-loop turn,
             # not just processEvents followed by a blocked GUI thread.
             self._dispatch_qt(QTest.qWait, 5)
