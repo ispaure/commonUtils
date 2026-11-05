@@ -8,7 +8,7 @@ from threading import Event
 from time import monotonic
 from .. import pyside as qt
 from ..appearance.status_line import StatusFooter
-from .operations import Operation, _format_error
+from .operations import ProgressOperation, _format_error
 
 
 class OperationProgress(StatusFooter):
@@ -57,26 +57,25 @@ class OperationProgress(StatusFooter):
         try:
             self.operation = self._worker
             if self.operation is None:
-                # Reuse the Qt wrapper across jobs. Recreating it repeatedly
-                # can crash inside PySide's metadata lookup on Windows.
-                self.operation = Operation(None, self)
-                self.operation.completed.connect(self._remember_result)
-                self.operation.finished.connect(self._finished)
+                # A plain QThread avoids PySide's native metadata lookup on
+                # Python thread subclasses during Notes open and save.
+                self.operation = ProgressOperation(self)
+                self.operation.thread.finished.connect(self._finished, qt.Qt.ConnectionType.QueuedConnection)
                 self._worker = self.operation
             self.operation.callback = lambda: work(report, self.cancelled.is_set)
             self.operation.start()
         except Exception as error:
-            self._remember_result(None, _format_error(error))
+            self._result = None, _format_error(error)
             # Preserve asynchronous completion even when no worker could start.
             qt.QTimer.singleShot(0, self, self._finished)
 
-    def _remember_result(self, result, error):
-        self._result = result, error
-
+    @qt.Slot()
     def _finished(self):
         operation = self.operation
         if operation is not None:
-            operation.wait()
+            operation.thread.wait()
+            if not self._result[1]:
+                self._result = operation.result, operation.error or ''
         self.operation = None
         self.busy = False
         self.cancel_button.setEnabled(False)
@@ -91,7 +90,7 @@ class OperationProgress(StatusFooter):
             operation.result = None
             operation.error = None
             if operation is not self._worker:
-                operation.deleteLater()
+                operation.thread.deleteLater()
         self.completed.emit(*self._result)
 
     def _progress(self, done, total, message):

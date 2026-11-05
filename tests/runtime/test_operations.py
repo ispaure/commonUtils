@@ -119,7 +119,7 @@ class OperationProgressTests(QtTestCase):
     def test_worker_admission_failure_completes_after_start_returns_and_allows_retry(self):
         results = []
         self.progress.completed.connect(lambda value, error: results.append((value, error)))
-        for target in ('Operation', 'Operation.start'):
+        for target in ('ProgressOperation', 'ProgressOperation.start'):
             with self.subTest(target=target):
                 results.clear()
                 try:
@@ -141,17 +141,17 @@ class OperationProgressTests(QtTestCase):
                 finally:
                     # Baseline admission errors leave a non-running retained worker.
                     worker = self.progress.operation
-                    if worker is None or not worker.isRunning():
+                    if worker is None or not worker.thread.isRunning():
                         self.progress.busy = False
                         self.progress.operation = None
                         if worker is not None:
-                            worker.deleteLater()
+                            worker.thread.deleteLater()
 
     def test_empty_admission_exception_still_reports_failure(self):
         results = []
         self.progress.completed.connect(lambda value, error: results.append((value, error)))
         try:
-            with patch('commonUtils.ui.tasks.operation_progress.Operation', side_effect=TimeoutError()):
+            with patch('commonUtils.ui.tasks.operation_progress.ProgressOperation', side_effect=TimeoutError()):
                 self.progress.start(lambda report, cancelled: None)
             self.wait()
             self.assertEqual(results, [(None, 'TimeoutError')])

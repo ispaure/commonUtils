@@ -13,6 +13,14 @@ def _format_error(error, formatter=str):
     return message if isinstance(message, str) and message.strip() else fallback
 
 
+def _run_callback(callback, error_formatter=str, cancellation_errors=()):
+    try:
+        with noninteractive_logging():
+            return callback(), None, False
+    except Exception as error:
+        return None, _format_error(error, error_formatter), isinstance(error, cancellation_errors)
+
+
 class ResultWorker(qt.QThread):
     """Owners consume result/error after finished, retaining the worker until then.
 
@@ -32,12 +40,8 @@ class ResultWorker(qt.QThread):
         self.result = None
         self.error = None
         self.cancelled = False
-        try:
-            with noninteractive_logging():
-                self.result = self.callback()
-        except Exception as error:
-            self.cancelled = isinstance(error, self.cancellation_errors)
-            self.error = _format_error(error, self.error_formatter)
+        self.result, self.error, self.cancelled = _run_callback(
+            self.callback, self.error_formatter, self.cancellation_errors)
 
     def cancel(self):
         self.requestInterruption()
@@ -53,3 +57,32 @@ class Operation(ResultWorker):
     def run(self):
         super().run()
         self.completed.emit(self.result, self.error or '')
+
+
+class ProgressOperation:
+    """Run a progress job on a plain Qt thread, without a Python Qt subclass."""
+
+    def __init__(self, parent):
+        self.thread = qt.QThread(parent)
+        self.thread.started.connect(self._run, qt.Qt.ConnectionType.DirectConnection)
+        self.callback = None
+        self.result = None
+        self.error = None
+
+    def start(self):
+        self.thread.start()
+
+    def wait(self):
+        return self.thread.wait()
+
+    def isRunning(self):
+        return self.thread.isRunning()
+
+    def isFinished(self):
+        return self.thread.isFinished()
+
+    def _run(self):
+        try:
+            self.result, self.error, _ = _run_callback(self.callback)
+        finally:
+            self.thread.quit()
