@@ -48,6 +48,40 @@ class Navigation:
 
 
 class NativeReaderGestureTests(unittest.TestCase):
+    def test_android_edge_tap_capability_tracks_callback_and_retirement(self):
+        android_backend = image_canvas_fixture().android_backend
+        class Native:
+            PageListener = object
+            def __init__(self, activity):
+                pass
+            def setContentDescription(self, value):
+                pass
+            def setVerticalPaging(self, value):
+                pass
+            def setMagnifierEnabled(self, value):
+                pass
+            def setMagnifierZoom(self, value):
+                pass
+            def setPageListener(self, value):
+                self.listener = value
+        class Base:
+            def __init__(self, *, interface):
+                self.interface = interface
+                self._native_activity = object()
+                self.create()
+        interface = SimpleNamespace(description='PDF', page_axis='vertical', magnifier_enabled=False,
+                                    magnifier_zoom=190, on_tap=None)
+        with patch.dict(sys.modules, {
+            'toga_android.widgets.imageview': SimpleNamespace(ImageView=Base),
+            'java': SimpleNamespace(jclass=lambda name: Native, dynamic_proxy=lambda protocol: object),
+        }):
+            backend = android_backend(interface)
+        self.assertFalse(backend.listener.imageTaps())
+        interface.on_tap = lambda x, y: True
+        self.assertTrue(backend.listener.imageTaps())
+        interface.on_tap = None
+        self.assertFalse(backend.listener.imageTaps())
+
     def test_apple_target_normalizes_real_location_and_preserves_programmatic_toggle(self):
         image_canvas = image_canvas_fixture()
         from unittest.mock import Mock

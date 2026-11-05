@@ -22,6 +22,7 @@ public final class ImageCanvasView extends AppCompatImageView {
     public interface PageListener {
         void page(int direction);
         void toggleControls();
+        default boolean imageTaps() { return false; }
         default void tap(float x, float y) { toggleControls(); }
         default void magnifierZoom(int percent) {}
     }
@@ -29,7 +30,7 @@ public final class ImageCanvasView extends AppCompatImageView {
     private final Matrix matrix = new Matrix();
     private final ScaleGestureDetector detector;
     private float zoom = 1, base = 1, lastX, lastY, startX, startY;
-    private boolean multiplePointers, verticalPaging, moved, finger;
+    private boolean multiplePointers, verticalPaging, moved, finger, edgeContact;
     public void setVerticalPaging(boolean value) { verticalPaging = value; }
     private boolean magnifierEnabled, lensActive, lensConsumed, touchActive;
     private int magnifierZoom = 190;
@@ -253,12 +254,15 @@ public final class ImageCanvasView extends AppCompatImageView {
             finger = event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER;
             touchActive = true;
             startX = lastX = event.getX(); startY = lastY = event.getY();
-            if (zoom <= 1.05f && (startX < 24*density || startX > getWidth()-24*density)) {
+            edgeContact = zoom <= 1.05f && (startX < 24*density || startX > getWidth()-24*density);
+            // Opt-in edge contacts are tap-only. Parent interception and system
+            // Back stay eligible; this stream never owns child paging or zoom.
+            if (edgeContact && (!finger || listener == null || !listener.imageTaps())) {
                 touchActive = false;
                 return false;
             }
-            if (magnifierEnabled) postDelayed(hold, 400);
-            getParent().requestDisallowInterceptTouchEvent(true);
+            if (magnifierEnabled && !edgeContact) postDelayed(hold, 400);
+            getParent().requestDisallowInterceptTouchEvent(!edgeContact);
         }
         if (event.getPointerCount() > 1) {
             multiplePointers = true;
@@ -269,16 +273,17 @@ public final class ImageCanvasView extends AppCompatImageView {
             moved = true;
             if (!lensActive) removeCallbacks(hold);
         }
-        detector.onTouchEvent(event);
-        if (event.getActionMasked() == MotionEvent.ACTION_MOVE && !detector.isInProgress() && zoom > 1.05f && !lensActive) {
+        if (!edgeContact) detector.onTouchEvent(event);
+        if (!edgeContact && event.getActionMasked() == MotionEvent.ACTION_MOVE && !detector.isInProgress() && zoom > 1.05f && !lensActive) {
             matrix.postTranslate(event.getX()-lastX, event.getY()-lastY);
             constrain();
         }
         if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+            if (edgeContact && !touchActive) return false;
             float dx = event.getX()-startX, dy = event.getY()-startY;
             float threshold = Math.max(32*density, Math.min(80*density, getWidth()*.12f));
             float along = verticalPaging ? dy : dx, across = verticalPaging ? dx : dy;
-            if (!lensConsumed && !multiplePointers && zoom <= 1.05f && Math.abs(along) > threshold && Math.abs(along) > Math.abs(across)*1.5f && listener != null) listener.page(along < 0 ? 1 : -1);
+            if (!edgeContact && !lensConsumed && !multiplePointers && zoom <= 1.05f && Math.abs(along) > threshold && Math.abs(along) > Math.abs(across)*1.5f && listener != null) listener.page(along < 0 ? 1 : -1);
             else if (!lensConsumed && !multiplePointers && !moved && Math.abs(dx) < 12*density && Math.abs(dy) < 12*density) {
                 Drawable image = getDrawable();
                 Matrix inverse = new Matrix();
@@ -289,7 +294,7 @@ public final class ImageCanvasView extends AppCompatImageView {
                     float[] point = {event.getX()-getPaddingLeft(), event.getY()-getPaddingTop()};
                     inverse.mapPoints(point);
                     listener.tap(point[0]/image.getIntrinsicWidth(), point[1]/image.getIntrinsicHeight());
-                } else performClick();
+                } else if (!edgeContact) performClick();
             }
             touchActive = false;
             dismissMagnifier();
@@ -299,7 +304,7 @@ public final class ImageCanvasView extends AppCompatImageView {
             dismissMagnifier();
             getParent().requestDisallowInterceptTouchEvent(false);
         } else {
-            getParent().requestDisallowInterceptTouchEvent(true);
+            getParent().requestDisallowInterceptTouchEvent(!edgeContact);
         }
         lastX = event.getX(); lastY = event.getY();
         if (lensActive) {

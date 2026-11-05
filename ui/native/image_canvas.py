@@ -362,6 +362,8 @@ def android_backend(interface):
                     owner.interface.page(direction)
                 def toggleControls(self):
                     owner.interface.toggle_controls()
+                def imageTaps(self):
+                    return owner.interface.on_tap is not None
                 def tap(self, x, y):
                     owner.interface.tap(x, y)
                 def magnifierZoom(self, value):
