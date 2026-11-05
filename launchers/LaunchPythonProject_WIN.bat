@@ -93,13 +93,7 @@ if /I "%NATIVE_ARCH%"=="AMD64" (
     echo WARNING: Unrecognized Windows architecture: %NATIVE_ARCH%
 )
 
-call :ReadLaunchConfig source_dir SOURCE_DIR_VALUE
-if errorlevel 1 goto :ConfigReadFailed
-call :ReadLaunchConfig launch_file LAUNCH_FILE_VALUE
-if errorlevel 1 goto :ConfigReadFailed
-call :ReadLaunchConfig ensure_user_dir ENSURE_USER_DIR
-if errorlevel 1 goto :ConfigReadFailed
-call :ReadLaunchConfig environment_sync_wrapper ENVIRONMENT_SYNC_WRAPPER_VALUE
+call :ReadLaunchConfig
 if errorlevel 1 goto :ConfigReadFailed
 
 if not defined SOURCE_DIR_VALUE (
@@ -536,22 +530,27 @@ echo Python installation/resolution succeeded.
 exit /b 0
 
 :ReadLaunchConfig
-set "CONFIG_KEY=%~1"
-set "CONFIG_OUTPUT=%TEMP%\commonutils_launch_%RANDOM%_%RANDOM%.tmp"
-if exist "%CONFIG_OUTPUT%" del /q "%CONFIG_OUTPUT%" >nul 2>&1
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $paths=@($env:CONFIG_FILE); if($env:COMMONUTILS_PERSONAL_CONFIG_FILE -and [IO.File]::Exists($env:COMMONUTILS_PERSONAL_CONFIG_FILE)){ $paths+= $env:COMMONUTILS_PERSONAL_CONFIG_FILE }; $key=$env:CONFIG_KEY; $result=''; foreach($path in $paths){ $inLaunch=$false; $values=New-Object System.Collections.Generic.List[string]; foreach($line in [IO.File]::ReadAllLines($path)){ $t=$line.Trim(); if($t -match '^\[(.+)\]$'){ $inLaunch=($matches[1].Trim() -ieq 'Launch'); continue }; if(-not $inLaunch -or $t.Length -eq 0 -or $t.StartsWith('#') -or $t.StartsWith(';')){ continue }; $idx=$line.IndexOf('='); if($idx -lt 0){ continue }; if($line.Substring(0,$idx).Trim() -ieq $key){ $v=$line.Substring($idx+1).Trim(); if($v.Length -ge 2){ if(($v[0] -eq [char]34 -and $v[$v.Length-1] -eq [char]34) -or ($v[0] -eq [char]39 -and $v[$v.Length-1] -eq [char]39)){ $v=$v.Substring(1,$v.Length-2) } }; $values.Add($v) } }; if($values.Count -gt 1){ [Console]::Error.WriteLine(('ERROR: Duplicate ''{0}'' entries were found in [Launch] in {1}.' -f $key,$path)); exit 2 }; if($values.Count -eq 1){ $result=$values[0] } }; [IO.File]::WriteAllText($env:CONFIG_OUTPUT,$result)"
-set "READ_STATUS=%ERRORLEVEL%"
-if not "%READ_STATUS%"=="0" (
-    if exist "%CONFIG_OUTPUT%" del /q "%CONFIG_OUTPUT%" >nul 2>&1
-    echo ERROR: Failed to read '%~1' from launch_config.ini.
-    exit /b %READ_STATUS%
+set "CONFIG_OUTPUT=%TEMP%\commonutils_launch_%RANDOM%_%RANDOM%"
+mkdir "%CONFIG_OUTPUT%" 2>nul
+if errorlevel 1 (
+    echo ERROR: Could not create a temporary directory for launch_config.ini.
+    exit /b 1
 )
 
-set "%~2="
-set /p "%~2="<"%CONFIG_OUTPUT%" 2>nul
-if exist "%CONFIG_OUTPUT%" del /q "%CONFIG_OUTPUT%" >nul 2>&1
-exit /b 0
+rem Read each layer once. Separate value files let SET /P import empty and
+rem literal values without feeding the INI contents back through CMD parsing.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $paths=@($env:CONFIG_FILE); if($env:COMMONUTILS_PERSONAL_CONFIG_FILE -and [IO.File]::Exists($env:COMMONUTILS_PERSONAL_CONFIG_FILE)){ $paths+= $env:COMMONUTILS_PERSONAL_CONFIG_FILE }; $outputs=@{source_dir='SOURCE_DIR_VALUE'; launch_file='LAUNCH_FILE_VALUE'; ensure_user_dir='ENSURE_USER_DIR'; environment_sync_wrapper='ENVIRONMENT_SYNC_WRAPPER_VALUE'}; $result=@{}; foreach($path in $paths){ $inLaunch=$false; $seen=@{}; foreach($line in [IO.File]::ReadAllLines($path)){ $t=$line.Trim(); if($t -match '^\[(.+)\]$'){ $inLaunch=($matches[1].Trim() -ieq 'Launch'); continue }; if(-not $inLaunch -or $t.Length -eq 0 -or $t.StartsWith('#') -or $t.StartsWith(';')){ continue }; $idx=$line.IndexOf('='); if($idx -lt 0){ continue }; $key=$line.Substring(0,$idx).Trim(); if(-not $outputs.ContainsKey($key)){ continue }; if($seen.ContainsKey($key)){ [Console]::Error.WriteLine(('ERROR: Duplicate ''{0}'' entries were found in [Launch] in {1}.' -f $key,$path)); exit 2 }; $seen[$key]=$true; $v=$line.Substring($idx+1).Trim(); if($v.Length -ge 2){ if(($v[0] -eq [char]34 -and $v[$v.Length-1] -eq [char]34) -or ($v[0] -eq [char]39 -and $v[$v.Length-1] -eq [char]39)){ $v=$v.Substring(1,$v.Length-2) } }; $result[$key]=$v } }; foreach($key in $outputs.Keys){ [IO.File]::WriteAllText((Join-Path $env:CONFIG_OUTPUT $outputs[$key]),[string]$result[$key]) }"
+set "READ_STATUS=%ERRORLEVEL%"
+if "%READ_STATUS%"=="0" (
+    for %%V in (SOURCE_DIR_VALUE LAUNCH_FILE_VALUE ENSURE_USER_DIR ENVIRONMENT_SYNC_WRAPPER_VALUE) do (
+        set "%%V="
+        set /p "%%V="<"%CONFIG_OUTPUT%\%%V" 2>nul
+    )
+) else (
+    echo ERROR: Failed to read launch_config.ini.
+)
+rd /s /q "%CONFIG_OUTPUT%" >nul 2>&1
+exit /b %READ_STATUS%
 
 :Pause
 if /I "%PAUSE_ON_EXIT%"=="true" pause

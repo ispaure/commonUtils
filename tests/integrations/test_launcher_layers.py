@@ -60,20 +60,42 @@ class LauncherLayersTests(unittest.TestCase):
         text = (self.base / 'LaunchPythonProject_WIN.bat').read_text()
         command = next(line for line in text.splitlines() if line.startswith('powershell.exe ') and '$path' in line)
         script = command.split('-Command "', 1)[1][:-1]
-        output = self.root / 'result.txt'
+        output = self.root / 'result'
+        output.mkdir()
         environment = dict(os.environ, CONFIG_FILE=str(self.defaults), COMMONUTILS_PERSONAL_CONFIG_FILE=str(self.personal),
-                           CONFIG_OUTPUT=str(output), CONFIG_KEY='source_dir')
+                           CONFIG_OUTPUT=str(output))
+
         def run():
             return subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
                                   env=environment, capture_output=True, text=True, timeout=20)
+
+        def read(variable):
+            return (output / variable).read_text(encoding='utf-8-sig')
+
+        self.defaults.write_text('[Launch]\nsource_dir=Python\nlaunch_file=main\nensure_user_dir=Server\n')
         result = run()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(output.read_text(encoding='utf-8-sig'), 'Python')
-        self.personal.write_text('[Launch]\nsource_dir=Personal Python\n')
-        self.assertEqual(run().returncode, 0)
-        self.assertEqual(output.read_text(encoding='utf-8-sig'), 'Personal Python')
+        self.assertEqual(read('SOURCE_DIR_VALUE'), 'Python')
+        self.assertEqual(read('LAUNCH_FILE_VALUE'), 'main')
+        self.assertEqual(read('ENSURE_USER_DIR'), '')
+        self.assertEqual(read('ENVIRONMENT_SYNC_WRAPPER_VALUE'), '')
+
+        literal_wrapper = 'sync %literal% & (guard)!.py'
+        self.personal.write_text(f'[Launch]\nSOURCE_DIR="Personal Python"\nenvironment_sync_wrapper="{literal_wrapper}"\n')
+        result = run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(read('SOURCE_DIR_VALUE'), 'Personal Python')
+        self.assertEqual(read('LAUNCH_FILE_VALUE'), 'main')
+        self.assertEqual(read('ENSURE_USER_DIR'), 'Server')
+        self.assertEqual(read('ENVIRONMENT_SYNC_WRAPPER_VALUE'), literal_wrapper)
+
         self.personal.write_text('[Launch]\nsource_dir=\n')
         self.assertEqual(run().returncode, 0)
-        self.assertEqual(output.read_text(encoding='utf-8-sig'), '')
-        self.personal.write_text('[Launch]\nsource_dir=one\nsource_dir=two\n')
-        self.assertNotEqual(run().returncode, 0)
+        self.assertEqual(read('SOURCE_DIR_VALUE'), '')
+        self.personal.write_text('[Launch]\nsource_dir=one\nSOURCE_DIR=two\n')
+        self.assertEqual(run().returncode, 2)
+        self.defaults.write_text('[Launch]\nlaunch_file=one\nlaunch_file=two\n')
+        self.personal.write_text('[Launch]\nlaunch_file=personal\n')
+        result = run()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Duplicate 'launch_file'", result.stderr)
