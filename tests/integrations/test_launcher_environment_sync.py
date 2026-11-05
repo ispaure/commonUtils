@@ -170,10 +170,13 @@ def windows_fixture_directory():
         cleanup_windows_fixture(temporary)
 
 
-def run_windows_batch(arguments, **options):
+def run_windows_batch(arguments, *, env, timeout=60):
     command = subprocess.list2cmdline(arguments)
+    # CMD uses its OEM code page while Python may run in UTF-8 mode. Capture
+    # raw bytes: a decoding exception in Windows' reader thread loses stdout.
     # Pass a raw command string so Popen cannot CRT-escape CMD's inner quotes.
-    return subprocess.run(f'cmd.exe /d /v:off /s /c "{command}"', **options)
+    return subprocess.run(f'cmd.exe /d /v:off /s /c "{command}"',
+                          env=env, capture_output=True, timeout=timeout)
 
 
 @unittest.skipUnless(shutil.which('bash') and os.name != 'nt', 'Actual Bash launchers require Unix')
@@ -320,7 +323,7 @@ class WindowsBatchInvocationTests(unittest.TestCase):
         root = r'C:\Temp\launcher café & (literal)! probe'
         config = root + r'\config.ini'
         environment = {'literal': 'MUST_NOT_EXPAND', 'FAKE_WRAPPER_STATUS': '37'}
-        options = dict(env=environment, capture_output=True, text=True, timeout=60)
+        options = dict(env=environment, timeout=60)
         with patch.object(subprocess, 'run') as run:
             result = run_windows_batch([batch, root, config, 'false'], **options)
         run.assert_called_once()
@@ -335,8 +338,28 @@ class WindowsBatchInvocationTests(unittest.TestCase):
         payload = raw_command[len(prefix):-1]  # CMD /s removes only the outer pair.
         self.assertEqual(payload, f'"{batch}" "{root}" "{config}" false')
         self.assertNotIn('\\"', raw_command)
-        self.assertEqual(run.call_args.kwargs, options)
+        self.assertEqual(run.call_args.kwargs, dict(options, capture_output=True))
         self.assertIs(run.call_args.kwargs['env'], environment)
+
+
+    def test_cmd_capture_preserves_oem_bytes_under_utf8_python_without_decoder_thread(self):
+        # Real byte-emitting child proves the capture contract on every host;
+        # native CMD/metacharacter acceptance remains the Windows-only test.
+        environment = dict(os.environ, PYTHONUTF8='1')
+        emitted = b'launcher caf\x82\r\n'
+        diagnostic = b'raw stderr \xff\r\n'
+        code = "import os,sys;os.write(1," + repr(emitted) + ");os.write(2," + repr(diagnostic) + ");sys.exit(37)"
+        real_run = subprocess.run
+        def emit_bytes(command, **options):
+            self.assertIsInstance(command, str)
+            self.assertTrue(command.startswith('cmd.exe /d /v:off /s /c '))
+            self.assertEqual(options, dict(env=environment, capture_output=True, timeout=10))
+            return real_run([sys.executable, '-I', '-c', code], **options)
+        with patch.object(subprocess, 'run', side_effect=emit_bytes):
+            result = run_windows_batch(['synthetic.bat', 'literal café path'], env=environment, timeout=10)
+        self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
+        self.assertEqual(result.stdout, emitted)
+        self.assertEqual(result.stderr, diagnostic)
 
 
 class WindowsLauncherDiagnosticSourceTests(unittest.TestCase):
@@ -484,7 +507,7 @@ class WindowsEnvironmentSyncTests(unittest.TestCase):
             env = dict(os.environ, LAUNCHER_TRACE=str(trace), FAKE_WRAPPER_STATUS='37', literal='MUST_NOT_EXPAND')
             result = run_windows_batch([str(LAUNCHERS / 'LaunchPythonProject_WIN.bat'),
                                         str(root), str(config), 'false'],
-                                       env=env, capture_output=True, text=True, timeout=60)
+                                       env=env, timeout=60)
             self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
             rows = [json.loads(line) for line in trace.read_text().splitlines()]
             argv = rows[-1]['argv']
