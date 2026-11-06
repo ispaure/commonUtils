@@ -58,6 +58,20 @@ class DownloadTests(unittest.TestCase):
             self.assertEqual(self.path.read_bytes(), b'previous executable')
             self.assertEqual(list(self.path.parent.iterdir()), [self.path])
 
+    def test_partial_archive_reports_response_metadata_without_installing(self):
+        data = self.archive[:12]
+        response = Response(data)
+        response.status = 206
+        response.headers.update({'Content-Range': 'bytes 0-11/200', 'Content-Type': 'application/zip'})
+        with patch('commonUtils.runtime.streams.downloads.urlopen', return_value=response):
+            with self.assertRaisesRegex(ValueError, 'SHA-256 verification') as failure:
+                provision(self.spec, self.path)
+        for evidence in ('HTTP=206', 'received_bytes=12', "content_length='12'",
+                         "content_range='bytes 0-11/200'", "content_type='application/zip'",
+                         'expected_sha256=' + self.spec.sha256, 'actual_sha256=' + hashlib.sha256(data).hexdigest()):
+            self.assertIn(evidence, str(failure.exception))
+        self.assertFalse(self.path.exists())
+
     def test_cancellation_keeps_old_file(self):
         self.path.parent.mkdir()
         self.path.write_bytes(b'old')

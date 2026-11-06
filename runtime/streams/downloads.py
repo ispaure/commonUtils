@@ -69,8 +69,18 @@ def provision(spec, destination, *, progress=lambda done, total: None, cancelled
                 digest.update(chunk)
                 done += len(chunk)
                 progress(done, total)
-        if digest.hexdigest() != spec.sha256:
-            raise ValueError(f'{spec.name} download failed SHA-256 verification')
+            actual = digest.hexdigest()
+            if actual != spec.sha256:
+                status = getattr(response, 'status', None)
+                length = str(response.headers.get('Content-Length', ''))[:32]
+                content_range = str(response.headers.get('Content-Range', ''))[:100]
+                content_type = str(response.headers.get('Content-Type', ''))[:100]
+                raise ValueError(
+                    f'{spec.name} download failed SHA-256 verification '
+                    f'(version={spec.version}, HTTP={status}, received_bytes={done}, '
+                    f'content_length={length!r}, content_range={content_range!r}, '
+                    f'content_type={content_type!r}, expected_sha256={spec.sha256}, actual_sha256={actual})'
+                )
         payload = Path(workspace) / 'payload'
         if spec.archive_member:
             with zipfile.ZipFile(archive_path) as archive:
