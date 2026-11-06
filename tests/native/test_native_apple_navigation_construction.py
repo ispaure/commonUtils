@@ -520,3 +520,94 @@ class AppleConstructionTests(unittest.TestCase):
             host.install(bridge.window)
             self.assertTrue(host.adapter.keyboard_live)
             host.uninstall()
+
+    def test_retired_base_never_returns_to_constructor_extension(self):
+        for callback_error in (None, LookupError('resize callback sentinel')):
+            with self.subTest(callback_error=callback_error):
+                bridge = Bridge()
+                host = bridge.navigation_host()
+                initialize = navigation.AppleNavigation.__init__
+                dispose = navigation.AppleNavigation.dispose
+                extension = NS(acquired=False, dispose_calls=0)
+                def extended_init(adapter, host, window):
+                    # Logistics installs its shell root only after base init returns.
+                    initialize(adapter, host, window)
+                    extension.acquired = True
+                def extended_dispose(adapter):
+                    extension.dispose_calls += 1
+                    extension.acquired = False
+                    dispose(adapter)
+                def resize(container):
+                    host.uninstall()
+                    if callback_error is not None:
+                        raise callback_error
+                bridge.window._impl.notify_resize = resize
+                with bridge.installed(), \
+                        patch.object(navigation.AppleNavigation, '__init__', extended_init), \
+                        patch.object(navigation.AppleNavigation, 'dispose', extended_dispose):
+                    with self.assertRaises(Exception) as caught:
+                        host.install(bridge.window)
+                    if callback_error is None:
+                        self.assertIsInstance(caught.exception, RuntimeError)
+                        self.assertIn('retired during', str(caught.exception))
+                    else:
+                        self.assertIs(caught.exception, callback_error)
+                    self.assertFalse(extension.acquired)
+                    self.assertEqual(extension.dispose_calls, 0)
+                    self.assertIsNone(host.adapter)
+                    self.assertIsNone(host._installing_adapter)
+                    self.assertIsNone(host.window)
+                    self.assertFalse(host._install_call_active)
+                    self.assertFalse(host.changing)
+                    self.assertEqual(bridge.active, set())
+                    host.uninstall()
+                    self.assertEqual(extension.dispose_calls, 0)
+                    bridge.window._impl.notify_resize = lambda container: None
+                    host.install(bridge.window)
+                    self.assertTrue(extension.acquired)
+                    self.assertTrue(host.adapter.keyboard_live)
+                    host.uninstall()
+                    self.assertFalse(extension.acquired)
+                    self.assertEqual(extension.dispose_calls, 1)
+                    self.assertIsNone(host.adapter)
+                    self.assertIsNone(host.window)
+                    self.assertEqual(bridge.active, set())
+
+    def test_existing_parent_survives_extended_constructor_failure_and_retry(self):
+        for failed_removal in (False, True):
+            with self.subTest(failed_removal=failed_removal):
+                bridge = Bridge()
+                bridge.controller.parentViewController = bridge.parent
+                host = bridge.navigation_host()
+                initialize = navigation.AppleNavigation.__init__
+                error = LookupError('consumer extension sentinel')
+                fail = [True]
+                def extended_init(adapter, host, window):
+                    initialize(adapter, host, window)
+                    if fail[0]:
+                        bridge.fail_remove = failed_removal
+                        raise error
+                with bridge.installed(), patch.object(navigation.AppleNavigation, '__init__', extended_init):
+                    with self.assertRaises(LookupError) as caught:
+                        host.install(bridge.window)
+                    self.assertIs(caught.exception, error)
+                    if failed_removal:
+                        self.assertIsNotNone(host._installing_adapter)
+                        self.assertEqual(bridge.active, set(bridge.observers))
+                        bridge.fail_remove = False
+                        host.uninstall()
+                    self.assertIs(bridge.controller.parentViewController, bridge.parent)
+                    self.assertEqual(bridge.active, set())
+                    self.assertIsNone(host.adapter)
+                    self.assertIsNone(host._installing_adapter)
+                    self.assertIsNone(host.window)
+                    host.uninstall()
+                    fail[0] = False
+                    host.install(bridge.window)
+                    self.assertTrue(host.adapter.keyboard_live)
+                    host.uninstall()
+                    self.assertIs(bridge.controller.parentViewController, bridge.parent)
+                    self.assertEqual(bridge.active, set())
+                    self.assertIsNone(host.adapter)
+                    self.assertIsNone(host._installing_adapter)
+                    self.assertIsNone(host.window)

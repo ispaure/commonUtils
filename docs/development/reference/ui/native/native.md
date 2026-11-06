@@ -163,6 +163,9 @@ call full `dispose` on an incomplete adapter. A controller already owned by a
 foreign parent is rejected before changing its containment. Replacement of the
 saved native More owner is reported as incomplete cleanup rather than adopting its
 old private list into an unknown tree.
+Normal disposal also preserves an admitted, already attached expected parent;
+it detaches only containment acquired by this adapter. This remains true when a
+consumer constructor extension fails and its completed base is disposed.
 
 The original construction exception is re-raised. If cleanup also fails, the host
 retains the inactive draft and its window, leaves the installed `adapter` slot
@@ -174,7 +177,9 @@ failed tokens. This also applies when observer removal interrupts normal
 uninstallation: the host retains the installed adapter until disposal succeeds.
 Original layout callbacks are restored only after their native state is restored.
 Nested installation is refused while an Apple constructor is running; if initial
-layout retires its draft, that draft is not published as the installed adapter.
+layout retires its draft, base construction raises before returning to a consumer
+constructor extension. The retired draft is not published as the installed adapter;
+an exception raised by the layout callback itself remains the original exception.
 
 Consumer constructor extensions that fail after base construction have their
 normal disposer invoked before the saved base state is restored. Extensions must
@@ -184,7 +189,7 @@ by initial resize, unreturned native acquisitions, or unknown UIKit mutations.
 Native operations may continue failing; retaining an inactive owner is not proof
 that its native resources have been released.
 
-`test_apple_navigation_construction` injects registration and construction failures,
+`test_native_apple_navigation_construction` injects registration and construction failures,
 tracks active registrations separately from removal attempts, tests cleanup retry
 and primary-exception identity, and exercises retained layout/notification
 callbacks, synchronous leaf layout, saved More state and consumer hook signatures.
@@ -192,7 +197,13 @@ Its bridge models explicit mutations; it does not certify UIKit's implicit
 containment, autorelease or More-controller behavior. Native acceptance still
 requires iPhone/iPad overflow/sidebar selection, independent scenes, keyboard and
 rotation behavior, extension cleanup, and repeated failure/retry/uninstall on the
-supported backend.
+supported backend. Keep the `test_native_` filename prefix: Logistics selects it
+for the Toga-required shared-test leg. From the Logistics checkout root, run:
+
+```sh
+python3 dev.py test shared test_native_apple_navigation_construction.py
+```
+
 `test_native_owner_lifetimes` covers host reinstall/restoration, fake native canvas
 detachment, retired layout dispatch, bound resize forwarding and queued speech
 suppression/presentation-owner release. Keyboard/gesture fixtures cover existing

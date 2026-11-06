@@ -217,6 +217,10 @@ class AppleNavigation:
             self._keyboard_restoration_pending = True
             self.keyboard_live = True
             self._layout_window(window._impl.container)
+            # Initial layout may synchronously retire this draft. Stop here,
+            # before returning to a consumer constructor that acquires more UI.
+            if host._installing_adapter is not self or not self.keyboard_live:
+                raise RuntimeError('Navigation was retired during installation.')
         except Exception as error:
             try:
                 self._rollback_construction()
@@ -720,8 +724,7 @@ class AppleNavigation:
             container.controller = content
             container.on_native_layout = None
         self.impl.refresh_tabs()
-        self.controller.willMoveToParentViewController(None)
-        self.controller.removeFromParentViewController()
+        self._restore_parent()
 
 
 class AndroidNavigation:
