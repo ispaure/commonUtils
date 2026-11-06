@@ -44,7 +44,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
                                    icon=SimpleNamespace(_impl=SimpleNamespace(native=self.icon)))
         self.interface = self.controller.interface = SimpleNamespace(
             data=[self.row], row_kind='File', row_visible=Mock(),
-            appearance=SimpleNamespace(apple_color=lambda role: role, row_height=48, icon_size=28))
+            appearance=SimpleNamespace(apple_color=lambda role: role, title_lines=1, row_height=48, icon_size=28))
         self.cell = SimpleNamespace(textLabel=SimpleNamespace(text=''), detailTextLabel=SimpleNamespace(text=''),
                                     imageView=SimpleNamespace(image=None), accessibilityLabel='', layer=SimpleNamespace())
         self.separator = Separator()
@@ -161,7 +161,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         namespace = self.controller.tableView_cellForRowAtIndexPath_.__globals__
         bind, clear = namespace['_bind_actions'], namespace['_clear_actions']
         interface = type('Interface', (), {})()
-        interface.appearance = SimpleNamespace(apple_color=lambda role: role, row_height=48)
+        interface.appearance = SimpleNamespace(apple_color=lambda role: role, title_lines=1, row_height=48)
         interface._primary_action = 'Actions'
         interface._impl = SimpleNamespace(primary_action_enabled=True)
         interface.enabled = True

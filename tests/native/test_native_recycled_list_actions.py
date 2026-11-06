@@ -49,7 +49,7 @@ class FileRowActionTests(unittest.TestCase):
         self.interface = Interface()
         self.interface.__dict__.update(_primary_action='Select', _impl=NS(primary_action_enabled=True),
                                       data=[self.row], enabled=True, on_primary_action=Mock(),
-                                      appearance=NS(apple_color=lambda role: role, row_height=48))
+                                      appearance=NS(apple_color=lambda role: role, title_lines=1, row_height=48))
         self.cell = NS(accessoryView=None)
         self.module._bind_actions(self.interface, self.cell, self.row)
 

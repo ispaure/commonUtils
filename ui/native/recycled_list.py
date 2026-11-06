@@ -40,8 +40,11 @@ class ListAppearance:
     body_text: int = 17
     caption_text: int = 13
     icon_size: int = 28
+    title_lines: int = 1
 
     def __post_init__(self):
+        if self.title_lines not in (1, 2):
+            raise ValueError('title_lines must be one or two')
         for name in ('row_height', 'body_text', 'caption_text', 'icon_size'):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
                 raise ValueError(name + ' must be a positive integer')

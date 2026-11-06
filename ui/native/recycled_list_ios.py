@@ -44,6 +44,27 @@ def _layout_action_labels(cell):
                              (max(0, right - float(frame.origin.x)), frame.size.height))
 
 
+def layout_two_line_title(cell):
+    """Measure after accessory and tree gutters have assigned the final width."""
+    from rubicon.objc import CGRect
+    original, subtitle = cell.textLabel, cell.detailTextLabel
+    title = cell.wrapping_title
+    title.font = original.font
+    title.textColor = original.textColor
+    title.highlightedTextColor = original.highlightedTextColor
+    title.highlighted = cell.isHighlighted()
+    frame = original.frame
+    width = float(frame.size.width)
+    height = float(cell.contentView.bounds.size.height)
+    if width <= 0 or height <= 0:
+        return
+    caption_height = float(subtitle.font.lineHeight) + 4 if subtitle.text else 0
+    title_height = max(0, height - caption_height)
+    title.frame = CGRect((frame.origin.x, 0), (width, title_height))
+    if caption_height:
+        subtitle.frame = CGRect((frame.origin.x, title_height), (width, caption_height))
+
+
 def _new_file_cell():
     global _file_cell_type
     if _file_cell_type is None:
@@ -55,6 +76,7 @@ def _new_file_cell():
             tree_drag = objc_property(object)
             tree_drop = objc_property(object)
             tree_icon_tap = objc_property(object)
+            wrapping_title = objc_property(object)
 
             @objc_method
             def layoutSubviews(self) -> None:
@@ -63,12 +85,14 @@ def _new_file_cell():
                 if self.tree_owner is not None:
                     from .recycled_tree_ios import layout
                     layout(self)
+                if self.wrapping_title is not None:
+                    layout_two_line_title(self)
         _file_cell_type = CommonUtilsFileCell
     cell = _file_cell_type.alloc()
     # Rubicon stores `object` properties in py_object-backed ivars. UIKit's
     # zeroed memory is NULL, not Python None; initialize before UIKit can enter
     # layout or before the binder inspects any optional tree control.
-    for name in ('tree_owner', 'tree_row', 'tree_disclosure', 'tree_drag', 'tree_drop', 'tree_icon_tap'):
+    for name in ('tree_owner', 'tree_row', 'tree_disclosure', 'tree_drag', 'tree_drop', 'tree_icon_tap', 'wrapping_title'):
         setattr(cell, name, None)
     return cell.initWithStyle(
         UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
@@ -109,7 +133,8 @@ def _bind_actions(interface, cell, row):
     button = cell.accessoryView
     if button is None:
         height = interface.appearance.row_height
-        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (height, height)))
+        width = 44 if interface.appearance.title_lines == 2 else height
+        button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (width, height)))
         button.setTitle('⋯', forState=0)
         button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
         button.addTarget(button, action=SEL('selectRow:'), forControlEvents=1 << 6)
@@ -185,7 +210,16 @@ def _bind_file_cell(interface, cell, index):
     cell.detailTextLabel.text = row.subtitle
     cell.imageView.image = row.icon._impl.native if row.icon is not None else None
     cell.accessoryType = 1 if row.folder else 0
-    cell.textLabel.lineBreakMode = 5  # Middle truncation preserves extensions.
+    cell.textLabel.lineBreakMode = 5  # Middle truncation for the standard cell.
+    if interface.appearance.title_lines == 2 and cell.wrapping_title is None:
+        from rubicon.objc import ObjCClass
+        label = ObjCClass('UILabel').alloc().init()
+        label.numberOfLines = 2
+        label.lineBreakMode = 4
+        label.isAccessibilityElement = False
+        cell.contentView.addSubview(label)
+        cell.wrapping_title = label
+        cell.textLabel.alpha = 0
     cell.accessibilityLabel = row.title + ('. Folder' if row.folder else '. ' + interface.row_kind)
     cell.backgroundColor = apple_color('surface')
     # Only the outer corners belong to the group; recycled middle cells must
@@ -211,6 +245,13 @@ def _bind_file_cell(interface, cell, index):
         from .recycled_tree_ios import bind
         interface._impl._tree_cells[cell.ptr.value] = cell
         bind(interface, cell, row)
+    if interface.appearance.title_lines == 2:
+        label = cell.wrapping_title
+        if getattr(row, 'tree_landing', False):
+            label.attributedText = cell.textLabel.attributedText
+        else:
+            label.text = row.title
+        cell.setNeedsLayout()
 
 
 class FileTableController(TogaTableViewController):

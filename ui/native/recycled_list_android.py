@@ -23,6 +23,7 @@ class AndroidFileList(Widget):
         self.native = FileListView(self._native_activity)
         appearance = self.interface.appearance
         self.native.setMetrics(appearance.row_height, appearance.body_text, appearance.caption_text, appearance.icon_size)
+        self.native.setTitleLines(appearance.title_lines)
         owner = weakref.ref(self)
 
         class Listener(dynamic_proxy(FileListView.Listener)):

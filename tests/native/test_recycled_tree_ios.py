@@ -38,7 +38,7 @@ class IOSTreeTests(unittest.TestCase):
         self.interface.data = [self.row]
         self.interface.enabled, self.interface.updating = True, False
         self.interface.tree_actions = self.actions
-        self.interface.appearance = NS(apple_color=lambda name: name, icon_size=20)
+        self.interface.appearance = NS(apple_color=lambda name: name, icon_size=20, title_lines=1)
         self.owner = weakref.ref(self.interface)
 
     def test_disclosure_rejects_disabled_updating_replaced_and_inactive_rows(self):

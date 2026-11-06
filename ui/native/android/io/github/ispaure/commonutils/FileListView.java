@@ -27,6 +27,7 @@ import android.widget.TextView;
 public final class FileListView extends ListView {
     // Native dp/sp; consumers may override these before publishing rows.
     private int rowHeight = 48, bodyText = 17, captionText = 13, iconSize = 28;
+    private int titleLines = 1;
     public interface Listener {
         void onActivate(int index, int generation);
         void onVisible(int index, int generation);
@@ -100,6 +101,10 @@ public final class FileListView extends ListView {
     public void setMetrics(int height, int body, int caption, int icon) {
         rowHeight = height; bodyText = body; captionText = caption; iconSize = icon;
     }
+
+    public void setTitleLines(int lines) { titleLines = lines; }
+
+    private int actionWidth() { return titleLines == 2 ? 44 : rowHeight; }
 
     public void setListener(Listener value) { listener = value; }
     public void setObserveRows(boolean enabled) { observeRows = enabled; }
@@ -342,7 +347,7 @@ public final class FileListView extends ListView {
             if (action != null && action.getVisibility() == View.VISIBLE) {
                 Rect hit = new Rect();
                 action.getHitRect(hit);
-                hit.left = hit.right - dp(rowHeight);
+                hit.left = hit.right - dp(actionWidth());
                 actionTouch = new TouchDelegate(hit, action);
             }
         }
@@ -391,8 +396,9 @@ public final class FileListView extends ListView {
                 text.setOrientation(LinearLayout.VERTICAL);
                 text.setPadding(dp(6), 0, dp(4), 0);
                 holder.title = new TextView(getContext());
-                holder.title.setSingleLine(true);
-                holder.title.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+                holder.title.setSingleLine(titleLines == 1);
+                holder.title.setMaxLines(titleLines);
+                holder.title.setEllipsize(titleLines == 2 ? TextUtils.TruncateAt.END : TextUtils.TruncateAt.MIDDLE);
                 holder.title.setTextSize(bodyText);
                 holder.subtitle = new TextView(getContext());
                 holder.subtitle.setSingleLine(true);
@@ -409,7 +415,7 @@ public final class FileListView extends ListView {
                 holder.actions.setMinimumWidth(0);
                 holder.actions.setFocusable(false);
                 holder.actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(rowHeight), -1));
+                row.addView(holder.actions, new LinearLayout.LayoutParams(dp(actionWidth()), -1));
                 row.action = holder.actions;
                 row.setTag(holder);
                 recycled = row;
@@ -417,7 +423,9 @@ public final class FileListView extends ListView {
             holder.index = position;
             holder.revision = generation;
             int depth = position < depths.length ? Math.max(0, Math.min(32, depths[position])) : 0;
-            recycled.setPadding(dp(8 + depth * 12), 0, dp(4), 0);
+            boolean compactTree = titleLines == 2 && depths.length > 0;
+            int indent = compactTree ? 6 + Math.min(depth, 8) * 8 : 8 + depth * 12;
+            recycled.setPadding(dp(indent), 0, dp(compactTree ? 2 : 4), 0);
             int expanded = position < disclosures.length ? disclosures[position] : -1;
             boolean landing = position < landingRows.length && landingRows[position];
             if (expanded >= 0 && holder.disclosure == null) {
@@ -428,7 +436,7 @@ public final class FileListView extends ListView {
                 holder.disclosure.setMinimumWidth(0);
                 holder.disclosure.setFocusable(false);
                 ((LinearLayout) recycled).addView(holder.disclosure, 1,
-                        new LinearLayout.LayoutParams(dp(44), -1));
+                        new LinearLayout.LayoutParams(dp(compactTree ? 24 : 44), -1));
             }
             final int treeRevision = generation;
             final Holder bound = holder;
@@ -452,12 +460,13 @@ public final class FileListView extends ListView {
                     (expanded == 1 ? "Collapse " : "Expand ") + titles[position]);
             holder.icon.setImportantForAccessibility(expanded < 0 ?
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO : View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            int iconSlot = expanded < 0 ? iconSize : Math.max(compactTree ? 22 : 32, iconSize);
             holder.icon.setLayoutParams(new LinearLayout.LayoutParams(
-                    dp(expanded < 0 ? iconSize : Math.max(32, iconSize)),
+                    dp(iconSlot),
                     dp(expanded < 0 ? iconSize : rowHeight)));
-            holder.icon.setPadding(expanded < 0 ? 0 : dp(Math.max(0, (32 - iconSize) / 2)),
+            holder.icon.setPadding(expanded < 0 ? 0 : dp(Math.max(0, (iconSlot - iconSize) / 2)),
                     expanded < 0 ? 0 : dp(Math.max(0, (rowHeight - iconSize) / 2)),
-                    expanded < 0 ? 0 : dp(Math.max(0, (32 - iconSize) / 2)),
+                    expanded < 0 ? 0 : dp(Math.max(0, (iconSlot - iconSize) / 2)),
                     expanded < 0 ? 0 : dp(Math.max(0, (rowHeight - iconSize) / 2)));
             holder.title.setPaintFlags(landing ? holder.title.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG
                     : holder.title.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);

@@ -193,14 +193,17 @@ def layout(cell):
     interface = owner() if owner is not None else None
     if row is None or interface is None:
         return
-    left = 12 + min(32, max(0, row.tree_depth)) * 12
+    compact = interface.appearance.title_lines == 2
+    depth = max(0, row.tree_depth)
+    left = 6 + min(8, depth) * 8 if compact else 12 + min(32, depth) * 12
     height = float(cell.bounds.size.height)
     size = interface.appearance.icon_size
     cell.imageView.frame = CGRect((left, (height - size) / 2), (size, size))
     left += size + 4
     if getattr(row, 'tree_expanded', None) is not None:
-        cell.tree_disclosure.frame = CGRect((left, 0), (44, height))
-        left += 44
+        disclosure_width = 24 if compact else 44
+        cell.tree_disclosure.frame = CGRect((left, 0), (disclosure_width, height))
+        left += disclosure_width
     right = float(cell.contentView.bounds.size.width) - 4
     for label in (cell.textLabel, cell.detailTextLabel):
         frame = label.frame

@@ -33,11 +33,12 @@ class AndroidFileListAppearanceTests(unittest.TestCase):
             impl._native_activity = object()
             current = NS(title='Current', subtitle='', folder=False, thumbnail=False)
             impl.interface = NS(appearance=NS(row_height=56, body_text=18, caption_text=14,
-                icon_size=32, icon=lambda folder: None), data=[current],
+                icon_size=32, title_lines=2, icon=lambda folder: None), data=[current],
                 on_select=Mock(), row_visible=Mock(), on_primary_action=Mock())
             impl.refresh_palette = Mock()
             impl.create()
             native.setMetrics.assert_called_once_with(56, 18, 14, 32)
+            native.setTitleLines.assert_called_once_with(2)
             old_generation = impl.generation
             impl.change_source(impl.interface.data)
             native.setIcons.assert_called_once_with(None, None)
