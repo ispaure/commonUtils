@@ -25,6 +25,9 @@ including exceptions during cleanup; the fixture restores the prior exception
 hook afterward. Normal waits report such exceptions immediately instead of consuming
 their timeout. Retirement defers callback reporting until widgets and workers have
 been released, including callback failures propagated directly out of Qt's wait API.
+Class and method skip decorators go through unittest before the Qt fixture installs
+its hook or registers cleanup. A runtime `SkipTest` still runs fixture cleanup and
+restores the prior hook.
 `tests/tooling/test_qt_test_case.py` checks this behavior with real timer callbacks.
 Shared resource-picker navigation and text-editor publication/conflict coverage
 lives in `tests/resources/test_resource_editor_ui.py`; consumer launchers and

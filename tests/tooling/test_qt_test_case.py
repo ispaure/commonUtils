@@ -192,6 +192,73 @@ class QtFixtureTests(unittest.TestCase):
             dispatch.processEvents()
             self.assertFalse(worker.is_alive(), 'Owned Python worker outlived fairness fixture')
 
+    def test_decorated_skips_do_not_install_fixtures_before_the_next_case(self):
+        class Probe(QtTestCase):
+            def setUp(self):
+                if self._testMethodName != 'test_callback':
+                    self.fail('Decorated skip entered setup')
+
+            @unittest.skip('method reason')
+            def test_skipped(self):
+                self.fail('Decorated skip entered the method')
+
+            def test_callback(self):
+                def broken_callback():
+                    raise RuntimeError('callback after decorated skip')
+                qt.QTimer.singleShot(0, broken_callback)
+                self.wait_until(lambda: False)
+
+        @unittest.skip('class reason')
+        class Skipped(Probe):
+            pass
+
+        for skipped, reason in ((Skipped('test_callback'), 'class reason'),
+                                (Probe('test_skipped'), 'method reason')):
+            with self.subTest(reason=reason), patch.object(sys, 'excepthook', sys.excepthook):
+                original = sys.excepthook
+                skipped.addCleanup(lambda: self.fail('Decorated skip ran an existing cleanup'))
+                existing_cleanups = skipped._cleanups[:]
+                result = unittest.TestResult()
+                with patch.object(qt.QApplication, 'instance', wraps=qt.QApplication.instance) as app_instance:
+                    self.assertIs(skipped.run(result), result)
+                hook_after_skip = sys.excepthook
+                self.assertIs(Probe('test_callback').run(result), result)
+                self.assertEqual(result.testsRun, 2)
+                self.assertEqual(result.skipped, [(skipped, reason)])
+                self.assertEqual(result.errors, [])
+                self.assertEqual(len(result.failures), 1)
+                self.assertIn('Unhandled Qt callback exception', result.failures[0][1])
+                self.assertIn('callback after decorated skip', result.failures[0][1])
+                self.assertIs(hook_after_skip, original)
+                self.assertIs(sys.excepthook, original)
+                app_instance.assert_not_called()
+                self.assertEqual(skipped._cleanups, existing_cleanups)
+                self.assertFalse(hasattr(skipped, '_record_callback_error'))
+                self.assertFalse(hasattr(skipped, '_check_callback_errors'))
+
+    def test_runtime_skip_in_setup_retires_resources_and_restores_hook(self):
+        class Probe(QtTestCase):
+            def setUp(self):
+                self.path = Path(self.temporary_directory().name)
+                self.window = qt.QWidget()
+                self.skipTest('runtime reason')
+
+            def runTest(self):
+                self.fail('Runtime skip entered the method')
+
+        original = sys.excepthook
+        probe = Probe()
+        result = probe.run()
+        self.assertEqual(result.testsRun, 1)
+        self.assertEqual(result.skipped, [(probe, 'runtime reason')])
+        self.assertTrue(result.wasSuccessful(), (result.errors, result.failures))
+        self.assertFalse(isValid(probe.window))
+        self.assertFalse(probe.path.exists())
+        self.assertIs(sys.excepthook, original)
+        self.assertFalse(hasattr(probe, '_record_callback_error'))
+        self.assertFalse(hasattr(probe, '_check_callback_errors'))
+        self.assertEqual(probe._cleanups, [])
+
     def test_callback_exceptions_fail_the_case_in_body_and_cleanup_and_restore_hook(self):
         original = sys.excepthook
         for during_cleanup in (False, True):

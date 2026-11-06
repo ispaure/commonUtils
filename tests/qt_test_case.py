@@ -123,6 +123,12 @@ class QtTestCase(unittest.TestCase):
             sleep(.001)
 
     def run(self, result=None):
+        # unittest returns before running cleanups for class and method skips.
+        test_method = getattr(self, self._testMethodName)
+        if (getattr(type(self), '__unittest_skip__', False)
+                or getattr(test_method, '__unittest_skip__', False)):
+            return super().run(result)
+
         callback_errors = []
         def callback_failed(kind, value, trace):
             callback_errors.append(''.join(traceback.format_exception(kind, value, trace)))
