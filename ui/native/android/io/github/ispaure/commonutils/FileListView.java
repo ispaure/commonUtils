@@ -107,6 +107,13 @@ public final class FileListView extends ListView {
         contextActions = enabled;
         invalidateViews();
     }
+    private Integer entryIconColor;
+
+    public void setEntryIconColor(int color) {
+        entryIconColor = color;
+        invalidateViews();
+    }
+
     public void setRowKind(String kind) { rowKind = kind; }
     public void setPalette(int text, int muted, int surface, int selectedText, int selected, int accent, int border, boolean highContrast) {
         textColor = text;
@@ -312,7 +319,8 @@ public final class FileListView extends ListView {
         holder.actions.setTextColor(selected ? foreground : accentColor);
         if (holder.disclosure != null) holder.disclosure.setTextColor(selected ? foreground : accentColor);
         if (holder.preview) holder.icon.clearColorFilter();
-        else holder.icon.setColorFilter(selected ? foreground : accentColor);
+        else holder.icon.setColorFilter(entryIconColor != null && !outlined
+            ? entryIconColor : selected ? foreground : accentColor);
     }
 
     private static final class Holder {
