@@ -6,9 +6,37 @@
 @property(nonatomic, strong) UILabel *movingText;
 @property(nonatomic) CGFloat travel;
 @property(nonatomic) BOOL startsAtRight;
++ (void)updateFadeMaskForLayer:(CALayer *)layer leading:(BOOL)leading trailing:(BOOL)trailing;
 @end
 
+static NSArray *FadeColors(BOOL leading, BOOL trailing) {
+    id clear = (__bridge id)UIColor.clearColor.CGColor;
+    id opaque = (__bridge id)UIColor.blackColor.CGColor;
+    return @[leading ? clear : opaque, opaque, opaque, trailing ? clear : opaque];
+}
+
 @implementation CommonUtilsPanningTitle
++ (void)updateFadeMaskForLayer:(CALayer *)layer leading:(BOOL)leading trailing:(BOOL)trailing {
+    if ((!leading && !trailing) || CGRectGetWidth(layer.bounds) <= 1) {
+        layer.mask = nil;
+        return;
+    }
+    CAGradientLayer *mask = (CAGradientLayer *)layer.mask;
+    if (![mask isKindOfClass:CAGradientLayer.class]) {
+        mask = [CAGradientLayer layer];
+        mask.startPoint = CGPointMake(0, 0.5);
+        mask.endPoint = CGPointMake(1, 0.5);
+    }
+    CGFloat stop = MIN(0.24, 8.0 / CGRectGetWidth(layer.bounds));
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    mask.frame = layer.bounds;
+    mask.locations = @[@0, @(stop), @(1 - stop), @1];
+    mask.colors = FadeColors(leading, trailing);
+    layer.mask = mask;
+    [CATransaction commit];
+}
+
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
@@ -47,6 +75,7 @@
 - (void)stopScrolling {
     if (!self.movingText) return;
     [self.movingText.layer removeAllAnimations];
+    self.layer.mask = nil;
     [self.movingText removeFromSuperview];
     self.movingText = nil;
     [self setNeedsDisplay];
@@ -80,6 +109,8 @@
     self.movingText.textColor = self.textColor;
     self.movingText.text = self.text;
     self.movingText.frame = CGRectMake(self.startsAtRight ? -travel : 0, 0, textWidth, CGRectGetHeight(self.bounds));
+    [CommonUtilsPanningTitle updateFadeMaskForLayer:self.layer
+        leading:self.startsAtRight trailing:!self.startsAtRight];
     if (!restart) return;
     self.travel = travel;
     NSTimeInterval pass = MAX(1, travel / 24.0);
@@ -90,5 +121,13 @@
     pan.keyTimes = @[@0, @(pause / duration), @0.5, @((2 * pause + pass) / duration), @1];
     pan.duration = duration;
     [self.movingText.layer addAnimation:pan forKey:@"readTitle"];
+
+    NSArray *start = FadeColors(self.startsAtRight, !self.startsAtRight);
+    NSArray *end = FadeColors(!self.startsAtRight, self.startsAtRight);
+    CAKeyframeAnimation *fade = [CAKeyframeAnimation animationWithKeyPath:@"colors"];
+    fade.values = @[start, start, end, end, start];
+    fade.keyTimes = pan.keyTimes;
+    fade.duration = duration;
+    [self.layer.mask addAnimation:fade forKey:@"titleEdges"];
 }
 @end

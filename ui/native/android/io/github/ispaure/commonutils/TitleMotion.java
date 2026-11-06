@@ -49,6 +49,8 @@ public final class TitleMotion extends ContentObserver implements View.OnAttachS
             && Settings.Secure.getInt(resolver, HIGH_CONTRAST, 0) == 0
             && Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0;
         label.setEllipsize(moving ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.MIDDLE);
+        label.setHorizontalFadingEdgeEnabled(moving);
+        label.setFadingEdgeLength(Math.round(8 * label.getResources().getDisplayMetrics().density));
         label.setMarqueeRepeatLimit(1);
         label.setSelected(moving);
     }
