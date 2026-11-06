@@ -62,9 +62,11 @@ class TestLoopCleanupTests(unittest.TestCase):
             finally:
                 retired.append(True)
 
-        loop.create_task(worker())
+        # Keep the pending task alive until the cleanup under test retires it.
+        task = loop.create_task(worker())
         loop.run_until_complete(asyncio.sleep(0))
         close_loop(loop)
+        self.assertTrue(task.done())
         self.assertEqual(retired, [True])
         self.assertTrue(loop.is_closed())
         close_loop(loop)  # Cleanup remains safe when another owner already closed it.
@@ -79,8 +81,10 @@ class TestLoopCleanupTests(unittest.TestCase):
             finally:
                 raise RuntimeError('fixture did not release its resource')
 
-        loop.create_task(worker())
+        # Keep the pending task alive until the cleanup under test retires it.
+        task = loop.create_task(worker())
         loop.run_until_complete(asyncio.sleep(0))
         with self.assertRaisesRegex(RuntimeError, 'did not release'):
             close_loop(loop)
+        self.assertTrue(task.done())
         self.assertTrue(loop.is_closed())
