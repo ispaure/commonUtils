@@ -138,7 +138,7 @@ Install/uninstall routes with their host to register/remove native Back delegate
 
 | Owner | Installation and retention | Retirement |
 | --- | --- | --- |
-| `NativeNavigationHost` | One installed window and adapter; adapter retains original containment/layout/listener bindings | `uninstall` restores chrome before disposing the adapter, then clears adapter/window. The host permits reinstall while retaining selected destination; a second simultaneous install is refused. Retired layout/selection callbacks do nothing. Android forwards the already-bound Toga resize handler without adding a window argument and restores that exact wrapper. `dispose` also clears the host selection callback. |
+| `NativeNavigationHost` | One installed window and adapter, or an inactive Apple draft awaiting cleanup; adapter retains original containment/layout/listener bindings | `uninstall` restores chrome before disposing the adapter, then clears adapter/window. The host permits reinstall while retaining selected destination; a second simultaneous install is refused. Retired layout/selection callbacks do nothing. Android forwards the already-bound Toga resize handler without adding a window argument and restores that exact wrapper. `dispose` also clears the host selection callback. |
 | `ImageCanvas` | Backend retains gestures/listeners; Apple native delegate ownership is weak | `dispose` clears pixels and page/toggle/magnifier callbacks, disables magnification, then detaches the native delegate/listener. Retire permanently before releasing a page. |
 | `NativeSpeech` | Backend owns engine/delegate or Java progress listener; notifications marshal onto the supplied loop | `close` marks the engine closed/not ready and clears voices and presentation callbacks before stopping it, then detaches native callbacks. Deliveries check closed state both before scheduling and when the loop executes them. `stop` alone permits reuse; `close` does not. |
 
@@ -148,6 +148,51 @@ allocates controls before admission must retire rejected controls itself.
 Android checks the supplied window's resize interface before replacing controls;
 failed admission clears the host's window so it can retry. This is not a general
 rollback guarantee for failures partway through native construction.
+
+Apple construction records each returned notification token immediately. Its
+native window and leaf layout dispatchers stay inactive during assembly and become
+inactive before rollback or disposal. The static `layout_content(container)` hook
+remains available to consumer extensions; installed dispatchers check the owner's
+liveness before invoking those extensions. Direct calls to that hook remain the
+caller's responsibility.
+
+If Apple base construction raises, staged cleanup attempts to restore the saved
+controller/container bindings, titles/images, tab and More stack/selection,
+sidebar mode, containment, geometry, window callbacks and size getter. It does not
+call full `dispose` on an incomplete adapter. A controller already owned by a
+foreign parent is rejected before changing its containment. Replacement of the
+saved native More owner is reported as incomplete cleanup rather than adopting its
+old private list into an unknown tree.
+
+The original construction exception is re-raised. If cleanup also fails, the host
+retains the inactive draft and its window, leaves the installed `adapter` slot
+empty, and refuses another `install`. Call `uninstall()` to retry cleanup; it
+raises grouped cleanup errors while any operation remains unsuccessful and clears
+the draft/window only on success. A failed observer removal retains its token;
+independent removals are still attempted, and subsequent attempts target only
+failed tokens. This also applies when observer removal interrupts normal
+uninstallation: the host retains the installed adapter until disposal succeeds.
+Original layout callbacks are restored only after their native state is restored.
+Nested installation is refused while an Apple constructor is running; if initial
+layout retires its draft, that draft is not published as the installed adapter.
+
+Consumer constructor extensions that fail after base construction have their
+normal disposer invoked before the saved base state is restored. Extensions must
+retain and retire their own resources, including partial acquisitions. Neither
+this boundary nor the shared rollback reverses arbitrary application work invoked
+by initial resize, unreturned native acquisitions, or unknown UIKit mutations.
+Native operations may continue failing; retaining an inactive owner is not proof
+that its native resources have been released.
+
+`test_apple_navigation_construction` injects registration and construction failures,
+tracks active registrations separately from removal attempts, tests cleanup retry
+and primary-exception identity, and exercises retained layout/notification
+callbacks, synchronous leaf layout, saved More state and consumer hook signatures.
+Its bridge models explicit mutations; it does not certify UIKit's implicit
+containment, autorelease or More-controller behavior. Native acceptance still
+requires iPhone/iPad overflow/sidebar selection, independent scenes, keyboard and
+rotation behavior, extension cleanup, and repeated failure/retry/uninstall on the
+supported backend.
 `test_native_owner_lifetimes` covers host reinstall/restoration, fake native canvas
 detachment, retired layout dispatch, bound resize forwarding and queued speech
 suppression/presentation-owner release. Keyboard/gesture fixtures cover existing
@@ -171,9 +216,11 @@ allocation/restoration and callback ownership throughout such a change.
 Navigation constructors keep admission, saved bindings and final publication in
 one owner. Apple observer registration and child-controller assembly have named
 private stages; Android bottom-bar replacement, weak selection-listener binding
-and menu population do too. Their call order matches allocation/restoration order;
-callbacks and `dispose` remain on the existing adapters. Platform imports stay
-lazy inside the native construction path.
+and menu population do too. Apple keeps a draft outside the installed adapter slot
+until its constructor and consumer extensions return. Its cleanup flags identify
+which native restoration stages remain pending; full disposal is used only after
+base construction completed. Callbacks and `dispose` remain on the existing
+adapters. Platform imports stay lazy inside the native construction path.
 
 Canvas construction separates Apple gesture wiring and magnifier/lens-control
 allocation from layout and gesture delivery, and Android page-listener binding

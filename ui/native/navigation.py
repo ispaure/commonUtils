@@ -3,6 +3,8 @@
 Backend access stays here. Neither feature controllers nor shared Python state
 need to know about UIKit/Java containment, insets or navigation bar placement.
 """
+from copy import copy
+
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN
@@ -32,6 +34,8 @@ class NativeNavigationHost:
         self.root.on_select = self._selected
         self.adapter = None
         self.window = None
+        self._installing_adapter = None
+        self._install_call_active = False
         self.chrome = NavigationChrome(self)
         self.activate(self.state.destination)
 
@@ -88,20 +92,67 @@ class NativeNavigationHost:
             self.changing = False
 
     def install(self, window):
+        if getattr(self, '_install_call_active', False):
+            raise RuntimeError('Navigation installation is in progress.')
+        if getattr(self, '_installing_adapter', None) is not None:
+            raise RuntimeError('Navigation cleanup is pending; uninstall before retrying.')
         if self.window is not None:
             raise RuntimeError('Navigation host is already installed.')
         self.window = window
         backend = type(self.root._impl).__module__
+        apple = backend.startswith('toga_iOS.')
+        changing = self.changing
+        if apple:
+            self.changing = True
+            self._install_call_active = True
         try:
-            if backend.startswith('toga_iOS.'):
-                self.adapter = AppleNavigation(self, window)
+            if apple:
+                adapter = AppleNavigation(self, window)
+                if self.window is not window:
+                    raise RuntimeError('Navigation was retired during installation.')
+                self.adapter = adapter
             elif backend.startswith('toga_android.'):
                 self.adapter = AndroidNavigation(self, window)
-        except Exception:
-            self.window = None
+            self._installing_adapter = None
+        except Exception as error:
+            pending = getattr(self, '_installing_adapter', None)
+            # A consumer may extend __init__ after Apple's base construction.
+            # That completed adapter can use its normal (possibly extended)
+            # disposer; the incomplete base already attempted staged rollback.
+            if pending is not None and pending._construction_complete:
+                try:
+                    pending.dispose()
+                    pending._construction_complete = False
+                    pending._rollback_construction()
+                except Exception:
+                    try:
+                        error.add_note('Apple navigation cleanup is pending; call host.uninstall() before retrying installation.')
+                    except Exception:
+                        pass
+                else:
+                    self._installing_adapter = None
+            if getattr(self, '_installing_adapter', None) is None:
+                self.window = None
             raise
+        finally:
+            if apple:
+                self.changing = changing
+                self._install_call_active = False
 
     def uninstall(self):
+        pending = getattr(self, '_installing_adapter', None)
+        if pending is not None:
+            changing, self.changing = self.changing, True
+            try:
+                if pending._construction_complete:
+                    pending.dispose()
+                    pending._construction_complete = False
+                pending._rollback_construction()
+                self._installing_adapter = None
+                self.window = None
+            finally:
+                self.changing = changing
+            return
         self.chrome.restore()
         if self.adapter is not None:
             self.adapter.dispose()
@@ -133,17 +184,165 @@ class AppleNavigation:
         self.parent = window._impl.container.content_controller
         self.old_layout = window._impl.container.on_native_layout
         self.old_get_size = window._impl.get_size
-        self.old_additional_insets = self.parent.additionalSafeAreaInsets
-        self._install_keyboard_observer()
-        self._install_controllers()
-        self.sidebar_available = bool(self.controller.respondsToSelector(SEL('setMode:')))
-        self.sidebar_used = (self.sidebar_available and host.prefer_sidebar
-                             and ObjCClass('UIDevice').currentDevice.userInterfaceIdiom == 1)
-        if self.sidebar_available:
-            self.controller.setMode(2 if self.sidebar_used else 1)  # Sidebar on iPad; bottom tabs on iPhone.
-        window._impl.container.on_native_layout = self.layout_window
-        window._impl.get_size = self.get_size
-        self.layout_window(window._impl.container)
+        self.old_additional_insets = copy(self.parent.additionalSafeAreaInsets)
+        self.keyboard_live = False
+        self.keyboard_visible = False
+        self.keyboard_frame = None
+        self.keyboard_tab_visibility = None
+        self.keyboard_layout_pending = False
+        self.keyboard_observer = None
+        self.keyboard_focus_observers = []
+        self._controllers_started = self._mode_started = self._window_hooks_started = False
+        self._container_hooks_pending = False
+        self._keyboard_restoration_pending = False
+        self._construction_complete = False
+        self.old_window_insets = tuple(getattr(window._impl.container, edge + '_inset')
+                                       for edge in ('top', 'bottom', 'left', 'right'))
+        # Retain the draft separately: consumer callbacks must not see it as an
+        # installed adapter, but failed cleanup still needs an owner and a retry.
+        host._installing_adapter = self
+        try:
+            self._install_keyboard_observer()
+            self._window_hooks_started = True
+            window._impl.container.on_native_layout = self._layout_window
+            window._impl.get_size = self.get_size
+            self._install_controllers()
+            self.sidebar_available = bool(self.controller.respondsToSelector(SEL('setMode:')))
+            self.sidebar_used = (self.sidebar_available and host.prefer_sidebar
+                                 and ObjCClass('UIDevice').currentDevice.userInterfaceIdiom == 1)
+            if self.sidebar_available:
+                self.old_mode = int(self.controller.mode)
+                self._mode_started = True
+                self.controller.setMode(2 if self.sidebar_used else 1)
+            self._keyboard_restoration_pending = True
+            self.keyboard_live = True
+            self._layout_window(window._impl.container)
+        except Exception as error:
+            try:
+                self._rollback_construction()
+            except Exception:
+                # The host retains this inactive draft until uninstall succeeds.
+                # Diagnostic formatting must never replace the original error.
+                try:
+                    error.add_note('Apple navigation cleanup is pending; call host.uninstall() before retrying installation.')
+                except Exception:
+                    pass
+            else:
+                host._installing_adapter = None
+            raise
+        self._construction_complete = True
+
+    def _rollback_construction(self):
+        # The draft has not reached the installed adapter slot. Full dispose requires
+        # all stages to have completed, so retire only recorded acquisitions here.
+        self.keyboard_live = False
+        self.keyboard_visible = False
+        self.keyboard_frame = None
+
+        errors = []
+
+        def restore(callback):
+            # Native getters belong inside the guarded operation too.
+            try:
+                callback()
+            except Exception as cleanup_error:
+                errors.append(cleanup_error)
+
+        restore(self._retire_keyboard_observers)
+        if self._keyboard_restoration_pending:
+            start = len(errors)
+            restore(self.restore_keyboard_chrome)
+            restore(lambda: setattr(self.parent, 'additionalSafeAreaInsets', self.old_additional_insets))
+            if len(errors) == start:
+                self._keyboard_restoration_pending = False
+        if self._mode_started:
+            start = len(errors)
+            restore(lambda: self.controller.setMode(self.old_mode))
+            if len(errors) == start:
+                self._mode_started = False
+        if self._controllers_started:
+            start = len(errors)
+            # Keep our inactive leaf callbacks installed while rebuilding native
+            # containment; restore original callbacks only after geometry.
+            for container, content, layout, title, image, frame, insets in self._old_containers:
+                restore(lambda: setattr(container, 'controller', content))
+                restore(lambda: setattr(content, 'title', title))
+                restore(lambda: setattr(content.tabBarItem, 'image', image))
+            restore(lambda: self.controller.setViewControllers(self._old_tabs, animated=False))
+            restore(self._restore_more)
+            restore(lambda: setattr(self.controller, 'selectedViewController', self._old_selection))
+            restore(self._restore_parent)
+            restore(lambda: self.outer_navigation.setNavigationBarHidden(self.old_bar_hidden, animated=False))
+            for container, content, layout, title, image, frame, insets in self._old_containers:
+                restore(lambda: setattr(container.native, 'frame', frame))
+                for edge, inset in zip(('top', 'bottom', 'left', 'right'), insets):
+                    restore(lambda: setattr(container, edge + '_inset', inset))
+            if (len(errors) == start and not self._mode_started
+                    and not self._keyboard_restoration_pending):
+                self._controllers_started = False
+                self.navigation.clear()
+                self.containers.clear()
+        if self._container_hooks_pending and not self._controllers_started:
+            start = len(errors)
+            for container, content, layout, title, image, frame, insets in self._old_containers:
+                restore(lambda: setattr(container, 'on_native_layout', layout))
+            if len(errors) == start:
+                self._container_hooks_pending = False
+        if (self._window_hooks_started and not self._controllers_started
+                and not self._container_hooks_pending and not self._mode_started
+                and not self._keyboard_restoration_pending):
+            start = len(errors)
+            container = self.window._impl.container
+            for edge, inset in zip(('top', 'bottom', 'left', 'right'), self.old_window_insets):
+                restore(lambda: setattr(container, edge + '_inset', inset))
+            restore(lambda: setattr(container, 'on_native_layout', self.old_layout))
+            restore(lambda: setattr(self.window._impl, 'get_size', self.old_get_size))
+            if len(errors) == start:
+                self._window_hooks_started = False
+        if errors:
+            raise ExceptionGroup('Apple navigation construction cleanup failed', errors)
+
+    def _restore_more(self):
+        more = self.controller.moreNavigationController
+        if more != self._old_more:
+            # Do not install UIKit's old private list controller in a new More
+            # owner or silently claim that an unknown native tree was restored.
+            raise RuntimeError('UIKit replaced the More controller during navigation construction.')
+        if more is not None:
+            more.setViewControllers(self._old_more_stack, animated=False)
+            more.delegate = self._old_more_delegate
+
+    def _restore_parent(self):
+        parent = self.controller.parentViewController
+        if parent == self._old_parent:
+            return
+        if self._old_parent is None and parent == self.parent:
+            self.controller.willMoveToParentViewController(None)
+            self.controller.removeFromParentViewController()
+        else:
+            raise RuntimeError('Navigation parent changed during construction cleanup.')
+
+    def _retire_keyboard_observers(self):
+        self.keyboard_live = False
+        errors = []
+        if self.keyboard_observer is not None:
+            try:
+                self.notification_center.removeObserver(self.keyboard_observer)
+            except Exception as error:
+                errors.append(error)
+            else:
+                self.keyboard_observer = None
+        failed = []
+        for observer in self.keyboard_focus_observers:
+            try:
+                self.notification_center.removeObserver(observer)
+            except Exception as error:
+                errors.append(error)
+                failed.append(observer)
+        # A native removal error must not erase the only handle for retry.
+        self.keyboard_focus_observers = failed
+        if errors:
+            raise ExceptionGroup('Apple navigation observer retirement failed', errors)
 
     def _install_keyboard_observer(self):
         from rubicon.objc import ObjCClass, Block, objc_id
@@ -151,7 +350,6 @@ class AppleNavigation:
         self.keyboard_visible = False
         self.keyboard_tab_visibility = None
         self.keyboard_layout_pending = False
-        self.keyboard_live = True
         self.keyboard_frame = None
         self.keyboard_block = Block(self.refresh_keyboard, None, objc_id)
         self.notification_center = ObjCClass('NSNotificationCenter').defaultCenter
@@ -162,22 +360,40 @@ class AppleNavigation:
         self.keyboard_focus_block = Block(self.keyboard_focus_changed, None, objc_id)
         # Child windows acquire their UIWindowScene after adapter construction.
         # Filter scene notifications at delivery time rather than binding nil.
-        self.keyboard_focus_observers = [self.notification_center.addObserverForName(
-            name, object=owner, queue=None, usingBlock=self.keyboard_focus_block)
-            for name, owner in (
+        for name, owner in (
                 ('UIWindowDidBecomeKeyNotification', self.window._impl.native),
                 ('UIWindowDidResignKeyNotification', self.window._impl.native),
                 ('UISceneDidActivateNotification', None),
-                ('UISceneWillDeactivateNotification', None))]
+                ('UISceneWillDeactivateNotification', None)):
+            observer = self.notification_center.addObserverForName(
+                name, object=owner, queue=None, usingBlock=self.keyboard_focus_block)
+            self.keyboard_focus_observers.append(observer)
 
     def _install_controllers(self):
         from rubicon.objc import ObjCClass
         self.outer_navigation = self.window._impl.native.rootViewController
         self.old_bar_hidden = bool(self.outer_navigation.isNavigationBarHidden())
-        self.outer_navigation.setNavigationBarHidden(True, animated=False)
+        self._old_parent = self.controller.parentViewController
+        if self._old_parent is not None and self._old_parent != self.parent:
+            raise ValueError('Navigation controller already belongs to another parent.')
+        self._old_tabs = list(self.controller.viewControllers or ())
+        self._old_selection = self.controller.selectedViewController
+        self._old_more = self.controller.moreNavigationController
+        self._old_more_delegate = self._old_more.delegate if self._old_more is not None else None
+        self._old_more_stack = list(self._old_more.viewControllers or ()) if self._old_more is not None else []
+        self._old_containers = [(container, container.controller, container.on_native_layout,
+                                 container.controller.title, container.controller.tabBarItem.image,
+                                 copy(container.native.frame),
+                                 tuple(getattr(container, edge + '_inset') for edge in ('top', 'bottom', 'left', 'right')))
+                                for container in self.impl.sub_containers]
         self.containers = []
         self.panes = []
         self.navigation = []
+        self._controllers_started = True
+        self._container_hooks_pending = True
+        for container in self.impl.sub_containers:
+            container.on_native_layout = self._layout_content
+        self.outer_navigation.setNavigationBarHidden(True, animated=False)
         # Toga normally attaches only the controller's view. Managed containment
         # is required for native safe areas, bars and appearance callbacks.
         if self.controller.parentViewController != self.parent:
@@ -189,18 +405,29 @@ class AppleNavigation:
             content = container.controller
             content.title = label
             navigation = ObjCClass('UINavigationController').alloc().initWithRootViewController(content)
+            self.navigation.append(navigation)
             navigation.tabBarItem = content.tabBarItem
             navigation.tabBarItem.image = ObjCClass('UIImage').systemImageNamed(symbol)
             container.controller = navigation
-            container.on_native_layout = self.layout_content
             self.containers.append((container, content))
-            self.navigation.append(navigation)
         self.impl.refresh_tabs()
 
     def get_size(self):
+        if not self.keyboard_live:
+            return self.old_get_size()
         from toga.types import Size
         bounds = self.window._impl.native.bounds.size
         return Size(int(bounds.width), int(bounds.height))
+
+    def _layout_content(self, container):
+        # Keep the static content hook compatible with consumer extensions, but
+        # gate native dispatch before invoking any extension's additional work.
+        if self.keyboard_live:
+            self.layout_content(container)
+
+    def _layout_window(self, container):
+        if self.keyboard_live:
+            self.layout_window(container)
 
     @staticmethod
     def layout_content(container):
@@ -346,7 +573,6 @@ class AppleNavigation:
                     self.controller.setMode(1)
                     changed = True
             elif saved is not None:
-                self._sidebar_visibility = None
                 mode, sidebar_hidden = saved
                 if int(self.controller.mode) != mode:
                     self.controller.setMode(mode)
@@ -354,6 +580,7 @@ class AppleNavigation:
                 if bool(self.controller.sidebar.isHidden()) != sidebar_hidden:
                     self.controller.sidebar.setHidden(sidebar_hidden)
                     changed = True
+                self._sidebar_visibility = None
         current = self.controller.isTabBarHidden() if modern else self.controller.tabBar.isHidden()
         if bool(current) != hidden:
             if modern:
@@ -372,8 +599,8 @@ class AppleNavigation:
     def restore_keyboard_chrome(self):
         if self.keyboard_tab_visibility is not None:
             modern, hidden = self.keyboard_tab_visibility
-            self.keyboard_tab_visibility = None
             self.set_keyboard_tabs_hidden(modern, hidden)
+            self.keyboard_tab_visibility = None
 
     def navigation_for(self, destination):
         """UIKit More can move a tab's root into its own navigation stack."""
@@ -407,7 +634,7 @@ class AppleNavigation:
     def push(self, destination, widget, title):
         from toga_iOS.container import ControlledContainer
         container = ControlledContainer(on_refresh=lambda value: None,
-                                        on_native_layout=self.layout_content)
+                                        on_native_layout=self._layout_content)
         widget.app = self.window.app
         widget.window = self.window
         container.content = widget._impl
@@ -436,7 +663,7 @@ class AppleNavigation:
         containers = []
         for column, widget in zip((0, 2), (leading, detail)):
             container = ControlledContainer(on_refresh=lambda value: None,
-                                            on_native_layout=self.layout_content)
+                                            on_native_layout=self._layout_content)
             widget.app = self.window.app
             widget.window = self.window
             container.content = widget._impl
@@ -471,10 +698,7 @@ class AppleNavigation:
     def dispose(self):
         self.keyboard_live = False
         self.keyboard_visible = False
-        self.notification_center.removeObserver(self.keyboard_observer)
-        for observer in self.keyboard_focus_observers:
-            self.notification_center.removeObserver(observer)
-        self.keyboard_focus_observers.clear()
+        self._retire_keyboard_observers()
         self.keyboard_frame = None
         self.restore_keyboard_chrome()
         self.parent.additionalSafeAreaInsets = self.old_additional_insets
