@@ -352,6 +352,8 @@ class BrowserFileActionTests(QtTestCase):
             self.addCleanup(signal.disconnect, record)
         observe(self.browser.model.fileRenamed, 'fileRenamed')
         observe(self.browser.model.dataChanged, 'dataChanged')
+        observe(self.browser.model.rowsRemoved, 'rowsRemoved')
+        observe(self.browser.model.rowsInserted, 'rowsInserted')
         observe(self.browser.views.selection_changed, 'viewSelection')
         for index, view in enumerate(self.browser.views.navigation_views):
             observe(view.selectionModel().selectionChanged, f'selection{index}')
@@ -382,6 +384,33 @@ class BrowserFileActionTests(QtTestCase):
             self.assertEqual(self.browser.heading.text(), next_path.name)
             path = next_path
         self.warning.assert_not_called()
+
+    def test_rename_selection_survives_filesystem_row_replacement(self):
+        self.wait_until(lambda: self.index(self.file).isValid() and self.index(self.folder).isValid())
+        self.browser.view_selector.setCurrentIndex(1)
+        self.menu(self.file)['Rename'].trigger()
+        editor = self.editor()
+        QTest.keyClicks(editor, 'Renamed')
+        QTest.keyClick(editor, qt.Qt.Key.Key_Return)
+        target = self.root / 'Renamed.txt'
+        self.wait_until(lambda: getattr(self.browser.selected_object, 'path', None) == target)
+        selected = qt.QPersistentModelIndex(self.browser.views.selected_rows()[0])
+
+        # Simulate a stale directory listing dropping the renamed row, followed
+        # by the next listing reinserting it under the new name.
+        with TemporaryDirectory() as outside:
+            parked = Path(outside) / target.name
+            model = self.browser.model
+            target.rename(parked)
+            model.setRootPath(outside)
+            model.setRootPath(str(self.root))
+            self.wait_until(lambda: not selected.isValid())
+            parked.rename(target)
+            model.setRootPath(outside)
+            model.setRootPath(str(self.root))
+            self.wait_until(lambda: self.browser.heading.text() == target.name)
+
+        self.assertEqual(self.browser.selected_object.path, target)
 
     def test_f2_and_slow_second_click_rename_but_double_click_opens(self):
         self.select(self.file)

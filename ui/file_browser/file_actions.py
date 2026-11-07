@@ -1,6 +1,7 @@
 """Default clipboard and inline-rename actions for every reusable browser."""
 
 from pathlib import Path
+from time import monotonic
 from uuid import uuid4
 from .. import pyside as qt
 from ..tasks.operation_progress import OperationProgress
@@ -86,7 +87,9 @@ class FileActions(TrashActionsMixin, qt.QObject):
         self.destroyed.connect(lambda: qt.QApplication.instance().focusChanged.disconnect(update_delete_focus))
         self.shortcuts.append(delete)
         browser.model.edit_failed.connect(self._error)
+        self._rename_selection = None
         browser.model.fileRenamed.connect(self._renamed)
+        browser.model.rowsInserted.connect(self._rename_rows_inserted)
 
     @property
     def busy(self):
@@ -184,11 +187,49 @@ class FileActions(TrashActionsMixin, qt.QObject):
         self.browser._maybe_idle()
 
     def _renamed(self, parent, before, after):
+        views = self.browser.views
+        target = Path(parent) / after
+        selected = views.selected_rows()
+        self._rename_selection = None
+        if (len(selected) == 1 and self.browser.model.browse_identity(selected[0]) == target):
+            self._rename_selection = (target, qt.QPersistentModelIndex(selected[0]),
+                                      views.currentWidget(), views.root, monotonic() + 2)
         for name in (before, after):
             path = Path(parent) / name
             self.browser.model.invalidate(path)
             self.browser.views.covers.invalidate(path)
         self.browser.refresh_changed((Path(parent),))
+
+    def _rename_rows_inserted(self, parent, first, last):
+        pending = self._rename_selection
+        if pending is None:
+            return
+        target, previous, _, _, expires = pending
+        if monotonic() >= expires:
+            self._rename_selection = None
+            return
+        model = self.browser.model
+        if previous.isValid() or model.browse_identity(parent) != target.parent:
+            return
+        if any(model.browse_identity(model.index(row, 0, parent)) == target
+               for row in range(first, last + 1)):
+            # The filesystem watcher can briefly replace the renamed row.
+            # Wait until the active view's proxy has processed the insertion.
+            qt.QTimer.singleShot(0, self, lambda: self._restore_rename_selection(pending))
+
+    def _restore_rename_selection(self, pending):
+        if self._rename_selection is not pending:
+            return
+        target, _, view, root, expires = pending
+        views = self.browser.views
+        if (self.browser.stopping or self.browser.index_search.active or monotonic() >= expires
+                or views.currentWidget() is not view or views.root != root or views.selected_rows()):
+            self._rename_selection = None
+            return
+        index = self.browser.model.browse_index(target)
+        if index.isValid():
+            self._rename_selection = None
+            views.select_source(index)
 
     def _error(self, message):
         qt.QMessageBox.warning(self.browser, 'File operation could not be completed', message)
