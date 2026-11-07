@@ -635,6 +635,14 @@ Only the iOS/Android adapters change native masking; the dummy backend exercises
 state and callbacks. No Qt or consuming application modules are imported. Hosts
 own persistence, credential validation, background privacy and disposal policy.
 
+## Markdown callouts
+
+Hosts can pass `callouts=True` to `markdown_body` or `markdown_preview` to
+render markers such as `[!NOTE]` in a blockquote's first paragraph as titled
+panels. A `+` or `-` suffix makes the panel expandable, starting open or
+closed respectively. The full preview supplies panel styles. Both functions
+preserve the original Markdown.
+
 ## Host-supplied Markdown images
 
 Host-supplied Markdown image failures retain the escaped alt label and display

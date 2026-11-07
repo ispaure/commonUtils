@@ -115,6 +115,33 @@ class MarkdownPresentationTests(QtTestCase):
         viewer.save_document()
         self.assertEqual(self.path.read_text(), source)
 
+    def test_callout_headings_keep_their_quote_frame_and_navigation(self):
+        source = (
+            '# Field Guide\n\n> [!note] Directions\n>\n'
+            '> ### 🧭 [Trail](trail.md)\n>\n'
+            '> > ## Detour\n> > Follow the signs.\n>\n'
+            '> Schedule\n> --------\n>\n> - Stop here.\n\n'
+            '### Outside\n'
+        )
+        viewer = self.viewer(source)
+        document = viewer.browser.document()
+        headings = {}
+        block = document.begin()
+        while block.isValid():
+            if block.blockFormat().headingLevel():
+                headings[block.text()] = (block.blockFormat().headingLevel(), qt.QTextCursor(block).currentFrame())
+            block = block.next()
+
+        callout = document.find('Directions').currentFrame()
+        self.assertTrue(callout.format().hasProperty(ACCENT))
+        self.assertEqual(headings['🧭 Trail'], (3, callout))
+        self.assertEqual(headings['Detour'], (2, callout))
+        self.assertEqual(headings['Schedule'], (2, callout))
+        self.assertEqual(headings['Outside'], (3, document.rootFrame()))
+        self.assertIn('trail.md', viewer.browser.toHtml())
+        self.assertNotIn('quote-heading:', viewer.browser.toHtml())
+        self.assertEqual(viewer.markdown_text(), source)
+
     def test_callout_examples_in_fences_and_mermaid_extraction_are_literal(self):
         source = '````md\n> [!tip]- Example\n```mermaid\ngraph TD\n```\n````\n\n> [!done]+ Finished\n> Body\n'
         rendered, callouts = reading_source(source)

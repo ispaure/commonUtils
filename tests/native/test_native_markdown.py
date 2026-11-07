@@ -43,6 +43,27 @@ class NativeMarkdownTests(unittest.TestCase):
         self.assertNotIn('<video ', markdown_preview('![[potato.mp4]]',
             image_source=lambda target: ('video/mp4', 'https://example.com/video.mp4')))
 
+    def test_callouts_preserve_nested_blocks_and_literal_examples(self):
+        from commonUtils.ui.native.markdown_preview import markdown_body
+        source = (
+            '> [!NOTE] **Field notes**\n> Continued on the next line.\n>\n'
+            '> ### Route\n>\n> - Take the bridge.\n>\n'
+            '> > [!tip]- Optional\n> > Bring a map.\n\n'
+            '> [!info]+ Forecast\n> Clear skies.\n\n'
+            '> Ordinary quote\n> [!NOTE] Mid-paragraph text.\n\n'
+            '```md\n> [!NOTE] Literal example\n```\n'
+        )
+        body = markdown_body(source, callouts=True)
+        self.assertIn('<p class="markdown-callout-title"><strong>Field notes</strong></p>', body)
+        self.assertIn('<p>Continued on the next line.</p>', body)
+        self.assertIn('<h3 id="route">Route</h3>\n<ul>\n<li>Take the bridge.</li>', body)
+        self.assertIn('<summary class="markdown-callout-title">Optional</summary>\n'
+                      '<p>Bring a map.</p>\n</details>\n</blockquote>', body)
+        self.assertIn('<details open=""', body)
+        self.assertIn('<blockquote>\n<p>Ordinary quote\n[!NOTE] Mid-paragraph text.</p>', body)
+        self.assertIn('&gt; [!NOTE] Literal example', body)
+        self.assertIn('[!NOTE] <strong>Field notes</strong>', markdown_body(source))
+
     def test_wiki_links_remain_inside_headings(self):
         html = markdown_preview('# # [[Art]]\n\n# # [[Tech]]', local_links=True)
         self.assertIn('<h1 id="art"># <a href="Art">Art</a></h1>', html)

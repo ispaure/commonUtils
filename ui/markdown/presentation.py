@@ -8,15 +8,14 @@ from ..appearance.typography import point_size
 from .document import space_headings
 from functools import lru_cache
 from typing import NamedTuple
-from .extensions import Callout
+from .extensions import Callout, HEADING_MARKER_SCHEME
+from ..appearance.markdown_colors import CALLOUT_COLORS
 from weakref import ref
 from shiboken6 import isValid
 
 ACCENT = int(qt.QTextFormat.Property.UserProperty) + 701
 CODE_LANGUAGE = int(qt.QTextFormat.Property.UserProperty) + 702
-COLORS = {'note': '#5f91ed', 'abstract': '#42a7b5', 'info': '#5f91ed', 'todo': '#5f91ed',
-          'tip': '#35a58a', 'success': '#38a16b', 'question': '#bf922f', 'warning': '#cb9137',
-          'failure': '#da6670', 'danger': '#da6670', 'bug': '#da6670', 'example': '#9475d5', 'quote': '#8993a2'}
+_QUOTE_LEVELS = {str(level): level for level in range(1, 33)}
 
 
 @lru_cache(maxsize=1)
@@ -58,11 +57,21 @@ def style_document(document, palette, *, callouts=None):
     document.setDocumentMargin(28)
     space_headings(document)
     active = {}
+    quote_level = qt.QTextFormat.Property.BlockQuoteLevel
     block = document.begin()
     while block.isValid():
         cursor = qt.QTextCursor(block)
         fmt = block.blockFormat()
-        depth = int(fmt.property(qt.QTextFormat.Property.BlockQuoteLevel) or 0)
+        if callouts is not None and fmt.headingLevel():
+            marker = block.begin().fragment()
+            if marker.isValid() and marker.text() == '\u200b':
+                href = marker.charFormat().anchorHref()
+                scheme, _, level = href.partition(':')
+                if scheme == HEADING_MARKER_SCHEME and level in _QUOTE_LEVELS:
+                    cursor.movePosition(qt.QTextCursor.MoveOperation.NextCharacter, qt.QTextCursor.MoveMode.KeepAnchor)
+                    cursor.removeSelectedText()
+                    fmt.setProperty(quote_level, _QUOTE_LEVELS[level])
+        depth = fmt.intProperty(quote_level)
         active = {level: value for level, value in active.items() if level <= depth}
         title, separator, inline_code, has_image = _classify_block(block, callouts, active, depth)
         _style_inline_code(document, inline_code, alternate, text)
@@ -92,7 +101,7 @@ def style_document(document, palette, *, callouts=None):
         fmt.setLineHeight(145, qt.QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
         if depth:
             callout = active.get(depth)
-            color = qt.QColor(COLORS.get(callout.kind, COLORS['note'])) if callout else muted
+            color = qt.QColor(CALLOUT_COLORS.get(callout.kind, CALLOUT_COLORS['note'])) if callout else muted
             if base.lightness() < 128:
                 color = color.lighter(120)
             fmt.setLeftMargin(18 + (depth - 1) * 20)

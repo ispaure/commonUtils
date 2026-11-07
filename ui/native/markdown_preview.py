@@ -6,6 +6,9 @@ import re
 from urllib.parse import quote, urlsplit
 
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
+from ..appearance.markdown_colors import CALLOUT_COLORS
+from ...formats.markdown.callouts import MARKER, callout_kind_title
 from ...formats.markdown.images import image_size, wiki_image
 from ...formats.markdown.image_sources import image_failure_reason
 
@@ -88,7 +91,51 @@ def embedded_image(target, alt, image_source=None, *, lazy=False):
     return '<span class="image-alt">' + escape(label) + '</span>'
 
 
-def markdown_body(text, *, local_links=False, image_source=None, limits=None):
+def _render_callouts(state):
+    """Promote a quote's first paragraph marker before parsing its inlines."""
+    tokens = state.tokens
+    result = []
+    quotes = []
+    start = 0
+    for index, token in enumerate(tokens):
+        if token.type == 'blockquote_close':
+            token.tag = quotes.pop()
+        if token.type != 'blockquote_open':
+            continue
+        quotes.append(token.tag)
+        if tokens[index + 1].type != 'paragraph_open':
+            continue
+        inline = tokens[index + 2]
+        line, _, body = inline.content.partition('\n')
+        match = MARKER.fullmatch(line)
+        if not match:
+            continue
+
+        kind, title = callout_kind_title(match)
+        color = CALLOUT_COLORS.get(kind, CALLOUT_COLORS['note'])
+        fold = match['fold']
+        title_tag = 'summary' if fold else 'p'
+        if fold:
+            token.tag = quotes[-1] = 'details'
+        if fold == '+':
+            token.attrSet('open', '')
+        token.attrSet('class', 'markdown-callout')
+        token.attrSet('style', f'--callout-accent:{color}')
+        title_open = Token('callout_title_open', title_tag, 1, block=True)
+        title_open.attrSet('class', 'markdown-callout-title')
+        result.extend(tokens[start:index + 1])
+        result.extend((title_open, Token('inline', '', 0, content=title, children=[]),
+                       Token('callout_title_close', title_tag, -1, block=True)))
+        if body:
+            inline.content = body
+            start = index + 1
+        else:
+            start = index + 4
+    result.extend(tokens[start:])
+    state.tokens = result
+
+
+def markdown_body(text, *, local_links=False, image_source=None, limits=None, callouts=False):
     """Render CommonMark with tables/strikethrough and opt-in local wiki links.
 
     HTML is escaped and external links remain inert. Images show alt text unless
@@ -102,6 +149,8 @@ def markdown_body(text, *, local_links=False, image_source=None, limits=None):
     parser.inline.ruler.before('link', 'wiki_alias', _alias)
     if image_source is not None:
         parser.inline.ruler.before('image', 'wiki_image', wiki_image)
+    if callouts:
+        parser.core.ruler.after('block', 'markdown_callouts', _render_callouts)
     tokens = parser.parse(text)
     headings = set()
     heading_counts = {}
@@ -166,11 +215,18 @@ def markdown_body(text, *, local_links=False, image_source=None, limits=None):
     return parser.renderer.render(tokens, parser.options, {})
 
 
-def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", image_source=None, limits=None):
+def markdown_preview(text, font_size=16, *, local_links=False, stylesheet="", image_source=None, limits=None, callouts=False):
     size = int(font_size)
     if not 12 <= size <= 32:
         raise ValueError('Invalid preview font size.')
-    body = markdown_body(text, local_links=local_links, image_source=image_source, limits=limits)
+    body = markdown_body(text, local_links=local_links, image_source=image_source, limits=limits, callouts=callouts)
+    if callouts:
+        stylesheet += (
+            '.markdown-callout{margin:1em 0;padding:.45em .9em;border-left:3px solid var(--callout-accent);'
+            'border-radius:4px;background:color-mix(in srgb,var(--callout-accent) 12%,transparent)}'
+            '.markdown-callout-title{font-weight:bold;margin:.25em 0}'
+            'summary.markdown-callout-title{cursor:pointer}'
+        )
     policy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
     if image_source is not None:
         policy += "; img-src data:; media-src http://127.0.0.1:*"

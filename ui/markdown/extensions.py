@@ -6,13 +6,14 @@ internal link. Fences are tracked so examples and diagram sources stay literal.
 from dataclasses import dataclass
 import re
 
+from ...formats.markdown.callouts import MARKER, callout_kind_title
+
 QUOTE_PREFIX = re.compile(r'^(?: {0,3}>[ \t]?)+')
-CALLOUT = re.compile(r'^(?P<quote>(?: {0,3}>[ \t]?)+)\s*\[!(?P<kind>[\w-]+)\](?P<fold>[+-]?)(?:\s+(?P<title>.*))?$', re.I)
+CALLOUT = re.compile(r'^(?: {0,3}>[ \t]?)+[ \t]*' + MARKER.pattern)
 FENCE = re.compile(r'^\s{0,3}(`{3,}|~{3,})(.*)$')
-ALIASES = {'summary': 'abstract', 'tldr': 'abstract', 'hint': 'tip', 'important': 'tip',
-           'check': 'success', 'done': 'success', 'help': 'question', 'faq': 'question',
-           'caution': 'warning', 'attention': 'warning', 'fail': 'failure',
-           'missing': 'failure', 'error': 'danger', 'cite': 'quote'}
+ATX = re.compile(r' {0,3}#{1,6}(?:[ \t]+|$)')
+QUOTED_HEADING = re.compile(QUOTE_PREFIX.pattern + r' {0,3}(?:#{1,6}(?:[ \t]|$)|(?:=+|-+)[ \t]*$)')
+HEADING_MARKER_SCHEME = 'quote-heading'
 
 
 @dataclass(frozen=True)
@@ -69,11 +70,10 @@ def reading_source(source, folded=None):
         if not match:
             result.append(line)
             continue
-        kind = match['kind'].lower()
-        title = match['title'] or kind.replace('-', ' ').title()
+        kind, title = callout_kind_title(match)
         foldable = bool(match['fold'])
         collapsed = foldable and folded.get(number, match['fold'] == '-')
-        callouts[number] = Callout(number, ALIASES.get(kind, kind), title, depth, foldable, collapsed)
+        callouts[number] = Callout(number, kind, title, depth, foldable, collapsed)
         open_callout = True
         label = ('▸ ' if collapsed else '▾ ') + title if foldable else title
         # Escape link syntax while allowing authored emphasis in the title.
@@ -84,7 +84,43 @@ def reading_source(source, folded=None):
             hidden_depth = depth
     if open_callout:
         result.extend(['', '[\u200b](callout-end:0)'])
+    _mark_quoted_headings(result)
     return '\n'.join(result), callouts
+
+
+def _mark_quoted_headings(lines):
+    # Qt imports headings without the quote depth of their enclosing block.
+    # Carry the depth through import as a temporary link on the heading.
+    if not any(QUOTED_HEADING.match(line) for line in lines):
+        return
+    try:
+        from markdown_it import MarkdownIt
+    except ImportError:
+        return
+    parser = MarkdownIt('commonmark', {'html': False}).enable('table')
+    tokens = []
+    parser.block.parse('\n'.join(lines), parser, {}, tokens)
+    depth = 0
+    for token in tokens:
+        if token.tag == 'blockquote':
+            depth += token.nesting
+        if not depth or token.type != 'heading_open':
+            continue
+        index = token.map[0]
+        line = lines[index]
+        quote = QUOTE_PREFIX.match(line)
+        if not quote:
+            continue
+        start = quote.end()
+        marker = f'[\u200b]({HEADING_MARKER_SCHEME}:{depth})'
+        if token.markup.startswith('#'):
+            atx = ATX.match(line, start)
+            if not atx:
+                continue
+            start = atx.end()
+            if start == len(line) or re.fullmatch(r'#+[ \t]*', line[start:]):
+                continue
+        lines[index] = line[:start] + marker + line[start:]
 
 
 def mermaid_blocks(source):

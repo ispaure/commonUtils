@@ -54,7 +54,8 @@ the file or editing font. Reading follows the host's light/dark palette. F11 tog
 fullscreen. Escape closes Contents/Find first, then leaves fullscreen. Missing or
 unreadable linked documents show an error and retain the current page.
 
-Callouts display as quote panels. A `+` callout starts expanded; a `-` callout starts
+Callouts display as quote panels with their headings inside the panel. A `+`
+callout starts expanded, and a `-` callout starts
 collapsed. Click its title to fold/unfold it. Folding never changes the file. Embedded
 HTML is shown literally; this is not a full web-page renderer.
 
