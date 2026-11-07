@@ -222,6 +222,7 @@ def _bind_file_cell(interface, cell, index):
         cell.textLabel.alpha = 0
     cell.accessibilityLabel = row.title + ('. Folder' if row.folder else '. ' + interface.row_kind)
     cell.backgroundColor = apple_color('surface')
+    cell.selectedBackgroundView.backgroundColor = apple_color('hover')
     # Only the outer corners belong to the group; recycled middle cells must
     # lose any corner mask left over from a previous first/last row.
     cell.layer.cornerRadius = 16
@@ -308,9 +309,7 @@ class FileTableController(TogaTableViewController):
         cell = tableView.dequeueReusableCellWithIdentifier('file-row')
         if cell is None:
             cell = _new_file_cell()
-            selection = UIView.alloc().init()
-            selection.backgroundColor = self.interface.appearance.apple_color('hover')
-            cell.selectedBackgroundView = selection
+            cell.selectedBackgroundView = UIView.alloc().init()
         _bind_file_cell(self.interface, cell, indexPath.row)
         return cell
 
@@ -322,6 +321,11 @@ class IOSFileList(DetailedList):
         if self.native.tableFooterView is None:
             self.native.tableFooterView = UIView.alloc().init()
         super().change_source(source)
+
+    def refresh_palette(self):
+        selection = self.interface.appearance.apple_color('hover')
+        for cell in self.native.visibleCells:
+            cell.selectedBackgroundView.backgroundColor = selection
 
     def set_enabled(self, enabled):
         self.native.userInteractionEnabled = bool(enabled)

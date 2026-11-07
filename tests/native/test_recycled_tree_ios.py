@@ -119,6 +119,24 @@ class IOSTreeTests(unittest.TestCase):
         button.toggle_(button)
         self.actions.toggle.assert_not_called()
 
+    def test_recycled_tree_applies_native_title_size_before_underlining(self):
+        self.interface.appearance.body_text = 15
+        self.interface._tree_icons = {'landing': None}
+        self.row.tree_expanded = None
+        self.row.tree_landing = True
+        self.row.title = 'Projects'
+        self.classes['NSAttributedString'] = attributed = Mock()
+        old_font = Mock()
+        old_font.fontWithSize.return_value = 'native-15pt'
+        cell = NS(tree_disclosure=None, tree_drag=(None, NS()), tree_drop=(None, NS()),
+                  textLabel=NS(font=old_font, textColor='text'), imageView=NS())
+        with patch.object(self.module, 'layout'):
+            self.module.bind(self.interface, cell, self.row)
+        old_font.fontWithSize.assert_called_once_with(15)
+        self.assertEqual(cell.textLabel.font, 'native-15pt')
+        attributed.alloc().initWithString.assert_called_once_with('Projects',
+            attributes={'NSUnderline': 1, 'NSFont': 'native-15pt', 'NSColor': 'text'})
+
     def test_layout_reserves_disclosure_and_action_width_without_overlapping_names(self):
         def rect(x, y, width, height):
             return NS(origin=NS(x=x, y=y), size=NS(width=width, height=height))

@@ -152,6 +152,8 @@ def bind(interface, cell, row):
         button.setTitle('⌄' if expanded else '›', forState=0)
         button.accessibilityLabel = ('Collapse ' if expanded else 'Expand ') + row.title
         button.setTitleColor(interface.appearance.apple_color('muted'), forState=0)
+    appearance = interface.appearance
+    cell.textLabel.font = cell.textLabel.font.fontWithSize(appearance.body_text)
     landing = bool(getattr(row, 'tree_landing', False))
     cell.textLabel.attributedText = (ObjCClass('NSAttributedString').alloc().initWithString(row.title,
         attributes={'NSUnderline': 1, 'NSFont': cell.textLabel.font, 'NSColor': cell.textLabel.textColor})
