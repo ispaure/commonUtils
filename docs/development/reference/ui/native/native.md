@@ -344,11 +344,11 @@ Its frame is lowered by 4.5% of the viewport height from the original
 36-unit above-finger gap, allowing overlap with the finger. It clamps at the edges. Image margins remain blank rather than snapping to the image edge.
 Keep the original finger holding the image and tap the 33-unit −/+ buttons
 with another finger to change `magnifier_zoom` through 150, 170, 190, 210, 230 and
-250 percent (default 190). The + and − controls sit at the upper-left and upper-right corners,
-6 units outward and 9 above the lens, clamped to the viewport. No percentage
+250 percent (default 190). The + control sits at the upper-left corner and − at the bottom-left corner,
+6 units outward and extending 9 units beyond the lens, clamped to the viewport. No percentage
 label overlays the image.
 UIKit adds the buttons as siblings of the clipped lens; Android uses a split-touch
-popup at the lens's top edge. The original hold stays on the image; button taps do not
+popup along the lens's left edge. The original hold stays on the image; button taps do not
 page or toggle controls. UIKit drag updates translate existing image/button centers;
 sizes and enabled states update when the lens layout or zoom changes. Android
 coalesces popup movement to display frames and updates enabled/alpha states only

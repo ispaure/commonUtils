@@ -89,9 +89,10 @@ public final class ImageCanvasView extends AppCompatImageView {
         float density = getResources().getDisplayMetrics().density;
         RectF lens = lensBounds();
         float left = Math.max(0, lens.left - 6*density);
-        float right = Math.min(getWidth(), lens.right + 6*density);
+        float right = left + 33*density;
         float top = Math.max(0, Math.min(lens.top - 9*density, getHeight() - 33*density));
-        return new RectF(left, top, right, top + 33*density);
+        float bottom = Math.max(0, Math.min(lens.bottom - 24*density, getHeight() - 33*density)) + 33*density;
+        return new RectF(left, top, right, bottom);
     }
     public int getMagnifierZoom() { return magnifierZoom; }
     public void setMagnifierRange(int minimum, int maximum, int step) {
@@ -139,10 +140,10 @@ public final class ImageCanvasView extends AppCompatImageView {
         lensMore.setContentDescription("Increase magnifier zoom");
         lensLess.setOnClickListener(view -> changeMagnifierZoom(-1));
         lensMore.setOnClickListener(view -> changeMagnifierZoom(1));
-        bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.RIGHT | Gravity.TOP));
+        bar.addView(lensLess, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.BOTTOM));
         bar.addView(lensMore, new FrameLayout.LayoutParams(side, side, Gravity.LEFT | Gravity.TOP));
         RectF rect = lensControlsBounds();
-        lensControls = new PopupWindow(bar, Math.round(rect.width()), side, false);
+        lensControls = new PopupWindow(bar, Math.round(rect.width()), Math.round(rect.height()), false);
         lensControls.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
         // Route a second finger to the buttons without cancelling the held
         // image gesture or treating that finger as a pinch.
@@ -166,9 +167,8 @@ public final class ImageCanvasView extends AppCompatImageView {
         }
         RectF rect = lensControlsBounds();
         int[] origin = new int[2]; getLocationOnScreen(origin);
-        float density = getResources().getDisplayMetrics().density;
         lensControls.update(origin[0]+Math.round(rect.left), origin[1]+Math.round(rect.top),
-            Math.round(rect.width()), Math.round(33*density));
+            Math.round(rect.width()), Math.round(rect.height()));
     }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);

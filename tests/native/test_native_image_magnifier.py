@@ -120,7 +120,8 @@ class AppleLensTests(unittest.TestCase):
         self.assertFalse(hasattr(backend, 'lens_label'))
         self.assertEqual((backend.lens_more.frame.size.width, backend.lens_more.frame.size.height), (33, 33))
         self.assertEqual(backend.lens_more.frame.origin.y, backend.lens.frame.origin.y - 9)
-        self.assertLess(backend.lens_more.frame.origin.x, backend.lens_less.frame.origin.x)
+        self.assertEqual(backend.lens_more.frame.origin.x, backend.lens_less.frame.origin.x)
+        self.assertEqual(backend.lens_less.frame.origin.y, backend.lens.frame.origin.y + backend.lens.frame.size.height - 24)
         backend.interface.magnifier_zoom = 150
         backend.hold = self.gesture()
         backend.set_magnifier_zoom(150)

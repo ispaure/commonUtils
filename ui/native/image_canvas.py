@@ -250,8 +250,9 @@ def apple_backend(interface):
             percent = getattr(self.interface, 'magnifier_zoom', 200)
             # Separate sibling controls can extend beyond the rounded lens;
             # clamp to the reader viewport so edge holds keep both reachable.
-            left, right, top = magnifier_controls_geometry(
+            left, _, top = magnifier_controls_geometry(
                 rect.size.width, rect.size.height, x, y, width)
+            bottom = max(0, min(y + height - 24, rect.size.height - 33))
             scale = percent / 100 * float(self.native.zoomScale)
             levels = getattr(self.interface, 'magnifier_levels', MAGNIFIER_ZOOMS)
             layout = (width, height, size.width, size.height, scale, percent, levels[0], levels[-1])
@@ -259,7 +260,7 @@ def apple_backend(interface):
                 self.lens_layout = layout
                 self.lens.frame = CGRect((rect.origin.x + x, rect.origin.y + y), (width, height))
                 self.lens_more.frame = CGRect((rect.origin.x + left, rect.origin.y + top), (33, 33))
-                self.lens_less.frame = CGRect((rect.origin.x + right, rect.origin.y + top), (33, 33))
+                self.lens_less.frame = CGRect((rect.origin.x + left, rect.origin.y + bottom), (33, 33))
                 self.lens_picture.frame = CGRect(
                     (width / 2 - source.x * scale, height / 2 - source.y * scale),
                     (size.width * scale, size.height * scale))
@@ -270,7 +271,7 @@ def apple_backend(interface):
                 # and UIButton frames repeatedly schedules layout/content work.
                 self.lens.center = CGPoint(rect.origin.x + x + width / 2, rect.origin.y + y + height / 2)
                 self.lens_more.center = CGPoint(rect.origin.x + left + 16.5, rect.origin.y + top + 16.5)
-                self.lens_less.center = CGPoint(rect.origin.x + right + 16.5, rect.origin.y + top + 16.5)
+                self.lens_less.center = CGPoint(rect.origin.x + left + 16.5, rect.origin.y + bottom + 16.5)
                 self.lens_picture.center = CGPoint(width / 2 + (size.width / 2 - source.x) * scale,
                                                     height / 2 + (size.height / 2 - source.y) * scale)
 
