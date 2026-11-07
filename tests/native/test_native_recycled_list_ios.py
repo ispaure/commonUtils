@@ -46,7 +46,8 @@ class IOSFileListLifecycleTests(unittest.TestCase):
             data=[self.row], row_kind='File', row_visible=Mock(),
             appearance=SimpleNamespace(apple_color=lambda role: role, title_lines=1, row_height=48, icon_size=28))
         self.cell = SimpleNamespace(textLabel=SimpleNamespace(text=''), detailTextLabel=SimpleNamespace(text=''),
-                                    imageView=SimpleNamespace(image=None), accessibilityLabel='', layer=SimpleNamespace())
+                                    imageView=SimpleNamespace(image=None), accessibilityLabel='', layer=SimpleNamespace(),
+                                    selectedBackgroundView=SimpleNamespace(backgroundColor=None))
         self.separator = Separator()
         self.cell.contentView = Mock()
         self.cell.contentView.bounds.size = SimpleNamespace(width=320, height=48)
