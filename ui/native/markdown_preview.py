@@ -32,6 +32,12 @@ class MarkdownPreviewLimits:
 DEFAULT_LIMITS = MarkdownPreviewLimits()
 
 
+@dataclass(frozen=True)
+class VideoPlaceholder:
+    """A host-owned video control whose source will be supplied on demand."""
+    key: str
+
+
 def _alias(state, silent):
     """Recognize existing wiki aliases through the parser, outside code spans."""
     if (state.src[state.pos] != '[' or state.linkLevel
@@ -59,16 +65,20 @@ def embedded_image(target, alt, image_source=None, *, lazy=False):
             image = image_source(target)
             if image is not None:
                 mime, data = image
-                if mime.startswith('video/') and isinstance(data, str):
-                    url = urlsplit(data)
-                    if url.scheme != 'http' or url.hostname != '127.0.0.1' or not url.port or url.username or url.password:
-                        raise ValueError('Invalid embedded video transport.')
+                if mime.startswith('video/') and isinstance(data, (str, VideoPlaceholder)):
+                    if isinstance(data, VideoPlaceholder):
+                        source = ' data-video-key="' + escape(data.key, quote=True) + '"'
+                    else:
+                        url = urlsplit(data)
+                        if url.scheme != 'http' or url.hostname != '127.0.0.1' or not url.port or url.username or url.password:
+                            raise ValueError('Invalid embedded video transport.')
+                        source = ' src="' + escape(data, quote=True) + '"'
                     caption, width, height = image_size(alt)
                     dimensions = f' width="{width}"' if width else ''
                     if height:
                         dimensions += f' height="{height}"'
                     return ('<video controls playsinline preload="none" aria-label="' + escape(caption, quote=True)
-                            + '" src="' + escape(data, quote=True) + '"' + dimensions
+                            + '"' + source + dimensions
                             + ' style="max-width:100%;height:auto">' + escape(caption) + '</video>')
                 if mime not in {'image/png', 'image/jpeg', 'image/webp', 'image/gif'} or not isinstance(data, bytes) or len(data) > 8 * 1024 * 1024:
                     raise ValueError('Invalid embedded image.')

@@ -17,9 +17,16 @@ The placeholder changes only the rendered resource, preserving authored syntax.
 
 Native HTML previews accept a host-supplied `image_source` returning
 `("video/<type>", "http://127.0.0.1:<port>/<capability>")` for video targets.
+Hosts can return `("video/<type>", VideoPlaceholder(key))` to render a
+`data-video-key` attribute and supply the media URL after a playback action.
 They emit inline video controls with no preload and a loopback-only media policy.
 The host owns stream lifetime, access checks and cleanup; previews never fetch
 an authored external video URL.
+
+Qt storage adapters can return a callable from `video_source(url)`. The
+inline card calls it on a worker after Play, passing a cancellation predicate.
+Return a playable URL or `None`. Hiding or retiring the card cancels pending
+work. The storage adapter owns the stream and its cleanup.
 
 Use `MarkdownViewer` for embedding and `MarkdownWindow` / `open_markdown` for a
 standalone or document-hosted window. They render Markdown with Qt without a web

@@ -348,7 +348,10 @@ class ResponsiveImages(qt.QPyTextObject):
     def drawObject(self, painter, rect, document, position, fmt):
         image = self._image(document, fmt)
         if not image.isNull():
+            painter.save()
+            painter.setRenderHint(qt.QPainter.RenderHint.SmoothPixmapTransform)
             painter.drawImage(rect, image)
+            painter.restore()
         else:
             painter.save()
             painter.setPen(qt.QColor('gray'))

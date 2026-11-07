@@ -8,19 +8,26 @@ from .controls import navigation_button
 
 class BreadcrumbSeparator(qt.QWidget):
     """Font-independent chevron, vertically centered on every platform."""
+    WIDTH = 14
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(14)
+        self.setFixedWidth(self.WIDTH)
         self.setSizePolicy(qt.QSizePolicy.Policy.Fixed, qt.QSizePolicy.Policy.Expanding)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
     def paintEvent(self, event):
         with qt.QPainter(self) as painter:
-            painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
-            painter.setPen(qt.QPen(self.palette().color(qt.QPalette.ColorRole.PlaceholderText), 1.5))
-            x, y = self.width()/2, self.height()/2
-            painter.drawLine(qt.QPointF(x-2,y-4), qt.QPointF(x+2,y))
-            painter.drawLine(qt.QPointF(x+2,y), qt.QPointF(x-2,y+4))
+            self.paint_chevron(painter, self.width(), self.height(),
+                               self.palette().color(qt.QPalette.ColorRole.PlaceholderText))
+
+    @staticmethod
+    def paint_chevron(painter, width, height, color):
+        painter.setRenderHint(qt.QPainter.RenderHint.Antialiasing)
+        painter.setPen(qt.QPen(color, 1.5))
+        x, y = width / 2, height / 2
+        painter.drawLine(qt.QPointF(x - 2, y - 4), qt.QPointF(x + 2, y))
+        painter.drawLine(qt.QPointF(x + 2, y), qt.QPointF(x - 2, y + 4))
 
 
 class BreadcrumbBar(qt.QWidget):
