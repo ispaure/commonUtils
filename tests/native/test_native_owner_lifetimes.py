@@ -61,6 +61,21 @@ class NativeOwnerLifetimeTests(unittest.TestCase):
         self.assertIs(adapter.navigation_for('settings'), own)
         self.assertIs(adapter.content_controller('settings'), root)
 
+    def test_normal_apple_routes_never_materialize_the_overflow_list(self):
+        class TabController:
+            @property
+            def moreNavigationController(self):
+                raise AssertionError('Normal route queried UIKit overflow')
+
+        adapter = object.__new__(navigation.AppleNavigation)
+        own = SimpleNamespace(viewControllers=[object(), object()])
+        adapter.controller = TabController()
+        adapter.navigation = [own]
+        adapter.host = SimpleNamespace(destinations=('home',))
+        self.assertFalse(adapter.is_more_navigation(own))
+        self.assertEqual(adapter.destination_for_navigation(own), 'home')
+        self.assertEqual(adapter.route_depth(own), 1)
+
     def test_programmatic_overflow_callback_does_not_reselect_or_cancel_routes(self):
         selected = Mock()
         items = tuple((str(i), 'Page ' + str(i), 'doc', 'ic_menu_edit') for i in range(6))

@@ -621,18 +621,25 @@ class AppleNavigation:
         return any(controller == root or controller == navigation
                    for (_, root), navigation in zip(self.containers, self.navigation))
 
+    def is_more_navigation(self, navigation):
+        # Accessing UIKit's overflow controller can lazily create and lay out
+        # its list. Normal tab transitions already identify their own stack.
+        return navigation not in self.navigation and navigation == self.controller.moreNavigationController
+
     def destination_for_navigation(self, navigation):
-        if navigation == self.controller.moreNavigationController:
+        if navigation in self.navigation:
+            return self.host.destinations[self.navigation.index(navigation)]
+        if self.is_more_navigation(navigation):
             stack = list(navigation.viewControllers)
             for index, (_, root) in enumerate(self.containers):
                 if root in stack:
                     return self.host.destinations[index]
             return None  # The overflow list itself has no document route.
-        return self.host.destinations[self.navigation.index(navigation)]
+        raise ValueError('Unknown Apple navigation controller.')
 
     def route_depth(self, navigation):
         # More's own list precedes the selected tab's root.
-        root_count = 2 if navigation == self.controller.moreNavigationController else 1
+        root_count = 2 if self.is_more_navigation(navigation) else 1
         return max(0, len(navigation.viewControllers) - root_count)
 
     def push(self, destination, widget, title):

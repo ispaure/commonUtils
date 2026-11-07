@@ -20,7 +20,7 @@ def apple_delegate():
                 owner = self.owner
                 if owner is not None and not owner.changing:
                     adapter = owner.host.adapter
-                    if (navigation == adapter.controller.moreNavigationController
+                    if (adapter.is_more_navigation(navigation)
                             and adapter.is_destination_controller(controller)):
                         adapter.controller.navigationController_willShowViewController_animated_(navigation, controller, animated)
 
