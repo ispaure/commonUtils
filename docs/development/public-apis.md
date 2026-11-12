@@ -12,6 +12,7 @@ part of the integration contract; see [integration contracts](contracts.md).
 | List paths and filter names | `filesystem.traversal.scan_directory` | Roots, recursion and cancellation policy |
 | Work with file objects and specialized formats | `filesystem.directories.Directory`, `formats.registry.file_from_path` | Registration and domain validation |
 | Save one JSON document atomically | `persistence.atomic_write_json` | Schema, writer coordination and when to save |
+| Inspect or transactionally edit SQLite records | [integrations.sqlite.Database](reference/integrations/sqlite.md) | Local resource access, editable schema and explicit save policy |
 | Run a process without widgets | `integrations.wrappers.cmdShellWrapper.run_command` | Argument list, timeouts and failure presentation |
 | Embed interactive controls | [UI reference](reference/ui/ui.md) | Application lifecycle, navigation and storage access |
 

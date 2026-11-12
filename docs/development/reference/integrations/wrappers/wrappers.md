@@ -4,6 +4,12 @@ Adapters for command execution, PowerShell, EXIF and SQLite. Dependencies remain
 
 [Command execution](cmdShellWrapper/cmdShellWrapper.md) owns structured outcomes, cancellation and timeouts.
 
+New database callers use the [SQLite API](../sqlite.md), which opens read-only by
+default, bounds pages and provides explicit atomic edit transactions. The legacy
+SQL wrapper remains a trusted-caller compatibility helper with whole-result
+reads; its raw command path commits successful statements. Do not route browser
+queries or untrusted SQL through that helper.
+
 ## Files
 
 | File | Responsibility / public entry points |

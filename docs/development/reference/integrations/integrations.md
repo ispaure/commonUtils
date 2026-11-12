@@ -17,3 +17,4 @@ Example: `from commonUtils.integrations.web import open_url`.
 - [External applications](applications/applications.md)
 - [Steam launch detection](steam/steam.md)
 - [Open a web link](web/web.md)
+- [SQLite databases, typed pages and transactions](sqlite.md)
