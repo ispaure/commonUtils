@@ -174,6 +174,17 @@ class LocalFiles:
             return None
         return self._locate(path)
 
+    def sqlite_local_path(self, path, *, writable=False):
+        """Explicit SQLite access for this ordinary local provider only.
+
+        Subclasses (including encoded or mapped stores) must opt in themselves;
+        replacement capability and a physical root do not imply SQLite safety.
+        The browser separately checks host policy, mounts, file type and access.
+        """
+        if type(self) is not LocalFiles or self.private or self.storage_namespace != 'local':
+            return None
+        return self._locate(path)
+
     def remove_empty(self, path, revision):
         with mutation_lock:
             if not self.relative(path):

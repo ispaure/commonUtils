@@ -23,6 +23,11 @@ installed decoder supports their format, including supported texture formats on
 desktop. Network mounts and virtual/cloud locations do not receive automatic
 image previews. Unsupported, unreadable or oversized images keep their file icon.
 
+For a local database file, choose **Inspect SQLite…** from its context menu to
+inspect schema and browse bounded pages. The [SQLite guide](../sqlite_browser/sqlite_browser.md)
+explains filters, typed values and explicit saves where the host allows editing.
+Opening the inspector does not change the file's normal double-click action.
+
 Hidden files and folders use muted grey text in these views and cached search
 results. Dot-prefixed names are muted on every desktop platform, along with
 Windows entries marked Hidden and macOS entries carrying the native hidden flag.

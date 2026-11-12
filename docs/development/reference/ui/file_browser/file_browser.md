@@ -85,6 +85,11 @@ established widget fields compatible.
 navigation boundary. The one-argument API remains folder-scoped. Applications choose
 Home/root defaults and new-tab destinations; these are not universal library policy.
 `index_settings_path` selects refresh preferences, **not** an alternate SQLite cache.
+
+The separate [SQLite inspector](../sqlite_browser/sqlite_browser.md) contributes
+an explicit context action for database files. It opens read-only; hosts may opt
+ordinary local files into staged editing through `sqlite_write_allowed`. It does
+not replace the directory index owner or change file activation handlers.
 See [index policy](../../../../user/file_browser/file_browser.md#settings-and-their-effects).
 
 ## Selection and extensions

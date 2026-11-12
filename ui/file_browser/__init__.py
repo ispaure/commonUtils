@@ -49,7 +49,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
     index_progress = qt.Signal(str)
     index_state_changed = qt.Signal()
 
-    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None, directory_handler=None, directory_boundary=None, column_navigation=True):
+    def __init__(self, directory=None, parent=None, *, services=None, action_providers=(), folder_fields=None, calculate_folder_sizes=True, index_settings_path=None, directory_handler=None, directory_boundary=None, column_navigation=True, sqlite_write_allowed=None, sqlite_readonly_paths=()):
         super().__init__(parent)
         from ..appearance.styling import bind_font
         bind_font(self, 'browser')
@@ -59,7 +59,11 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         self.directory_boundary = directory_boundary
         self.column_navigation = bool(column_navigation)
         self.services = services or {}
-        self.action_providers = tuple(action_providers)
+        from ..sqlite_browser.controller import SQLiteController
+        self.sqlite_browser = SQLiteController(self, write_allowed=sqlite_write_allowed,
+                                               readonly_paths=sqlite_readonly_paths)
+        self.sqlite_browser.idle.connect(self._sqlite_idle)
+        self.action_providers = (*action_providers, self.sqlite_browser.actions)
         self.folder_fields = folder_fields
         self._base_services = dict(self.services)
         self._base_action_providers = self.action_providers
@@ -563,6 +567,10 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
                 self._selection_changed()
 
     def stop(self):
+        if not self.sqlite_browser.prepare_close():
+            # A dirty-edit veto is not worker retirement. Keep this browser
+            # visible and operational until the user resolves that window.
+            return True
         if self._index_details_dialog is not None:
             self._index_details_dialog.close()
         from ...filesystem.index import directory_cache
@@ -578,9 +586,13 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
             self.folder_operation.requestInterruption()
         return self._owned_operations_busy()
 
+    def _sqlite_idle(self):
+        if self.sqlite_browser.closing and self.sqlite_browser.can_retire:
+            self.idle.emit()
+
     def _owned_operations_busy(self):
         """Close and idle share admission across all owned worker families."""
-        return self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy()
+        return self.busy or self.folder_busy or self.views.cover_busy or self.views.storage.busy or self.file_actions.busy or self._scan_busy() or self.sqlite_browser.busy
 
     def _maybe_idle(self):
         if self.stopping and not self._owned_operations_busy():
@@ -588,6 +600,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
 
     def shutdown(self):
         self.stop()
+        self.sqlite_browser.wait()
         self.views.storage.wait()
         self.file_actions.wait()
         self.index_search.wait()
@@ -606,7 +619,8 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
 
     def closeEvent(self, event):
         if self.stop():
-            self.hide()
+            if self.stopping:
+                self.hide()
             event.ignore()
         else:
             event.accept()

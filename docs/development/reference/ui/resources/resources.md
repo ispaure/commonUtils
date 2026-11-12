@@ -13,6 +13,13 @@ modules have been removed.
 | `ui.resources.editor` | `ResourceTextWindow` and revision-checked text editing |
 | `ui.resources.lifecycle` | `ResourceOperations` worker retention and captured provider identity |
 
+An explicit `sqlite_local_path` provider hook can expose direct local databases
+through the [SQLite inspector](../sqlite_browser/sqlite_browser.md). Ordinary
+`LocalFiles` supplies it; mapped, encrypted, remote, archive and native providers
+do not inherit access from replacement capability. Editing still requires host
+opt-in. Parent operation owners observe SQLite workers and dirty-close vetoes
+through `ResourceBrowser.busy` before releasing the provider.
+
 ## Changing provider and closing
 
 `ResourceOperations.bind(provider)` captures provider object identity and a new

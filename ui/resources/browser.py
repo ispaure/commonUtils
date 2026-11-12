@@ -37,13 +37,17 @@ class ResourceBrowser(qt.QWidget):
     idle = qt.Signal()
     persistent_index = False
 
-    def __init__(self, provider: DirectoryProvider, parent=None, *, directory=None, actions=(), thumbnail=None, details=None, preview=True, path_label=None):
+    def __init__(self, provider: DirectoryProvider, parent=None, *, directory=None, actions=(), thumbnail=None, details=None, preview=True, path_label=None, sqlite_write_allowed=None, sqlite_readonly_paths=()):
         super().__init__(parent)
         self.provider = provider
         self.directory_gate = None
         self.operations = ResourceOperations()
         self.operations.bind(provider)
         self.actions = tuple(actions)
+        from ..sqlite_browser.controller import SQLiteController
+        self.sqlite_browser = SQLiteController(self, provider=provider, write_allowed=sqlite_write_allowed,
+                                               readonly_paths=sqlite_readonly_paths)
+        self.sqlite_browser.idle.connect(self._sqlite_idle)
         self.thumbnail = thumbnail
         self.path_label = path_label
         self._queued_listings = deque()
@@ -205,7 +209,13 @@ class ResourceBrowser(qt.QWidget):
 
     @property
     def busy(self):
-        return self.operations.busy
+        # ResourceOperations parents observe busy after calling stop(); a
+        # SQLite dialog's dirty-close veto must also retain the provider owner.
+        return self.operations.busy or self.sqlite_browser.busy or not self.sqlite_browser.can_retire
+
+    @property
+    def can_retire(self):
+        return self.sqlite_browser.can_retire
 
     def _thumbnail(self, path, size, cancelled):
         provider = getattr(self.provider, 'provider', self.provider)
@@ -474,6 +484,9 @@ class ResourceBrowser(qt.QWidget):
             menu.addAction('Rename…', lambda: self._rename(row))
         if capabilities(self.provider).delete:
             menu.addAction('Delete…', lambda: self._delete(row))
+        path = self.provider.root / row['path']
+        if not row['directory'] and self.sqlite_browser.available(path):
+            menu.addAction('Inspect SQLite…', lambda: self.sqlite_browser.open(path))
         for label, available, callback in self.actions:
             if available(row):
                 menu.addAction(label, lambda checked=False, callback=callback: callback(self.provider.root / row['path']))
@@ -540,7 +553,13 @@ class ResourceBrowser(qt.QWidget):
         if not self.busy:
             self.idle.emit()
 
+    def _sqlite_idle(self):
+        if self.sqlite_browser.closing and self.sqlite_browser.can_retire:
+            self.idle.emit()
+
     def stop(self):
+        if not self.sqlite_browser.prepare_close():
+            return True
         self.closing = True
         self.search_timer.stop()
         self.search_pending = False

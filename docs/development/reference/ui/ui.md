@@ -66,6 +66,7 @@ non-Qt alternative. [Streams](../runtime/streams/streams.md) handles copying and
 | Code editing, gutters and syntax | [Code editor](code_editor/code_editor.md) |
 | Plain UTF-8 editor and INI settings editor | [Configuration](../configuration/configuration.md), [user guide](../../../user/components/components.md) |
 | Archive contents and member selection | [Archive view](archive_view/archive_view.md) |
+| SQLite schema, paged records and staged edits | [SQLite browser](sqlite_browser/sqlite_browser.md) |
 | Shared reader menus, fullscreen controls and recent paths | [Browser features](features/features.md) |
 
 The plain editor exposes `save()`, `reload()` and `can_close()`. Ask `can_close()`
