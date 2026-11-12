@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 
 class Separator:
     # UIKit exposes setHidden/isHidden, not a Python `hidden` field.
-    __slots__ = ('_hidden', 'frame', 'backgroundColor')
+    __slots__ = ('_hidden', 'backgroundColor')
 
     def setHidden(self, value):
         self._hidden = value
@@ -49,9 +49,7 @@ class IOSFileListLifecycleTests(unittest.TestCase):
                                     imageView=SimpleNamespace(image=None), accessibilityLabel='', layer=SimpleNamespace(),
                                     selectedBackgroundView=SimpleNamespace(backgroundColor=None))
         self.separator = Separator()
-        self.cell.contentView = Mock()
-        self.cell.contentView.bounds.size = SimpleNamespace(width=320, height=48)
-        self.cell.contentView.viewWithTag.return_value = self.separator
+        self.cell.viewWithTag = Mock(return_value=self.separator)
         self.table = Mock()
         self.table.dequeueReusableCellWithIdentifier.return_value = self.cell
         self.table.indexPathForCell.return_value = None
@@ -261,7 +259,21 @@ class IOSFileListLifecycleTests(unittest.TestCase):
                 self.assertFalse(self.cell.preservesSuperviewLayoutMargins)
                 self.assertEqual(self.cell.textLabel.text, 'Documents')
                 self.assertEqual(self.separator.isHidden(), index == count - 1)
-                self.assertEqual(self.separator.frame, ((12, 47), (296, 1)))
+
+    def test_separator_spans_the_cell_with_equal_insets_past_the_accessory(self):
+        namespace = self.controller.tableView_cellForRowAtIndexPath_.__globals__
+        cell = Mock()
+        cell.viewWithTag.return_value = None
+        line = Mock()
+        with patch.dict(namespace, {'UIView': Mock()}):
+            namespace['UIView'].alloc.return_value.init.return_value = line
+            namespace['_bind_separator'](cell, last=False, color='border')
+        cell.addSubview.assert_called_once_with(line)
+        cell.contentView.addSubview.assert_not_called()
+        line.leadingAnchor.constraintEqualToAnchor.assert_called_once_with(cell.leadingAnchor, constant=12)
+        line.trailingAnchor.constraintEqualToAnchor.assert_called_once_with(cell.trailingAnchor, constant=-12)
+        line.bottomAnchor.constraintEqualToAnchor.assert_called_once_with(cell.bottomAnchor)
+        line.heightAnchor.constraintEqualToConstant.assert_called_once_with(1)
 
     def test_recycled_last_row_gets_its_separator_back_when_moved_to_middle(self):
         self.bind()

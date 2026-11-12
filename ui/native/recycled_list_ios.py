@@ -186,18 +186,19 @@ def _clear_actions(cell):
 
 def _bind_separator(cell, *, last, color):
     """Own the between-row line without changing UIKit's text layout insets."""
-    from rubicon.objc import CGRect
-    content = cell.contentView
-    line = content.viewWithTag(7421)
+    line = cell.viewWithTag(7421)
     if line is None:
         line = UIView.alloc().init()
         line.tag = 7421
         line.setUserInteractionEnabled(False)
-        # Flexible width and top margin keep the line at the row's bottom.
-        line.autoresizingMask = 2 | 8
-        content.addSubview(line)
-    line.frame = CGRect((12, max(0, float(content.bounds.size.height) - 1)),
-                        (max(0, float(content.bounds.size.width) - 24), 1))
+        # The cell spans the accessory slot. UIKit narrows contentView to
+        # reserve space for the menu, so anchor the divider to the whole row.
+        line.translatesAutoresizingMaskIntoConstraints = False
+        cell.addSubview(line)
+        line.leadingAnchor.constraintEqualToAnchor(cell.leadingAnchor, constant=12).active = True
+        line.trailingAnchor.constraintEqualToAnchor(cell.trailingAnchor, constant=-12).active = True
+        line.bottomAnchor.constraintEqualToAnchor(cell.bottomAnchor).active = True
+        line.heightAnchor.constraintEqualToConstant(1).active = True
     line.backgroundColor = color
     line.setHidden(last)
 
