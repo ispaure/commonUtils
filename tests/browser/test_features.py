@@ -73,10 +73,11 @@ class BindingTests(QtTestCase):
         for handle in self.handles:
             file_types.unregister(handle)
 
-    def browser(self):
+    def browser(self, *, install_feature=True):
         browser = FileBrowser(self.root)
         self.browsers.append(browser)
-        self.feature.install_browser(browser)
+        if install_feature:
+            self.feature.install_browser(browser)
         self.wait(browser)
         return browser
 
@@ -130,22 +131,30 @@ class BindingTests(QtTestCase):
         opened.assert_called_once_with(self.other)
 
     def test_toggle_updates_all_bindings_and_rejects_stale_action(self):
-        first = self.browser()
-        second = self.browser()
+        first = self.browser(install_feature=False)
+        second = self.browser(install_feature=False)
+        browsers = (first, second)
+        base_providers = [browser.action_providers for browser in browsers]
         binding = self.feature.install_browser(first)
+        self.feature.install_browser(second)
+        enabled_providers = [browser.action_providers for browser in browsers]
+        for base, enabled in zip(base_providers, enabled_providers, strict=True):
+            self.assertEqual(enabled[:-1], base)
+            self.assertEqual(len(enabled), len(base) + 1)
         context = first.context(first.model.object_for_path(self.path))
         action = binding._actions_for(context.selection[0], context)[0]
         self.feature.set_enabled(False)
         self.assertIs(type(file_from_path(self.path)), File)
-        for browser in (first, second):
+        for browser, base in zip(browsers, base_providers, strict=True):
             self.assertFalse(browser.activation_handlers)
-            self.assertFalse(browser.action_providers)
+            self.assertEqual(browser.action_providers, base)
             self.wait(browser)
         with self.assertRaisesRegex(RuntimeError, 'disabled'):
             action.run(context)
         self.feature.set_enabled(True)
-        for browser in (first, second):
+        for browser, enabled in zip(browsers, enabled_providers, strict=True):
             self.assertTrue(browser.activation_handlers)
+            self.assertEqual(browser.action_providers, enabled)
             self.assertIs(type(browser.model.object_for_path(self.path)), ProjectFile)
             self.wait(browser)
 
