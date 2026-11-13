@@ -14,7 +14,8 @@ from commonUtils.tests.qt_test_case import QtTestCase
 from unittest.mock import patch
 from commonUtils.filesystem.index import DirectoryCache
 from commonUtils.ui import pyside as qt
-from commonUtils.ui.file_browser.index_worker import FolderOperation
+from commonUtils.ui.file_browser.index_worker import FolderOperation, _FolderScan
+from commonUtils.ui.file_browser.index_policy import IndexPolicy
 
 
 class SharedJobTests(QtTestCase):
@@ -167,8 +168,8 @@ class SharedJobTests(QtTestCase):
 
     def test_descendant_view_joins_reconcile_scan_without_starting_another_scanner(self):
         with TemporaryDirectory() as folder:
-            root = Path(folder); child = root / 'child'; child.mkdir()
-            with DirectoryCache(database=root / 'index.sqlite3') as cache:
+            base = Path(folder); root = base / 'files'; child = root / 'child'; child.mkdir(parents=True)
+            with DirectoryCache(database=base / 'cache' / 'index.sqlite3') as cache:
                 entered, release = Event(), Event(); calls = []
                 def scanner(root, stop, **kwargs):
                     calls.append(root); entered.set()
@@ -190,3 +191,58 @@ class SharedJobTests(QtTestCase):
                         self.wait(lambda: first.isFinished() and second.isFinished())
                         first.deleteLater(); second.deleteLater()
                 self.assertEqual(calls, [root])
+
+    def test_shallow_parent_does_not_delay_child_admission_or_retarget(self):
+        with TemporaryDirectory() as folder:
+            base = Path(folder); root = base / 'files'; child = root / 'child'; child.mkdir(parents=True)
+            with DirectoryCache(database=base / 'cache' / 'index.sqlite3') as cache:
+                entered, child_entered, release = Event(), Event(), Event()
+                def reconcile(path, *, cancelled, **kwargs):
+                    (entered if path == root else child_entered).set()
+                    while not release.wait(.01):
+                        if cancelled():
+                            return None
+                shallow = _FolderScan(cache, IndexPolicy(recursive_on_open=False),
+                                      read_cache=False, paused=False, full=False, changes=())
+                recursive = _FolderScan(cache, IndexPolicy(recursive_on_open=True),
+                                        read_cache=False, paused=False, full=False, changes=())
+                with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache), \
+                     patch.object(cache, 'reconcile_folder', side_effect=reconcile):
+                    first = FolderOperation(root, shallow, self.app, request_key=('reconcile', ()))
+                    second = FolderOperation(child, recursive, self.app, request_key=('reconcile', ()))
+                    try:
+                        first.start(); self.wait(entered.is_set)
+                        self.assertFalse(first.retarget(child))
+                        second.start(); self.wait(child_entered.is_set)
+                        self.assertIsNot(first._job, second._job)
+                        self.assertFalse(release.is_set())
+                    finally:
+                        release.set()
+                        first.requestInterruption(); second.requestInterruption()
+                        self.wait(lambda: first.isFinished() and second.isFinished())
+                        first.deleteLater(); second.deleteLater()
+
+    def test_excluded_descendant_is_not_attached_to_parent_worker(self):
+        with TemporaryDirectory() as folder:
+            base = Path(folder); root = base / 'files'; child = root / 'child'; child.mkdir(parents=True)
+            with DirectoryCache(database=base / 'cache' / 'index.sqlite3') as cache:
+                entered, child_entered, release = Event(), Event(), Event()
+                def scanner(path, cancelled, **kwargs):
+                    (entered if path == root else child_entered).set()
+                    while not release.wait(.01):
+                        if cancelled():
+                            return None
+                with patch('commonUtils.ui.file_browser.index_worker.directory_cache', cache), \
+                     patch('commonUtils.filesystem.index.exclusions.network_mount_roots', return_value=(child,)):
+                    first = FolderOperation(root, scanner, self.app, request_key=('reconcile', ()))
+                    second = FolderOperation(child, scanner, self.app, request_key=('reconcile', ()))
+                    try:
+                        first.start(); self.wait(entered.is_set)
+                        self.assertFalse(first.retarget(child))
+                        second.start(); self.wait(child_entered.is_set)
+                        self.assertIsNot(first._job, second._job)
+                    finally:
+                        release.set()
+                        first.requestInterruption(); second.requestInterruption()
+                        self.wait(lambda: first.isFinished() and second.isFinished())
+                        first.deleteLater(); second.deleteLater()

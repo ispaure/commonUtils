@@ -8,6 +8,7 @@ from threading import Event, RLock
 from ..tasks.operations import Operation
 from .. import pyside as qt
 from ...filesystem.index import DirectoryCache, directory_cache
+from ...filesystem.index.exclusions import is_excluded, scan_exclusions
 from ...runtime.operations import OperationCancelled
 from .index_policy import IndexPolicy
 from .status import IndexProgress
@@ -63,6 +64,8 @@ class _IndexJob(Operation):
 
     def __init__(self, root, scanner, parent):
         self.root = root
+        self.scanner = scanner
+        self._descendant_exclusions = None
         self._last_update = 0
         self.started_at = monotonic()
         self._last_progress = 0
@@ -99,6 +102,9 @@ class _IndexJob(Operation):
             self.progress.emit(self._status.render())
 
     def _collect(self, scanner):
+        # Resolve mount/cache exclusions on the worker, never during GUI-side
+        # subscription or navigation. Unknown coverage gets its own admission.
+        self._descendant_exclusions = tuple(scan_exclusions(self.root, directory_cache.database))
         try:
             self._cached(force=True)
         except sqlite3.OperationalError:
@@ -109,6 +115,17 @@ class _IndexJob(Operation):
         if not self.isInterruptionRequested():
             self._cached(force=True)
         return result
+
+    def accepts_descendant(self, root):
+        if root == self.root:
+            return True
+        if self.root not in root.parents or self._descendant_exclusions is None:
+            return False
+        scanner = self.scanner
+        if isinstance(scanner, _FolderScan) and (scanner.paused or
+                not scanner.full and not scanner.policy.recursive_on_open):
+            return False
+        return not is_excluded(root, self._descendant_exclusions)
 
     def _report(self, done, total, message):
         if message == 'Following shared index':
@@ -231,7 +248,7 @@ class FolderOperation(qt.QObject):
             candidates = [owner for identity,owner in tuple(_jobs.items())
                           if identity[0] == directory_cache.database and len(identity) == 3
                           and isinstance(identity[2], tuple) and identity[2][0] == 'reconcile'
-                          and (owner.root == self.root or owner.root in self.root.parents)
+                          and owner.accepts_descendant(self.root)
                           and not owner.isInterruptionRequested()]
             if candidates:
                 job = max(candidates, key=lambda owner: len(owner.root.parts))
@@ -269,7 +286,7 @@ class FolderOperation(qt.QObject):
         job = self._job
         if job is None or self._stopped or self._finished:
             return False
-        if root != job.root and job.root not in root.parents:
+        if not job.accepts_descendant(root):
             return False
         self.visible_root = root
         if directory_cache.coordinator is not None:

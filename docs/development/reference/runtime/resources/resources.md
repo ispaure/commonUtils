@@ -64,6 +64,10 @@ directory during enumeration fails the snapshot.
 index with resource-provider results. The host explicitly admits physical local
 adapters and supplies the database location. Private, session-only and remote
 providers always use memory-only recursive search, even if admitted by mistake.
+The optional `cache=` argument accepts a caller-owned DirectoryCache. If that
+cache has a host coordinator, preparation and a cold query use its names-only
+receipt rather than opening an independent scan. The caller closes the cache
+only after its own workers and snapshots retire.
 
 Call `prepare(provider, directory, cancelled=...)` off the UI thread to reconcile
 names, then `search(...)` for cached hits. A persisted hit is revalidated through
@@ -72,6 +76,18 @@ incomplete. Provider guards run before scanning and before results return. Cache
 metadata never grants access to a file. Close `search.cache` after retiring its
 workers. Query rules, symlink exclusion and stale-name behavior match directory
 index search; applications own refresh scheduling and provider eligibility.
+
+With `progress=callback`, one ordered SQL query streams saved hits in batches of 50 and
+validated before publication. The first accepted page is delivered before later
+pages perform provider work; later cumulative snapshots are throttled to 250 ms.
+Progress rows/errors are detached lists and remain incomplete until the final
+return. The pinned read transaction preserves page order during a concurrent
+refresh. Cancellation and the provider guard are checked before each callback
+and the final result. Callbacks run on the search worker; hosts retain their
+query/session fence when delivering to the UI. A cold query still waits for its
+initial index, and the final return still contains all authorized matches.
+An unreadable/corrupt SQLite cache falls back to authorized provider traversal;
+the read path does not delete or replace a database being used by another writer.
 
 ## Streamed mutations
 

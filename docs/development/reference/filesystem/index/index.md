@@ -41,6 +41,13 @@ returns `(entries, total_matches)`, sorted before paging. Search is case-insensi
 filename matching, with all bare terms required and quoted separator-normalized
 phrases; it is not content indexing or a wildcard language.
 
+`iter_search(name, cancelled=...)` streams matching entries from one ordered SQL
+cursor without counting or materializing every match. Close the iterator before
+its snapshot if stopping early (for example, with `contextlib.closing`). The
+existing `search()` still returns all matches and `search_page()` still returns
+the requested page plus a count. Provider admission and UI publication remain
+the caller's responsibility.
+
 `folder_stats(paths=...)` limits aggregate reads to requested paths;
 `children_of=...` requests a folder and its immediate children (mutually exclusive
 with explicit paths). Their sizes still include known descendants. `scan_folders`
@@ -137,16 +144,29 @@ and sets `cache.coordinator` while it is available. Logistics supplies this life
 Standalone `DirectoryCache` calls keep their synchronous semantics and writer lock.
 
 `reconcile_folder()` submits or follows a job and returns a saved snapshot; `submit`,
-`status`, `active_job` and `follow` also support explicit subscriptions. Cancelling a
+`status`, `active_job`, `active_jobs` and `follow` also support explicit subscriptions. Cancelling a
 follower only detaches it. Submitted jobs survive subscribers; a process with no
 subscribers can take over, and the next host launch resumes work if all hosts exited.
 An OS-held runner lock prevents competing runners; actual index writes additionally
 retain the existing writer lock. Ownership never expires on a timer. Abrupt death
 releases both OS locks; normal stop checkpoints cooperatively. In-progress receipts
 are retried after takeover; terminal errors/partial attempts require a new request.
+Failed jobs, a stopped service and expired receipts raise `IndexUnavailableError`
+(an `OSError` subclass); filename preparation also raises it if its completed
+snapshot disappeared. Cancellation remains `OperationCancelled`. The receipt
+retains its diagnostic error, while cache-backed filename search falls back to
+the provider for this availability failure or a SQLite error.
 
 Compatible active requests coalesce. Recursive initial discovery/full refresh can
 cover descendant requests; a completed parent's immediate-folder check cannot.
+Compatible pending child requests can expand to a newly requested covering parent.
+Other pending filename receipts redirect to the surviving job; `status(old_id)` resolves
+that redirect, and existing followers still complete. Ordinary receipts remain
+independent when they cannot be promoted in place, because pre-upgrade followers
+cannot resolve redirects. Claimed/running roots are not
+retargeted. Excluded children keep independent receipts. Selection and claiming share
+one queue transaction, so a concurrent submission cannot change an already selected
+traversal's root.
 Refresh and change notifications arriving during a running job queue a later pass.
 The runner rechecks coverage if another operation completed a queued root first.
 Terminal receipts are retained for seven days and pruned on submission. Queue
@@ -163,10 +183,38 @@ receipt errors remain local diagnostic data. Hosts must stop/join their runner
 before destroying it. No external daemon, network service or arbitrary operation
 replay is involved.
 
-An optional `set_priority(background)` callback applies the original submitter's
-saved background-priority setting when a runner starts or resumes the job. Joining
-an existing job does not change its priority. Shared queue contention has bounded,
-cancellable retries; it never authorizes a second index writer.
+`prepare_search(root, cancelled=..., report=...)` coalesces filename preparation and
+returns a snapshot scoped to the requested root. Its `names_only=True` receipt calls
+`DirectoryCache.get(validate_files=False)`: saved folder identities are validated
+recursively while unchanged files do not receive a separate metadata pass. This is
+different from the ordinary visible-folder reconciliation contract. Covering ordinary
+metadata work can satisfy filename demand; names-only work cannot replace file-metadata
+reconciliation. Merging a pending ordinary request upgrades the combined job to ordinary
+metadata validation. Private/provider eligibility remains the host's responsibility;
+never submit decoded private paths to this ordinary durable queue.
+
+An optional `set_priority(background)` callback applies the saved background-priority
+setting when a runner starts or resumes a job. A non-background subscriber promotes
+an existing receipt for its next start/resume. `select_job(jobs)` may choose one of
+the supplied canonical pending/running job dictionaries, or return `None` to defer
+work. The default remains interrupted/running first, then creation order. Selection
+runs under the short queue transaction and should only inspect captured host policy.
+`should_yield(job)` is checked at most every 200 ms through cooperative cancellation.
+A yield keeps the receipt pending; initial scans retain completed checkpoints and
+reconciliation rolls back its uncommitted update. It does not remove followers.
+Hosts own foreground hints, debounce, lifecycle gating and fairness; callbacks do not
+access UI from the worker. Existing snapshot reads remain independent. Shared queue
+contention has bounded, cancellable retries and never authorizes another index writer.
+
+Existing job databases gain filename-kind, redirect and filename-activity columns
+under a serialized upgrade, preserving queued work. Upgraded receipt reads require
+no schema write lock. Filename receipts use separate stored states such as
+`pending_names`/`running_names` and a separate activity timestamp; the public APIs
+normalize these to ordinary `pending`/`running` state and `updated` values. Older
+runners, activity observers and terminal-receipt pruning therefore ignore new
+filename-only receipts. Ordinary receipts retain their original stored semantics,
+so a mixed-version ordinary subscriber may perform extra validation but cannot
+incorrectly complete a filename request or wait on an unsupported redirect.
 
 ## Disconnected drives
 

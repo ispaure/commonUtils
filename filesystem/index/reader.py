@@ -116,8 +116,12 @@ class SqlEntries(Sequence):
             return _entry(row)
 
     def search(self, name, *, cancelled=lambda: False):
+        return tuple(self.iter_search(name, cancelled=cancelled))
+
+    def iter_search(self, name, *, cancelled=lambda: False):
+        """Stream one ordered query; close the iterator before its snapshot."""
         condition, parameters = search_sql(name)
-        return tuple(self._rows('AND '+condition, parameters, cancelled=cancelled))
+        return self._rows('AND '+condition, parameters, cancelled=cancelled)
 
     def by_depth(self):
         return self._rows(order='length(path) DESC,path')
