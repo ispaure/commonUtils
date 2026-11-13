@@ -229,8 +229,10 @@ class MarkdownViewer(MarkdownReadingMixin, MarkdownEditingMixin, qt.QWidget):
         self.diagrams_button.hide()
         toolbar.addWidget(self.diagrams_button)
         self._build_reading_appearance(toolbar)
-        from ..readers.read_aloud import ReadAloud, reader_text
-        self.speech = ReadAloud(self, lambda: reader_text(self.browser), text_widget=self.browser)
+        from ..readers.read_aloud import ReadAloud
+        from .speech import prepare_document
+        self.speech = ReadAloud(self, None, text_widget=self.browser,
+                                prepared_provider=lambda: prepare_document(self.browser))
         self.speech.anchor = reader_button(self, 'Read aloud', action=self.speech.action, icon='speaker')
         toolbar.addWidget(self.speech.anchor)
         self.browser.textChanged.connect(self.speech.stop)

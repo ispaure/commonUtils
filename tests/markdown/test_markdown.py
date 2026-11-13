@@ -91,7 +91,7 @@ class MarkdownTests(QtTestCase):
         viewer.speech.show()
         viewer.speech.start()
         spoken = viewer.speech.session.text
-        self.assertIn('Heading\nReadable label and bold.', spoken)
+        self.assertIn('Heading\n\nReadable label and bold.', spoken)
         self.assertIn('Reference', spoken)
         self.assertNotIn('https://example.invalid', spoken)
         self.assertIn('https://visible.invalid/path', spoken)

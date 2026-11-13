@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import quote, urlsplit
 import re
+from ...formats.markdown.tokens import asset_embed
 from .syntax import inline_spans, FENCE_OPEN, fence_close
 
 
@@ -18,7 +19,8 @@ class LinkSpan:
 
 # Angle-bracket destinations and balanced parentheses cover typical file/URL links.
 _LINK = re.compile(r'(?<![\\!\[])(?:'
-    r'\[(?P<reference_label>[^\]\n]+)\]\[(?P<reference_target>[^\]\n]+)\]'
+    r'!\[\[(?P<embed>[^\]\n|]+)(?:\|(?P<embed_alias>[^\]\n]+))?\]\]'
+    r'|\[(?P<reference_label>[^\]\n]+)\]\[(?P<reference_target>[^\]\n]+)\]'
     r'|\[\[(?P<page>[^\]\n|]+)(?:\|(?P<alias>[^\]\n]+))?\]\]'
     r'|\[(?P<shortpage>[^\]\n|]+)\|(?P<shortalias>[^\]\n]+)\]'
     r'|\[(?P<label>[^\]\n]+)\]\((?P<url><[^>\n]+>|(?:[^()\s]|\([^()\n]*\))+)(?:[ \t]+[\"\'][^\n]*?[\"\'])?\))')
@@ -56,12 +58,18 @@ def wiki_target(target):
     return quote(path, safe='/:@%?=&+') + (('#' + quote(heading, safe='%-')) if separator else '')
 
 
-def link_spans(text, references=None):
+def link_spans(text, references=None, *, note_embeds=False):
     code = [(span.start, span.end) for span in inline_spans(text) if span.marker.startswith('`')]
     for match in _LINK.finditer(text):
         if any(start <= match.start() < end for start, end in code):
             continue
-        if match.group('reference_target') is not None:
+        if match.group('embed') is not None:
+            if not note_embeds or asset_embed(match.group('embed')):
+                continue
+            label = 'embed_alias' if match.group('embed_alias') is not None else 'embed'
+            target = wiki_target(match.group('embed'))
+            wiki = True
+        elif match.group('reference_target') is not None:
             label = 'reference_label'
             key = ' '.join(match.group('reference_target').split()).casefold()
             target = (references or {}).get(key)
@@ -99,7 +107,7 @@ def render_links(markdown):
         if opening:
             fence = opening.group(1)
         else:
-            for span in reversed(list(link_spans(line, references))):
+            for span in reversed(list(link_spans(line, references, note_embeds=True))):
                 if span.wiki or re.fullmatch(r'\[[^]\n]+\]\[[^]\n]+\]', line[span.start:span.end]):
                     label = line[span.content_start:span.content_end]
                     line = line[:span.start] + '[' + label + '](' + span.target + ')' + line[span.end:]

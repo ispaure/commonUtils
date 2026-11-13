@@ -8,10 +8,27 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from commonUtils.runtime.speech import SpeechSession, utterances, PlaybackTimer
+from commonUtils.runtime.speech import SpeechSession, utterances, PlaybackTimer, seek_boundary, speech_word_starts
 
 
 class SpeechCoreTests(unittest.TestCase):
+    def test_sequence_targets_keep_residual_and_reposition_paused(self):
+        self.assertEqual(speech_word_starts('😀aBCde', {5, 3}), [0, 3, 5])
+        self.assertEqual(seek_boundary(45, 15), (1, 30))
+        self.assertEqual(seek_boundary(30, 0), (1, 30))
+        self.assertEqual(seek_boundary(-30, 0), (-1, -30))
+        engine = SimpleNamespace(ready=True, error='', speak=Mock(), stop=Mock(), close=Mock())
+        ranges, state = Mock(), Mock()
+        session = SpeechSession(engine, on_range=ranges, on_state=state, clock=lambda: 0)
+        session.reposition('zero one two', 9, paused=True)
+        engine.speak.assert_not_called()
+        self.assertEqual(ranges.call_args.args, (9, 12))
+        self.assertEqual(session.seek_position(-1), -1)
+        self.assertEqual(session.seek_position(15), 47)
+        session.resume()
+        self.assertEqual(engine.speak.call_args.args[0], 'two')
+        self.assertNotIn('stopped', [call.args[0] for call in state.call_args_list])
+
     def test_prose_punctuation_preserves_meaning_and_source_word_ranges(self):
         from commonUtils.runtime.speech_text import SpeechText, utf16_length, word_ranges
         source = '😀 co\u00adoperate--please - now… "Really?!" Yes.'

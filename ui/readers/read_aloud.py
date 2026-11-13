@@ -6,6 +6,7 @@ utterances; stopping clears the queue before asking the native engine to stop.
 """
 import math
 from time import monotonic
+from weakref import ref
 from ...runtime.speech import SpeechSession, PlaybackTimer, utterances
 from .qt_speech import QtScheduler, QtSpeechEngine
 from ...runtime.speech_language import passage_language, matching_locale
@@ -38,12 +39,16 @@ def visible_text_start(widget):
 
 class ReadAloud(qt.QObject):
     positionChanged = qt.Signal(int, int)
+    _active = None
 
     def __init__(self, owner, text_provider, *, engine_factory=None, scope='the current document',
-                 text_widget=None, start_provider=None, language_provider=lambda: '', on_finished=lambda: None):
+                 text_widget=None, start_provider=None, language_provider=lambda: '',
+                 on_finished=lambda: None, prepared_provider=None):
         super().__init__(owner)
         self.owner = owner
         self.text_provider = text_provider
+        self.prepared_provider = prepared_provider
+        self._prepared = None
         self.scope = scope
         self.engine_factory = engine_factory
         self.text_widget = text_widget
@@ -248,13 +253,20 @@ class ReadAloud(qt.QObject):
         self._selected_passage = cursor is not None and cursor.hasSelection()
         base = cursor.selectionStart() if cursor is not None and cursor.hasSelection() else (
             self.start_provider() if self.start_provider else visible_text_start(widget) if widget is not None else 0)
-        text = reader_text(widget, start=0) if widget is not None and not cursor.hasSelection() else self.text_provider()
-        source_base = 0 if widget is not None and not cursor.hasSelection() else base
         self.stop()
-        self._source_base = source_base
         self._highlight_widget = widget
+        if self.prepared_provider is not None:
+            self._prepared = self.prepared_provider()
+            self._source_base = 0
+            return self.play_passage(self._prepared.text, self._prepared.speech_position(base),
+                                     breaks=self._prepared.breaks)
+        text = reader_text(widget, start=0) if widget is not None and not cursor.hasSelection() else self.text_provider()
+        self._source_base = 0 if widget is not None and not cursor.hasSelection() else base
+        return self.play_passage(text, max(0, base - self._source_base))
+
+    def play_passage(self, text, start=0, *, paused=False, breaks=()):
+        """Select the voice and load a passage into the existing playback session."""
         if self.language.currentData() is None:
-            start = max(0, base - source_base)
             sample = text.encode('utf-16-le')[start * 2:].decode('utf-16-le')
             language = passage_language(sample, self.language_provider())
             locales = {locale.name(): locale for locale in self.engine.availableLocales()}
@@ -264,11 +276,15 @@ class ReadAloud(qt.QObject):
                 return
             self.engine.setLocale(locales[tag] if tag else self._default_locale)
             self._voices()
-        self.session.play(text, max(0, base - source_base), speed=self.speed.value() / 100)
+        self.session.reposition(text, start, paused=paused, speed=self.speed.value() / 100, breaks=breaks)
 
     @property
     def _position(self):
-        return self._source_base + getattr(self.session, 'position', 0)
+        position = getattr(self.session, 'position', 0)
+        if self._prepared is not None:
+            span = self._prepared.source_range(position, position + 1)
+            return span[0] if span is not None else 0
+        return self._source_base + position
 
     @property
     def _speaking(self):
@@ -279,6 +295,10 @@ class ReadAloud(qt.QObject):
             widget = self._highlight_widget
             self._clear_highlight()
             self._highlight_widget = widget
+        elif self._prepared is not None:
+            span = self._prepared.source_range(start, end)
+            if span is not None:
+                self._highlight(span[0], span[1] - span[0])
         else:
             self._highlight(self._source_base + start, end - start)
 
@@ -319,6 +339,13 @@ class ReadAloud(qt.QObject):
 
     def _session_state(self, state, message):
         speaking, paused = state == 'speaking', state == 'paused'
+        active = ReadAloud._active() if ReadAloud._active is not None else None
+        if speaking or paused:
+            ReadAloud._active = ref(self)
+            if active is not None and active is not self:
+                active.stop()
+        elif active is self:
+            ReadAloud._active = None
         self.playback.set_running(speaking)
         if self.panel is None:
             return
@@ -362,3 +389,4 @@ class ReadAloud(qt.QObject):
             self.session.stop()
         self.playback.set_running(False)
         self._clear_highlight()
+        self._prepared = None
