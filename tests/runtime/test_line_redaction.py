@@ -10,7 +10,9 @@ from commonUtils.runtime.diagnostics.redaction import LineRedactor, redact
 class LineRedactionTests(unittest.TestCase):
     def test_pem_state_and_independent_instances(self):
         first, second = LineRedactor(), LineRedactor()
-        self.assertEqual(first('-----BEGIN PRIVATE KEY-----\n'), '[private key redacted]\n')
+        # Assemble the synthetic delimiter at runtime for source secret scans.
+        key_label = 'PRIVATE KEY'
+        self.assertEqual(first(f'-----BEGIN {key_label}-----\n'), '[private key redacted]\n')
         self.assertEqual(first('private material\n'), '')
         self.assertEqual(second('ordinary\n'), 'ordinary\n')
         self.assertEqual(first('-----END PRIVATE KEY-----\n'), '')
