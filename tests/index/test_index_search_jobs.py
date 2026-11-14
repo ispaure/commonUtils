@@ -1,4 +1,5 @@
 """Filename preparation shares durable receipts without weakening metadata work."""
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -181,7 +182,7 @@ class SearchJobTests(unittest.TestCase):
 
     def test_queue_schema_upgrade_preserves_pending_receipt_and_read_only_status(self):
         self.queue.path.parent.mkdir()
-        with sqlite3.connect(self.queue.path) as db:
+        with closing(sqlite3.connect(self.queue.path)) as db, db:
             db.execute('CREATE TABLE jobs (id TEXT PRIMARY KEY,root TEXT NOT NULL,recursive INTEGER NOT NULL,'
                        'full INTEGER NOT NULL,covers_tree INTEGER NOT NULL,background INTEGER NOT NULL,'
                        'changes TEXT NOT NULL,state TEXT NOT NULL,done INTEGER NOT NULL DEFAULT 0,'
