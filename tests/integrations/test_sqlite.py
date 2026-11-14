@@ -2,6 +2,7 @@
 
 from contextlib import closing
 from dataclasses import FrozenInstanceError
+import os
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -22,7 +23,9 @@ class SQLiteTest(unittest.TestCase):
     def setUp(self):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.path = Path(temporary.name) / 'sample ?#% &.db'
+        # Keep reserved URI characters on every platform. Windows forbids '?' in filenames.
+        filename = 'sample #% &.db' if os.name == 'nt' else 'sample ?#% &.db'
+        self.path = Path(temporary.name) / filename
 
     def fixture(self, sql):
         with closing(sqlite3.connect(self.path)) as connection, connection:
