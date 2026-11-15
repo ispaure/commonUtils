@@ -41,6 +41,18 @@ password. Toggling preserves the value and selection; clearing masks it again.
 `LineEdit(..., pw_field=True)` also installs this helper. The host owns secret
 storage, validation, submission and lifetime.
 
+## Selection and details
+
+Import `SelectionDetails` from `commonUtils.ui.pyside.selection_details` for
+a group box with a list on the left and details on the right. Supply
+`show_details(entry)` to populate `details_layout` on the GUI thread.
+`set_entries(entries, label=...)` selects the first entry or clears the pane
+when the list is empty. The widget disposes of the previous pane's child widgets
+on every selection change. Add plain widgets to the detail layout, or use
+`add_detail_action(label, callback, enabled=..., tooltip=...)` for a button
+with a no-argument handler. The consumer owns entry discovery, action labels
+and the operations themselves.
+
 ## Files
 
 | File | Responsibility / public entry points |
@@ -53,6 +65,7 @@ storage, validation, submission and lifetime.
 | [messages.py](../../../../../ui/pyside/messages.py) | Messages utilities; public API is commonUtils.ui.pyside. |
 | [progress.py](../../../../../ui/pyside/progress.py) | Progress utilities; public API is commonUtils.ui.pyside. |
 | [passwords.py](../../../../../ui/pyside/passwords.py) | Password masking and accessible reveal action. |
+| [selection_details.py](../../../../../ui/pyside/selection_details.py) | List selection and detail actions. |
 | [widgets.py](../../../../../ui/pyside/widgets.py) | Widgets utilities; public API is commonUtils.ui.pyside. |
 | [windows.py](../../../../../ui/pyside/windows.py) | Windows utilities; public API is commonUtils.ui.pyside. |
 

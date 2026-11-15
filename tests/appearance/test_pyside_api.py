@@ -45,6 +45,36 @@ class PySideAPITests(QtTestCase):
         factory.assert_called_once()
         widget.close()
 
+    def test_selection_details_replaces_actions_and_clears_empty_lists(self):
+        from commonUtils.ui.pyside.selection_details import SelectionDetails
+
+        clicked = Mock()
+
+        def show_entry(entry):
+            panel.add_detail_action(entry, lambda: clicked(entry), enabled=entry != 'disabled')
+
+        panel = SelectionDetails('Entries', show_entry)
+        panel.set_entries(('first', 'second', 'disabled'), label=str)
+        self.assertEqual(panel.selection_list.currentRow(), 0)
+        first_button = panel.details_layout.itemAt(0).widget()
+        first_button.click()
+        clicked.assert_called_once_with('first')
+
+        panel.selection_list.setCurrentRow(1)
+        second_button = panel.details_layout.itemAt(0).widget()
+        self.assertIsNot(first_button, second_button)
+        second_button.click()
+        clicked.assert_called_with('second')
+
+        panel.selection_list.setCurrentRow(2)
+        panel.details_layout.itemAt(0).widget().click()
+        self.assertEqual(clicked.call_count, 2)
+
+        panel.set_entries((), label=str)
+        self.assertEqual(panel.selection_list.currentRow(), -1)
+        self.assertEqual(panel.details_layout.count(), 0)
+        panel.close()
+
     def test_public_classes_keep_module_and_inheritance(self):
         self.assertEqual(qt.Window.__module__, 'commonUtils.ui.pyside')
         self.assertTrue(issubclass(qt.ProgressBarWindow, qt.Window))
