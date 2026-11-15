@@ -12,6 +12,7 @@ class PasswordInput(toga.Box):
                                         style=Pack(flex=1, height=TOUCH_TARGET))
         self.revealed = False
         self.eye = toga.Button(on_press=self.toggle_visibility, style=Pack(width=TOUCH_TARGET, height=TOUCH_TARGET))
+        self.eye._keyboard_input = self.field
         self._update_eye()
         super().__init__(children=[self.field, self.eye], style=style)
         self.style.direction = ROW

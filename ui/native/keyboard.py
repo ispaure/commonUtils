@@ -39,6 +39,11 @@ def install(window):
                             or (view.isKindOfClass(ObjCClass('UITextView')) and native_value(view.editable))
                             or view.isKindOfClass(ObjCClass('WKWebView'))):
                         return False
+                    # A password eye belongs to the active input. Do not end
+                    # editing before its button callback changes the masking.
+                    control = getattr(getattr(view, 'interface', None), '_keyboard_input', None)
+                    if control is not None and native_value(control._impl.native.isFirstResponder):
+                        return False
                     view = native_value(view.superview)
                 window = native_value(touched.window) if touched is not None else None
                 if window is not None:

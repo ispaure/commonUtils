@@ -96,7 +96,8 @@ editable with colours paused; the app controls files, saving and any live previe
 ## Password visibility
 
 Password and token controls start hidden. Use the eye button to show or hide the
-current value. Clearing the field hides it again. The application decides when
+current value. While typing, toggling the eye keeps the keyboard open so you can
+continue entering the password. Clearing the field hides it again. The application decides when
 credentials are submitted, retained or cleared.
 
 ## Images supplied by an app
