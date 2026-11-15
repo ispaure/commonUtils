@@ -31,6 +31,20 @@ does not change point sizes or address default-font differences between platform
 Tests exercise real widgets with synthetic native Windows message sequences;
 physical mixed-DPI monitor transitions still require Windows hardware validation.
 
+## Scroll areas
+
+Use `qt.resizable_scroll_area(parent=None)` for a scroll area managed by a Qt
+layout. It returns a resizable `QScrollArea` with the native frame and both
+scrollbars shown as needed. Pass `framed=False` for a frameless pane or set
+`horizontal_policy` and `vertical_policy` independently using
+`Qt.ScrollBarPolicy`. Set the content with `area.setWidget(content)` and add
+the area to its layout.
+
+`qt.create_scroll_area(target, rect, rect_content)` is the fixed-geometry
+factory. It returns the inner content widget and applies the configured ROG Ally
+scrollbar dimensions. `qt.create_scroll_area_grid` builds a grid in that
+content widget.
+
 ## Password fields
 
 Import `password_field` from `commonUtils.ui.pyside.passwords` and pass an existing

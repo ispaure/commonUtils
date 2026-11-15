@@ -98,8 +98,7 @@ class LayeredSettingsEditor(qt.QWidget):
             if self.only_sections is not None and section not in self.only_sections:
                 continue
             if section not in forms:
-                scroll = qt.QScrollArea()
-                scroll.setWidgetResizable(True)
+                scroll = qt.resizable_scroll_area()
                 body = qt.QWidget()
                 forms[section] = qt.QFormLayout(body)
                 forms[section].setFieldGrowthPolicy(qt.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
