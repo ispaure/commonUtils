@@ -1,5 +1,8 @@
 # Native Toga components
 
+Use `ui.native.presentation.TOUCH_TARGET` for the standard 48-point or 48-dp
+control size. Rows that need more space can set a larger minimum.
+
 For independently compiled Swift extension components, see
 [native iOS widget values](widget-values.md).
 

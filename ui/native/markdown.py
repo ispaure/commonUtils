@@ -14,6 +14,7 @@ from toga.style.pack import COLUMN, ROW
 
 from ...formats.markdown.wiki import MarkdownWiki, documentation_root
 from .markdown_preview import markdown_preview
+from .presentation import TOUCH_TARGET
 from .inline_html import set_inline_html
 from ...formats.markdown.image_sources import local_image_source
 from .adaptive import AdaptiveSidebar, allocated_width
@@ -37,9 +38,9 @@ class MarkdownWikiView:
         self.pending_fragment = ''
         self.wide = None
         self.search = toga.TextInput(placeholder='Search documentation', on_change=DebouncedCallback(self.filter),
-                                     style=Pack(height=48))
+                                     style=Pack(height=TOUCH_TARGET))
         self.mode = toga.Selection(items=['File names & titles', 'Page text'],
-                                   on_change=self.filter, style=Pack(height=48))
+                                   on_change=self.filter, style=Pack(height=TOUCH_TARGET))
         self.rows = toga.Box(style=Pack(direction=COLUMN))
         self.notice = toga.Label('')
         self.browse = toga.Box(children=[toga.Label('Documentation Library'), self.search,

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import weakref
 from .appearance import accessible_name
+from .presentation import TOUCH_TARGET
 
 
 @dataclass(frozen=True)
@@ -195,7 +196,7 @@ class IconRenderer:
         backend = type(button._impl).__module__
         if not preserve_layout:
             button.text = spec.fallback
-            button.style.width = button.style.height = 48
+            button.style.width = button.style.height = TOUCH_TARGET
         elif not backend.startswith(('toga_iOS.', 'toga_android.')):
             button.text = spec.fallback
         button.control_icon = name
@@ -213,7 +214,7 @@ class IconRenderer:
             native = button._impl.native
             density = native.getResources().getDisplayMetrics().density
             icon_size = size or 24
-            extent, padding = round(icon_size * density), round((48 - icon_size) / 2 * density)
+            extent, padding = round(icon_size * density), round((TOUCH_TARGET - icon_size) / 2 * density)
             if preserve_layout and hasattr(button._impl, '_control_drawable'):
                 extent = button._impl._control_drawable.getBounds().width()
             drawable = android_drawable(spec, bounds=(extent, extent), resources=native.getResources())

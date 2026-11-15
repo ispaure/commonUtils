@@ -1,5 +1,7 @@
 """Small native presentation helpers; system colours follow light/dark appearance."""
 
+TOUCH_TARGET = 48  # Native points on iOS and density-independent pixels on Android.
+
 def surface(widget):
     if type(widget._impl).__module__.startswith('toga_iOS.'):
         from rubicon.objc import ObjCClass
@@ -79,7 +81,7 @@ def hierarchy_row(label, *, depth=0, expanded=None, on_toggle=None, on_activate=
     row.add(toga.Box(style=Pack(width=min(max(0, depth), 8) * 20)))
     row.disclosure = None
     if expanded is None:
-        row.add(toga.Box(style=Pack(width=48, height=48)))
+        row.add(toga.Box(style=Pack(width=TOUCH_TARGET, height=TOUCH_TARGET)))
     else:
         disclosure = row.disclosure = navigation_button('forward',
             ('Collapse ' if expanded else 'Expand ') + label, on_press=on_toggle)
@@ -96,7 +98,7 @@ def hierarchy_row(label, *, depth=0, expanded=None, on_toggle=None, on_activate=
             disclosure.text = '⌄' if expanded else '›'
         row.add(disclosure)
     button = row.title_button = list_button(toga.Button(label, on_press=on_activate,
-        style=Pack(flex=1, height=48, font_size=15)))
+        style=Pack(flex=1, height=TOUCH_TARGET, font_size=15)))
     button.hierarchy_selected = selected
     row.add(button)
     return row
@@ -128,7 +130,7 @@ def sidebar_button(callback, label='Browse folders'):
     """Accessible hamburger control with an Apple symbol and portable fallback."""
     import toga
     from toga.style import Pack
-    button = toga.Button('☰', on_press=callback, style=Pack(width=48, height=48))
+    button = toga.Button('☰', on_press=callback, style=Pack(width=TOUCH_TARGET, height=TOUCH_TARGET))
     button.accessible_name = label
     backend = type(button._impl).__module__
     if backend.startswith('toga_iOS.'):
@@ -150,7 +152,7 @@ def navigation_button(direction, label, *, on_press=None, enabled=True):
                'forward': ('chevron.right', '›', (((9, 5), (16, 12), (9, 19)),)),
                'up': ('arrow.up', '↑', (((5, 11), (12, 4), (19, 11)), ((12, 4), (12, 21))))}
     from .icons import IconRenderer, IconSpec
-    button = toga.Button(on_press=on_press, enabled=enabled, style=Pack(width=48, height=48))
+    button = toga.Button(on_press=on_press, enabled=enabled, style=Pack(width=TOUCH_TARGET, height=TOUCH_TARGET))
     return IconRenderer({name: IconSpec(*artwork) for name, artwork in symbols.items()}).apply(button, direction, label)
 
 

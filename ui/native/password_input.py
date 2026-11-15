@@ -2,20 +2,21 @@
 import toga
 from toga.style import Pack
 from toga.style.pack import ROW
+from .presentation import TOUCH_TARGET
 
 
 class PasswordInput(toga.Box):
     def __init__(self, *, placeholder='', on_confirm=None, style=None):
         self.field = toga.PasswordInput(placeholder=placeholder, on_confirm=on_confirm,
                                         on_change=self._changed,
-                                        style=Pack(flex=1, height=48))
+                                        style=Pack(flex=1, height=TOUCH_TARGET))
         self.revealed = False
-        self.eye = toga.Button(on_press=self.toggle_visibility, style=Pack(width=48, height=48))
+        self.eye = toga.Button(on_press=self.toggle_visibility, style=Pack(width=TOUCH_TARGET, height=TOUCH_TARGET))
         self._update_eye()
         super().__init__(children=[self.field, self.eye], style=style)
         self.style.direction = ROW
         height = self.style.height
-        self.style.height = max(height, 48) if isinstance(height, (int, float)) else 48
+        self.style.height = max(height, TOUCH_TARGET) if isinstance(height, (int, float)) else TOUCH_TARGET
 
     def _changed(self, widget, **kwargs):
         if not widget.value and hasattr(self, 'eye'):
