@@ -1,3 +1,5 @@
+"""Result workers retire cleanly and expose redacted success or failure state."""
+
 
 from commonUtils.testing.stages import TestStage
 

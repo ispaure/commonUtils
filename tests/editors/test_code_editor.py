@@ -1,3 +1,5 @@
+"""Code editor views preserve shared document hooks, gutters and highlighting."""
+
 
 from commonUtils.testing.stages import TestStage
 

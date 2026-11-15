@@ -1,3 +1,5 @@
+"""Editor search and replacement honor Unicode, selection, matching and undo."""
+
 
 from commonUtils.testing.stages import TestStage
 

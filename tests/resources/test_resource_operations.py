@@ -1,3 +1,5 @@
+"""Resource moves and copies preserve conflict policy, streaming and verification."""
+
 
 from commonUtils.testing.stages import TestStage
 

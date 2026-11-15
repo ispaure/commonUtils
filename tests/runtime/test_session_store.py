@@ -1,3 +1,5 @@
+"""Session checkpoints preserve recoverable data when validation or promotion fails."""
+
 
 from commonUtils.testing.stages import TestStage
 

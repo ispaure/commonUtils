@@ -1,3 +1,5 @@
+"""Code folds follow syntax, render indentation guides and cooperate with navigation."""
+
 
 from commonUtils.testing.stages import TestStage
 
