@@ -1,3 +1,5 @@
+"""Multicursor and rectangular edits preserve selection, clipboard and undo behavior."""
+
 
 from commonUtils.testing.stages import TestStage
 

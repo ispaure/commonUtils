@@ -1,3 +1,5 @@
+"""Line diffs preserve Unicode and final newlines and reject stale edits."""
+
 
 from commonUtils.testing.stages import TestStage
 

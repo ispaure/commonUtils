@@ -1,3 +1,5 @@
+"""Resource leases release their final owner once and isolate cancellation."""
+
 
 from commonUtils.testing.stages import TestStage
 

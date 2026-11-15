@@ -1,3 +1,5 @@
+"""JPEG comment edits retain Unicode metadata and preserve the original on failure."""
+
 
 from commonUtils.testing.stages import TestStage
 

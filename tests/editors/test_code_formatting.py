@@ -1,3 +1,5 @@
+"""JSON and XML formatting preserve tokens and reject unsafe or invalid input."""
+
 
 from commonUtils.testing.stages import TestStage
 

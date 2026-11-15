@@ -1,3 +1,5 @@
+"""Process progress tracks command output, cancellation, retries and exit status."""
+
 
 from commonUtils.testing.stages import TestStage
 

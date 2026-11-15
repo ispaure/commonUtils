@@ -1,3 +1,5 @@
+"""Diff gutter markers distinguish added, changed and deleted lines."""
+
 
 from commonUtils.testing.stages import TestStage
 

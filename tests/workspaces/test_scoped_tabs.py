@@ -1,3 +1,5 @@
+"""Scoped tab drags finish once and stay within their owning workspace."""
+
 
 from commonUtils.testing.stages import TestStage
 

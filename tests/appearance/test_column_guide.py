@@ -1,3 +1,5 @@
+"""Column guides track text geometry, scrolling and font changes."""
+
 
 from commonUtils.testing.stages import TestStage
 
