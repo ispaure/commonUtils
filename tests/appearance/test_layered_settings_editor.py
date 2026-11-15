@@ -24,11 +24,13 @@ class LayeredSettingsEditorTests(QtTestCase):
                 editor.resize(500, 300)
                 editor.sections.setCurrentIndex(1)
                 editor.show()
+                editor.activateWindow()
                 field = editor.fields['Other', 'name_str']
                 field.setText('Saved value')
                 field.setFocus()
+                self.wait_until(lambda: app.focusWidget() is field,
+                                message='Settings field did not receive keyboard focus before save')
                 field.setSelection(1, 4)
-                app.processEvents()
                 scroll = editor.sections.currentWidget().verticalScrollBar()
                 scroll.setValue(30)
                 position = scroll.value()
