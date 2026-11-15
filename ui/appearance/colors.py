@@ -6,11 +6,20 @@ def argb(value):
     return value - 2**32
 
 
+def _luminance(rgb):
+    channels = (channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4
+                for channel in rgb)
+    return sum(channel * weight for channel, weight in zip(channels, (.2126, .7152, .0722)))
+
+
+def black_or_white_text(rgb):
+    """Choose readable text for three sRGB channels in the range 0 to 1."""
+    return '#000000' if _luminance(rgb) > .179 else '#ffffff'
+
+
 def contrast_ratio(first, second):
     def luminance(value):
-        channels = [((value >> shift) & 255) / 255 for shift in (16, 8, 0)]
-        channels = [channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4 for channel in channels]
-        return sum(a * b for a, b in zip(channels, (.2126, .7152, .0722)))
+        return _luminance(((value >> shift) & 255) / 255 for shift in (16, 8, 0))
     low, high = sorted([luminance(first), luminance(second)])
     return (high + .05) / (low + .05)
 

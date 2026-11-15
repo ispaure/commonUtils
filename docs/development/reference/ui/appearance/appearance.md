@@ -48,8 +48,10 @@ shared module so desktop and mobile cannot drift into different icon sets.
 
 ## Portable color calculations
 
-`ui.appearance.colors` provides `argb(hex_color)`, `contrast_ratio(first, second)`
-and `readable_accent(accent, foreground, background)`. Integer channels accept
+`ui.appearance.colors` provides `argb(hex_color)`, `contrast_ratio(first, second)`,
+`readable_accent(accent, foreground, background)` and `black_or_white_text(rgb)`.
+The text helper accepts three sRGB channels in the range 0 to 1. Qt callers can
+pass the RGB channels from `QColor.getRgbF()` directly. The integer helpers accept
 signed Android ARGB values. Accent blending moves toward the supplied foreground
 until reaching 4.5:1 contrast or falling back to that foreground. These calculations
 do not import Qt or Toga. Native painting and role providers are documented in the
