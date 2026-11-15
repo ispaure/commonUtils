@@ -18,19 +18,45 @@ Consumers choose roots, exclusions, private-storage policy and buffer snapshots.
 | `files` | Text-content search across supplied roots and unsaved buffers, plus bounded preview reads | QtCore loaded only when searching |
 
 Filename indexes contain names and metadata, not document contents. Provider
-search validates every returned path against its scope; indexed hits are rechecked
-through the provider. Private/session/remote providers are never automatically
+search validates every returned path against its scope; final indexed hits are
+rechecked through the provider. Private/session/remote providers are never automatically
 admitted to persistent local indexes.
+
+`IndexedLocalSearch.cached(...)` reads saved names without per-hit filesystem
+validation and returns `None` if no index exists. Root access and lexical scope
+are still checked. Provisional results carry `SearchResult.cached=True` and
+`cached=True` on each row. The first 50 rows publish as soon as SQL returns them;
+subsequent progress is throttled to 250 ms, followed by the complete saved list.
+These rows authorize display only: consumers must validate through the provider
+before opening an item or offering actions based on its type.
+
+`search(..., cached_progress=True)` opts into that provisional publication before
+the ordinary validation pass. It retains the full saved list until returning a
+validated result, avoiding a shrinking validated prefix. Default callers still
+receive only validated progress (up to 50 initial hits, or fewer after 50 ms of
+validation work). The shared 300 ms typing delay and SQLite matching/sorting
+still precede display. Filename search never opens document bodies.
 
 `files.search_files(roots, excluded, query, masks='', *, case=False, whole=False,
 regex=False, buffers=None, cancelled=..., limit=500, max_files=10000,
-max_entries=100000, max_file_size=1048576)` returns immutable hits with paths,
+max_entries=100000, max_file_size=1048576, cache=None, exclude_path=None)` returns immutable hits with paths,
 line numbers, code-point columns, UTF-16 offsets and bounded excerpts. These
 options are keyword-only after `masks`. Roots/options/buffers belong to the caller;
 pass stable snapshots from a worker. Searches skip symbolic links and unreadable,
 non-text or oversized files. `limited` reports traversal/match/result caps;
 cancellation returns no hits. Buffer text overrides disk bytes without saving.
+An optional `exclude_path(path, root)` predicate receives absolute paths
+and returns true to skip a root, directory subtree, file, or unsaved buffer.
+The predicate applies in addition to the relative exclusions.
 `preview_text(path, buffer=None)` reads up to 1 MiB or returns the supplied buffer.
+
+An explicitly supplied `DirectoryCache` lets file-content search borrow existing
+folder-name checkpoints through `peek()` without starting an index build or
+waiting for its writer. Matching folder fingerprints allow cached child names;
+changed, missing, incomplete or errored checkpoints and parents with index
+exclusions use live enumeration. Project masks/exclusions still prune traversal.
+File contents and unsaved buffers remain authoritative; this is not a text index.
+The caller owns the cache, while each search closes its borrowed snapshots.
 
 `qt_text.find_matches` retains desktop PCRE syntax, replacement capture expansion,
 selection scope, Unicode word rules, cooperative cancellation and a 50,000-match

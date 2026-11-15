@@ -26,6 +26,7 @@ class SqlEntries(Sequence):
     and cleanup. It is released when the owning Snapshot/iterator is collected.
     """
     def __init__(self, database, generation, *, parent=None, connection=None, scope=None):
+        self.database = database
         self.connection = connection or sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True, check_same_thread=False)
         self.connection.execute('PRAGMA query_only=ON')
         self.connection.create_function('search_words', 1, search_words, deterministic=True)
@@ -128,6 +129,29 @@ class SqlEntries(Sequence):
 
     def children(self, path, limit=None):
         return tuple(self._rows('AND '+self.parent_filter, (str(path),), limit=limit))
+
+    def child_names(self, path, *, cancelled=lambda: False):
+        """Read only names/types for traversal, without decoding file metadata."""
+        with self.lock:
+            self.connection.set_progress_handler(lambda: int(cancelled()), 1000)
+            try:
+                check_cancelled(cancelled)
+                if self.compact:
+                    query = ('SELECT n.name,r.directory,r.symlink FROM '
+                             f'(SELECT node_id,record_id FROM generation_entries WHERE {self.where} AND {self.parent_filter}) g '
+                             'JOIN entry_nodes n ON n.id=g.node_id JOIN entry_records r ON r.id=g.record_id')
+                    parameters = self.parameters + (str(path),)
+                else:
+                    query = (f'SELECT substr(path,length(rtrim(parent,?))+2),directory,symlink FROM entries '
+                             f'WHERE {self.where} AND {self.parent_filter}')
+                    parameters = (os.sep,) + self.parameters + (str(path),)
+                return tuple(self.connection.execute(
+                    query, parameters))
+            except sqlite3.OperationalError:
+                check_cancelled(cancelled)
+                raise
+            finally:
+                self.connection.set_progress_handler(None, 0)
 
     def storage_children(self, path, limit, *, cancelled=lambda: False, metric='size'):
         """Largest children and scalar totals, without deserializing subtree metadata."""
@@ -274,6 +298,7 @@ class SqlDirectories(Sequence):
     """Folder fingerprints from the same immutable read transaction as entries."""
     def __init__(self, entries):
         self.entries = entries
+        self._exclusions = None
         self.where = 'generation=? AND identity IS NOT NULL'
         self.parameters = (entries.generation,)
         if entries.scope is not None:
@@ -286,6 +311,24 @@ class SqlDirectories(Sequence):
             return self.entries.connection.execute(
                 f'SELECT count(*) FROM folders WHERE {self.where}',
                 self.parameters).fetchone()[0]
+
+    def identity(self, path):
+        """Read one completed folder checkpoint within this snapshot's scope."""
+        with self.entries.lock:
+            if self._exclusions is None:
+                from .exclusions import scan_exclusions
+                root = self.entries.connection.execute('SELECT root FROM scans WHERE id=?',
+                                                       (self.entries.generation,)).fetchone()[0]
+                self._exclusions = scan_exclusions(Path(root), self.entries.database)
+            # The index deliberately omits its own storage and network mounts.
+            # Such a parent is not a complete inventory for other consumers.
+            if any(path == excluded.parent or path == excluded or excluded in path.parents
+                   for excluded in self._exclusions):
+                return None
+            row = self.entries.connection.execute(
+                f"SELECT identity FROM folders WHERE {self.where} AND path=? AND status='done'",
+                self.parameters + (str(path),)).fetchone()
+        return tuple(json.loads(row[0])) if row is not None else None
 
     def __iter__(self):
         with self.entries.lock:

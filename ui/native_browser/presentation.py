@@ -31,6 +31,7 @@ class NativeBrowser:
         self.search_epoch = 0
         self.searching = False
         self.search_cancelled = Event()
+        self._dismissed_cached_paths = set()
         self.navigation_busy = False
         self.back_button = toga.Button('Back', on_press=self.go_back, enabled=False, style=Pack(height=44))
         self.search = toga.TextInput(placeholder='Search this folder and its subfolders', on_change=self.query_changed, style=Pack(height=44, flex=1))
@@ -86,6 +87,7 @@ class NativeBrowser:
         if location is not None and location != self.location:
             self.search.value = ''
         self.search_cancelled.set()
+        self._dismissed_cached_paths.clear()
         self.search_epoch += 1
         self.searching = False
         self.search_provider, self.search_directory = provider, directory
@@ -96,22 +98,27 @@ class NativeBrowser:
             self.history.visit(location)
         self.back_button.enabled = self.on_navigate is not None and self.history.previous() is not None
 
-    def set_tree(self, tree):
+    def set_tree(self, tree, *, preserve=False):
         """Publish a prepared portable snapshot, including non-filesystem identities."""
+        position = getattr(self, 'vertical_position', None) if preserve else None
+        selected = self.selected if preserve and self.selected in tree.entries else None
         self._cancel()
         self.closed = self.work.closed = False
         # Only retain covers that this snapshot certifies as unchanged.
         valid = {(entry.identity, entry.revision) for entry in tree.entries.values() if entry.revision is not None}
         self.work.prune(valid)
         self.tree = tree
-        self.page = 0
-        self.selected = None
+        if not preserve:
+            self.page = 0
+        self.selected = selected
         clear_box(self.info)
         if self.on_selected:
-            result = self.on_selected(None)
+            result = self.on_selected(tree.entries[selected].payload if selected is not None else None)
             if inspect.isawaitable(result):
                 self._spawn(result)
         self.render()
+        if position is not None:
+            self.vertical_position = position
 
     @property
     def epoch(self):
@@ -147,6 +154,7 @@ class NativeBrowser:
             self.render()
             return
         self.search_cancelled.set()
+        self._dismissed_cached_paths.clear()
         self.search_cancelled = Event()
         self.search_epoch += 1
         self.searching = False
@@ -187,20 +195,24 @@ class NativeBrowser:
             if not current():
                 return
             self.searching = not finished
-            if len(result.rows) != published or finished:
+            cached = getattr(result, 'cached', False)
+            rows = [row for row in result.rows if not cached or row['path'] not in self._dismissed_cached_paths]
+            if len(rows) != published or finished:
                 root = provider.root / provider.relative(directory)
-                tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(result.rows) + 1)
+                tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(rows) + 1)
                 from pathlib import PurePosixPath
                 tree.set_children(root, provider_entries(provider,
-                    [dict(row, name=PurePosixPath(row['path']).name) for row in result.rows]))
-                self.set_tree(tree)
-                published = len(result.rows)
+                    [dict(row, name=PurePosixPath(row['path']).name) for row in rows]))
+                self.set_tree(tree, preserve=published >= 0)
+                published = len(rows)
             elif finished and not result.rows:
                 self.render()
             if finished:
                 self.page_label.text = f'{len(result.rows)} matches'
                 if not result.complete:
                     self.page_label.text += ' · Partial results'
+            elif cached:
+                self.page_label.text = f'{len(rows)} cached matches · Checking…'
             else:
                 self.page_label.text = f'Searching… {len(result.rows)} found · {result.scanned} checked'
         def progress(result):
@@ -276,6 +288,9 @@ class NativeBrowser:
     async def _select_pressed(self, entry, widget, **kwargs):
         if self.closed or self.navigation_busy or not self.tree or entry.identity not in self.tree.entries:
             return
+        entry = await self.validate_cached_entry(entry)
+        if entry is None:
+            return
         await self.select(entry)
         if entry.container and self.on_open_folder:
             self.navigation_busy = True
@@ -285,6 +300,38 @@ class NativeBrowser:
                     await result
             finally:
                 self.navigation_busy = False
+
+    async def validate_cached_entry(self, entry):
+        """A cached display row never authorizes opening or acting on a path."""
+        action = self._entry_action_generation = getattr(self, '_entry_action_generation', 0) + 1
+        if not isinstance(entry.payload, dict) or not entry.payload.get('cached'):
+            return entry
+        provider, epoch = self.search_provider, self.search_epoch
+        path = entry.payload['path']
+        try:
+            row = await asyncio.to_thread(provider.entry, path)
+            if provider.relative(row['path']) != provider.relative(path):
+                raise ValueError('The item location changed.')
+        except (OSError, ValueError) as error:
+            row, error_text = None, 'This result is no longer available: ' + str(error)[:120]
+        else:
+            error_text = 'This item changed. The search results are being updated.'
+        if (self.closed or epoch != self.search_epoch or provider is not self.search_provider
+                or action != self._entry_action_generation):
+            return None
+        current = self.tree.entries.get(entry.identity) if self.tree else None
+        if current is None:
+            return None
+        if row is None or row['directory'] != current.container:
+            self._dismissed_cached_paths.add(path)
+            self.tree.set_children(self.tree.root, [self.tree.entries[key]
+                for key in self.tree.children.get(self.tree.root, ()) if key != entry.identity])
+            self.set_tree(self.tree, preserve=True)
+            self.page_label.text = error_text
+            return None
+        current.payload.clear()
+        current.payload.update(row)
+        return current
 
     async def select(self, entry):
         if self.closed:

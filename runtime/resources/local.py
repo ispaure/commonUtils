@@ -49,7 +49,10 @@ class LocalFiles:
 
     def _locate(self, path):
         file = self._guard(self._physical(path))
-        folder = self._guard(self._physical(path, True))
+        folder = self._physical(path, True)
+        if file == folder:
+            return file
+        folder = self._guard(folder)
         if file != folder and file.exists() and folder.exists():
             raise ValueError('Ambiguous file and folder names.')
         return file if file.exists() else folder

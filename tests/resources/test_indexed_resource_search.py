@@ -48,6 +48,23 @@ class IndexedSearchTests(unittest.TestCase):
         result = self.search.search(self.provider, '', 'STRASSE')
         self.assertEqual(result.rows, [])
 
+    def test_local_lookup_checks_one_location_but_mapped_names_keep_both_guards(self):
+        with patch.object(self.provider, '_guard', wraps=self.provider._guard) as guard:
+            self.assertEqual(self.provider.entry('Straße.txt')['size'], 5)
+        self.assertEqual(guard.call_count, 1)
+
+        class Mapped(LocalFiles):
+            def _physical(self, path, directory=False):
+                return self.root / (path + ('.folder' if directory else '.file'))
+
+        mapped = Mapped(self.root)
+        (self.root / 'note.file').touch()
+        (self.root / 'note.folder').mkdir()
+        with patch.object(mapped, '_guard', wraps=mapped._guard) as guard:
+            with self.assertRaisesRegex(ValueError, 'Ambiguous'):
+                mapped.entry('note')
+        self.assertEqual(guard.call_count, 2)
+
     def test_corrupt_saved_index_falls_back_to_authorized_provider_search(self):
         self.database.write_bytes(b'not a SQLite database')
         updates = []
@@ -60,6 +77,41 @@ class IndexedSearchTests(unittest.TestCase):
         for number in range(125):
             (self.root / f'note-{number:03}.txt').write_bytes(b'note')
         self.search.prepare(self.provider, '', cancelled=lambda: False)
+
+    def test_cached_progress_precedes_every_hit_check_then_final_results_reconcile(self):
+        self.prepare_many()
+        (self.root / 'note-000.txt').unlink()
+        updates = []
+        entry = self.provider.entry
+
+        def checked(path):
+            self.assertTrue(updates)
+            self.assertEqual(len(updates[-1].rows), 125)
+            self.assertTrue(updates[-1].cached)
+            return entry(path)
+
+        with patch.object(self.provider, 'entry', side_effect=checked), \
+                patch('commonUtils.search.indexed.monotonic', return_value=0):
+            result = self.search.search(self.provider, '', 'note', progress=updates.append, cached_progress=True)
+        self.assertEqual([len(update.rows) for update in updates], [50, 125])
+        self.assertTrue(all(row['cached'] for row in updates[-1].rows))
+        self.assertEqual(updates[-1].rows[0]['path'], 'note-000.txt')
+        self.assertFalse(result.cached)
+        self.assertEqual(len(result.rows), 124)
+        self.assertTrue(all('cached' not in row for row in result.rows))
+
+    def test_cached_display_keeps_storage_guards_and_private_admission(self):
+        self.prepare_many()
+        updates = []
+        with patch.object(self.provider, '_guard', side_effect=[self.root, ValueError('Revoked')]):
+            with self.assertRaisesRegex(ValueError, 'Revoked'):
+                self.search.cached(self.provider, '', 'note', progress=updates.append)
+        self.assertEqual(updates, [])
+        for flag in ('private', 'session_only', 'remote_storage'):
+            setattr(self.provider, flag, True)
+            self.assertIsNone(self.search.cached(self.provider, '', 'note', progress=updates.append))
+            setattr(self.provider, flag, False)
+        self.assertEqual(updates, [])
 
     def test_first_saved_page_precedes_later_provider_work_and_keeps_order(self):
         from commonUtils.filesystem.index import reader
@@ -78,6 +130,7 @@ class IndexedSearchTests(unittest.TestCase):
             if len(publications) == 1:
                 self.assertEqual(mapped.call_count, 50, 'Later SQL rows were mapped before first publication')
         with patch.object(self.provider, 'entry', side_effect=checked), \
+             patch('commonUtils.search.indexed.monotonic', return_value=0), \
              patch.object(reader, '_entry', wraps=reader._entry) as mapped, \
              patch.object(SqlEntries, 'search', side_effect=AssertionError('Unbounded SQL materialization')):
             result = self.search.search(self.provider, '', 'note', progress=publish)
@@ -92,13 +145,53 @@ class IndexedSearchTests(unittest.TestCase):
         def publish(result):
             nonlocal cancelled
             cancelled = True
-        with patch.object(self.provider, 'entry', wraps=self.provider.entry) as entry:
+        with patch.object(self.provider, 'entry', wraps=self.provider.entry) as entry, \
+                patch('commonUtils.search.indexed.monotonic', return_value=0):
             with self.assertRaises(OperationCancelled):
                 self.search.search(self.provider, '', 'note', cancelled=lambda: cancelled, progress=publish)
             self.assertEqual(entry.call_count, 50)
         with self.search.cache.peek(self.root) as saved:
             self.assertTrue(saved.complete)
             self.assertEqual(saved.search_page('note', limit=1)[1], 125)
+
+    def test_slow_validation_publishes_before_fifty_hits_and_rechecks_access(self):
+        self.prepare_many()
+        clock = [0.0]
+        entry = self.provider.entry
+        publications = []
+
+        def checked(path):
+            row = entry(path)
+            clock[0] += .03  # Simulate storage latency without a timing-sensitive sleep.
+            return row
+
+        def publish(result):
+            publications.append(result)
+            if len(publications) == 1:
+                self.assertEqual(len(result.rows), 2)
+                self.assertEqual(result.scanned, 2)
+
+        with patch('commonUtils.search.indexed.monotonic', side_effect=lambda: clock[0]), \
+                patch.object(self.provider, 'entry', side_effect=checked):
+            result = self.search.search(self.provider, '', 'note', progress=publish)
+        self.assertEqual(len(result.rows), 125)
+        self.assertEqual(publications[0].rows, result.rows[:2])
+
+        publications.clear()
+        clock[0] = 0
+        guard = self.provider._guard
+
+        def guarded(path):
+            if clock[0] >= .06:
+                raise ValueError('Storage changed')
+            return guard(path)
+
+        with patch('commonUtils.search.indexed.monotonic', side_effect=lambda: clock[0]), \
+                patch.object(self.provider, 'entry', side_effect=checked), \
+                patch.object(self.provider, '_guard', side_effect=guarded):
+            with self.assertRaisesRegex(ValueError, 'Storage changed'):
+                self.search.search(self.provider, '', 'note', progress=publications.append)
+        self.assertEqual(publications, [])
 
     def test_publication_rechecks_guard_after_provider_admission(self):
         self.prepare_many()
@@ -116,6 +209,7 @@ class IndexedSearchTests(unittest.TestCase):
                 raise ValueError('Storage changed')
             return guard(path)
         with patch.object(self.provider, 'entry', side_effect=checked), \
+             patch('commonUtils.search.indexed.monotonic', return_value=0), \
              patch.object(self.provider, '_guard', side_effect=guarded):
             with self.assertRaisesRegex(ValueError, 'Storage changed'):
                 self.search.search(self.provider, '', 'note', progress=publications.append)

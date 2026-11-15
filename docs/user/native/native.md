@@ -32,6 +32,11 @@ Find supports previous/next matches, wrapping and optional case matching. Replac
 uses literal text, including backslashes, and Replace all updates every match.
 The application controls whether editing and saving are available.
 
+Apps can show saved local filename results with a **Checking…** status while
+updating them in the background. Tapping a saved result checks that item before
+opening it; an unavailable item is removed with a message. The app keeps the
+current selection and scroll position when replacing search results where possible.
+
 When an editor offers language selection, Automatic follows the filename and
 initial source line. A manual language remains selected through text and filename
 changes until Automatic is chosen again. Plain Text disables syntax colours.

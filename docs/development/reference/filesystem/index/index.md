@@ -48,6 +48,14 @@ existing `search()` still returns all matches and `search_page()` still returns
 the requested page plus a count. Provider admission and UI publication remain
 the caller's responsibility.
 
+`cached_child_names(path, cancelled=...)` returns `(name, directory, symlink)`
+rows from a completed SQL folder checkpoint only when its current fingerprint
+matches before and after reading. It returns `None` when live enumeration is
+needed, including missing/partial checkpoints, relevant recorded errors and
+parents of current index exclusions. It reads names/types without deserializing
+file metadata. This is an optional traversal optimization: consumers still
+validate access, links and current file contents. Non-SQL snapshots return `None`.
+
 `folder_stats(paths=...)` limits aggregate reads to requested paths;
 `children_of=...` requests a folder and its immediate children (mutually exclusive
 with explicit paths). Their sizes still include known descendants. `scan_folders`
