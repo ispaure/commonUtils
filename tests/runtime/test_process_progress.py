@@ -66,6 +66,18 @@ class ProcessTests(QtTestCase):
             time.sleep(.01)
         self.app.processEvents()
 
+    def test_generic_process_window_can_run_without_transfer_widgets(self):
+        from commonUtils.ui.tasks.process_progress import ProcessProgressPresentation
+        window = ProcessProgressWindow('Process', presentation=ProcessProgressPresentation,
+            runner=ProcessRunner(parser=lambda line: ProcessUpdate(1, 2, 'Half done')))
+        self.windows.append(window)
+        window.start(sys.executable, ['-u', '-c', "print('work')"])
+        self.wait(window)
+        self.assertTrue(window.result.succeeded)
+        self.assertEqual(window.bar.format(), 'Complete')
+        self.assertIn('work', window.log.toPlainText())
+        self.assertIsNone(window.findChild(qt.QTreeWidget))
+
     def test_private_child_environment_reaches_qprocess_without_parent_mutation(self):
         name = 'COMMONUTILS_QPROCESS_FIXTURE'
         previous = os.environ.get(name)
