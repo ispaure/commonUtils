@@ -1,3 +1,5 @@
+"""Perforce commands preserve file inputs and report subprocess failures."""
+
 
 from commonUtils.testing.stages import TestStage
 

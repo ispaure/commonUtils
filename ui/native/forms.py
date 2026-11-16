@@ -2,6 +2,7 @@
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN
+from .presentation import TOUCH_TARGET
 
 
 def wrap_text(text, width, measure):
@@ -82,7 +83,8 @@ def fit_text(control, width, *, style_button=None):
         if style_button is not None and not getattr(control, '_settings_list_styled', False):
             style_button(control)
             control._settings_list_styled = True
-        control.style.height = max(52 if getattr(control, '_settings_row', False) else 48, int(line_height * len(rendered.split('\n')) + 20))
+        minimum = 52 if getattr(control, '_settings_row', False) else TOUCH_TARGET
+        control.style.height = max(minimum, int(line_height * len(rendered.split('\n')) + 20))
         if type(control._impl).__module__.startswith('toga_iOS.'):
             control._impl.native.titleLabel.numberOfLines = len(rendered.split('\n'))
             control._impl.native.accessibilityLabel = source
@@ -185,6 +187,6 @@ def collapsible(title, children, *, style_button=lambda button: button, changed=
             button.text = title + ' +'
         if changed is not None:
             changed(box)
-    button = style_button(toga.Button(title + ' +', on_press=toggle, style=Pack(height=48)))
+    button = style_button(toga.Button(title + ' +', on_press=toggle, style=Pack(height=TOUCH_TARGET)))
     box.add(button)
     return box, button

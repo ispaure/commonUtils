@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 from commonUtils.tests.qt_test_case import QtTestCase
 from commonUtils.ui import pyside as qt
+from commonUtils.ui.appearance.colors import black_or_white_text
 from commonUtils.ui.appearance.theme import apply_theme, SLATE_LIGHT, SLATE_DARK, configured_colors
 from commonUtils.ui.workspaces.workspace import Workspace
 
@@ -37,6 +38,10 @@ class ThemeTests(QtTestCase):
             controller.deleteLater();del self.app._commonutils_theme
         self.app.setPalette(self.old_palette);self.app.setStyleSheet(self.old_css)
         self.app.sendPostedEvents(None,qt.QEvent.Type.DeferredDelete)
+
+    def test_text_color_preserves_sub_byte_rgb_precision(self):
+        self.assertEqual(black_or_white_text((.46, .46, .46)), '#ffffff')
+        self.assertEqual(black_or_white_text((.461, .461, .461)), '#000000')
 
     def test_import_is_opt_in_and_palette_pairs_are_readable(self):
         import commonUtils.ui.appearance.theme as theme

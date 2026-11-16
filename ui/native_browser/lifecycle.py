@@ -42,6 +42,8 @@ class BrowserLifecycle:
                     del cache[key]
 
     async def thumbnail(self, entry, loader, publish, *, epoch, cancelled):
+        if isinstance(entry.payload, dict) and entry.payload.get('cached'):
+            return  # Provisional rows use generic icons until their validation pass.
         if self.slots is None:
             self.slots = asyncio.Semaphore(2)
         async with self.slots:

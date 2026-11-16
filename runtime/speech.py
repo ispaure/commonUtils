@@ -72,6 +72,34 @@ class PlaybackTimer:
         self.deadline = None
 
 
+def seek_boundary(word_index, word_count):
+    """Return (step, remainder) for a word index in an ordered sequence.
+
+    On a backward step, add the preceding segment's word count to the
+    remainder. On a forward step the remainder is relative to the next
+    segment. Empty segments consume no part of the jump.
+    """
+    if word_index < 0:
+        return -1, word_index
+    if word_index >= word_count:
+        return 1, word_index - word_count
+    return 0, word_index
+
+
+def speech_word_starts(text, breaks=()):
+    """Count words across explicit block boundaries even without whitespace."""
+    units = text.encode("utf-16-le")
+    words = []
+    left = 0
+    for right in (*sorted(breaks), len(units) // 2):
+        if right > left:
+            words.extend(start for start, _ in word_ranges(
+                units[left * 2:right * 2].decode("utf-16-le"), left
+            ))
+            left = right
+    return words
+
+
 def utterances(text, start=0, end=None, *, limit=1000, breaks=(), sentence_breaks=True):
     """Keep browser offsets intact, including astral characters and block edges."""
     units = [0]
@@ -119,6 +147,7 @@ class SpeechSession:
         self.engine, self.on_range, self.on_state = engine, on_range, on_state
         self.can_speak = lambda: True
         self.on_finished = lambda: None
+        self.on_exhausted = lambda: False
         self.closed, self.state, self.generation = False, "stopped", 0
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()
@@ -137,27 +166,36 @@ class SpeechSession:
                           sentence_breaks=getattr(self.engine, 'sentence_breaks', True))
 
     def play(self, text, start=0, end=None, *, voice="", speed=1, breaks=()):
+        self.reposition(text, start, end, voice=voice, speed=speed, breaks=breaks)
+
+    def reposition(self, text, start=0, end=None, *, voice="", speed=1, breaks=(), paused=False):
+        """Load a passage at a UTF-16 position and optionally hold it paused."""
         if self.closed:
             return
-        self.stop()
+        self.stop(notify=False)
         if not self.engine.ready:
             self.on_state(
                 "unavailable", self.engine.error or "Speech engine is starting."
             )
             return
         self.text, self.start, self.end, self.breaks = text, start, end, breaks
-        self.words = [left for left, _ in word_ranges(text)
-                      if left >= start and (end is None or left < end)]
+        self.words = [left for left in speech_word_starts(text, breaks)
+                      if end is None or start <= left < end]
         self.ranges = list(self.utterances(text, start, end, breaks=breaks))
         self.voice, self.speed, self.index = voice, speed, 0
         if self.ranges:
-            self.state = "speaking"
-            self.next()
+            if paused:
+                self._show_paused_position()
+            else:
+                self.state = "speaking"
+                self.next()
         else:
             self.finish()
 
     def finish(self):
         """Natural exhaustion only; hosts may lazily supply another document."""
+        if self.on_exhausted():
+            return
         self.stop()
         generation = self.generation
         self.on_state("stopped", "Finished the selected passage or current chapter.")
@@ -171,6 +209,7 @@ class SpeechSession:
             self.stop()
             return
         if self.index >= len(self.ranges):
+            self.index = len(self.ranges) - 1
             self.finish()
             return
         text, start, end = self.ranges[self.index]
@@ -317,25 +356,34 @@ class SpeechSession:
         if speaking:
             self.resume()
 
-    def skip(self, seconds):
-        """Estimate a time jump from word rate; system synthesis has no seek API."""
+    def seek_position(self, seconds):
+        """Approximate an unclamped word index, including boundary overshoot."""
         if (
             self.closed
             or self.state not in {"speaking", "paused"}
             or not self.words
             or not self.ranges
         ):
+            return None
+        if self.native_progress:
+            current = bisect_right(self.words, self.position) - 1
+            return max(0, current) + round(seconds * 3 * self.speed)
+        elapsed = self.elapsed if self.state == "paused" else max(0, self.clock() - self.started_at)
+        current = bisect_right(self.words, self.ranges[self.index][1]) - 1
+        return max(0, current) + round((elapsed + seconds) * 3 * self.speed)
+
+    def skip(self, seconds):
+        """Seek within this passage. Sequence hosts may carry the overshoot."""
+        target = self.seek_position(seconds)
+        if target is None:
+            return
+        self.seek_word(max(0, min(len(self.words) - 1, target)))
+
+    def seek_word(self, index):
+        """Jump to a word within this passage while retaining its selection."""
+        if self.state not in {"paused", "speaking"} or not 0 <= index < len(self.words):
             return
         paused = self.state == "paused"
-        elapsed = self.elapsed if paused else max(0, self.clock() - self.started_at)
-        current = bisect_right(self.words, self.ranges[self.index][1]) - 1
-        target = max(
-            0,
-            min(
-                len(self.words) - 1,
-                current + round((elapsed + seconds) * 3 * self.speed),
-            ),
-        )
         self.cancel_timer()
         self.generation += 1
         self.token = str(self.generation)
@@ -344,24 +392,31 @@ class SpeechSession:
         self.engine.stop()
         self.native_paused = False
         self.ranges = list(
-            self.utterances(self.text, self.words[target], self.end, breaks=self.breaks)
+            self.utterances(self.text, self.words[index], self.end, breaks=self.breaks)
         )
         self.index, self.elapsed = 0, 0
         if paused:
-            text, base, _ = self.ranges[0]
-            word = next(word_ranges(text, base), None)
-            if word:
-                self.on_range(*word)
-            self.on_state("paused", "Paused · Resume reads from the new position.")
+            self._show_paused_position()
         else:
             self.next()
 
-    def stop(self):
+    def _show_paused_position(self):
+        text, base, _ = self.ranges[0]
+        self.state = "paused"
+        self.position = base
+        self.native_progress = False
+        word = next(word_ranges(text, base), None)
+        if word:
+            self.on_range(*word)
+        self.on_state("paused", "Paused · Resume reads from the new position.")
+
+    def stop(self, *, notify=True):
         self.cancel_timer()
         self.generation += 1
         self.token = str(self.generation)
         self.state = "stopped"
         self.native_paused = False
+        self.native_progress = False
         self.engine.stop()
         self.ranges, self.index = [], 0
         self.text, self.words, self.breaks = "", [], ()
@@ -369,7 +424,8 @@ class SpeechSession:
         self.utterance_words = []
         self.elapsed = 0
         self.on_range(-1, -1)
-        self.on_state("stopped", "Stopped")
+        if notify:
+            self.on_state("stopped", "Stopped")
 
     def dispose(self):
         if not self.closed:
@@ -382,3 +438,4 @@ class SpeechSession:
             self.on_range = self.on_state = lambda *args: None
             self.can_speak = lambda: False
             self.on_finished = lambda: None
+            self.on_exhausted = lambda: False

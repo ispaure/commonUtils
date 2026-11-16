@@ -18,6 +18,7 @@ rog_ally = False
 from .application import set_font, get_scale_multiplier, Palette, initialize_q_app, hide_console_window
 from .windows import Window
 from .widgets import connect_search, button, Label, LineEdit, button_open_win, create_scroll_area, create_grid, create_scroll_area_grid, create_size, create_frame, create_checkbox
+from .widgets import resizable_scroll_area
 from .messages import MessageBox, create_msg_box_base, display_msg_box_ok_cancel, display_msg_box_ok, display_msg_box_ignore_abort, display_msg_box_yes_no, display_msg_box_ok_help
 from .progress import ProgressBar, ProgressBarWindow, display_progress_bar
 from .window_dpi import WindowDpiScaleFixer, install_window_dpi_scale_fixer
@@ -25,5 +26,5 @@ from .window_dpi import WindowDpiScaleFixer, install_window_dpi_scale_fixer
 WindowDpiScaleFixer.__module__ = __name__
 
 # Export class/function identities from the public facade for introspection and pickling.
-for _name in ['Label', 'LineEdit', 'MessageBox', 'Palette', 'ProgressBar', 'ProgressBarWindow', 'Window', 'button', 'button_open_win', 'create_checkbox', 'create_frame', 'create_grid', 'create_msg_box_base', 'create_scroll_area', 'create_scroll_area_grid', 'create_size', 'display_msg_box_ignore_abort', 'display_msg_box_ok', 'display_msg_box_ok_cancel', 'display_msg_box_ok_help', 'display_msg_box_yes_no', 'display_progress_bar', 'get_scale_multiplier', 'hide_console_window', 'initialize_q_app', 'set_font']:
+for _name in ['Label', 'LineEdit', 'MessageBox', 'Palette', 'ProgressBar', 'ProgressBarWindow', 'Window', 'button', 'button_open_win', 'create_checkbox', 'create_frame', 'create_grid', 'create_msg_box_base', 'create_scroll_area', 'create_scroll_area_grid', 'create_size', 'display_msg_box_ignore_abort', 'display_msg_box_ok', 'display_msg_box_ok_cancel', 'display_msg_box_ok_help', 'display_msg_box_yes_no', 'display_progress_bar', 'get_scale_multiplier', 'hide_console_window', 'initialize_q_app', 'resizable_scroll_area', 'set_font']:
     globals()[_name].__module__ = __name__

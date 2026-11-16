@@ -6,6 +6,7 @@ TEST_STAGE = TestStage.REGRESSION
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
+import sys
 from tempfile import TemporaryDirectory
 from time import monotonic, sleep
 import unittest
@@ -57,6 +58,18 @@ class EventDrivenIndexTests(QtTestCase):
         watcher = self.browser.index_watcher
         paths = watcher.directories() + watcher.files()
         if paths: watcher.removePaths(paths)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'macOS vnode descriptors')
+    def test_browser_close_releases_index_descriptors(self):
+        watcher = self.browser.index_watcher
+        descriptors = [fd for fd, _ in watcher._entries.values()]
+        self.assertTrue(descriptors)
+        self.assertIn(str(self.root), watcher.directories())
+        self.browser.close()
+        self.assertEqual(watcher.directories() + watcher.files(), [])
+        for fd in descriptors:
+            with self.assertRaises(OSError):
+                os.fstat(fd)
 
     def test_duplicate_watcher_burst_is_coalesced_until_reconciliation_consumes_it(self):
         from commonUtils.ui.file_browser.index_policy import index_policy

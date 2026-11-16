@@ -1,3 +1,5 @@
+"""Directory scans, searches and cached snapshots preserve index and handle lifetime."""
+
 
 from commonUtils.testing.stages import TestStage
 

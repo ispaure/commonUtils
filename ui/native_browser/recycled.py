@@ -131,10 +131,10 @@ class RecycledBrowser(NativeBrowser):
         rows = tuple(rows)
         super().set_entries(provider, directory, rows, location=location)
 
-    def set_tree(self, tree):
+    def set_tree(self, tree, *, preserve=False):
         self.dismiss_item_menu()
         self._population_epoch += 1
-        return super().set_tree(tree)
+        return super().set_tree(tree, preserve=preserve)
 
     @property
     def entries(self):
@@ -260,10 +260,13 @@ class RecycledBrowser(NativeBrowser):
     async def _select_row(self, row):
         if (not self.closed and not self.navigation_busy and row.epoch == self.epoch
                 and self._list_rows.get(row.entry.identity) is row and self._entry_current(row.entry)):
-            await self.select(row.entry)
-            if (self.on_item_actions is not None and row.epoch == self.epoch
-                    and self._entry_current(row.entry) and self.selected == row.entry.identity):
-                result = self.on_item_actions(row.entry.payload)
+            entry = await self.validate_cached_entry(row.entry)
+            if entry is None or not self._entry_current(entry):
+                return
+            await self.select(entry)
+            if (self.on_item_actions is not None and self._entry_current(entry)
+                    and self.selected == entry.identity):
+                result = self.on_item_actions(entry.payload)
                 if inspect.isawaitable(result):
                     await result
 
@@ -500,6 +503,9 @@ class RecycledBrowser(NativeBrowser):
     async def _select_pressed(self, entry, widget, **kwargs):
         with self.population_paused():
             if self.closed or self.navigation_busy or not self._entry_current(entry):
+                return
+            entry = await self.validate_cached_entry(entry)
+            if entry is None or not self._entry_current(entry):
                 return
             if entry.container and self.on_open_folder:
                 self.navigation_busy = True

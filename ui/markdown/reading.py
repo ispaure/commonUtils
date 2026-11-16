@@ -7,6 +7,7 @@ from .headings import _iter_headings
 from .links import render_links
 from .images import prepare_wiki_images, configure_images
 from .presentation import style_document
+from .speech import protect_markup, restore_markup
 from ..readers.reader_chrome import reader_button, reading_spin, show_reader_popup
 
 
@@ -86,10 +87,13 @@ class MarkdownReadingMixin:
         # Qt's HTML-block importer can silently discard everything after a div.
         # Treat embedded HTML as literal Markdown rather than losing authored text.
         body = self._diagram_renderer.substitute(parts.body, self.browser.document()) if self._diagram_renderer else parts.body
+        # Keep source line numbering for folded callouts and Markdown links.
+        body, speech_markup = protect_markup(body)
         rendered, callouts = reading_source(body, self._folded_callouts)
         prepared, images = prepare_wiki_images(render_links(rendered))
         self.browser.document().setMarkdown(prepared,
             qt.QTextDocument.MarkdownFeature.MarkdownDialectGitHub | qt.QTextDocument.MarkdownFeature.MarkdownNoHTML)
+        restore_markup(self.browser.document(), speech_markup)
         configure_images(self.browser.document(), images)
         style_document(self.browser.document(), self.browser.palette(), callouts=callouts)
         self.browser.update_reading_width()

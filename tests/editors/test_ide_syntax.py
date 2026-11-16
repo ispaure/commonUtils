@@ -1,3 +1,5 @@
+"""IDE highlighting preserves compound names, themes and multiline language state."""
+
 
 from commonUtils.testing.stages import TestStage
 

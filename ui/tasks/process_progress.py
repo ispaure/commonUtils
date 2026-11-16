@@ -1,15 +1,42 @@
 """Reusable process status/log presentation; execution lives in ProcessRunner."""
 from .. import pyside as qt
 from .process_runner import ProcessRunner
-from ...filesystem import format_size
 
 _windows = []
+
+
+class ProcessProgressPresentation:
+    """Optional widgets and display policy for a process window.
+
+    The context layout appears above the bar, and the body below it. The
+    window owns runner signals, numeric progress, completion and shutdown.
+    """
+
+    def __init__(self, window, context_layout, body):
+        self.window = window
+        window.context_fields = {}
+
+    def status(self, state, attempt):
+        if state == 'running':
+            self.window.bar.setStyleSheet('')
+
+    def reset(self):
+        pass
+
+    def update_metrics(self, values):
+        pass
+
+    def progress(self, update):
+        self.window.bar.setFormat('%p%' if update.total > 0 else 'Working…')
+
+    def completed(self, state):
+        pass
 
 
 class ProcessProgressWindow(qt.QDialog):
     idle = qt.Signal()
 
-    def __init__(self, name, parent=None, *, runner=None, context=None):
+    def __init__(self, name, parent=None, *, runner=None, context=None, presentation=None):
         super().__init__(parent)
         self.setWindowFlag(qt.Qt.WindowType.Window, True)
         self.setAttribute(qt.Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -40,43 +67,13 @@ class ProcessProgressWindow(qt.QDialog):
         self.cancel_button = qt.QPushButton('Cancel')
         self.cancel_button.clicked.connect(self._cancel_or_close)
         for widget in (self.name, self.state): layout.addWidget(widget)
-        self.context_fields = {}
         context_layout = qt.QFormLayout()
-        for key, title in (('source', 'Source'), ('destination', 'Destination')):
-            if key in self.context:
-                value = self._label(str(self.context[key]))
-                self.context_fields[key] = value
-                context_layout.addRow(title, value)
         layout.addLayout(context_layout)
         layout.addWidget(self.bar)
-        self.statistics = qt.QGroupBox('Transfer statistics')
-        grid = qt.QGridLayout(self.statistics)
-        self.fields = {}
-        for index, (key, title) in enumerate((('bytes', 'Planned / total' if self.context.get('dry_run') else 'Transferred / total'), ('speed', 'Speed'),
-                ('files', 'Files / total'), ('eta', 'Time remaining'), ('checks', 'Checks / total'),
-                ('elapsed', 'Elapsed'), ('errors', 'Errors'), ('warnings', 'Warnings'))):
-            value = self._label('Not reported')
-            self.fields[key] = value
-            row, column = index // 2, (index % 2) * 2
-            grid.addWidget(qt.QLabel(title), row, column)
-            grid.addWidget(value, row, column + 1)
-        grid.setColumnStretch(1, 1); grid.setColumnStretch(3, 1)
-        self.statistics.setVisible(bool(self.context))
-        layout.addWidget(self.statistics)
-        self.active = qt.QTreeWidget()
-        self.active.setHeaderLabels(['Active transfer', 'Transferred / size', 'Speed', 'Time remaining'])
-        self.active.setRootIsDecorated(False)
-        self.active.setUniformRowHeights(True)
-        self.active.setMaximumHeight(150)
-        self.active.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
-        for column in (1, 2, 3):
-            self.active.header().setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
-        self.active_status = self._label('Active transfer details not reported.')
-        self.active.setVisible(bool(self.context)); self.active_status.setVisible(bool(self.context))
-        layout.addWidget(self.active); layout.addWidget(self.active_status)
-        self.issue = self._label('')
-        self.issue.hide()
-        layout.addWidget(self.issue)
+        if presentation is None:
+            from .process_transfer_progress import legacy_transfer_presentation
+            presentation = legacy_transfer_presentation
+        self.presentation = presentation(self, context_layout, layout)
         layout.addWidget(self.details)
         self.logs_toggle = qt.QToolButton()
         self.logs_toggle.setText('Details and logs')
@@ -106,48 +103,9 @@ class ProcessProgressWindow(qt.QDialog):
         self.log.setVisible(opened)
         self.logs_toggle.setArrowType(qt.Qt.ArrowType.DownArrow if opened else qt.Qt.ArrowType.RightArrow)
 
-    @staticmethod
-    def _duration(value):
-        if value is None: return 'Not reported'
-        seconds = int(value)
-        hours, seconds = divmod(seconds, 3600)
-        minutes, seconds = divmod(seconds, 60)
-        return f'{hours:d}:{minutes:02d}:{seconds:02d}'
-
-    @staticmethod
-    def _pair(done, total, *, sizes=False):
-        if done is None: return 'Not reported'
-        format_value = format_size if sizes else lambda value: f'{int(value):,}'
-        return format_value(done) + (' / ' + format_value(total) if total is not None else ' / total not reported')
-
     def _metrics(self, values):
         self.metrics = dict(values)
-        self.statistics.show(); self.active.show(); self.active_status.show()
-        self.fields['bytes'].setText(self._pair(values.get('bytes'), values.get('total_bytes'), sizes=True))
-        self.fields['files'].setText(self._pair(values.get('files'), values.get('total_files')))
-        self.fields['checks'].setText(self._pair(values.get('checks'), values.get('total_checks')))
-        speed = values.get('speed')
-        self.fields['speed'].setText(format_size(speed) + '/s' if speed is not None else 'Not reported')
-        self.fields['eta'].setText(self._duration(values.get('eta')))
-        self.fields['elapsed'].setText(self._duration(values.get('elapsed')))
-        errors = values.get('errors')
-        self.fields['errors'].setText(str(int(errors)) if errors is not None else
-                                     f'{values["reported_errors"]} error log records' if values.get('reported_errors') else 'Not reported')
-        warnings = values.get('warnings')
-        self.fields['warnings'].setText(str(int(warnings)) if warnings is not None else 'Not reported')
-        self.issue.setText('Last reported error: ' + values['last_error'] if values.get('last_error') else '')
-        self.issue.setVisible(bool(self.issue.text()))
-        self.active.clear()
-        transfers = values.get('active_transfers')
-        for transfer in transfers or ():
-            speed = transfer.get('speed')
-            row = qt.QTreeWidgetItem([transfer.get('name', ''), self._pair(transfer.get('bytes'), transfer.get('total_bytes'), sizes=True),
-                                     format_size(speed) + '/s' if speed is not None else 'Not reported',
-                                     self._duration(transfer.get('eta'))])
-            row.setToolTip(0, transfer.get('name', ''))
-            self.active.addTopLevelItem(row)
-        self.active_status.setText('Active transfer details not reported.' if transfers is None else
-                                  f'{len(transfers)} active transfer(s).' if transfers else 'No active transfers in the latest statistics.')
+        self.presentation.update_metrics(self.metrics)
 
     @property
     def busy(self):
@@ -170,19 +128,13 @@ class ProcessProgressWindow(qt.QDialog):
     def _status(self, state, attempt, message):
         self.state.setText(f'{state.capitalize()} · Attempt {attempt}')
         detail = message.splitlines()[0] if message else ''
-        if state == 'running' and self.context and self.bar.format() == '100% of known work · Still running':
-            self.state.setText(f'Still running · Attempt {attempt}')
-            detail = 'Reported progress is 100%. Scanning or final checks may still be running.'
         self.details.setText(detail)
         if state == 'running':
             self.bar.setProperty('operationState', 'running')
-            self.bar.setStyleSheet('QProgressBar { color: #101620; }'
-                                  if self.context and self.bar.format() == '100% of known work · Still running' else '')
+        self.presentation.status(state, attempt)
         if state == 'running' and message == 'Starting process…':
             self.metrics = {}
-            for value in self.fields.values(): value.setText('Not reported')
-            self.issue.clear(); self.issue.hide(); self.active.clear()
-            self.active_status.setText('Active transfer details not reported.')
+            self.presentation.reset()
             self.bar.setRange(0, 0)
             self.bar.setFormat('Starting…')
         if state in ('retrying', 'failed'):
@@ -191,21 +143,12 @@ class ProcessProgressWindow(qt.QDialog):
     def _progress(self, update):
         if update.metrics:
             self._metrics(update.metrics)
+        self.presentation.progress(update)
         if update.total > 0:
-            self.bar.setFormat('Planned: %p%' if self.context.get('dry_run') else
-                               'Transferred: %p%' if update.metrics.get('progress_basis') == 'bytes' else
-                               'Checks / files: %p%' if update.metrics else '%p%')
             self.bar.setRange(0, 1000)
             self.bar.setValue(min(1000, max(0, int(update.done / update.total * 1000))))
-            if self.context and update.done >= update.total:
-                self.bar.setFormat('100% of known work · Still running')
-                self.details.setText('Reported progress is 100%. Scanning or final checks may still be running.')
-            elif self.context:
-                self.bar.setFormat(self.bar.format() + ' of known work')
-            self.bar.setToolTip('Totals can grow as more files are discovered. Completion is confirmed when the process exits successfully.')
         else:
             self.bar.setRange(0, 0)
-            self.bar.setFormat('Discovering / checking files…' if self.context else 'Working…')
 
     def _completed(self, result):
         self.result = result
@@ -223,11 +166,7 @@ class ProcessProgressWindow(qt.QDialog):
             self.bar.setFormat('Stopped at %p%' if had_percentage else result.state.capitalize())
             self.bar.setProperty('operationState', result.state)
             self.bar.setStyleSheet('QProgressBar::chunk { background-color: #aa7832; }')
-        if self.metrics:
-            self.fields['speed'].setText('—')
-            self.fields['eta'].setText('—')
-            self.active.clear()
-            self.active_status.setText(f'No active transfers · {result.state}.')
+        self.presentation.completed(result.state)
         self.cancel_button.setText('Close')
         self.idle.emit()
         if self.closing:
@@ -254,12 +193,19 @@ class ProcessProgressWindow(qt.QDialog):
         self.close()
 
 
-def open_process(name, program, arguments=(), parent=None, *, parser=None, context=None, **runner_options):
-    window = ProcessProgressWindow(name, parent, runner=ProcessRunner(parser=parser, **runner_options), context=context)
+def present_process_window(window):
+    """Show a process window in the current host and track it through shutdown."""
     _windows.append(window)
     window.destroyed.connect(lambda: _windows.remove(window) if window in _windows else None)
     from .process_host import show_process
     show_process(window)
+
+
+def open_process(name, program, arguments=(), parent=None, *, parser=None, context=None,
+                 presentation=None, **runner_options):
+    window = ProcessProgressWindow(name, parent, runner=ProcessRunner(parser=parser, **runner_options),
+                                   context=context, presentation=presentation)
+    present_process_window(window)
     window.start(program, arguments)
     return window
 

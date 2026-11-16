@@ -405,10 +405,14 @@ class BrowserFileActionTests(QtTestCase):
             model.setRootPath(outside)
             model.setRootPath(str(self.root))
             self.wait_until(lambda: not selected.isValid())
+            self.assertIsNotNone(self.browser.file_actions._rename_selection)
             parked.rename(target)
             model.setRootPath(outside)
             model.setRootPath(str(self.root))
-            self.wait_until(lambda: self.browser.heading.text() == target.name)
+            self.wait_until(lambda: self.browser.heading.text() == target.name,
+                            message=lambda: (f'Renamed file still exists: {target.is_file()}, '
+                                             f'replacement index available: {self.index(target).isValid()}, '
+                                             f'pending selection: {self.browser.file_actions._rename_selection is not None}'))
 
         self.assertEqual(self.browser.selected_object.path, target)
 

@@ -213,7 +213,9 @@ class AppleNavigation:
             if self.sidebar_available:
                 self.old_mode = int(self.controller.mode)
                 self._mode_started = True
-                self.controller.setMode(2 if self.sidebar_used else 1)
+                mode = 2 if self.sidebar_used else 1
+                if self.old_mode != mode:
+                    self.controller.setMode(mode)
             self._keyboard_restoration_pending = True
             self.keyboard_live = True
             self._layout_window(window._impl.container)
@@ -259,11 +261,7 @@ class AppleNavigation:
             restore(lambda: setattr(self.parent, 'additionalSafeAreaInsets', self.old_additional_insets))
             if len(errors) == start:
                 self._keyboard_restoration_pending = False
-        if self._mode_started:
-            start = len(errors)
-            restore(lambda: self.controller.setMode(self.old_mode))
-            if len(errors) == start:
-                self._mode_started = False
+        restore(self._restore_mode)
         if self._controllers_started:
             start = len(errors)
             # Keep our inactive leaf callbacks installed while rebuilding native
@@ -305,6 +303,12 @@ class AppleNavigation:
                 self._window_hooks_started = False
         if errors:
             raise ExceptionGroup('Apple navigation construction cleanup failed', errors)
+
+    def _restore_mode(self):
+        if self._mode_started:
+            if int(self.controller.mode) != self.old_mode:
+                self.controller.setMode(self.old_mode)
+            self._mode_started = False
 
     def _restore_more(self):
         more = self.controller.moreNavigationController
@@ -727,6 +731,9 @@ class AppleNavigation:
         self.window._impl.container.on_native_layout = self.old_layout
         self.window._impl.get_size = self.old_get_size
         self.outer_navigation.setNavigationBarHidden(self.old_bar_hidden, animated=False)
+        # Release the adapter's adaptive tab style before replacing its tabs.
+        # Toga reuses this controller if the same content is installed again.
+        self._restore_mode()
         for container, content in self.containers:
             container.controller = content
             container.on_native_layout = None

@@ -17,6 +17,7 @@ from .views import FileViews
 from .editing import FilenameDelegate
 from .file_actions import FileActions, clipboard_files
 from .indexing import BrowserIndexing, IndexPriorityLease
+from .index_watcher import create_index_watcher
 
 
 @dataclass(frozen=True)
@@ -99,7 +100,7 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         from .keyboard import BrowserKeyboard
         self.keyboard = BrowserKeyboard(self)
         self._reconcile_pending = False
-        self.index_watcher = qt.QFileSystemWatcher(self)
+        self.index_watcher = create_index_watcher(self)
         self.index_watcher.directoryChanged.connect(self._indexed_path_changed)
         self.index_watcher.fileChanged.connect(self._indexed_path_changed)
         self.reconcile_debounce = qt.QTimer(self)
@@ -577,6 +578,9 @@ class FileBrowser(BrowserIndexing, qt.QWidget):
         directory_cache.set_priority_folders(self._index_priority_owner)
         self.stopping = True
         self.reconcile_debounce.stop()
+        watches = self.index_watcher.directories() + self.index_watcher.files()
+        if watches:
+            self.index_watcher.removePaths(watches)
         self.index_search.stop()
         for window in tuple(self._scan_windows):
             window.close()

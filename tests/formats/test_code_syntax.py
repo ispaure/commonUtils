@@ -1,3 +1,5 @@
+"""Syntax tokenization, language detection and palette changes preserve editor colors."""
+
 
 from commonUtils.testing.stages import TestStage
 

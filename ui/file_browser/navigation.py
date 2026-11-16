@@ -46,11 +46,9 @@ class BreadcrumbBar(qt.QWidget):
         self.root_button.setToolButtonStyle(qt.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.layout.addWidget(self.root_button)
         self.root_button.clicked.connect(lambda: self.requested.emit(self.paths[0]) if self.paths else None)
-        self.scroll = qt.QScrollArea()
-        self.scroll.setFrameShape(qt.QFrame.Shape.NoFrame)
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setVerticalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        no_scroll_bar = qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        self.scroll = qt.resizable_scroll_area(
+            framed=False, horizontal_policy=no_scroll_bar, vertical_policy=no_scroll_bar)
         self.scroll.setSizePolicy(qt.QSizePolicy.Policy.Expanding, qt.QSizePolicy.Policy.Fixed)
         self.scroll.viewport().setAutoFillBackground(False)
         self.scroll.setAutoFillBackground(False)

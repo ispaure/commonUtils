@@ -63,6 +63,23 @@ def button_open_win(text: str, target: _api.QWidget, rect: _api.QRect, window):
     return push_button
 
 
+def resizable_scroll_area(
+    parent: _api.QWidget | None = None,
+    *,
+    framed: bool = True,
+    horizontal_policy: _api.Qt.ScrollBarPolicy = _api.Qt.ScrollBarPolicy.ScrollBarAsNeeded,
+    vertical_policy: _api.Qt.ScrollBarPolicy = _api.Qt.ScrollBarPolicy.ScrollBarAsNeeded,
+) -> _api.QScrollArea:
+    """Create a layout-managed scroll area ready to receive a content widget."""
+    area = _api.QScrollArea(parent)
+    area.setWidgetResizable(True)
+    if not framed:
+        area.setFrameShape(_api.QFrame.Shape.NoFrame)
+    area.setHorizontalScrollBarPolicy(horizontal_policy)
+    area.setVerticalScrollBarPolicy(vertical_policy)
+    return area
+
+
 def create_scroll_area(target, rect, rect_content):
     """
     Creates a scroll area (scroll bar appears only if not everything can be seen).
@@ -75,9 +92,8 @@ def create_scroll_area(target, rect, rect_content):
     :type rect_content: QSize
     :rtype: PySide6.QtWidgets.QWidget
     """
-    scroll_area = _api.QScrollArea(target)
+    scroll_area = _api.resizable_scroll_area(target)
     scroll_area.setGeometry(rect)
-    scroll_area.setWidgetResizable(True)
     scroll_area.setObjectName('scroll_area')
 
     scroll_area_widget_contents = _api.QWidget()

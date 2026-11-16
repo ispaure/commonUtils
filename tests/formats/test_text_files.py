@@ -1,3 +1,5 @@
+"""Bounded text file I/O preserves encodings, line endings and conflict handling."""
+
 
 from commonUtils.testing.stages import TestStage
 

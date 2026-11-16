@@ -4,6 +4,7 @@ from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
 import sys
+from importlib.util import find_spec
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
@@ -74,6 +75,46 @@ class AppleKeyboardTests(unittest.TestCase):
         delegate = self.delegate()
         for leaf in (None, self.view('UIView')):
             self.assertFalse(delegate.gestureRecognizer_shouldReceiveTouch_(None, NS(view=leaf)))
+
+    @unittest.skipUnless(find_spec('toga'), 'Optional Toga backend is not installed')
+    def test_password_eye_keeps_active_input_editing_in_both_directions(self):
+        from commonUtils.ui.native.password_input import PasswordInput
+
+        delegate = self.delegate()
+        for getters in (False, True):
+            for touch_icon in (False, True):
+                with self.subTest(getters=getters, touch_icon=touch_icon):
+                    password = PasswordInput()
+                    password.value = 'typing '
+                    native = NS(isFirstResponder=(lambda: True) if getters else True)
+                    password.field._impl.native = native
+                    window = NS(endEditing=Mock())
+                    button = self.view('UIButton', window=window, getters=getters)
+                    button.interface = password.eye
+                    touched = self.view('UIImageView', button, window=window) if touch_icon else button
+                    for revealed in (True, False):
+                        self.assertFalse(delegate.gestureRecognizer_shouldReceiveTouch_(None, NS(view=touched)))
+                        window.endEditing.assert_not_called()
+                        password.eye.on_press()
+                        self.assertEqual(password.revealed, revealed)
+                        password.field.value += 'more '
+                    self.assertEqual(password.value, 'typing more more ')
+
+    @unittest.skipUnless(find_spec('toga'), 'Optional Toga backend is not installed')
+    def test_inactive_password_eye_does_not_keep_another_inputs_keyboard(self):
+        from commonUtils.ui.native.password_input import PasswordInput
+
+        delegate = self.delegate()
+        password = PasswordInput()
+        password.field._impl.native = NS(isFirstResponder=False, becomeFirstResponder=Mock())
+        window = NS(endEditing=Mock())
+        button = self.view('UIButton', window=window)
+        button.interface = password.eye
+        self.assertFalse(delegate.gestureRecognizer_shouldReceiveTouch_(None, NS(view=button)))
+        password.eye.on_press()
+        self.assertTrue(password.revealed)
+        window.endEditing.assert_called_once_with(True)
+        password.field._impl.native.becomeFirstResponder.assert_not_called()
 
 
 class AndroidBrowserBindingTests(unittest.TestCase):

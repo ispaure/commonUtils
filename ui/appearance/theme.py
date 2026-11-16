@@ -5,6 +5,7 @@ the returned controller supports system/light/dark selection without restarting.
 """
 from dataclasses import dataclass, replace
 from .. import pyside as qt
+from .colors import black_or_white_text
 from ...configuration.settings import get_setting
 
 
@@ -34,14 +35,8 @@ def configured_colors(dark):
     values = style_values()
     colors = SLATE_DARK if dark else SLATE_LIGHT
     accent = qt.QColor(values['accent_color_str'])
-    def luminance(color):
-        channels = [channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4
-                    for channel in color.getRgbF()[:3]]
-        return sum(channel * weight for channel, weight in zip(channels, (.2126, .7152, .0722)))
-    def text_on(color):
-        return '#000000' if luminance(color) > .179 else '#ffffff'
-    selection = accent
-    changes = dict(accent=accent.name(), selection_background=selection.name(), selected_text=text_on(selection))
+    changes = dict(accent=accent.name(), selection_background=accent.name(),
+                   selected_text=black_or_white_text(accent.getRgbF()[:3]))
     if dark:
         amount = values['dark_tint_int'] / 100
         for name, neutral in (('window', '#1e1e1e'), ('surface', '#282828'), ('alternate', '#303030'),

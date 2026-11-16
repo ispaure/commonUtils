@@ -1,3 +1,5 @@
+"""Text transforms preserve Unicode, newlines and editor transaction boundaries."""
+
 
 from commonUtils.testing.stages import TestStage
 

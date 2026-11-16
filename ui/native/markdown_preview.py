@@ -5,15 +5,13 @@ from html import escape
 import re
 from urllib.parse import quote, urlsplit
 
-from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from ..appearance.markdown_colors import CALLOUT_COLORS
 from ...formats.markdown.callouts import MARKER, callout_kind_title
-from ...formats.markdown.images import image_size, wiki_image
+from ...formats.markdown.images import image_size, wiki_image as wiki_image
+from ...formats.markdown.properties import split_frontmatter
+from ...formats.markdown.tokens import HIDDEN_FENCES, TASK, code_language, markdown_parser
 from ...formats.markdown.image_sources import image_failure_reason
-
-_ALIAS = re.compile(r'\[\[([^]\n|]+)(?:\|([^]\n]+))?\]\]|\[([^]\n|]+)\|([^]\n]+)\]')
-
 
 @dataclass(frozen=True)
 class MarkdownPreviewLimits:
@@ -36,24 +34,6 @@ DEFAULT_LIMITS = MarkdownPreviewLimits()
 class VideoPlaceholder:
     """A host-owned video control whose source will be supplied on demand."""
     key: str
-
-
-def _alias(state, silent):
-    """Recognize existing wiki aliases through the parser, outside code spans."""
-    if (state.src[state.pos] != '[' or state.linkLevel
-            or (state.pos and state.src[state.pos - 1] in '![')):
-        return False
-    match = _ALIAS.match(state.src, state.pos, state.posMax)
-    if not match:
-        return False
-    if not silent:
-        token = state.push('link_open', 'a', 1)
-        token.attrSet('href', quote((match[1] or match[3]).strip(), safe='/:@%#?=&+'))
-        token = state.push('text', '', 0)
-        token.content = match[2] or match[4] or match[1]
-        state.push('link_close', 'a', -1)
-    state.pos = match.end()
-    return True
 
 
 def embedded_image(target, alt, image_source=None, *, lazy=False):
@@ -155,20 +135,33 @@ def markdown_body(text, *, local_links=False, image_source=None, limits=None, ca
     limits = DEFAULT_LIMITS if limits is None else limits
     if len(text.encode('utf-8')) > limits.source_bytes:
         raise ValueError(f'Preview source exceeds the {limits.source_bytes / (1024 * 1024):g} MiB limit.')
-    parser = MarkdownIt('commonmark', {'html': False, 'maxNesting': 32}).enable(['table', 'strikethrough'])
-    parser.inline.ruler.before('link', 'wiki_alias', _alias)
-    if image_source is not None:
-        parser.inline.ruler.before('image', 'wiki_image', wiki_image)
+    parser = markdown_parser(wiki_images=image_source is not None)
     if callouts:
         parser.core.ruler.after('block', 'markdown_callouts', _render_callouts)
-    tokens = parser.parse(text)
+    tokens = parser.parse(split_frontmatter(text.removeprefix('\ufeff')).body)
     headings = set()
     heading_counts = {}
 
     def prepare(items):
-        links = []
+        links, tasks = [], []
         for index, token in enumerate(items):
-            if token.type == 'heading_open':
+            if token.type == 'list_item_open':
+                tasks.append(token)
+            elif token.type == 'list_item_close':
+                tasks.pop()
+            elif token.type == 'inline' and tasks and tasks[-1] is not None:
+                task = TASK.match(token.content)
+                if task and token.children and token.children[0].type == 'text':
+                    tasks[-1].attrSet('data-speech-task', 'checked' if task[1].lower() == 'x' else 'unchecked')
+                    # Keep the checkbox separate from visible item text and DOM offsets.
+                    content = token.children[0].content
+                    token.children[0].content = content[task.end():]
+                    box = Token('task_checkbox', 'input', 0)
+                    if task[1].lower() == 'x':
+                        box.attrSet('checked', '')
+                    token.children.insert(0, box)
+                tasks[-1] = None
+            elif token.type == 'heading_open':
                 content = items[index + 1]
                 title = ''.join(child.content for child in content.children or []
                                 if child.type in ('text', 'code_inline', 'image'))
@@ -219,7 +212,32 @@ def markdown_body(text, *, local_links=False, image_source=None, limits=None, ca
     def table_close(renderer, items, index, options, env):
         return '</table></div>\n'
 
+    def fence(renderer, items, index, options, env):
+        token = items[index]
+        if code_language(token) in HIDDEN_FENCES:
+            token.attrSet('data-speech-skip', '')
+        return renderer.fence(items, index, options, env)
+
+    def task_checkbox(renderer, items, index, options, env):
+        checked = ' checked' if items[index].attrGet('checked') is not None else ''
+        return '<input type="checkbox" disabled' + checked + '> '
+
+    def footnote_reference(renderer, items, index, options, env):
+        return '<sup class="footnote-ref">' + escape(items[index].content) + '</sup>'
+
+    def math_source(renderer, items, index, options, env):
+        token = items[index]
+        return f'<{token.tag} class="math-source">{escape(token.content)}</{token.tag}>'
+
+    def silent(renderer, items, index, options, env):
+        return ''
+
     for name, rule in (('image', image),
+                       ('fence', fence),
+                       ('task_checkbox', task_checkbox),
+                       ('footnote_reference', footnote_reference),
+                       ('math_source', math_source),
+                       ('hidden_comment', silent),
                        ('table_open', table_open), ('table_close', table_close)):
         parser.add_render_rule(name, rule)
     return parser.renderer.render(tokens, parser.options, {})

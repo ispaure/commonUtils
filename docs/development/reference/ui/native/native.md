@@ -1,5 +1,8 @@
 # Native Toga components
 
+Use `ui.native.presentation.TOUCH_TARGET` for the standard 48-point or 48-dp
+control size. Rows that need more space can set a larger minimum.
+
 For independently compiled Swift extension components, see
 [native iOS widget values](widget-values.md).
 
@@ -630,7 +633,9 @@ The row is at least 48 points tall. `value`, `enabled`, `focus()` and assignable
 
 `revealed` reports visibility; `set_revealed(bool)` changes it and
 `toggle_visibility()` toggles it. Input starts hidden, toggling preserves its value
-and selection, and clearing through `value` or the input masks it again.
+and selection, and clearing through `value` or the input masks it again. On iOS,
+the eye is associated with its input so `keyboard.install()` keeps the active
+field's keyboard open; toggling an inactive field does not focus it.
 Only the iOS/Android adapters change native masking; the dummy backend exercises
 state and callbacks. No Qt or consuming application modules are imported. Hosts
 own persistence, credential validation, background privacy and disposal policy.
@@ -776,6 +781,8 @@ a temporary noninteractive view. No file-opening or application state is inspect
 a `KeyboardDismissal` (or `None` on other backends). Retain it for the window and
 call `dispose()` when retiring it. Outside taps dismiss without consuming the
 original touch; editable text controls and WebViews retain selection behavior.
+The active password field's eye button is also excluded, including touches on
+its icon subviews, so showing or hiding a password does not end editing.
 
 `SearchDismissal(search_widget)` owns one Android outside-touch listener.
 Call `bind(roots)` with explicit Toga subtrees when controls are added; retained

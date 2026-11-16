@@ -31,6 +31,20 @@ does not change point sizes or address default-font differences between platform
 Tests exercise real widgets with synthetic native Windows message sequences;
 physical mixed-DPI monitor transitions still require Windows hardware validation.
 
+## Scroll areas
+
+Use `qt.resizable_scroll_area(parent=None)` for a scroll area managed by a Qt
+layout. It returns a resizable `QScrollArea` with the native frame and both
+scrollbars shown as needed. Pass `framed=False` for a frameless pane or set
+`horizontal_policy` and `vertical_policy` independently using
+`Qt.ScrollBarPolicy`. Set the content with `area.setWidget(content)` and add
+the area to its layout.
+
+`qt.create_scroll_area(target, rect, rect_content)` is the fixed-geometry
+factory. It returns the inner content widget and applies the configured ROG Ally
+scrollbar dimensions. `qt.create_scroll_area_grid` builds a grid in that
+content widget.
+
 ## Password fields
 
 Import `password_field` from `commonUtils.ui.pyside.passwords` and pass an existing
@@ -40,6 +54,18 @@ checkable action; its text and tooltip switch between Show password and Hide
 password. Toggling preserves the value and selection; clearing masks it again.
 `LineEdit(..., pw_field=True)` also installs this helper. The host owns secret
 storage, validation, submission and lifetime.
+
+## Selection and details
+
+Import `SelectionDetails` from `commonUtils.ui.pyside.selection_details` for
+a group box with a list on the left and details on the right. Supply
+`show_details(entry)` to populate `details_layout` on the GUI thread.
+`set_entries(entries, label=...)` selects the first entry or clears the pane
+when the list is empty. The widget disposes of the previous pane's child widgets
+on every selection change. Add plain widgets to the detail layout, or use
+`add_detail_action(label, callback, enabled=..., tooltip=...)` for a button
+with a no-argument handler. The consumer owns entry discovery, action labels
+and the operations themselves.
 
 ## Files
 
@@ -53,6 +79,7 @@ storage, validation, submission and lifetime.
 | [messages.py](../../../../../ui/pyside/messages.py) | Messages utilities; public API is commonUtils.ui.pyside. |
 | [progress.py](../../../../../ui/pyside/progress.py) | Progress utilities; public API is commonUtils.ui.pyside. |
 | [passwords.py](../../../../../ui/pyside/passwords.py) | Password masking and accessible reveal action. |
+| [selection_details.py](../../../../../ui/pyside/selection_details.py) | List selection and detail actions. |
 | [widgets.py](../../../../../ui/pyside/widgets.py) | Widgets utilities; public API is commonUtils.ui.pyside. |
 | [windows.py](../../../../../ui/pyside/windows.py) | Windows utilities; public API is commonUtils.ui.pyside. |
 

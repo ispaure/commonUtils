@@ -150,9 +150,12 @@ Click the speaker icon to open Read aloud and press Play. Language defaults to
 **Automatic (detect text)** and chooses an installed voice for the passage’s
 language locally. You can choose a language and voice manually. A selected passage takes
 priority; otherwise playback starts from the visible reading area. Speech follows
-the rendered reading view: links read their visible labels without the underlying
-destinations, and formatting markers are omitted. URLs and code written visibly
-in the document remain readable. The same button
+the rendered reading view. It reads link labels and captions, pauses between
+table cells and rows, and says checked or unchecked before tasks. It reads an
+expanded callout’s title and body, or the title of a collapsed callout. Footnote
+text has a spoken cue. URLs and code written visibly in the document remain
+readable. Image alt text, hidden comments and formatting markers are silent.
+The same button
 changes to Pause while speaking and Resume while paused. Engines without pause/resume
 support disable it during playback; Stop remains available. The speed slider snaps
 from 50% to 200% in 25% steps, with gray limit labels and the selected percentage.

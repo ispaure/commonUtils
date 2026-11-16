@@ -60,8 +60,7 @@ class INISettingsEditor(TextFileEditor):
             parser = INIFile.parse(self.text.toPlainText())
             sections = (['DEFAULT'] if parser.defaults() else []) + parser.sections()
             for section in sections:
-                scroll = qt.QScrollArea()
-                scroll.setWidgetResizable(True)
+                scroll = qt.resizable_scroll_area()
                 body = qt.QWidget()
                 form = qt.QFormLayout(body)
                 form.setFieldGrowthPolicy(qt.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)

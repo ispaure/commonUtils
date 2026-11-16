@@ -89,6 +89,16 @@ to fetch the next passage lazily, retaining their own cancellation and access
 checks. Qt `ReadAloud(..., on_finished=...)` forwards this event only when the user
 is reading the document rather than a text selection.
 
+`seek_position(seconds)` returns a signed approximate word index using the
+session speed and native word progress when available. The host may use
+`speech_word_starts(text, breaks)` to count words in adjacent segments and
+`seek_boundary(index, count)` to carry the remainder. On a backward step,
+add the preceding segment's word count before calling the helper again.
+`reposition(text, start, paused=True)` accepts a UTF-16 offset and publishes
+the new range while holding audio paused. A sequence host can supply
+`on_exhausted` and return true to retain the live session during a transition.
+The host then repositions or stops the session and owns cancellation and access.
+
 `PlaybackTimer(loop, changed=..., expired=..., clock=...)` tracks active listening
 time. Pause preserves the remaining budget; Play after expiry starts a fresh
 budget. `dispose()` cancels outstanding timer handles. The host owns source text,

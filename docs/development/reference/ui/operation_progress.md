@@ -103,6 +103,22 @@ the complete child environment. Omitting it inherits the system environment; an
 empty mapping supplies none. Values are never added to command arguments or job
 context. The caller owns filtering and the lifetime of sensitive values.
 
+## Process window presentation
+
+`ui.tasks.process_progress.ProcessProgressWindow` owns the progress bar, logs,
+runner and safe shutdown. Pass a `presentation` factory to the constructor or
+`open_process` to supply the display for a specific workload. The factory receives
+the window, a form above the bar and a layout beneath it. A
+`ProcessProgressPresentation` subclass can add widgets in its constructor and
+update them in its status, metrics, progress, reset and completion methods.
+
+The default keeps existing transfer-context callers working.
+`ui.tasks.process_transfer_progress.TransferProgressPresentation` provides the
+reusable transfer table and counters. A caller sets its own byte heading, progress
+format and extra counter labels before starting the runner. When using a custom
+runner, call `present_process_window(window)` to show it in the current host and
+include it in application shutdown.
+
 ## Result-worker failure admission
 
 `ui.tasks.operations.ResultWorker` clears its result, error and cancellation flag

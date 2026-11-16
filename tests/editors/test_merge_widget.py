@@ -1,3 +1,5 @@
+"""The merge editor preserves source text and gates application on resolved changes."""
+
 
 from commonUtils.testing.stages import TestStage
 

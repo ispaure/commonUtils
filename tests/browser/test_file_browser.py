@@ -520,10 +520,13 @@ class BrowserTests(QtTestCase):
         self.assertGreater(self.browser.tabs.count(), 0)
 
     def test_tiles_sort_names_naturally_independent_of_list_sort(self):
-        for name in ('zeta.txt', 'Alpha.txt', 'file10.txt', 'file2.txt'):
-            (self.root/name).write_text('text')
+        catalog = self.root / 'catalog'
+        catalog.mkdir()
+        for name in ('zeta.txt', 'Alpha.txt', 'file10.txt', 'file2.txt', 'item.project', 'other.bin'):
+            (catalog / name).write_text('text')
         for name in ('Folder10', 'Folder2'):
-            (self.root/name).mkdir()
+            (catalog / name).mkdir()
+        self.browser.navigate(catalog)
         self.browser.tree.sortByColumn(3, qt.Qt.SortOrder.DescendingOrder)
         self.browser.view_selector.setCurrentIndex(1)
         tiles = self.browser.views.tiles

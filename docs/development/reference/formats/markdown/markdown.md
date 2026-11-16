@@ -53,3 +53,39 @@ own span. The web adapter implements the same predicate, with consumer browser
 regressions comparing its results to `syntax_active`, including emoji offsets.
 WebView hosts own DOM interaction, selection positions, composition and undo.
 These helpers do not implement a complete CommonMark parser.
+
+## Read-aloud preparation
+
+Use `formats.markdown.speech.prepare_markdown(markdown)` when the caller already
+holds authorized Markdown. It uses the offline Markdown parser and keeps link
+labels, task states, footnote bodies and code while skipping image markup,
+hidden comments, frontmatter and data-view source. It performs no provider
+access and has no query or embed resolver. Unresolved note embeds contribute
+their labels. Supply rendered content if a host has expanded an embed or
+published a generated view.
+
+Use `prepare_rendered(runs)` with ordered `RenderedRun` values from the visible
+document. Qt passes text fragments and their cursor positions. The mobile
+adapter passes selected or visible DOM text and coordinates. Include visible
+table captions and cells, accessible math labels, and already-resolved embed or
+generated content when available. Exclude hidden nodes and image alt text.
+Boundary values are `line`, `cell`, `row` and `block`. A run can also carry a
+cue such as `checked` or `Footnote` anchored to the first visible word.
+
+```python
+from commonUtils.formats.markdown.speech import prepare_markdown
+from commonUtils.runtime.speech import utterances
+
+prepared = prepare_markdown("# Heading\n\n[Label](destination)")
+payload = list(utterances(prepared.text, breaks=prepared.breaks))
+assert payload[0][0] == "Heading"
+assert prepared.source_range(0, 7) == (2, 9)
+```
+
+Positions and hard breaks use UTF-16 code units. `source_range(start, end)`
+maps a speech callback to the original Markdown or rendered coordinate space.
+`speech_position(source_position)` maps the other way and advances across
+hidden markup. Inserted breaks and unavailable source fragments have no
+highlight. For transformed text such as HTML entities, the mapping covers the
+source token. The caller owns authorization, snapshot lifetime, playback,
+the visibility of rendered nodes, and discarding mappings after a view refresh.

@@ -45,6 +45,75 @@ class PySideAPITests(QtTestCase):
         factory.assert_called_once()
         widget.close()
 
+    def test_resizable_scroll_area_keeps_native_defaults_and_independent_policies(self):
+        owner = qt.QWidget()
+        self.addCleanup(owner.deleteLater)
+        native_frame = qt.QScrollArea(owner).frameShape()
+        as_needed = qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        horizontal_off = qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        vertical_on = qt.Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+
+        default = qt.resizable_scroll_area(owner)
+        self.assertIsInstance(default, qt.QScrollArea)
+        self.assertIs(default.parentWidget(), owner)
+        self.assertTrue(default.widgetResizable())
+        self.assertEqual(default.frameShape(), native_frame)
+        self.assertEqual(default.horizontalScrollBarPolicy(), as_needed)
+        self.assertEqual(default.verticalScrollBarPolicy(), as_needed)
+
+        custom = qt.resizable_scroll_area(
+            owner, framed=False, horizontal_policy=horizontal_off, vertical_policy=vertical_on)
+        self.assertTrue(custom.widgetResizable())
+        self.assertEqual(custom.frameShape(), qt.QFrame.Shape.NoFrame)
+        self.assertEqual(custom.horizontalScrollBarPolicy(), horizontal_off)
+        self.assertEqual(custom.verticalScrollBarPolicy(), vertical_on)
+
+    def test_fixed_scroll_area_keeps_content_contract_and_device_styles(self):
+        owner = qt.QWidget()
+        self.addCleanup(owner.deleteLater)
+        bounds = qt.QRect(5, 10, 100, 120)
+        minimum = qt.QSize(180, 200)
+        with patch.object(qt, 'rog_ally', True):
+            content = qt.create_scroll_area(owner, bounds, minimum)
+            layout_area = qt.resizable_scroll_area(owner)
+        area = owner.findChild(qt.QScrollArea, 'scroll_area')
+        self.assertIs(area.widget(), content)
+        self.assertEqual(area.geometry(), bounds)
+        self.assertEqual(content.objectName(), 'scroll_area_widget')
+        self.assertEqual(content.minimumSize(), minimum)
+        self.assertIn('30px', area.styleSheet())
+        self.assertEqual(layout_area.styleSheet(), '')
+
+    def test_selection_details_replaces_actions_and_clears_empty_lists(self):
+        from commonUtils.ui.pyside.selection_details import SelectionDetails
+
+        clicked = Mock()
+
+        def show_entry(entry):
+            panel.add_detail_action(entry, lambda: clicked(entry), enabled=entry != 'disabled')
+
+        panel = SelectionDetails('Entries', show_entry)
+        panel.set_entries(('first', 'second', 'disabled'), label=str)
+        self.assertEqual(panel.selection_list.currentRow(), 0)
+        first_button = panel.details_layout.itemAt(0).widget()
+        first_button.click()
+        clicked.assert_called_once_with('first')
+
+        panel.selection_list.setCurrentRow(1)
+        second_button = panel.details_layout.itemAt(0).widget()
+        self.assertIsNot(first_button, second_button)
+        second_button.click()
+        clicked.assert_called_with('second')
+
+        panel.selection_list.setCurrentRow(2)
+        panel.details_layout.itemAt(0).widget().click()
+        self.assertEqual(clicked.call_count, 2)
+
+        panel.set_entries((), label=str)
+        self.assertEqual(panel.selection_list.currentRow(), -1)
+        self.assertEqual(panel.details_layout.count(), 0)
+        panel.close()
+
     def test_public_classes_keep_module_and_inheritance(self):
         self.assertEqual(qt.Window.__module__, 'commonUtils.ui.pyside')
         self.assertTrue(issubclass(qt.ProgressBarWindow, qt.Window))

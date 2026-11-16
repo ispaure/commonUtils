@@ -81,13 +81,21 @@ class Snapshot:
     def search(self, name, *, cancelled=lambda: False):
         if hasattr(self.entries, "search"):
             return self.entries.search(name, cancelled=cancelled)
+        return tuple(self.iter_search(name, cancelled=cancelled))
+
+    def iter_search(self, name, *, cancelled=lambda: False):
+        """Yield matching metadata in snapshot order without materializing hits.
+
+        Close this iterator before closing the snapshot when stopping early.
+        """
+        if hasattr(self.entries, 'iter_search'):
+            yield from self.entries.iter_search(name, cancelled=cancelled)
+            return
         terms = search_terms(name)
-        matches = []
         for entry in self.entries:
             check_cancelled(cancelled)
             if matches_name(entry.path.name, terms):
-                matches.append(entry)
-        return tuple(matches)
+                yield entry
 
     def storage_children(self, path, limit, *, cancelled=lambda: False, metric='size'):
         if metric not in ('size', 'disk_size'):
@@ -118,6 +126,34 @@ class Snapshot:
         if hasattr(self.entries, 'children'):
             return self.entries.children(path, limit=limit)
         return tuple(entry for entry in self.entries if entry.path.parent == path)[:limit]
+
+    def cached_child_names(self, path, *, cancelled=lambda: False):
+        """Reuse names only while a completed folder checkpoint still matches.
+
+        None requests a live listing. File metadata/content can change without
+        changing the folder fingerprint and must still be read by the caller.
+        """
+        path = Path(path)
+        if path != self.root and not path.is_relative_to(self.root):
+            return None
+        if any(error_path == path or error_path.parent == path for error_path, _ in self.errors):
+            return None
+        identity = getattr(self.directories, 'identity', None)
+        if identity is None:
+            return None
+        check_cancelled(cancelled)
+        expected = identity(path)
+        if expected is None:
+            return None
+        try:
+            before = path.lstat()
+            if not stat.S_ISDIR(before.st_mode) or is_junction(path) or fingerprint(before) != expected:
+                return None
+            rows = self.entries.child_names(path, cancelled=cancelled)
+            check_cancelled(cancelled)
+            return rows if fingerprint(path.lstat()) == expected else None
+        except OSError:
+            return None
 
     def entry(self, path):
         if hasattr(self.entries, 'get'):

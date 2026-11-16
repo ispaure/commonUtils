@@ -97,8 +97,14 @@ remain the retirement path.
 
 Recycled lists and tiles use a provider's `hidden` flag or a dot-prefixed
 basename. A hidden ancestor alone does not dim an ordinary child in search
-results. Provider payloads retain that metadata through browse projections;
-indexed search revalidates hits through the provider before publication.
+results. Provider payloads retain that metadata through browse projections.
+Hosts may opt into provisional indexed rows marked `cached=True`; these show
+generic icons and a checking status until live validation replaces them. Cached
+row activation and context actions call `provider.entry()` on a worker first,
+independently of background search. Missing, linked or type-changed items are
+removed with an explanatory status. Query/source changes and newer clicks fence
+late validation. Search updates preserve selection and scroll position where
+possible. Final indexed results carry live provider metadata.
 Native selection preserves muted hidden names, including Android high-contrast
 selection; iOS binds both normal and highlighted colors on every reused cell.
 The default tile presentation uses system/theme surface roles and resets the

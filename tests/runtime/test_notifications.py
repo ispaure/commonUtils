@@ -1,3 +1,5 @@
+"""Notifications keep bounded deduplicated history and support acknowledgement."""
+
 
 from commonUtils.testing.stages import TestStage
 

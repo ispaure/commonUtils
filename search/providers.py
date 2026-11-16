@@ -13,6 +13,7 @@ class SearchResult:
     scanned: int
     complete: bool
     errors: list
+    cached: bool = False
 
 
 def search_resources(provider, directory, query, *, cancelled=lambda: False, max_entries=None, progress=None,

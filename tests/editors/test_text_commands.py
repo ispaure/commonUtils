@@ -1,3 +1,5 @@
+"""Both editor engines preserve Unicode selections and one-step undo."""
+
 
 from commonUtils.testing.stages import TestStage
 
