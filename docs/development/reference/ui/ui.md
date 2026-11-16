@@ -94,7 +94,9 @@ panels; applications supply editing actions separately.
 
 [Configuration](../configuration/configuration.md#shared-navigation-settings) describes
 wheel preferences. Browser indexing uses event-driven updates and explicit refresh; ordinary browsing
-remains available. Pause methods are programmatic APIs, not visible controls. See the [index reference](../filesystem/index/index.md).
+remains available. On macOS, native vnode changes also refresh the filesystem model's
+watched root independently of FSEvents delivery. Pause methods are programmatic APIs,
+not visible controls. See the [index reference](../filesystem/index/index.md).
 
 ## Opt-in Slate appearance
 

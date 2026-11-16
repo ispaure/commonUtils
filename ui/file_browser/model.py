@@ -10,6 +10,7 @@ from ...formats.registry import file_types, object_from_path
 from ...filesystem import format_size, format_datetime
 from ...filesystem.transfers import validate_name
 from ...runtime.browsing import BrowseRole
+from .index_watcher import create_macos_watcher
 
 
 def hidden_path(path, *, info=None):
@@ -52,6 +53,38 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
         self._item_check_timer = qt.QTimer(self)
         self._item_check_timer.setSingleShot(True)
         self._item_check_timer.timeout.connect(self._item_checks.clear)
+        self._root_watcher = create_macos_watcher(self)
+        if self._root_watcher is not None:
+            self._root_refresh = qt.QTimer(self)
+            self._root_refresh.setSingleShot(True)
+            self._root_refresh.setInterval(80)
+            self._root_refresh.timeout.connect(self._reload_watched_root)
+            self._root_watcher.directoryChanged.connect(self._root_changed)
+            self.rootPathChanged.connect(self._watch_root)
+
+    def _watch_root(self, root):
+        self._root_refresh.stop()
+        existing = self._root_watcher.directories()
+        if existing:
+            self._root_watcher.removePaths(existing)
+        if (root and not self.testOption(self.Option.DontWatchForChanges)
+                and not self.browse_network(root)):
+            self._root_watcher.addPaths([root])
+
+    def _root_changed(self, root):
+        if root == self.rootPath() and not self.testOption(self.Option.DontWatchForChanges):
+            self._root_refresh.start()
+
+    def _reload_watched_root(self):
+        root = self.rootPath()
+        if not root or self.testOption(self.Option.DontWatchForChanges) or not Path(root).is_dir():
+            return
+        # QFileSystemModel marks the old root stale when switching paths,
+        # while keeping its model indexes. Revisit it so Qt lists the actual
+        # rows after a vnode notification, even if FSEvents is delayed.
+        with qt.QSignalBlocker(self):
+            self.setRootPath('')
+            self.setRootPath(root)
 
     def _managed_directory(self, index):
         return bool(index.isValid() and getattr(self, 'directory_boundary', None)

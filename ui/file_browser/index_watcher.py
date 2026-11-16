@@ -8,13 +8,17 @@ import sys
 from .. import pyside as qt
 
 
-def create_index_watcher(parent):
+def create_macos_watcher(parent):
     if sys.platform == 'darwin':
         try:
             return _MacIndexWatcher(parent, select.kqueue())
         except OSError:
             pass
-    return qt.QFileSystemWatcher(parent)
+    return None
+
+
+def create_index_watcher(parent):
+    return create_macos_watcher(parent) or qt.QFileSystemWatcher(parent)
 
 
 class _MacIndexWatcher(qt.QObject):
