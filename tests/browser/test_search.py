@@ -3,7 +3,9 @@
 from commonUtils.testing.stages import TestStage
 
 TEST_STAGE = TestStage.REGRESSION
+from contextlib import closing
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -155,8 +157,7 @@ class IndexedFileSearchTests(unittest.TestCase):
         self.assertFalse(search_files([self.root], ['ignored'], 'target', cache=self.cache).hits)
 
     def test_unfinished_checkpoint_and_broken_cache_fall_back_to_live_names(self):
-        import sqlite3
-        with sqlite3.connect(self.cache.database) as connection:
+        with closing(sqlite3.connect(self.cache.database)) as connection, connection:
             connection.execute("UPDATE folders SET status='pending' WHERE path=?", (str(self.root / 'src'),))
         import os
         with patch('os.scandir', wraps=os.scandir) as scan:
@@ -175,8 +176,7 @@ class IndexedFileSearchTests(unittest.TestCase):
             cache.get(self.root).close()
             result = search_files([self.root], ['ignored'], 'target', '*.py', cache=cache)
         self.assertEqual([hit.path for hit in result.hits], [storage / 'visible.py'])
-        import sqlite3
-        with sqlite3.connect(self.cache.database) as connection:
+        with closing(sqlite3.connect(self.cache.database)) as connection, connection:
             generation = connection.execute('SELECT completed FROM roots WHERE root=?',
                                             (str(self.root),)).fetchone()[0]
             connection.execute('INSERT INTO errors VALUES(?,?,?)',
