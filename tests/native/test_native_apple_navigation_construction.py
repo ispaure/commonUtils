@@ -183,13 +183,18 @@ class AppleConstructionTests(unittest.TestCase):
             self.assertEqual(first.get_size(), (400, 800))
             with self.assertRaises(RuntimeError):
                 host.install(bridge.window)
+            bridge.events.clear()
             host.uninstall()
+            self.assertEqual(bridge.controller.mode, 0)
+            self.assertLess(bridge.events.index('mode'), bridge.events.index('refresh_tabs'))
             self.assertFalse(first.keyboard_live)
             self.assertIsNone(host.adapter)
             self.assertIsNone(host.window)
             self.assertIs(bridge.window._impl.get_size, bridge.original_get_size)
             host.install(bridge.window)
             self.assertIsNot(host.adapter, first)
+            self.assertEqual(host.adapter.old_mode, 0)
+            self.assertEqual(bridge.controller.mode, 2)
             host.uninstall()
 
     def test_late_constructor_failure_restores_leaf_layout_and_retires_captured_callback(self):
