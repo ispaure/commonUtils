@@ -79,7 +79,9 @@ partial rather than retried indefinitely. Explicit refresh retries failed branch
 Completed-index reconciliation changes affected folders and ancestors in a writer
 transaction. Cancellation rolls that transaction back, unlike initial/partial scans
 which retain checkpoints. Browser notifications repair affected branches; no periodic
-full-tree validation runs after completion. First session visits can check immediate
+full-tree validation runs after completion. On macOS the browser index uses native
+vnode events for its bounded set of paths and uses Qt's watcher where a native
+descriptor cannot be opened. First session visits can check immediate
 entries, with subsequent visits reading saved sizes, subject to the host's index
 policy. Missed unwatched changes remain cached until validation.
 
