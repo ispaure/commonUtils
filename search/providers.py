@@ -17,7 +17,8 @@ class SearchResult:
 
 
 def search_resources(provider, directory, query, *, cancelled=lambda: False, max_entries=None, progress=None,
-                     list_children=None, read_text=None):
+                     list_children=None, read_text=None, load_match=None):
+    """Search rooted entries, optionally loading full metadata only for matches."""
     directory = provider.relative(directory)
     terms = search_terms(query)
     queue, visited, rows, errors = deque([directory]), set(), [], []
@@ -47,6 +48,18 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                 return
             if not matches_name(body, missing):
                 return
+        if load_match is not None:
+            try:
+                live = load_match(path)
+            except FileNotFoundError:
+                return
+            except OSError as error:
+                errors.append((path, str(error)))
+                return
+            if live['directory'] != row['directory']:
+                return
+            row = live
+            check_cancelled(cancelled)
         item = dict(row)
         item['name'] = path[len(directory) + 1:] if directory else path
         if read_text is not None:
@@ -67,6 +80,7 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                 scanned += 1
                 collect(row, path)
                 report()
+            check_cancelled(cancelled)
             return SearchResult(rows, scanned, not errors, errors)
         while queue:
             check_cancelled(cancelled)
@@ -74,6 +88,7 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
             if folder in visited:
                 continue
             visited.add(folder)
+            report()
             try:
                 children = (list_children or provider.list)(folder, cancelled=cancelled)
             except OSError as error:
@@ -91,4 +106,5 @@ def search_resources(provider, directory, query, *, cancelled=lambda: False, max
                 if row['directory']:
                     queue.append(path)
                 report()
+        check_cancelled(cancelled)
     return SearchResult(rows, scanned, not errors, errors)

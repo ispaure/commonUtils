@@ -41,12 +41,13 @@ class IndexedLocalSearch:
             return coordinator.prepare_search(folder, cancelled=cancelled)
         return self.cache.get(folder, cancelled=cancelled, validate_files=False)
 
-    def cached(self, provider, directory, query, *, cancelled=lambda: False, progress=None):
+    def cached(self, provider, directory, query, *, cancelled=lambda: False, progress=None,
+               complete_only=False):
         """Publish provisional names without per-hit I/O; actions must revalidate.
 
         Only explicitly admitted ordinary providers can use this display path.
         The storage root/scope is still checked before publishing each batch.
-        None means there is no saved snapshot, and never starts an index build.
+        None means there is no suitable saved snapshot. This never starts an index build.
         """
         if not self.supports(provider):
             return None
@@ -54,8 +55,11 @@ class IndexedLocalSearch:
         folder = provider._locate(directory)
         from ..filesystem.local_access import check_local_path
         check_local_path(folder, recursive=True)
-        snapshot = self.cache.peek(folder, cancelled=cancelled)
+        snapshot = self.cache.peek(folder, partial=not complete_only, cancelled=cancelled)
         if snapshot is None:
+            return None
+        if complete_only and not snapshot.complete:
+            snapshot.close()
             return None
         with snapshot, closing(snapshot.iter_search(query, cancelled=cancelled)) as matches:
             rows, last_report, published = [], None, -1
@@ -91,29 +95,33 @@ class IndexedLocalSearch:
             return SearchResult(rows, 0, False, [], cached=True)
 
     def search(self, provider, directory, query, *, cancelled=lambda: False, progress=None,
-               cached_progress=False):
+               cached_progress=False, cold_search=None):
         if not self.supports(provider):
             return search_resources(provider, directory, query, cancelled=cancelled, progress=progress)
         try:
             if cached_progress and progress is not None:
-                saved = self.cached(provider, directory, query, cancelled=cancelled, progress=progress)
+                saved = self.cached(provider, directory, query, cancelled=cancelled, progress=progress,
+                                    complete_only=cold_search is not None)
+                if saved is None and cold_search is not None:
+                    return cold_search(provider, directory, query, cancelled=cancelled, progress=progress)
                 if saved is not None:
                     # Keep the full cached list until validation is complete;
                     # a growing validated prefix would make it shrink/flicker.
                     progress = None
-            return self._search(provider, directory, query, cancelled=cancelled, progress=progress)
+            return self._search(provider, directory, query, cancelled=cancelled, progress=progress,
+                                partial=cold_search is None or not cached_progress)
         except (DatabaseError, IndexUnavailableError):
             # An unavailable disposable index must not disable provider search.
             # Keep repair/writer ownership separate from this read fallback.
             check_cancelled(cancelled)
             return search_resources(provider, directory, query, cancelled=cancelled, progress=progress)
 
-    def _search(self, provider, directory, query, *, cancelled, progress):
+    def _search(self, provider, directory, query, *, cancelled, progress, partial=True):
         directory = provider.relative(directory)
         folder = provider._locate(directory)
         from ..filesystem.local_access import check_local_path
         check_local_path(folder, recursive=True)
-        snapshot = self.cache.peek(folder, cancelled=cancelled)
+        snapshot = self.cache.peek(folder, partial=partial, cancelled=cancelled)
         if snapshot is None:
             snapshot = self._prepare(folder, cancelled)
         with snapshot, closing(snapshot.iter_search(query, cancelled=cancelled)) as matches:

@@ -318,7 +318,7 @@ class ByteSortModel(qt.QSortFilterProxyModel):
             column = index.column()
             cached = (index.data(BrowseRole.Container) if column == 0 else None,
                       index.data(BrowseRole.SortValue) if column != 0 else None,
-                      natural_path_key(str(index.siblingAtColumn(0).data())))
+                      natural_path_key(self.filesystem.fileName(index)))
             self._sort_values[key] = cached
             while len(self._sort_values) > 4096:
                 self._sort_values.popitem(last=False)

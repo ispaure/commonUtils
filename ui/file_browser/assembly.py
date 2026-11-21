@@ -115,9 +115,13 @@ class BrowserControls:
         browser.tree.hideColumn(2)
         browser.tree.header().moveSection(3, 1)
         browser.tree.header().setStretchLastSection(False)
-        browser.tree.header().setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
+        header = browser.tree.header()
+        header.setSectionResizeMode(0, qt.QHeaderView.ResizeMode.Stretch)
+        # Size metadata columns from the visible rows. Otherwise Qt formats up
+        # to 1,000 entries each time the directory or its index totals change.
+        header.setResizeContentsPrecision(0)
         for column in (1, 3):
-            browser.tree.header().setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(column, qt.QHeaderView.ResizeMode.ResizeToContents)
         browser.model.directory_boundary = browser.directory_boundary
         browser.views = FileViews(browser.model, browser.tree, browser, directory_handler=browser.handle_directory,
                                column_navigation=browser.column_navigation)

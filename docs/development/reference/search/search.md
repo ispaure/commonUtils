@@ -35,7 +35,11 @@ the ordinary validation pass. It retains the full saved list until returning a
 validated result, avoiding a shrinking validated prefix. Default callers still
 receive only validated progress (up to 50 initial hits, or fewer after 50 ms of
 validation work). The shared 300 ms typing delay and SQLite matching/sorting
-still precede display. Filename search never opens document bodies.
+still precede display. A consumer may supply `cold_search` with cached progress
+to search live while a complete index is unavailable. The callback owns its
+live traversal policy. `search_resources(..., list_children=..., load_match=...)`
+lets a provider traverse lightweight name rows and load full metadata only for
+matching entries. Filename search never opens document bodies.
 
 `files.search_files(roots, excluded, query, masks='', *, case=False, whole=False,
 regex=False, buffers=None, cancelled=..., limit=500, max_files=10000,
