@@ -91,7 +91,10 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
                     and self.directory_boundary(Path(self.filePath(index))))
 
     def rowCount(self, parent=qt.QModelIndex()):
-        return 0 if self._managed_directory(parent) else super().rowCount(parent)
+        rows = super().rowCount(parent)
+        # Qt probes leaves repeatedly while updating views after inserts. A
+        # node with no loaded rows cannot expose children through rowCount.
+        return 0 if rows and self._managed_directory(parent) else rows
 
     def canFetchMore(self, parent):
         return False if self._managed_directory(parent) else super().canFetchMore(parent)

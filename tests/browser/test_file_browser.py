@@ -126,6 +126,22 @@ class BrowserTests(QtTestCase):
             time.sleep(.01)
         self.assertFalse(any(pending.values()), f'Browser workers did not settle: {pending}')
 
+    def test_boundary_skips_empty_row_counts_and_hides_already_loaded_children(self):
+        loaded = self.root / 'loaded'
+        loaded.mkdir()
+        (loaded / 'opaque.bin').touch()
+        model = self.browser.model
+        self.wait_until(lambda: model.index(str(loaded)).isValid())
+        parent = model.index(str(loaded))
+        model.fetchMore(parent)
+        self.wait_until(lambda: model.rowCount(parent) == 1)
+        child = model.index(0, 0, parent)
+        with patch.object(model, 'directory_boundary', return_value=True) as boundary:
+            self.assertEqual(model.rowCount(child), 0)
+            boundary.assert_not_called()
+            self.assertEqual(model.rowCount(parent), 0)
+            boundary.assert_called_once_with(loaded)
+
     def test_host_managed_directory_routes_all_navigation_without_listing_children(self):
         managed = self.root / 'managed'
         managed.mkdir()
