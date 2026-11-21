@@ -1,5 +1,17 @@
 """Bounded provider-backed raster images for native Markdown readers/editors."""
 
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 def folder_image_source(provider, document, *, root=None, resolve=None, max_total_bytes=16 * 1024 * 1024):
     """Resolve relative images, with optional library-root/attachment fallbacks."""
     import posixpath

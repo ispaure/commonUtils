@@ -1,4 +1,17 @@
 """Cursor-sensitive Markdown display; highlighting never changes text or undo history."""
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from ...formats.markdown.editing import syntax_active
 from .. import pyside as qt
 from .syntax import inline_spans, FENCE_OPEN, fence_close, HEADING, fenced_regions

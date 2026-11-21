@@ -1,3 +1,6 @@
+// Copyright (c) 2020-2026 Marc-André Voyer
+// SPDX-License-Identifier: MIT
+
 package io.github.ispaure.commonutils;
 
 import android.view.View;

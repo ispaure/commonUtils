@@ -4,6 +4,19 @@ The owner supplies validated entries and decoded previews and handles requests
 for extraction, removal and preview. This widget has no password policy, worker,
 filesystem mutations, executable discovery or Logistics imports.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from pathlib import PurePosixPath
 from .. import pyside as qt
 from ..entry_views import configure_entry_selection

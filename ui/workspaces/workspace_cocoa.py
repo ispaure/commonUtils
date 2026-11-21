@@ -4,6 +4,19 @@ Qt exposes NSEvent through QAbstractNativeEventFilter:
 https://doc.qt.io/qt-6/qabstractnativeeventfilter.html
 Only scalar Objective-C messages are used; Qt still owns windows and dragging.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 import ctypes
 import sys
 from weakref import WeakSet

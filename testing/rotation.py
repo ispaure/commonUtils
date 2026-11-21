@@ -5,6 +5,19 @@ the configuration and window aspect; this does not certify left/right direction
 on devices whose firmware constrains rotation. Scenario assertions own layout
 and content readiness after native acknowledgement.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from contextlib import asynccontextmanager
 
 from ..runtime.platform import get_os

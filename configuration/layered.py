@@ -5,6 +5,19 @@ edits. A None update removes a personal override rather than copying a default.
 Hosts register their own default/personal path pairs; commonUtils owns no feature
 discovery or application configuration directories.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from configparser import Error
 from pathlib import Path
 from functools import lru_cache

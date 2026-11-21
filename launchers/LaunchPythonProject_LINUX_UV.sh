@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Copyright (c) 2020-2026 Marc-André Voyer
+# SPDX-License-Identifier: MIT
+
 set -u
 set -o pipefail
 

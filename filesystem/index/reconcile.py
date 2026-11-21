@@ -6,6 +6,19 @@ no full generation copy or repeated descendant validation is needed. Cancellatio
 rolls back this update; initial scans and explicit partial retries use resumable
 DirectoryCache.get. Finished partial attempts also accept bounded notifications.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 import json
 import os
 from pathlib import Path

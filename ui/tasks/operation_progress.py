@@ -4,6 +4,19 @@ A callback receives (report, cancelled). It must never touch Qt widgets. Reports
 are (done, total, message); total=0 means indeterminate. Completion is delivered
 on the GUI thread only after the worker has stopped, so owners can close safely.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from threading import Event
 from time import monotonic
 from .. import pyside as qt
