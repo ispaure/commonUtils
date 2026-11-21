@@ -1,6 +1,7 @@
 """Qt filesystem watching with File/Directory objects as the public data model."""
 
 from collections import OrderedDict
+from functools import lru_cache
 from pathlib import Path
 import stat
 import sys
@@ -45,6 +46,9 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.directory_boundary = None
+        # Qt can ask for the same nonempty parent thousands of times during an
+        # insert. Reuse only its immutable path and call the current policy.
+        self._boundary_path = lru_cache(maxsize=1024)(Path)
         self.folder_totals = {}
         self.network_location = False
         self.size_parents = set()
@@ -88,7 +92,7 @@ class BrowserFileSystemModel(qt.QFileSystemModel):
 
     def _managed_directory(self, index):
         return bool(index.isValid() and getattr(self, 'directory_boundary', None)
-                    and self.directory_boundary(Path(self.filePath(index))))
+                    and self.directory_boundary(self._boundary_path(self.filePath(index))))
 
     def rowCount(self, parent=qt.QModelIndex()):
         rows = super().rowCount(parent)
