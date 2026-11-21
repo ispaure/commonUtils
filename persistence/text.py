@@ -22,6 +22,7 @@ BOMS = (
     (codecs.BOM_UTF16_LE, "utf-16-le"),
     (codecs.BOM_UTF16_BE, "utf-16-be"),
 )
+_TEXT_BYTES = b"\t\n\f\r" + bytes(range(32, 256))
 ENCODINGS = (
     "utf-8",
     "utf-8-sig",
@@ -46,11 +47,7 @@ def likely_binary(data):
         return False
     if b"\0" in data:
         return True
-    return (
-        bool(data)
-        and sum(byte < 32 and byte not in (9, 10, 12, 13) for byte in data) / len(data)
-        > 0.02
-    )
+    return bool(data) and len(data.translate(None, _TEXT_BYTES)) / len(data) > 0.02
 
 
 def is_text_path(path):
@@ -139,7 +136,8 @@ class TextSnapshot:
 
 
 def decode_bytes(data, *, path=None, encoding=None, force=False):
-    if likely_binary(data) and not force:
+    binary = likely_binary(data)
+    if binary and not force:
         raise BinaryTextError(
             "This looks like a binary file. Use Force Open as Text only if intended."
         )
@@ -149,7 +147,7 @@ def decode_bytes(data, *, path=None, encoding=None, force=False):
             if data.startswith(prefix):
                 bom, encoding = prefix, codec
                 break
-        encoding = encoding or ("latin-1" if force and likely_binary(data) else "utf-8")
+        encoding = encoding or ("latin-1" if binary else "utf-8")
     elif encoding == "utf-8-sig":
         encoding = "utf-8"
         bom = codecs.BOM_UTF8 if data.startswith(codecs.BOM_UTF8) else b""
@@ -159,8 +157,10 @@ def decode_bytes(data, *, path=None, encoding=None, force=False):
                 bom = prefix
                 break
     decoded = data[len(bom) :].decode(encoding, errors="strict")
-    endings = re.findall(r"\r\n|\r|\n|\u2028|\u2029", decoded)
-    newline = max(dict.fromkeys(endings), key=endings.count) if endings else "\n"
+    newline = "\n"
+    if any(separator in decoded for separator in ("\r", "\u2028", "\u2029")):
+        endings = re.findall(r"\r\n|\r|\n|\u2028|\u2029", decoded)
+        newline = max(dict.fromkeys(endings), key=endings.count)
     return TextSnapshot(
         Path(path) if path else None,
         data,

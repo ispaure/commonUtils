@@ -100,9 +100,14 @@ class FoldController(qt.QObject):
         self.timer.start(0 if self.collapsed else 250)
 
     def expand_after_edit(self):
+        was_collapsed = bool(self.collapsed)
+        previous = self.ranges
         self.collapsed.clear()
         self.rebuild()
-        self.visibility()
+        if was_collapsed:
+            self.visibility()
+        elif self.ranges != previous:
+            self._refresh_views()
 
     def configure(self, language):
         if language != self.language:
@@ -149,6 +154,9 @@ class FoldController(qt.QObject):
             block.setLineCount(1 if visible else 0)
             block = block.next()
         self.document.markContentsDirty(0, self.document.characterCount())
+        self._refresh_views()
+
+    def _refresh_views(self):
         for reference in self.views:
             editor = reference()
             if editor is not None and isValid(editor):

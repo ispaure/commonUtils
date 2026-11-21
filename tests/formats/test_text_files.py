@@ -15,6 +15,7 @@ from commonUtils.persistence.text import (
     BinaryTextError,
     FileConflictError,
     is_text_path,
+    likely_binary,
 )
 
 
@@ -57,6 +58,14 @@ class TextFilesTests(unittest.TestCase):
             "😀 one\r\nedit\r\nthree\n".encode(),
         )
 
+        for ending in ("\u2028", "\u2029"):
+            with self.subTest(ending=ending):
+                data = f"first{ending}second{ending}\n".encode()
+                snapshot = decode_bytes(data)
+                self.assertEqual(snapshot.newline, ending)
+                self.assertEqual(snapshot.text, "first\nsecond\n\n")
+                self.assertEqual(snapshot.encode(snapshot.text), data)
+
     def test_binary_legacy_and_force(self):
         with self.assertRaises(BinaryTextError):
             decode_bytes(b"abc\0def")
@@ -66,6 +75,14 @@ class TextFilesTests(unittest.TestCase):
         with self.assertRaises(UnicodeError):
             decode_bytes(b"caf\xe9")
         self.assertEqual(decode_bytes(b"caf\xe9", encoding="cp1252").text, "café")
+
+    def test_binary_detection_preserves_control_byte_threshold_and_bom(self):
+        printable = b"\t\n\f\rcaf\xc3\xa9".ljust(98, b"x")
+        self.assertFalse(likely_binary(printable + b"\x01\x02"))
+        self.assertTrue(likely_binary(printable[:-1] + b"\x01\x02\x03"))
+        self.assertTrue(likely_binary(printable + b"\0"))
+        self.assertFalse(likely_binary(codecs.BOM_UTF16_LE + "text".encode("utf-16-le")))
+        self.assertFalse(likely_binary(b""))
 
     def test_extensionless_atomic_save_conflicts_and_permissions(self):
         with tempfile.TemporaryDirectory() as folder:

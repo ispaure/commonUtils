@@ -80,7 +80,8 @@ class SearchResult:
 def search_files(roots, excluded, query, masks='', *, case=False, whole=False,
                  regex=False, buffers=None, cancelled=lambda: False, limit=500,
                  max_files=10000, max_entries=100000, max_file_size=1024 * 1024,
-                 cache=None, exclude_path=None):
+                 cache=None, exclude_path=None, on_first_hit=None):
+    """Search eligible files in order, optionally reporting the first hit on the caller's thread."""
     from .qt_text import find_matches
     if not query:
         return SearchResult((), 0, False)
@@ -174,8 +175,11 @@ def search_files(roots, excluded, query, masks='', *, case=False, whole=False,
                         (match.start - starts[row] + match.length) * 2].decode('utf-16-le'))
             left = max(0, column - 70)
             excerpt = content[left:left + 240]
-            hits.append(SearchHit(path, row + 1, column, match.start, match.length,
-                                  excerpt, column - left, min(len(excerpt), column - left + width)))
+            hit = SearchHit(path, row + 1, column, match.start, match.length,
+                            excerpt, column - left, min(len(excerpt), column - left + width))
+            if not hits and on_first_hit is not None:
+                on_first_hit(hit)
+            hits.append(hit)
             matched_files.add(path)
             if len(hits) >= limit:
                 return SearchResult(tuple(hits), len(matched_files), True)

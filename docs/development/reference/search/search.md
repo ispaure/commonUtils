@@ -43,7 +43,8 @@ matching entries. Filename search never opens document bodies.
 
 `files.search_files(roots, excluded, query, masks='', *, case=False, whole=False,
 regex=False, buffers=None, cancelled=..., limit=500, max_files=10000,
-max_entries=100000, max_file_size=1048576, cache=None, exclude_path=None)` returns immutable hits with paths,
+max_entries=100000, max_file_size=1048576, cache=None, exclude_path=None,
+on_first_hit=None)` returns immutable hits with paths,
 line numbers, code-point columns, UTF-16 offsets and bounded excerpts. These
 options are keyword-only after `masks`. Roots/options/buffers belong to the caller;
 pass stable snapshots from a worker. Searches skip symbolic links and unreadable,
@@ -52,6 +53,10 @@ cancellation returns no hits. Buffer text overrides disk bytes without saving.
 An optional `exclude_path(path, root)` predicate receives absolute paths
 and returns true to skip a root, directory subtree, file, or unsaved buffer.
 The predicate applies in addition to the relative exclusions.
+If supplied, `on_first_hit(hit)` runs on the search caller's thread when the
+first match is ready. It is called at most once. A successful result includes
+that first hit. A UI worker must marshal the hit to its UI thread and discard it
+if the query has been superseded or cancelled.
 `preview_text(path, buffer=None)` reads up to 1 MiB or returns the supplied buffer.
 
 An explicitly supplied `DirectoryCache` lets file-content search borrow existing
