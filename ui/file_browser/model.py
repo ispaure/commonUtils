@@ -286,6 +286,7 @@ class ByteSortModel(qt.QSortFilterProxyModel):
     def __init__(self, filesystem, parent=None):
         super().__init__(parent)
         self.filesystem = filesystem
+        self._native_name = getattr(filesystem, 'fileName', None)
         self._sort_values = OrderedDict()
         self._sort_revision = file_types.revision
         # Invalidate before the proxy's native source-signal handlers can sort.
@@ -323,9 +324,11 @@ class ByteSortModel(qt.QSortFilterProxyModel):
         if cached is None:
             from ...filesystem.traversal import natural_path_key
             column = index.column()
+            name = (self._native_name(index) if self._native_name is not None
+                    else str(index.siblingAtColumn(0).data()))
             cached = (index.data(BrowseRole.Container) if column == 0 else None,
                       index.data(BrowseRole.SortValue) if column != 0 else None,
-                      natural_path_key(self.filesystem.fileName(index)))
+                      natural_path_key(name))
             self._sort_values[key] = cached
             while len(self._sort_values) > 4096:
                 self._sort_values.popitem(last=False)
