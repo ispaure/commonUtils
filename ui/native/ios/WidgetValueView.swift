@@ -1,3 +1,6 @@
+// Copyright (c) 2020-2026 Marc-André Voyer
+// SPDX-License-Identifier: MIT
+
 import SwiftUI
 
 /// Presentation only: no storage, scheduling, networking, or application lifecycle.

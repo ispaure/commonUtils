@@ -1,3 +1,6 @@
+// Copyright (c) 2020-2026 Marc-André Voyer
+// SPDX-License-Identifier: MIT
+
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
 

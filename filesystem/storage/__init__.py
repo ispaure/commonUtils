@@ -4,6 +4,19 @@ Path resolution is side-effect free with create=False. Persistent caches are nev
 cleaned on application exit; a temporary_workspace cleans only its own directory.
 Atomic file replacement staging must stay beside its destination, not in Temp.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 import os
 from pathlib import Path
 import sys

@@ -3,6 +3,19 @@
 Qt's delegating-lexer fallback operates per line; multiline Blade expressions
 are intentionally not a full template parser.
 """
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from pygments.lexer import DelegatingLexer, RegexLexer, bygroups, using
 from pygments.lexers.templates import HtmlPhpLexer
 from pygments.lexers.php import PhpLexer

@@ -4,6 +4,18 @@ No OS mocks, GUI, subprocesses or user documents. --target host is only a deskto
 harness check and never emits a mobile success. Fixtures live in app-private temp.
 """
 
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 # TEST_STAGE = TestStage.SMOKE
 import argparse
 import codecs

@@ -1,4 +1,17 @@
 """Qt's visible Markdown runs and UTF-16 coordinates for read-aloud."""
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AUTHORSHIP INFORMATION - THIS FILE BELONGS TO MARC-ANDRE VOYER HELPER FUNCTIONS CODEBASE
+
+__author__ = 'Marc-André Voyer'
+__copyright__ = 'Copyright (C) 2020-2026, Marc-André Voyer'
+__license__ = "MIT License"
+__maintainer__ = 'Marc-André Voyer'
+__email__ = 'marcandre.voyer@gmail.com'
+__status__ = 'Production'
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 from ...formats.markdown.speech import RenderedRun, prepare_rendered, reading_markup
 from ...formats.markdown.tokens import HIDDEN_FENCES
 from ...runtime.speech_text import utf16_length
