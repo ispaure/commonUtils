@@ -153,15 +153,18 @@ class NativeBrowser:
             self.page = 0
             self.render()
             return
+        self._queue_query()
+
+    def _queue_query(self, *, delay=SEARCH_DEBOUNCE_SECONDS):
         self.search_cancelled.set()
         self._dismissed_cached_paths.clear()
         self.search_cancelled = Event()
         self.search_epoch += 1
         self.searching = False
-        self._spawn(self._apply_query(self.search_epoch, self.search_cancelled))
+        self._spawn(self._apply_query(self.search_epoch, self.search_cancelled, delay))
 
-    async def _apply_query(self, epoch, cancelled):
-        await asyncio.sleep(SEARCH_DEBOUNCE_SECONDS)
+    async def _apply_query(self, epoch, cancelled, delay):
+        await asyncio.sleep(delay)
         if self.closed or epoch != self.search_epoch or cancelled.is_set():
             return
         if self.folder_tree is not None:
