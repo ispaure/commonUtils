@@ -45,6 +45,59 @@ class ArchiveWorkspaceTests(unittest.TestCase):
                 self.assertEqual((destination / 'source' / 'hello.txt').read_text(), 'Hello, archive!')
                 self.assertTrue((destination / 'source' / 'empty').is_dir())
 
+    def test_android_archive_publication_uses_no_replace_rename(self):
+        from commonUtils.archives import _publication
+        from commonUtils.persistence.publication import rename_exclusive
+        from commonUtils.runtime.platform import OS
+        source = self.folder / 'hello.txt'
+        before = source.read_bytes()
+        with patch.object(_publication, 'get_os', return_value=OS.ANDROID), \
+                patch.object(os, 'link', side_effect=PermissionError('hard links denied')), \
+                patch('commonUtils.persistence.publication.rename_exclusive', wraps=rename_exclusive) as publish:
+            archive = self.root / 'android.zip'
+            backend.create([source], archive)
+            addition = self.folder / 'nested' / 'notes.md'
+            backend.update_zip(archive, sources=(addition,))
+            with zipfile.ZipFile(archive) as result:
+                self.assertEqual(result.read(source.name), before)
+                self.assertEqual(result.read(addition.name), addition.read_bytes())
+            tar = self.root / 'android.tar'
+            backend.create([source], tar, format='tar')
+            with tarfile.open(tar) as result:
+                with result.extractfile(source.name) as stream:
+                    self.assertEqual(stream.read(), before)
+            self.assertEqual(publish.call_count, 3)
+
+            for format in ('zip', 'tar'):
+                with self.subTest(format=format):
+                    target = self.root / ('collision.' + format)
+
+                    def race(staged, destination):
+                        destination.write_bytes(b'concurrent output')
+                        return rename_exclusive(staged, destination)
+
+                    publish.side_effect = race
+                    with self.assertRaises(FileExistsError):
+                        backend.create([source], target, format=format)
+                    self.assertEqual(target.read_bytes(), b'concurrent output')
+
+                    cancelled = self.root / ('cancelled.' + format)
+                    calls = publish.call_count
+                    stop = False
+
+                    def progress(*args):
+                        nonlocal stop
+                        stop = True
+
+                    with self.assertRaises(OperationCancelled):
+                        backend.create([source], cancelled, format=format, progress=progress,
+                                       cancelled=lambda: stop)
+                    self.assertEqual(publish.call_count, calls)
+                    self.assertFalse(cancelled.exists())
+        self.assertEqual(source.read_bytes(), before)
+        self.assertEqual({path.name for path in self.root.iterdir()},
+                         {'source', 'android.zip', 'android.tar', 'collision.zip', 'collision.tar'})
+
     def test_encrypted_headers_can_be_browsed_and_payloads_require_password(self):
         path = self.make_zip('test-secret')
         self.assertTrue(any(entry.encrypted for entry in backend.entries(path)))

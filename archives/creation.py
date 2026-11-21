@@ -7,6 +7,7 @@ import zipfile
 
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import stream_signature
+from ._publication import publish_created_archive
 from .zip_access import create_archive, directory_entries
 from .reading import reader
 
@@ -80,5 +81,5 @@ def create(sources, destination, *, format='zip', password=None, level=6,
         with staged.open('r+b') as stream:
             os.fsync(stream.fileno())
         check_cancelled(cancelled)
-        os.link(staged, destination)
+        publish_created_archive(staged, destination)
     return destination

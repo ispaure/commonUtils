@@ -63,7 +63,9 @@ traversal, symbolic links and special TAR entries are rejected before payloads
 are extracted. File timestamps, empty directories and Unix executable bits are
 retained; ownership and setuid bits are not restored.
 
-Creation verifies staged payload hashes before exclusive publication. ZIP edits
+Creation verifies staged payload hashes before exclusive publication. On Android,
+this step uses the same atomic no-replace rename as extraction, including when
+staging ZIP additions. ZIP edits
 preserve the original until a rebuilt archive passes decrypted manifest checks
 and its source identity is unchanged immediately before replacement, after staged
 flush/permission work and the final cancellation callback. These checks are

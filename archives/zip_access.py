@@ -13,6 +13,7 @@ from tempfile import NamedTemporaryFile
 import zipfile
 import zlib
 
+from ._publication import publish_created_archive
 from .members import copy_member_info, name_key
 from ..runtime.operations import check_cancelled
 from ..runtime.streams import CHUNK_SIZE, copy_stream, iter_chunks, stream_signature
@@ -313,8 +314,7 @@ def create_archive(sources, destination, *, password=None, keep_root=True,
         # Windows _commit requires a writable descriptor, even after ZIP close.
         with staged.open('r+b') as stream:
             os.fsync(stream.fileno())
-        # Exclusive link prevents replacing an output created by another operation.
         progress(3 * total_bytes, 3 * total_bytes, f'Publishing verified ZIP: {destination}')
         check_cancelled(cancelled)
-        os.link(staged, destination)
+        publish_created_archive(staged, destination)
     return destination
