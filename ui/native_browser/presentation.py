@@ -3,6 +3,7 @@ from ...search.policy import SEARCH_DEBOUNCE_SECONDS
 import asyncio
 import inspect
 from threading import Event
+from time import monotonic
 
 import toga
 from toga.style import Pack
@@ -161,10 +162,12 @@ class NativeBrowser:
         self.search_cancelled = Event()
         self.search_epoch += 1
         self.searching = False
-        self._spawn(self._apply_query(self.search_epoch, self.search_cancelled, delay))
+        self._spawn(self._apply_query(self.search_epoch, self.search_cancelled, monotonic(), delay))
 
-    async def _apply_query(self, epoch, cancelled, delay):
-        await asyncio.sleep(delay)
+    async def _apply_query(self, epoch, cancelled, queued_at, delay):
+        # The quiet period starts at the edit even if the native event loop
+        # is still processing keyboard or layout work before this task runs.
+        await asyncio.sleep(max(0, delay - (monotonic() - queued_at)))
         if self.closed or epoch != self.search_epoch or cancelled.is_set():
             return
         if self.folder_tree is not None:
