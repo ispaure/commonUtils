@@ -1,4 +1,16 @@
-*.pyc
+__pycache__/
+*.py[cod]
+
+# Local build output and disposable developer workspaces.
+/tmp/
+/.venv/
+/build/
+/dist/
+.DS_Store
+*.log
+*.apk
+*.aab
+*.ipa
 
 # Local test evidence and its former documentation location.
 /test-results/
@@ -7,6 +19,7 @@
 # Local secrets, signing material and disposable developer output.
 .env
 .env.*
+/.aws/
 *.pem
 *.key
 *.p8
