@@ -153,6 +153,10 @@ or headless flows where dialogs are inappropriate.
 branch commits and published releases, protected Git/archive transactions,
 rollback receipts and detached apply/restart. Hosts own update policy and UI.
 
+`runtime.notifications` provides portable notices and a one-shot completion
+token. See [completion notifications](reference/runtime/runtime.md#completion-notifications)
+for the terminal-event contract and Qt presentation hooks.
+
 `runtime.protected_keys` supplies explicitly namespaced Android/iOS 256-bit key
 adapters. Consumers own credential records, backup exclusions and key namespaces.
 See [runtime](reference/runtime/runtime.md).

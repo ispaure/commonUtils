@@ -40,3 +40,40 @@ class NoticeTests(QtTestCase):
         center.publish(Notice('three', 'test', 'Done', ''))
         self.assertEqual(list(center.records), ['two', 'three'])
         self.assertEqual(center.unread, {'two', 'three'})
+
+
+    def test_completion_is_one_shot_per_run_even_after_an_ineligible_event(self):
+        from commonUtils.runtime.notifications import Completion, Notice as PortableNotice
+
+        now = 0
+        short = Completion(30, clock=lambda: now)
+        long = Completion(30, clock=lambda: now)
+        concurrent = Completion(30, clock=lambda: now)
+        observed = Completion(30, clock=lambda: now)
+        cancelled = Completion(30, clock=lambda: now)
+        args = ('fixture', 'Transfer complete', 'Open Transfers for details.')
+        now = 29.99
+        self.assertIsNone(short.finish(*args, outcome='success'))
+        now = 30
+        self.assertIsNone(short.finish(*args, outcome='success'))
+        first = long.finish(*args, outcome='success')
+        second = concurrent.finish(*args, outcome='failure')
+        self.assertIsInstance(first, PortableNotice)
+        self.assertNotEqual(first.id, second.id)
+        self.assertIsNone(long.finish(*args, outcome='failure'))
+        self.assertIsNone(observed.finish(*args, outcome='success', observed=True))
+        self.assertIsNone(cancelled.finish(*args, outcome='cancelled'))
+
+    def test_queued_toasts_keep_the_actions_of_concurrent_results(self):
+        center = NotificationCenter()
+        toast = Toast(center, queue=True)
+        calls = []
+        for identifier in ('first', 'second'):
+            center.publish(Notice(identifier, 'test', identifier, 'Details',
+                                  activate=lambda value=identifier: calls.append(value)))
+        self.assertEqual(toast.notice.id, 'first')
+        toast.open_details()
+        self.assertEqual(toast.notice.id, 'second')
+        toast.open_details()
+        self.assertEqual(calls, ['first', 'second'])
+        self.assertFalse(center.unread)

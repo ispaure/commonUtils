@@ -72,6 +72,21 @@ fallback is provided. Hosts own namespace constants, backup exclusions, metadata
 records and encrypted payloads. Changing a namespace/AAD string makes existing
 keys inaccessible; preserve those strings during consumer migrations.
 
+## Completion notifications
+
+`commonUtils.runtime.notifications.Notice` is the immutable event used by the
+Qt notification center. `commonUtils.ui.notifications.Notice` remains available
+for Qt consumers. Portable callers can create one `Completion(minimum_seconds,
+clock=...)` per admitted run and call `finish(source, title, message, outcome=...,
+observed=...)` on their presentation thread. The first terminal call consumes
+the run. It returns a uniquely identified notice for an unobserved success or
+failure at or above the duration threshold, measured with a monotonic clock.
+Cancel, duplicate, short and already observed events return `None`.
+
+The host maps terminal outcomes, constructs safe text, rechecks access for
+any action, and owns OS delivery and fallback. The Qt `Toast` accepts an
+optional `accepts` filter and can queue incoming notices with `queue=True`.
+
 ## Portable speech sessions
 
 `speech.utterances(text, start=0, end=None, limit=1000, breaks=())` yields

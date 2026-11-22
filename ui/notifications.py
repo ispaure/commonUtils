@@ -12,19 +12,10 @@ __status__ = 'Production'
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass
+from collections import deque
+
+from ..runtime.notifications import Notice as Notice
 from . import pyside as qt
-
-
-@dataclass(frozen=True)
-class Notice:
-    id: str
-    source: str
-    title: str
-    message: str
-    outcome: str = 'success'
-    activate: object = None
-    native: bool = False
 
 
 class NotificationCenter(qt.QObject):
@@ -57,10 +48,12 @@ class NotificationCenter(qt.QObject):
 
 class Toast(qt.QWidget):
     """Plain text, bounded lifetime, optional details action; never a decision prompt."""
-    def __init__(self, center, parent=None):
+    def __init__(self, center, parent=None, *, accepts=lambda notice: True, queue=False):
         super().__init__(parent)
         self.center = center
         self.notice = None
+        self.pending = deque(maxlen=center.limit) if queue else None
+        self.accepts = accepts
         row = qt.QHBoxLayout(self)
         row.setContentsMargins(4, 0, 4, 0)
         self.label = qt.QLabel()
@@ -74,21 +67,37 @@ class Toast(qt.QWidget):
         self.dismiss.clicked.connect(self.acknowledge)
         self.timer = qt.QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self.hide)
+        self.timer.timeout.connect(self.advance)
         center.published.connect(self.present)
         self.hide()
 
     def present(self, notice):
+        if not self.accepts(notice):
+            return
+        if self.pending is not None and self.notice is not None:
+            self.pending.append(notice)
+            return
+        self.display(notice)
+
+    def display(self, notice):
         self.notice = notice
         self.label.setText(f'{notice.title}: {notice.message}')
         self.details.setVisible(callable(notice.activate))
         self.show()
         self.timer.start(6000)
 
+    def advance(self):
+        self.timer.stop()
+        self.notice = None
+        if self.pending:
+            self.display(self.pending.popleft())
+        else:
+            self.hide()
+
     def acknowledge(self):
         if self.notice:
             self.center.acknowledge(self.notice.id)
-        self.hide()
+        self.advance()
 
     def open_details(self):
         if self.notice and callable(self.notice.activate):
