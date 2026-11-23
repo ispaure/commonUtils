@@ -27,7 +27,7 @@ import unittest
 from unittest.mock import patch
 
 from commonUtils.filesystem.index import DirectoryCache
-from commonUtils.filesystem.index.coordinator import IndexCoordinator, runner_lock, _retry_sql
+from commonUtils.filesystem.index.coordinator import IndexCoordinator, runner_lock, _busy
 from commonUtils.runtime.operations import OperationCancelled
 
 
@@ -85,11 +85,16 @@ class CoordinatorTests(unittest.TestCase):
             if child is not None and child.poll() is not None:
                 _, errors = child.communicate()
                 self.fail(f'Index runner exited with {child.returncode}: {errors.decode(errors="replace")}')
-            # Match production follow(): short queue/schema lock contention is
-            # retried while the actual index writer remains serialized.
-            result = _retry_sql(predicate, cancelled=lambda: monotonic() >= deadline)
-            if result:
-                return result
+            # Poll the durable state until the fixture's deadline. Queue
+            # contention during a worker handoff can span several poll attempts.
+            try:
+                result = predicate()
+            except sqlite3.OperationalError as error:
+                if not _busy(error):
+                    raise
+            else:
+                if result:
+                    return result
             sleep(.03)
         try:
             with self.queue._connection() as db:
