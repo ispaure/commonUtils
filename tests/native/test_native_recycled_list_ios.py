@@ -304,8 +304,9 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         source = ast.parse(path.read_text())
         owner = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'IOSFileList')
         method = next(node for node in owner.body if isinstance(node, ast.FunctionDef) and node.name == 'source_change')
+        row_image = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == '_row_image')
         namespace = {}
-        exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
+        exec(compile(ast.Module(body=[row_image, method], type_ignores=[]), str(path), 'exec'), namespace)
         image = object()
         row = SimpleNamespace(index=0, icon=SimpleNamespace(_impl=SimpleNamespace(native=image)))
         cell = SimpleNamespace(imageView=SimpleNamespace(image=None), setNeedsLayout=Mock())
@@ -316,6 +317,15 @@ class IOSFileListLifecycleTests(unittest.TestCase):
         with patch.dict(sys.modules, {'toga_iOS.libs': libs}):
             namespace['source_change'](host, item=row)
             self.assertIs(cell.imageView.image, image)
+            native.reloadData.assert_not_called()
+            unchecked, checked = object(), object()
+            host.interface.selection_indicators = (unchecked, checked)
+            host.interface.checked_indices = {0}
+            namespace['source_change'](host, item=row)
+            self.assertIs(cell.imageView.image, checked)
+            host.interface.checked_indices.clear()
+            namespace['source_change'](host, item=row)
+            self.assertIs(cell.imageView.image, unchecked)
             native.reloadData.assert_not_called()
             native.reset_mock()
             host.interface.data = [object()]
