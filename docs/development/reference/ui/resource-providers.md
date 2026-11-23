@@ -460,8 +460,11 @@ The default scan visits the full subtree; callers can explicitly set max_entries
 An optional `progress(SearchResult)` callback runs on the scanning thread with detached,
 incomplete snapshots. It publishes the first match immediately, then throttles
 updates to at most four per second. Callers marshal these snapshots to their UI loop;
-the returned result carries final completeness and errors. NativeBrowser publishes
-these matches while scanning continues and discards obsolete query results.
+the returned result carries final completeness and errors. A host can attach a
+`cache_phase` to progress produced by its provider and override
+`NativeBrowser.search_progress_text(result, visible_count)` to describe that phase.
+NativeBrowser keeps the progress label current while limiting result-tree rebuilds
+for large sets. It renders final results immediately and discards obsolete queries.
 An optional provider search_entries(directory, cancelled=...) iterator supplies a
 recursive listing directly; its rows must stay strictly beneath the requested
 directory. Partial or failed listings must not be presented as complete.

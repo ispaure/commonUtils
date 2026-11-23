@@ -206,17 +206,25 @@ class NativeBrowser:
             return
         loop = asyncio.get_running_loop()
         published = -1
+        last_results_render = None
         self.searching = True
         self.render()
         self.page_label.text = 'Searching subfolders…'
         def publish(result, *, finished=False):
-            nonlocal published
+            nonlocal published, last_results_render
             if not current():
                 return
             self.searching = not finished
             cached = getattr(result, 'cached', False)
-            rows = [row for row in result.rows if not cached or row['path'] not in self._dismissed_cached_paths]
-            if len(rows) != published or finished:
+            rows = ([row for row in result.rows if row['path'] not in self._dismissed_cached_paths]
+                    if cached and self._dismissed_cached_paths else result.rows)
+            now = monotonic()
+            # Keep counts live without rebuilding a large result tree on every
+            # worker tick. The first page and the final results still publish promptly.
+            update_rows = (len(rows) != published and
+                           (len(rows) <= 2 * self.page_size or last_results_render is None
+                            or now - last_results_render >= .75))
+            if update_rows or finished:
                 root = provider.root / provider.relative(directory)
                 tree = BrowseTree(BrowseEntry(root, root.name, True), max_entries=len(rows) + 1)
                 from pathlib import PurePosixPath
@@ -224,16 +232,15 @@ class NativeBrowser:
                     [dict(row, name=PurePosixPath(row['path']).name) for row in rows]))
                 self.set_tree(tree, preserve=published >= 0)
                 published = len(rows)
+                last_results_render = now
             elif finished and not result.rows:
                 self.render()
             if finished:
                 self.page_label.text = f'{len(result.rows)} matches'
                 if not result.complete:
                     self.page_label.text += ' · Partial results'
-            elif cached:
-                self.page_label.text = f'{len(rows)} cached matches · Checking…'
             else:
-                self.page_label.text = f'Searching… {len(result.rows)} found · {result.scanned} checked'
+                self.page_label.text = self.search_progress_text(result, len(rows))
         def progress(result):
             loop.call_soon_threadsafe(publish, result)
         try:
@@ -251,6 +258,11 @@ class NativeBrowser:
         finally:
             if current():
                 self.searching = False
+
+    def search_progress_text(self, result, visible_count):
+        if getattr(result, 'cached', False):
+            return f'{visible_count} cached matches · Checking…'
+        return f'Searching… {len(result.rows)} found · {result.scanned} checked'
 
     async def go_back(self, widget=None, **kwargs):
         if self.closed or self.navigation_busy or not self.on_navigate or self.history.previous() is None:
