@@ -111,11 +111,20 @@ def _new_file_cell():
         UITableViewCellStyleSubtitle, reuseIdentifier='file-row')
 
 
+def _row_image(interface, row):
+    indicators = getattr(interface, 'selection_indicators', None)
+    if indicators is not None:
+        return indicators[row.index in interface.checked_indices]
+    return row.icon._impl.native if row.icon is not None else None
+
+
 def _bind_actions(interface, cell, row):
     """A visible contextual control; a normal row tap continues to open."""
     apple_color = interface.appearance.apple_color
-    if (not getattr(interface, '_primary_action', None)
+    if (getattr(interface, 'selection_indicators', None) is not None
+            or not getattr(interface, '_primary_action', None)
             or not getattr(getattr(interface, '_impl', None), 'primary_action_enabled', False)):
+        _clear_actions(cell)
         cell.accessoryView = None
         return
     global _row_action_type
@@ -222,7 +231,7 @@ def _bind_file_cell(interface, cell, index):
     row = interface.data[index]
     cell.textLabel.text = row.title
     cell.detailTextLabel.text = row.subtitle
-    cell.imageView.image = row.icon._impl.native if row.icon is not None else None
+    cell.imageView.image = _row_image(interface, row)
     cell.accessoryType = 1 if row.folder else 0
     cell.textLabel.lineBreakMode = 5  # Middle truncation for the standard cell.
     if interface.appearance.title_lines == 2 and cell.wrapping_title is None:
@@ -234,7 +243,13 @@ def _bind_file_cell(interface, cell, index):
         cell.contentView.addSubview(label)
         cell.wrapping_title = label
         cell.textLabel.alpha = 0
+    selecting = getattr(interface, 'selection_indicators', None) is not None
+    cell.isAccessibilityElement = selecting
     cell.accessibilityLabel = row.title + ('. Folder' if row.folder else '. ' + interface.row_kind)
+    if selecting:
+        cell.accessibilityValue = 'Selected' if row.index in interface.checked_indices else 'Not selected'
+    else:
+        cell.accessibilityValue = None
     cell.backgroundColor = apple_color('surface')
     cell.selectedBackgroundView.backgroundColor = apple_color('hover')
     # Only the outer corners belong to the group; recycled middle cells must
@@ -255,7 +270,7 @@ def _bind_file_cell(interface, cell, index):
     _bind_actions(interface, cell, row)
     interface.row_visible(index)
     # A cached visible-row callback may have supplied its image synchronously.
-    cell.imageView.image = row.icon._impl.native if row.icon is not None else None
+    cell.imageView.image = _row_image(interface, row)
     if getattr(interface, 'tree_actions', None) is not None:
         from .recycled_tree_ios import bind
         interface._impl._tree_cells[cell.ptr.value] = cell
@@ -350,8 +365,18 @@ class IOSFileList(DetailedList):
         from toga_iOS.libs import NSIndexPath
         cell = self.native.cellForRowAtIndexPath(NSIndexPath.indexPathForRow(item.index, inSection=0))
         if cell is not None:
-            cell.imageView.image = item.icon._impl.native if item.icon is not None else None
+            cell.imageView.image = _row_image(self.interface, item)
             cell.setNeedsLayout()
+
+    def refresh_selection_indicators(self, indices=None):
+        paths = self.native.indexPathsForVisibleRows
+        for path in paths if paths is not None else ():
+            index = int(path.row)
+            if (indices is None or index in indices) and 0 <= index < len(self.interface.data):
+                cell = self.native.cellForRowAtIndexPath(path)
+                if cell is not None:
+                    _bind_file_cell(self.interface, cell, index)
+                    cell.setNeedsLayout()
 
     def get_vertical_position(self):
         return max(0, float(self.native.contentOffset.y + self.native.adjustedContentInset.top))

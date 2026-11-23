@@ -69,6 +69,16 @@ public final class FileListView extends ListView {
     private int createdRows;
     private boolean observeRows;
     private boolean contextActions;
+    private boolean selectionIndicators;
+    private Bitmap uncheckedIcon, checkedIcon;
+
+    public void setSelectionIndicators(boolean active, Bitmap unchecked, Bitmap checked) {
+        selectionIndicators = active;
+        uncheckedIcon = unchecked;
+        checkedIcon = checked;
+        invalidateViews();
+    }
+
     private String rowKind = "File";
     private int textColor, mutedColor, surfaceColor, selectedTextColor, selectedColor, accentColor;
     private final Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -94,7 +104,7 @@ public final class FileListView extends ListView {
             if (listener != null) listener.onActivate(position, generation);
         });
         setOnItemLongClickListener((parent, view, position, id) -> {
-            if (!contextActions || !isEnabled()) return false;
+            if (!contextActions || selectionIndicators || !isEnabled()) return false;
             selectRow(position);
             if (listener != null) listener.onContext(position, generation);
             return true;
@@ -226,7 +236,7 @@ public final class FileListView extends ListView {
         if (visible >= 0 && visible < getChildCount()) {
             Holder holder = (Holder) getChildAt(visible).getTag();
             holder.preview = image != null;
-            holder.icon.setImageBitmap(image != null ? image : defaultIcon(index));
+            if (!selectionIndicators) holder.icon.setImageBitmap(image != null ? image : defaultIcon(index));
             paint(getChildAt(visible), isItemChecked(index));
         }
     }
@@ -326,7 +336,10 @@ public final class FileListView extends ListView {
         holder.subtitle.setTextColor(selected ? foreground : mutedColor);
         holder.actions.setTextColor(selected ? foreground : accentColor);
         if (holder.disclosure != null) holder.disclosure.setTextColor(selected ? foreground : accentColor);
-        if (holder.preview) holder.icon.clearColorFilter();
+        if (selectionIndicators) {
+            holder.icon.setImageBitmap(selected ? checkedIcon : uncheckedIcon);
+            holder.icon.setColorFilter(selected ? (outlined ? foreground : accentColor) : mutedColor);
+        } else if (holder.preview) holder.icon.clearColorFilter();
         else holder.icon.setColorFilter(entryIconColor != null && !outlined
             ? entryIconColor : selected ? foreground : accentColor);
     }
@@ -357,7 +370,7 @@ public final class FileListView extends ListView {
 
         @Override public boolean dispatchTouchEvent(MotionEvent event) {
             // The action owns a full row-height-wide slot, separate from the filename.
-            if (contextActions && FileListView.this.isEnabled() && actionTouch != null
+            if (contextActions && !selectionIndicators && FileListView.this.isEnabled() && actionTouch != null
                     && actionTouch.onTouchEvent(event)) return true;
             return super.dispatchTouchEvent(event);
         }
@@ -509,18 +522,20 @@ public final class FileListView extends ListView {
             holder.icon.setImageBitmap(thumbnails.get(position,
                     defaultIcon(position)));
             holder.preview = thumbnails.get(position) != null;
-            holder.actions.setVisibility(contextActions ? View.VISIBLE : View.GONE);
+            holder.actions.setVisibility(contextActions && !selectionIndicators ? View.VISIBLE : View.GONE);
             holder.actions.setContentDescription((depths.length > 0 ? "Actions for " : "Select ") + titles[position]);
             final int revision = generation;
             holder.actions.setOnClickListener(view -> {
-                if (contextActions && FileListView.this.isEnabled() && generation == revision && listener != null) {
+                if (contextActions && !selectionIndicators && FileListView.this.isEnabled() && generation == revision && listener != null) {
                     selectRow(position);
                     listener.onContext(position, revision);
                 }
             });
             recycled.setActivated(isItemChecked(position));
             paint(recycled, isItemChecked(position));
-            recycled.setContentDescription(titles[position] + (folders[position] ? ". Folder" : ". " + rowKind));
+            String identity = titles[position] + (folders[position] ? ". Folder" : ". " + rowKind);
+            if (selectionIndicators) identity += isItemChecked(position) ? ". Selected" : ". Not selected";
+            recycled.setContentDescription(identity);
             if (listener != null && observeRows) listener.onVisible(position, generation);
             return recycled;
         }
