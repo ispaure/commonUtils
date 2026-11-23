@@ -20,6 +20,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread, current_thread
 from time import sleep
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -269,6 +270,11 @@ class PersistentIndexTests(unittest.TestCase):
     def test_index_exceeds_old_entry_limit_without_loading_every_entry(self):
         count = 200_005
         info = (self.root / 'aaa' / 'file.txt').lstat()
+        # The virtual names have no filesystem allocation to query.
+        # Supply the synthetic metadata up front even on hosts without st_blocks.
+        fields = ('st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+        info = SimpleNamespace(**{name: getattr(info, name) for name in fields},
+                               st_blocks=getattr(info, 'st_blocks', None) or 0)
         original_stat = Path.lstat
         class Child:
             def __init__(self, index):
