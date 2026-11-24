@@ -54,7 +54,7 @@ class BrowserLifecycle:
                 if key not in valid:
                     del cache[key]
 
-    async def thumbnail(self, entry, loader, publish, *, epoch, cancelled):
+    async def thumbnail(self, entry, loader, publish, *, epoch, cancelled, cache=True):
         if isinstance(entry.payload, dict) and entry.payload.get('cached'):
             return  # Provisional rows use generic icons until their validation pass.
         if self.slots is None:
@@ -65,6 +65,9 @@ class BrowserLifecycle:
             try:
                 data = await asyncio.to_thread(loader, entry.payload, (160, 160), cancelled.is_set)
                 if data and not self.closed and not cancelled.is_set() and epoch == self.epoch:
+                    if not cache:
+                        publish(data)
+                        return
                     key = entry.identity, entry.revision
                     self.encoded[key] = data
                     self.encoded.move_to_end(key)

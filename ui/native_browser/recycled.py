@@ -299,15 +299,16 @@ class RecycledBrowser(NativeBrowser):
                     and entry.identity in self._list_rows)
         return entry.identity in self.buttons
 
-    def _set_row_thumbnail(self, row, image):
+    def _set_row_thumbnail(self, row, image, *, cache=True):
         key = row.entry.identity, row.entry.revision
-        decoded = self.work.decoded.get(key)
+        decoded = self.work.decoded.get(key) if cache else None
         if decoded is None:
             decoded = thumbnail_image(image, size=self.native_list.icon_size)
+        if cache:
             self.work.decoded[key] = decoded
-        self.work.decoded.move_to_end(key)
-        while len(self.work.decoded) > 64:
-            self.work.decoded.popitem(last=False)
+            self.work.decoded.move_to_end(key)
+            while len(self.work.decoded) > 64:
+                self.work.decoded.popitem(last=False)
         row.thumbnail = True
         row.icon = decoded
         self._list_thumbnail_rows[row.entry.identity] = row
@@ -379,6 +380,7 @@ class RecycledBrowser(NativeBrowser):
 
     TILE_ROW_HEIGHT = 164
     TILE_OVERSCAN = 2
+    tile_columns = 2
 
     def _clear_tiles(self):
         restore = getattr(self, '_tile_restore', None)
@@ -398,7 +400,7 @@ class RecycledBrowser(NativeBrowser):
             for child in list(self.items.children):
                 self.items.remove(child)
 
-    def _render_tiles(self):
+    def _render_tiles(self, position=0):
         if self.closed:
             return
         self._cancel()
@@ -413,7 +415,7 @@ class RecycledBrowser(NativeBrowser):
         if not self._tile_entries:
             self._tile_rows.add(toga.Label('No matching items.' if self.search.value else 'This folder is empty.'))
         else:
-            self._update_tile_window(0)
+            self._update_tile_window(position)
         self.page_label.text = ''
 
     def _tile_scrolled(self, widget, **kwargs):
@@ -423,7 +425,8 @@ class RecycledBrowser(NativeBrowser):
 
     def _update_tile_window(self, position):
         entries = self._tile_entries
-        total = (len(entries) + 1) // 2
+        columns = self.tile_columns
+        total = (len(entries) + columns - 1) // columns
         if not total:
             return
         height = self._tile_scroll.layout.content_height or self._app.main_window.size.height or 640
@@ -439,7 +442,8 @@ class RecycledBrowser(NativeBrowser):
         try:
             for row_index in set(self._tile_row_views) - set(range(start, end)):
                 self._tile_rows.remove(self._tile_row_views.pop(row_index))
-                for entry in entries[row_index * 2:row_index * 2 + 2]:
+                first = row_index * columns
+                for entry in entries[first:first + columns]:
                     self._retire_tile(entry.identity)
             self._tile_top.style.height = start * self.TILE_ROW_HEIGHT
             self._tile_bottom.style.height = (total - end) * self.TILE_ROW_HEIGHT
@@ -447,10 +451,11 @@ class RecycledBrowser(NativeBrowser):
                 if row_index in self._tile_row_views:
                     continue
                 row = toga.Box(style=Pack(direction=ROW, height=self.TILE_ROW_HEIGHT))
-                for entry in entries[row_index * 2:row_index * 2 + 2]:
+                first = row_index * columns
+                for entry in entries[first:first + columns]:
                     row.add(self._tile_card(entry))
-                if len(row.children) == 1:
-                    row.add(toga.Box(style=Pack(flex=1)))
+                if len(row.children) < columns:
+                    row.add(toga.Box(style=Pack(flex=columns - len(row.children))))
                 self._tile_row_views[row_index] = row
                 self._tile_rows.insert(offset, row)
             self.highlight_selection()

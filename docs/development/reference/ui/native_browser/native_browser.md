@@ -13,7 +13,9 @@ and paginated presentation modules still require their native toolkit.
 
 Import `RecycledBrowser` and `BrowserPresentation` from
 `commonUtils.ui.native_browser.recycled` for a continuous native list and
-viewport-limited two-column tiles. The existing `NativeBrowser` retains its
+viewport-limited tiles with two columns by default. Consumers can set
+`tile_columns` and rebuild the tile window at a new scroll position when the
+viewport changes. The existing `NativeBrowser` retains its
 paginated presentation. Both consume the same provider snapshots and search model.
 
 ```python
@@ -58,6 +60,8 @@ late results. These limits bound widgets/images, not the complete row inventory.
 
 `lifecycle.BrowserLifecycle` owns thumbnail epochs,
 cooperative cancellation, retained async tasks and encoded/decoded caches.
+Hosts with private content can pass `cache=False` when loading a thumbnail
+and publishing a row icon, keeping only the visible widget's image.
 `paginated.PaginatedRenderer` builds bounded widget pages; `RecycledBrowser`
 provides native recycled rows and bounded tiles. Rendering policy stays separate
 while both use the same worker and revision lifetime.
