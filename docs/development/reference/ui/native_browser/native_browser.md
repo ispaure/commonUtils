@@ -95,6 +95,14 @@ storage leases merely because rows disappeared. For a memory trim,
 also release their own displayed image references when appropriate. Stop/close
 remain the retirement path.
 
+## Row action captions
+
+Native list rows may supply `accessory_caption=(text, color_role)` for a short
+status above the trailing action. Updating that field on a live data row
+repaints the accessory without rebuilding the listing. Use an empty string to
+clear a caption. The action keeps its existing hit target and includes the
+caption in its accessible name.
+
 ## Hidden item appearance
 
 Recycled lists and tiles use a provider's `hidden` flag or a dot-prefixed

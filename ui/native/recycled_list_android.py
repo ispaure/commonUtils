@@ -109,6 +109,16 @@ class AndroidFileList(Widget):
         self.native.setPalette(*[Color.parseColor(value) for value in
             (colors['text'], colors['muted'], colors['surface'], selected_text, selected_fill,
              colors['accent'], colors['border'])], appearance.high_contrast())
+        self.colors = colors
+        for row in getattr(self.interface, 'data', None) or ():
+            if getattr(row, 'accessory_caption', None) is not None:
+                self._accessory_caption(row)
+
+    def _accessory_caption(self, row):
+        from android.graphics import Color
+        caption, role = row.accessory_caption
+        self.native.setRowAccessoryCaption(row.index, caption,
+            Color.parseColor(self.colors.get(role, self.colors['muted'])), self.generation)
 
     def change_source(self, source):
         actions = getattr(self.interface, 'tree_actions', None)
@@ -132,11 +142,15 @@ class AndroidFileList(Widget):
         for index, row in enumerate(source):
             if getattr(row, 'thumbnail', False):
                 self.native.setRowIcon(index, row.icon._impl.native, self.generation)
+            if getattr(row, 'accessory_caption', None) is not None:
+                self._accessory_caption(row)
 
     def source_change(self, *, item):
         if item.index < len(self.interface.data) and self.interface.data[item.index] is item:
             image = item.icon._impl.native if item.thumbnail else None
             self.native.setRowIcon(item.index, image, self.generation)
+            if getattr(item, 'accessory_caption', None) is not None:
+                self._accessory_caption(item)
 
     def source_insert(self, **kwargs):
         self.change_source(self.interface.data)

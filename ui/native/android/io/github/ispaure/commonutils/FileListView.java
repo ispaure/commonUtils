@@ -14,6 +14,12 @@ import android.graphics.RectF;
 import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.SparseArray;
+import android.util.SparseIntArray;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.TouchDelegate;
@@ -65,6 +71,8 @@ public final class FileListView extends ListView {
     private int generation;
     private Bitmap folderIcon, fileIcon;
     private final SparseArray<Bitmap> thumbnails = new SparseArray<>();
+    private final SparseArray<String> accessoryCaptions = new SparseArray<>();
+    private final SparseIntArray accessoryColors = new SparseIntArray();
     private final Rows rows = new Rows();
     private int createdRows;
     private boolean observeRows;
@@ -209,6 +217,8 @@ public final class FileListView extends ListView {
         landingIcon = null; dragToken = null;
         generation = revision;
         thumbnails.clear();
+        accessoryCaptions.clear();
+        accessoryColors.clear();
         clearChoices();
         rows.notifyDataSetChanged();
         setSelection(0);
@@ -239,6 +249,42 @@ public final class FileListView extends ListView {
             if (!selectionIndicators) holder.icon.setImageBitmap(image != null ? image : defaultIcon(index));
             paint(getChildAt(visible), isItemChecked(index));
         }
+    }
+
+    public void setRowAccessoryCaption(int index, String caption, int color, int revision) {
+        if (revision != generation || index < 0 || index >= titles.length) return;
+        if (caption.isEmpty()) {
+            accessoryCaptions.remove(index);
+            accessoryColors.delete(index);
+        } else {
+            accessoryCaptions.put(index, caption);
+            accessoryColors.put(index, color);
+        }
+        int visible = index - getFirstVisiblePosition();
+        if (visible >= 0 && visible < getChildCount()) {
+            Holder holder = (Holder) getChildAt(visible).getTag();
+            if (holder.index == index && holder.revision == revision) bindAccessoryCaption(holder, index);
+        }
+    }
+
+    private void bindAccessoryCaption(Holder holder, int index) {
+        String caption = accessoryCaptions.get(index);
+        String name = (depths.length > 0 ? "Actions for " : "Select ") + titles[index];
+        holder.actions.setIncludeFontPadding(caption == null);
+        holder.actions.setLineSpacing(caption == null ? 0 : -dp(4), 1f);
+        if (caption == null) {
+            holder.actions.setTextSize(24);
+            holder.actions.setText("⋯");
+        } else {
+            SpannableString text = new SpannableString(caption + "\n⋯");
+            text.setSpan(new ForegroundColorSpan(accessoryColors.get(index)), 0, caption.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, caption.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new AbsoluteSizeSpan(24, true), caption.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            holder.actions.setTextSize(12);
+            holder.actions.setText(text);
+            name += ", " + caption;
+        }
+        holder.actions.setContentDescription(name);
     }
 
     public void selectRow(int position) {
@@ -322,6 +368,7 @@ public final class FileListView extends ListView {
         holder.subtitle.setText("");
         holder.icon.setImageDrawable(null);
         holder.actions.setOnClickListener(null);
+        holder.actions.setText("");
         holder.actions.setContentDescription("");
         view.setContentDescription("");
     }
@@ -425,6 +472,7 @@ public final class FileListView extends ListView {
                 holder.actions = new Button(getContext(), null, android.R.attr.borderlessButtonStyle);
                 holder.actions.setText("⋯");
                 holder.actions.setTextSize(24);
+                holder.actions.setMaxLines(2);
                 holder.actions.setGravity(Gravity.CENTER);
                 holder.actions.setPadding(0, 0, 0, 0);
                 holder.actions.setMinWidth(0);
@@ -523,7 +571,7 @@ public final class FileListView extends ListView {
                     defaultIcon(position)));
             holder.preview = thumbnails.get(position) != null;
             holder.actions.setVisibility(contextActions && !selectionIndicators ? View.VISIBLE : View.GONE);
-            holder.actions.setContentDescription((depths.length > 0 ? "Actions for " : "Select ") + titles[position]);
+            bindAccessoryCaption(holder, position);
             final int revision = generation;
             holder.actions.setOnClickListener(view -> {
                 if (contextActions && !selectionIndicators && FileListView.this.isEnabled() && generation == revision && listener != null) {

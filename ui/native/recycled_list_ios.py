@@ -18,6 +18,7 @@ from toga_iOS.libs import UITableViewCell, UITableViewCellStyleSubtitle, UIView
 
 _row_action_type = None
 _file_cell_type = None
+_ACCESSORY_CAPTION_TAG = 9183
 
 
 def _superview(view):
@@ -118,6 +119,18 @@ def _row_image(interface, row):
     return row.icon._impl.native if row.icon is not None else None
 
 
+def _bind_accessory_caption(interface, button, row):
+    caption, role = getattr(row, 'accessory_caption', ('', 'muted'))
+    label = button.viewWithTag(_ACCESSORY_CAPTION_TAG)
+    label.text = caption
+    label.hidden = not caption
+    if caption:
+        label.textColor = interface.appearance.apple_color(role)
+    name = interface._primary_action + ' ' + row.title
+    button.accessibilityLabel = f'{name}, {caption}' if caption else name
+    button.setNeedsLayout()
+
+
 def _bind_actions(interface, cell, row):
     """A visible contextual control; a normal row tap continues to open."""
     apple_color = interface.appearance.apple_color
@@ -128,13 +141,29 @@ def _bind_actions(interface, cell, row):
         cell.accessoryView = None
         return
     global _row_action_type
-    from rubicon.objc import ObjCClass, objc_property, SEL, CGRect, CGPoint, Block, objc_id, ns_from_py
+    from rubicon.objc import ObjCClass, objc_property, SEL, CGRect, CGPoint, Block, objc_id, ns_from_py, send_super
     import weakref
     if _row_action_type is None:
         class FileRowAction(ObjCClass('UIButton')):
             owner = objc_property(object)
             row = objc_property(object)
             menu_provider_block = objc_property(object)
+
+            @objc_method
+            def layoutSubviews(self) -> None:
+                send_super(__class__, self, 'layoutSubviews')
+                label = self.viewWithTag(_ACCESSORY_CAPTION_TAG)
+                if label is None:
+                    return
+                middle = float(self.bounds.size.height) / 2
+                offset = 8 if not label.hidden else 0
+                if offset:
+                    height = 16
+                    label.frame = CGRect((0, middle - offset - height / 2), (self.bounds.size.width, height))
+                title = self.titleLabel
+                frame = title.frame
+                y = middle + offset - frame.size.height / 2
+                title.frame = CGRect((frame.origin.x, y), (frame.size.width, frame.size.height))
 
             @objc_method
             def pointInside_withEvent_(self, point: CGPoint, event: ObjCInstance) -> bool:
@@ -159,6 +188,13 @@ def _bind_actions(interface, cell, row):
         button = _row_action_type.alloc().initWithFrame(CGRect((0, 0), (width, height)))
         button.setTitle('⋯', forState=0)
         button.titleLabel.font = ObjCClass('UIFont').systemFontOfSize(24)
+        caption = ObjCClass('UILabel').alloc().init()
+        caption.tag = _ACCESSORY_CAPTION_TAG
+        caption.font = ObjCClass('UIFont').boldSystemFontOfSize(12)
+        caption.textAlignment = 1
+        caption.isAccessibilityElement = False
+        caption.userInteractionEnabled = False
+        button.addSubview(caption)
         button.addTarget(button, action=SEL('selectRow:'), forControlEvents=1 << 6)
         cell.accessoryView = button
     button.owner, button.row = weakref.ref(interface), row
@@ -190,7 +226,7 @@ def _bind_actions(interface, cell, row):
         button.menu = ObjCClass('UIMenu').menuWithTitle('', children=[deferred])
         button.showsMenuAsPrimaryAction = True
 
-    button.accessibilityLabel = interface._primary_action + ' ' + row.title
+    _bind_accessory_caption(interface, button, row)
     button.setTitleColor(apple_color('accent'), forState=0)
     button.enabled = interface.enabled
     cell.isAccessibilityElement = False
@@ -204,6 +240,9 @@ def _clear_actions(cell):
         button.showsMenuAsPrimaryAction = False
         button.menu_provider_block = None
         button.accessibilityLabel = ''
+        caption = button.viewWithTag(_ACCESSORY_CAPTION_TAG)
+        caption.text = ''
+        caption.hidden = True
 
 
 def _bind_separator(cell, *, last, color):
@@ -355,6 +394,9 @@ class IOSFileList(DetailedList):
         selection = self.interface.appearance.apple_color('hover')
         for cell in self.native.visibleCells:
             cell.selectedBackgroundView.backgroundColor = selection
+            button = cell.accessoryView
+            if button is not None and button.row is not None:
+                _bind_accessory_caption(self.interface, button, button.row)
 
     def set_enabled(self, enabled):
         self.native.userInteractionEnabled = bool(enabled)
@@ -366,6 +408,9 @@ class IOSFileList(DetailedList):
         cell = self.native.cellForRowAtIndexPath(NSIndexPath.indexPathForRow(item.index, inSection=0))
         if cell is not None:
             cell.imageView.image = _row_image(self.interface, item)
+            button = cell.accessoryView
+            if button is not None and button.row is item:
+                _bind_accessory_caption(self.interface, button, item)
             cell.setNeedsLayout()
 
     def refresh_selection_indicators(self, indices=None):
