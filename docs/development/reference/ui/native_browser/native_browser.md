@@ -61,6 +61,8 @@ cooperative cancellation, retained async tasks and encoded/decoded caches.
 `paginated.PaginatedRenderer` builds bounded widget pages; `RecycledBrowser`
 provides native recycled rows and bounded tiles. Rendering policy stays separate
 while both use the same worker and revision lifetime.
+Hosts can override `RecycledBrowser.TILE_OVERSCAN` to set the number of
+extra tile rows built on each side of the viewport. The default is two rows.
 
 Within `RecycledBrowser`, construction keeps callback, event-loop and renderer
 state admission together, then builds navigation controls and the listing.

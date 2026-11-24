@@ -378,6 +378,7 @@ class RecycledBrowser(NativeBrowser):
             self._item_menu = None
 
     TILE_ROW_HEIGHT = 164
+    TILE_OVERSCAN = 2
 
     def _clear_tiles(self):
         restore = getattr(self, '_tile_restore', None)
@@ -426,8 +427,10 @@ class RecycledBrowser(NativeBrowser):
         if not total:
             return
         height = self._tile_scroll.layout.content_height or self._app.main_window.size.height or 640
-        count = min(40, max(6, int(height / self.TILE_ROW_HEIGHT) + 5))
-        start = min(max(0, total - count), max(0, int(position / self.TILE_ROW_HEIGHT) - 2))
+        overscan = self.TILE_OVERSCAN
+        visible = max(2, int(height / self.TILE_ROW_HEIGHT) + 1)
+        count = min(40, visible + 2 * overscan)
+        start = min(max(0, total - count), max(0, int(position / self.TILE_ROW_HEIGHT) - overscan))
         end = min(total, start + count)
         if self._tile_range == (start, end):
             return
