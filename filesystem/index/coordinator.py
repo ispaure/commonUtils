@@ -295,7 +295,8 @@ class IndexCoordinator:
             job = _retry_sql(lambda: self.status(identity), cancelled)
             with self.cache._state_lock:
                 self.cache._shared_sources[root] = Path(job['root'])
-            report(job['done'], job['total'], job['message'])
+            message = 'Queued for indexing' if job['state'] == 'pending' else job['message']
+            report(job['done'], job['total'], message)
             if job['state'] == 'error':
                 raise IndexUnavailableError(job['error'])
             if job['state'] == 'done':

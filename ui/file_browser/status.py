@@ -36,6 +36,8 @@ def indexing_phase(message):
         return 'Optimizing saved index'
     if message.startswith('Preparing '):
         return 'Preparing file index'
+    if message == 'Queued for indexing':
+        return message
     if message.startswith('Waiting '):
         return 'Waiting for index writer'
     if message.startswith('Loading '):
